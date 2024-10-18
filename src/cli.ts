@@ -1,11 +1,27 @@
 import { Command } from "commander";
-import { FireflyApiClient } from "./api/client";
 import { AccountService } from "./services/accountService";
 import { getAccounts } from "./commands/getAccounts";
+import { FireflyApiClient, ApiClientConfig } from "./api/client";
+import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export const createCli = (): Command => {
   const program = new Command();
-  const apiClient = new FireflyApiClient();
+
+  const config: ApiClientConfig = {
+    baseUrl:
+      process.env.FIREFLY_API_URL || "https://your-firefly-instance.com/api/v1",
+    apiToken: process.env.FIREFLY_API_TOKEN || "",
+    caCertPath: path.resolve(__dirname, "../certs/ca.pem"),
+    clientCertPath: path.resolve(__dirname, "../certs/client.p12"),
+    clientCertPassword: process.env.CLIENT_CERT_PASSWORD,
+    rejectUnauthorized: false
+  };
+
+  const apiClient = new FireflyApiClient(config);
+
   const accountService = new AccountService(apiClient);
 
   program

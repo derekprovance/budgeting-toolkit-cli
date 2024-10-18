@@ -3,5 +3,5 @@ node_modules
 
 # Certificate files
 certs/
-*.crt
-*.key
+*.cer
+*.pem

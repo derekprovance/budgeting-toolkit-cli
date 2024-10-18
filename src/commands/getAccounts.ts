@@ -7,9 +7,6 @@ export const getAccounts = async (
     const accounts = await accountService.getAccounts();
     console.log(JSON.stringify(accounts, null, 2));
   } catch (error) {
-    console.error(
-      "Error fetching accounts:",
-      error instanceof Error ? error.message : JSON.stringify(error)
-    );
+    console.error("Error fetching accounts:", JSON.stringify(error));
   }
 };
