@@ -3,6 +3,7 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 import https from "https";
 import fs from "fs";
 import forge from "node-forge";
+import { logger } from "../logger";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -54,14 +55,14 @@ export class FireflyApiClient {
       }
 
       // Debug logging
-      console.log("CA certificate:", options.ca.substring(0, 100) + "...");
-      console.log(
+      logger.trace("CA certificate:", options.ca.substring(0, 100) + "...");
+      logger.trace(
         "Client certificate:",
         options.cert.substring(0, 100) + "..."
       );
-      console.log("Client key:", options.key.substring(0, 100) + "...");
+      logger.trace("Client key:", options.key.substring(0, 100) + "...");
     } catch (error) {
-      console.error(
+      logger.error(
         "Error setting up HTTPS agent:",
         this.getErrorMessage(error)
       );
@@ -74,8 +75,8 @@ export class FireflyApiClient {
   private readCertFile(filePath: string, fileType: CertificateType): string {
     try {
       const fileContent = fs.readFileSync(filePath, "utf8");
-      console.log(`Reading ${fileType} from ${filePath}`);
-      console.log(
+      logger.debug(`Reading ${fileType} from ${filePath}`);
+      logger.debug(
         `File content (first 100 chars): ${fileContent.substring(0, 100)}...`
       );
 
@@ -105,7 +106,7 @@ export class FireflyApiClient {
         forge.pki.oids.certBag
       ];
 
-      if(!certBags || !certBags[0].cert) {
+      if (!certBags || !certBags[0].cert) {
         throw new Error("CertBag not generated correctly");
       }
       const cert = forge.pki.certificateToPem(certBags[0].cert);
@@ -115,35 +116,39 @@ export class FireflyApiClient {
         bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
       })[forge.pki.oids.pkcs8ShroudedKeyBag];
 
-      if(!keyBags || !keyBags[0].key) {
+      if (!keyBags || !keyBags[0].key) {
         throw new Error("keyBags not generated correctly");
       }
       const key = forge.pki.privateKeyToPem(keyBags[0].key);
 
-      console.log("Successfully read P12 file");
+      logger.trace("Successfully read P12 file");
       return { cert, key };
     } catch (error) {
-      console.error("Error reading P12 file:", this.getErrorMessage(error));
+      logger.error("Error reading P12 file:", this.getErrorMessage(error));
       throw error;
     }
   }
 
-  private isValidCertificate(content: string, fileType: CertificateType): boolean {
-    const pemRegex = /-----BEGIN (?:CERTIFICATE|PRIVATE KEY)-----[\s\S]*?-----END (?:CERTIFICATE|PRIVATE KEY)-----/;
-    const isDER = content.includes('\0'); // DER-encoded files typically contain null bytes
-  
+  private isValidCertificate(
+    content: string,
+    fileType: CertificateType
+  ): boolean {
+    const pemRegex =
+      /-----BEGIN (?:CERTIFICATE|PRIVATE KEY)-----[\s\S]*?-----END (?:CERTIFICATE|PRIVATE KEY)-----/;
+    const isDER = content.includes("\0"); // DER-encoded files typically contain null bytes
+
     if (pemRegex.test(content)) {
-      console.log(`${fileType} appears to be in PEM format`);
+      logger.trace(`${fileType} appears to be in PEM format`);
       return true;
     } else if (isDER) {
-      console.log(`${fileType} appears to be in DER format`);
+      logger.trace(`${fileType} appears to be in DER format`);
       return true;
-    } else if (content === 'mock-pem-content') {
+    } else if (content === "mock-pem-content") {
       // Special case for our mocked content in tests
-      console.log(`${fileType} is mocked content`);
+      logger.trace(`${fileType} is mocked content`);
       return true;
     } else {
-      console.log(`${fileType} format could not be determined`);
+      logger.trace(`${fileType} format could not be determined`);
       return false;
     }
   }
@@ -171,16 +176,16 @@ export class FireflyApiClient {
   private handleApiError(error: unknown): void {
     if (axios.isAxiosError(error)) {
       if (error.response) {
-        console.error("API error:", error.response.status, error.response.data);
+        logger.error("API error:", error.response.status, error.response.data);
       } else if (error.request) {
-        console.error("No response received:", error.message);
+        logger.error("No response received:", error.message);
       } else {
-        console.error("Error setting up request:", error.message);
+        logger.error("Error setting up request:", error.message);
       }
     } else if (error instanceof Error) {
-      console.error("Unexpected error:", error.message);
+      logger.error("Unexpected error:", error.message);
     } else {
-      console.error("Unknown error:", error);
+      logger.error("Unknown error:", error);
     }
   }
 

@@ -1,3 +1,4 @@
+import { logger } from "../logger";
 import { AccountService } from "../services/accountService";
 
 export const getAccounts = async (
@@ -5,8 +6,9 @@ export const getAccounts = async (
 ): Promise<void> => {
   try {
     const accounts = await accountService.getAccounts();
+    //TODO - think about the console export
     console.log(JSON.stringify(accounts, null, 2));
   } catch (error) {
-    console.error("Error fetching accounts:", JSON.stringify(error));
+    logger.error("Error fetching accounts:", JSON.stringify(error));
   }
 };
