@@ -1,5 +1,5 @@
 import { logger } from "../logger";
-import { AccountService } from "../services/accountService";
+import { AccountService } from "../services/account.service";
 
 export const getAccounts = async (
   accountService: AccountService

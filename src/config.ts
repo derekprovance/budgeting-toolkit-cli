@@ -15,3 +15,25 @@ export const config: ApiClientConfig = {
 };
 
 export const logLevel: string = process.env.LOG_LEVEL || "info";
+
+export enum Account {
+  PRIMARY = "1",
+  DISPOSABLE = "13",
+  SAVINGS = "2",
+  MONEY_MARKET = "27",
+  CHASE_AMAZON = "8",
+  CHASE_SAPPHIRE = "11",
+  CITIBANK_DOUBLECASH = "14",
+}
+
+export enum ExpenseAccount {
+  NO_NAME = "5",
+}
+
+export enum Tag {
+  DISPOSABLE_INCOME = "Disposable Income",
+}
+
+export enum Category {
+  BILLS_UTILITIES = "2",
+}

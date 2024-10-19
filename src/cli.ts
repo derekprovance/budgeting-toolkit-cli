@@ -1,10 +1,13 @@
 import { Command, Option } from "commander";
-import { AccountService } from "./services/accountService";
+import { AccountService } from "./services/account.service";
 import { getAccounts } from "./commands/getAccounts";
 import { FireflyApiClient, ApiClientConfig } from "./api/client";
-import { UnbudgetedExpenseService } from "./services/unbudgetedExpenseService";
+import { UnbudgetedExpenseService } from "./services/unbudgetedExpense.service";
 import { getUnbudgetedExpenses } from "./commands/getUnbudgetedExpenses";
 import { config } from "./config";
+import { TransactionService } from "./services/transaction.service";
+import { AdditionalIncomeService } from "./services/additionalIncome.service";
+import { getAdditionalIncome } from "./commands/getAdditionalIncome";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -12,7 +15,11 @@ export const createCli = (): Command => {
   const apiClient = new FireflyApiClient(config);
 
   const accountService = new AccountService(apiClient);
-  const unbudgetedExpenseService = new UnbudgetedExpenseService(apiClient);
+  const transactionService = new TransactionService(apiClient);
+  const additionalIncomeService = new AdditionalIncomeService(transactionService);
+  const unbudgetedExpenseService = new UnbudgetedExpenseService(
+    transactionService
+  );
 
   program
     .name("firefly-cli")
@@ -27,8 +34,26 @@ export const createCli = (): Command => {
   program
     .command("get-unbudgeted")
     .description("Get all unbudgeted expenses")
-    .addOption(new Option('-m, --month <month>', 'a month must be specified <int>').argParser(parseInt).makeOptionMandatory())
-    .action((opts) => getUnbudgetedExpenses(unbudgetedExpenseService, opts.month));
+    .addOption(
+      new Option("-m, --month <month>", "a month must be specified <int>")
+        .argParser(parseInt)
+        .makeOptionMandatory()
+    )
+    .action((opts) =>
+      getUnbudgetedExpenses(unbudgetedExpenseService, opts.month)
+    );
+
+  program
+    .command("get-additional")
+    .description("Get all additional income")
+    .addOption(
+      new Option("-m, --month <month>", "a month must be specified <int>")
+        .argParser(parseInt)
+        .makeOptionMandatory()
+    )
+    .action((opts) =>
+      getAdditionalIncome(additionalIncomeService, opts.month)
+    );
 
   return program;
 };

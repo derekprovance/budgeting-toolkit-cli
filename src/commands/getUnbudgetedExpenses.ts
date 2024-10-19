@@ -1,5 +1,5 @@
 import { logger } from "../logger";
-import { UnbudgetedExpenseService } from "../services/unbudgetedExpenseService";
+import { UnbudgetedExpenseService } from "../services/unbudgetedExpense.service";
 
 export const getUnbudgetedExpenses = async (
   unbudgetedExpenseService: UnbudgetedExpenseService,
@@ -8,6 +8,8 @@ export const getUnbudgetedExpenses = async (
   try {
     const unbudgetedExpenses =
       await unbudgetedExpenseService.getUnbudgetedExpenses(queryMonth);
+
+      console.log(unbudgetedExpenses);
   } catch (ex) {
     if(ex instanceof Error) {
         logger.error("Failed to get unbudgeted expenses", ex.message);
