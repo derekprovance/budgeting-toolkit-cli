@@ -1,4 +1,5 @@
 import { TransactionSplit } from "firefly-iii-sdk";
+import { logger } from "../logger";
 
 interface LineItem {
   description: string;
@@ -13,11 +14,16 @@ interface Report {
 
 export class PrinterService {
   private static readonly DESCRIPTION_PADDING = 3;
+  private static readonly TOTAL_DESCRIPTION_OUTPUT = "= Total: ";
 
   static printTransactions(
     transactions: TransactionSplit[],
     title?: string
   ): void {
+    if(!transactions) {
+      console.log(`No results were returned.`)
+    }
+
     const report = this.createReport(transactions);
 
     const maxDescriptionSize = this.calculateMaxDescription(report.items);
@@ -43,22 +49,21 @@ export class PrinterService {
   }
 
   private static generateTotalOutput(maxLength: number, total: number) {
-    const totalDescription = "= Total: ";
     const formattedTotal = this.formatCurrency(total);
 
-    return `${totalDescription.padEnd(
-      maxLength - totalDescription.length - 2
+    return `${this.TOTAL_DESCRIPTION_OUTPUT.padEnd(
+      maxLength - this.TOTAL_DESCRIPTION_OUTPUT.length - 2
     )}${formattedTotal} =\n`;
   }
 
   private static createTitle(maxLength: number, title: string): string {
-    const totalPadding = maxLength - title.length - 2; // Space for borders
+    const totalPadding = maxLength - title.length - 2;
     const leftPadding = Math.floor(totalPadding / 2);
 
     // Clearer approach
     const centeredTitle = title
-      .padStart(title.length - 1 + leftPadding) // Add left padding
-      .padEnd(maxLength - 3); // Fill to final width (minus borders)
+      .padStart(title.length - 1 + leftPadding)
+      .padEnd(maxLength - 2);
 
     return `=${centeredTitle}=\n`;
   }
@@ -93,7 +98,7 @@ export class PrinterService {
 
     transactions.forEach((item) => {
       const lineItem: LineItem = {
-        description: item.description,
+        description: item.description?.trim() || "[No Description]",
         amount: Number(item.amount),
         formattedAmount: this.formatCurrency(item.amount),
       };
@@ -115,13 +120,6 @@ export class PrinterService {
   }
 
   private static calculateTotal(transactions: TransactionSplit[]): number {
-    let total = 0;
-
-    for (let i = 0; i < transactions.length; i++) {
-      const transaction = transactions[i];
-      total += Number(transaction.amount);
-    }
-
-    return total;
+    return transactions.reduce((sum, t) => sum + Number(t.amount), 0);
   }
 }
