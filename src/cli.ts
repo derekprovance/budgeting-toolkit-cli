@@ -2,11 +2,11 @@ import { Command, Option } from "commander";
 import { AccountService } from "./services/account.service";
 import { getAccounts } from "./commands/getAccounts";
 import { FireflyApiClient, ApiClientConfig } from "./api/client";
-import { UnbudgetedExpenseService } from "./services/unbudgetedExpense.service";
+import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
 import { getUnbudgetedExpenses } from "./commands/getUnbudgetedExpenses";
 import { config } from "./config";
 import { TransactionService } from "./services/transaction.service";
-import { AdditionalIncomeService } from "./services/additionalIncome.service";
+import { AdditionalIncomeService } from "./services/additional-income.service";
 import { getAdditionalIncome } from "./commands/getAdditionalIncome";
 
 export const createCli = (): Command => {

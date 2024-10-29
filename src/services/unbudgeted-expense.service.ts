@@ -1,24 +1,18 @@
 import { TransactionSplit } from "firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
 import { Account, Category, ExpenseAccount, Tag } from "../config";
-import { UnbudgetedExpenseSummary } from "../dto/UnbudgetedExpenseSummary.dto";
+import { PrinterService } from "./printer.service";
 
 export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}
 
-  async getUnbudgetedExpenses(month: number): Promise<UnbudgetedExpenseSummary> {
+  async getUnbudgetedExpenses(month: number): Promise<void> {
     const transactions = await this.transactionService.getTransactionsForMonth(
       month
     );
     const filteredTransactions = this.filterExpenses(transactions);
-    const descriptions = filteredTransactions.map(
-      (t) => `${t.description}, $${t.amount}`
-    );
 
-    return {
-      total: `$${this.transactionService.calculateTotal(filteredTransactions).toFixed(2)}`,
-      transactions: descriptions,
-    };
+    PrinterService.printTransactions(filteredTransactions, 'Unbudgeted Expenses');
   }
 
   private filterExpenses(transactions: TransactionSplit[]) {
@@ -32,9 +26,14 @@ export class UnbudgetedExpenseService {
       (!transaction.budget_id &&
         this.hasNoDestination(transaction.destination_id) &&
         !this.isSupplementedByDisposable(transaction.tags) &&
+        !this.isVanguard(transaction.description) &&
         this.isExpenseAccount(transaction.source_id)) ||
       transaction.category_id == Category.BILLS_UTILITIES
     );
+  }
+
+  private isVanguard(description: string): boolean {
+    return description === "VANGUARD BUY INVESTMENT"
   }
 
   private hasNoDestination(destinationId: string | null) {

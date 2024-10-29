@@ -1,8 +1,8 @@
-import { AdditionalIncomeService } from "../services/additionalIncome.service";
+import { AdditionalIncomeService } from "../services/additional-income.service";
 
 export const getAdditionalIncome = async (
   additionalIncomeService: AdditionalIncomeService,
   month: number
 ) => {
-    await additionalIncomeService.getAdditionalIncome(month);
+  await additionalIncomeService.getAdditionalIncome(month);
 };

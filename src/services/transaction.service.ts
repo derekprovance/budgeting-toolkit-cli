@@ -17,17 +17,6 @@ export class TransactionService {
     return this.flattenTransactionsResults(transactions.data);
   }
 
-  calculateTotal(transactions: TransactionSplit[]): number {
-    let total = 0;
-
-    for (let i = 0; i < transactions.length; i++) {
-      const transaction = transactions[i];
-      total += Number(transaction.amount);
-    }
-
-    return total;
-  }
-
   private flattenTransactionsResults(
     transactions: TransactionRead[]
   ): TransactionSplit[] {

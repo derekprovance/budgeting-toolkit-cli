@@ -1,20 +1,17 @@
 import { logger } from "../logger";
-import { UnbudgetedExpenseService } from "../services/unbudgetedExpense.service";
+import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
 
 export const getUnbudgetedExpenses = async (
   unbudgetedExpenseService: UnbudgetedExpenseService,
   queryMonth: number
 ): Promise<void> => {
   try {
-    const unbudgetedExpenses =
-      await unbudgetedExpenseService.getUnbudgetedExpenses(queryMonth);
-
-      console.log(unbudgetedExpenses);
+    await unbudgetedExpenseService.getUnbudgetedExpenses(queryMonth);
   } catch (ex) {
-    if(ex instanceof Error) {
-        logger.error("Failed to get unbudgeted expenses", ex.message);
+    if (ex instanceof Error) {
+      logger.error("Failed to get unbudgeted expenses", ex.message);
     } else {
-        logger.fatal("Unknown Error: Unbudgeted Expense", ex);
+      logger.fatal("Unknown Error: Unbudgeted Expense", ex);
     }
   }
 };
