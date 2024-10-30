@@ -41,3 +41,8 @@ export enum Tag {
 export enum Category {
   BILLS_UTILITIES = "2",
 }
+
+export enum Description {
+  PAYROLL = "PAYROLL",
+  VANGUARD_INVESTMENT = "VANGUARD BUY INVESTMENT",
+}

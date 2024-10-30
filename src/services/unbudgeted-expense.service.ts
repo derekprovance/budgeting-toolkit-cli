@@ -1,6 +1,6 @@
 import { TransactionSplit } from "firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
-import { Account, Category, ExpenseAccount, Tag } from "../config";
+import { Account, Category, Description, ExpenseAccount, Tag } from "../config";
 import { PrinterService } from "./printer.service";
 
 export class UnbudgetedExpenseService {
@@ -36,7 +36,7 @@ export class UnbudgetedExpenseService {
   }
 
   private isVanguard(description: string): boolean {
-    return description === "VANGUARD BUY INVESTMENT";
+    return description === Description.VANGUARD_INVESTMENT;
   }
 
   private hasNoDestination(destinationId: string | null) {
@@ -52,12 +52,11 @@ export class UnbudgetedExpenseService {
       return false;
     }
 
-    const foobar = [
+    return [
       Account.CHASE_AMAZON.toString(),
       Account.CHASE_SAPPHIRE.toString(),
       Account.CITIBANK_DOUBLECASH.toString(),
       Account.PRIMARY.toString(),
     ].includes(sourceId);
-    return foobar;
   }
 }

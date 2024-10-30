@@ -1,6 +1,6 @@
-import { TransactionSplit } from "firefly-iii-sdk";
+import { TransactionSplit, TransactionTypeProperty } from "firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
-import { Account } from "../config";
+import { Account, Description } from "../config";
 import { PrinterService } from "./printer.service";
 
 export class AdditionalIncomeService {
@@ -18,7 +18,7 @@ export class AdditionalIncomeService {
   }
 
   private filterDeposits(transactions: TransactionSplit[]) {
-    return transactions.filter((transaction) => transaction.type === "deposit");
+    return transactions.filter((transaction) => transaction.type === TransactionTypeProperty.DEPOSIT);
   }
 
   private filterAccounts(transactions: TransactionSplit[]): TransactionSplit[] {
@@ -36,7 +36,7 @@ export class AdditionalIncomeService {
 
   private filterIncome(transactions: TransactionSplit[]): TransactionSplit[] {
     return transactions.filter(
-      (transaction) => !transaction.description.includes("PAYROLL")
+      (transaction) => !transaction.description.includes(Description.PAYROLL)
     );
   }
 }
