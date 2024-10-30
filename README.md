@@ -1,6 +1,6 @@
 # Firefly III CLI
 
-A command-line interface (CLI) for interacting with the Firefly III Personal Finance Manager API. This CLI allows you to perform various operations such as fetching accounts and creating transactions directly from your terminal.
+A opinionated command-line interface (CLI) for interacting with the Firefly III Personal Finance Manager API. This CLI allows you to perform various budget related operations.
 
 ## Features
 
@@ -31,16 +31,10 @@ Before you begin, ensure you have met the following requirements:
    npm install
    ```
 
-3. Create a `.env` file in the project root and add the following environment variables:
+3. Copy the `.env.example` file in the project root and replace the values with your actual Firefly III API URL, API token, and paths to your certificate files.
    ```
-   FIREFLY_API_URL=https://your-firefly-instance.com/api/v1
-   FIREFLY_API_TOKEN=your_api_token_here
-   CLIENT_CERT_PATH=/path/to/your/client.crt
-   CLIENT_KEY_PATH=/path/to/your/client.key
-   CA_CERT_PATH=/path/to/your/ca.crt
+   cp .env.example .env
    ```
-
-   Replace the values with your actual Firefly III API URL, API token, and paths to your certificate files.
 
 ## Usage
 
@@ -55,8 +49,16 @@ Available commands:
 1. Get all accounts:
    ```
    npm start -- get-accounts
+
+2. Get unbudgeted transactions:
    ```
-2. Test the connection to Firefly III API:
+   npm start -- get-unbudgeted
+
+3. Get additional income transactions:
+   ```
+   npm start -- get-additional
+   ```
+4. Test the connection to Firefly III API:
    ```
    npm start -- test-connection
    ```
