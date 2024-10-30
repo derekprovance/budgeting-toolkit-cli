@@ -46,21 +46,13 @@ npm start -- [command] [options]
 
 Available commands:
 
-1. Get all accounts:
+1. Calculate unbudgeted transactions:
    ```
-   npm start -- get-accounts
+   npm start -- calculate-unbudgeted
 
-2. Get unbudgeted transactions:
+2. Calculate additional income transactions:
    ```
-   npm start -- get-unbudgeted
-
-3. Get additional income transactions:
-   ```
-   npm start -- get-additional
-   ```
-4. Test the connection to Firefly III API:
-   ```
-   npm start -- test-connection
+   npm start -- calculate-additional
    ```
 
 ## Development

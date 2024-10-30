@@ -1,5 +1,4 @@
 import { TransactionSplit } from "firefly-iii-sdk";
-import { logger } from "../logger";
 
 interface LineItem {
   description: string;
@@ -20,8 +19,8 @@ export class PrinterService {
     transactions: TransactionSplit[],
     title?: string
   ): void {
-    if(!transactions) {
-      console.log(`No results were returned.`)
+    if (!transactions) {
+      console.log(`No results were returned.`);
     }
 
     const report = this.createReport(transactions);

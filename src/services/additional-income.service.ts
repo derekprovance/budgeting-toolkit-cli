@@ -6,7 +6,7 @@ import { PrinterService } from "./printer.service";
 export class AdditionalIncomeService {
   constructor(private transactionService: TransactionService) {}
 
-  async getAdditionalIncome(month: number): Promise<void> {
+  async calculateAdditionalIncome(month: number): Promise<void> {
     const transactions = await this.transactionService.getTransactionsForMonth(
       month
     );
@@ -14,7 +14,7 @@ export class AdditionalIncomeService {
     filteredTransactions = this.filterDeposits(filteredTransactions);
     filteredTransactions = this.filterAccounts(filteredTransactions);
 
-    PrinterService.printTransactions(filteredTransactions, 'Additional Income');
+    PrinterService.printTransactions(filteredTransactions, "Additional Income");
   }
 
   private filterDeposits(transactions: TransactionSplit[]) {

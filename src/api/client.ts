@@ -1,5 +1,5 @@
 // src/api/client.ts
-import axios, { AxiosInstance, AxiosError } from "axios";
+import axios, { AxiosInstance } from "axios";
 import https from "https";
 import fs from "fs";
 import forge from "node-forge";
@@ -8,8 +8,8 @@ import { logger } from "../logger";
 export interface ApiClientConfig {
   baseUrl: string;
   apiToken: string;
-  caCertPath: string;
-  clientCertPath: string;
+  caCertPath?: string;
+  clientCertPath?: string;
   clientCertPassword?: string;
   rejectUnauthorized?: boolean;
 }
@@ -23,13 +23,16 @@ export class FireflyApiClient {
   private client: AxiosInstance;
 
   constructor(private config: ApiClientConfig) {
-    const httpsAgent = new https.Agent(this.createHttpsAgentOptions());
+    let httpsAgent;
+    if (config.caCertPath && config.clientCertPath) {
+      httpsAgent = new https.Agent(this.createHttpsAgentOptions());
+    }
 
     this.client = axios.create({
-      baseURL: this.config.baseUrl,
+      baseURL: config.baseUrl,
       httpsAgent,
       headers: {
-        Authorization: `Bearer ${this.config.apiToken}`,
+        Authorization: `Bearer ${config.apiToken}`,
         "Content-Type": "application/json",
         Accept: "application/json",
       },
@@ -37,6 +40,10 @@ export class FireflyApiClient {
   }
 
   private createHttpsAgentOptions(): https.AgentOptions {
+    if (!this.config.caCertPath || !this.config.clientCertPath) {
+      throw new Error("Certificate not configured correctly");
+    }
+
     const options: https.AgentOptions = {
       rejectUnauthorized: this.config.rejectUnauthorized !== false,
     };
@@ -163,7 +170,7 @@ export class FireflyApiClient {
     }
   }
 
-  async post<T>(url: string, data: any): Promise<T> {
+  async post<T>(url: string, data: unknown): Promise<T> {
     try {
       const response = await this.client.post<T>(url, data);
       return response.data;

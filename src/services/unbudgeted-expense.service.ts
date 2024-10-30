@@ -6,13 +6,16 @@ import { PrinterService } from "./printer.service";
 export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}
 
-  async getUnbudgetedExpenses(month: number): Promise<void> {
+  async calculateUnbudgetedExpenses(month: number): Promise<void> {
     const transactions = await this.transactionService.getTransactionsForMonth(
       month
     );
     const filteredTransactions = this.filterExpenses(transactions);
 
-    PrinterService.printTransactions(filteredTransactions, 'Unbudgeted Expenses');
+    PrinterService.printTransactions(
+      filteredTransactions,
+      "Unbudgeted Expenses"
+    );
   }
 
   private filterExpenses(transactions: TransactionSplit[]) {
@@ -33,7 +36,7 @@ export class UnbudgetedExpenseService {
   }
 
   private isVanguard(description: string): boolean {
-    return description === "VANGUARD BUY INVESTMENT"
+    return description === "VANGUARD BUY INVESTMENT";
   }
 
   private hasNoDestination(destinationId: string | null) {

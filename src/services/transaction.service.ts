@@ -5,16 +5,49 @@ import {
 } from "firefly-iii-sdk";
 import { DateRange } from "../dto/DateRange.dto";
 import { FireflyApiClient } from "../api/client";
+import { logger } from "../logger";
 
+interface TransactionStore {
+  [key: number]: TransactionRead[];
+}
 export class TransactionService {
+  private transactionStore: TransactionStore = {};
+
   constructor(private apiClient: FireflyApiClient) {}
 
   async getTransactionsForMonth(month: number): Promise<TransactionSplit[]> {
+    try {
+      const data =
+        this.transactionStore[month] ??
+        (await this.fetchTransactionsFromAPI(month));
+
+      if (!this.transactionStore[month]) {
+        this.transactionStore[month] = data;
+      }
+
+      return this.flattenTransactionsResults(data) ?? [];
+    } catch (error) {
+      if (error instanceof Error) {
+        logger.error(`Failed to fetch transactions for month ${month}:`, error.message);
+        throw new Error(`Failed to fetch transactions: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  private async fetchTransactionsFromAPI(
+    month: number
+  ): Promise<TransactionRead[]> {
+    if (month < 1 || month > 12) {
+      throw new Error("Month must be between 1 and 12");
+    }
+
     const range = this.convertMonthToRange(month);
-    const transactions = await this.apiClient.get<TransactionArray>(
+    const response = await this.apiClient.get<TransactionArray>(
       `/transactions?start=${range.start}&end=${range.end}`
     );
-    return this.flattenTransactionsResults(transactions.data);
+
+    return response.data;
   }
 
   private flattenTransactionsResults(

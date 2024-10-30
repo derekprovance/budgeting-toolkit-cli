@@ -8,8 +8,12 @@ export const config: ApiClientConfig = {
   baseUrl:
     process.env.FIREFLY_API_URL || "https://your-firefly-instance.com/api/v1",
   apiToken: process.env.FIREFLY_API_TOKEN || "",
-  caCertPath: path.resolve(__dirname, "../certs/ca.pem"),
-  clientCertPath: path.resolve(__dirname, "../certs/client.p12"),
+  caCertPath: process.env.CLIENT_CERT_CA_PATH
+    ? path.resolve(__dirname, process.env.CLIENT_CERT_CA_PATH)
+    : undefined,
+  clientCertPath: process.env.CLIENT_CERT_PATH
+    ? path.resolve(__dirname, process.env.CLIENT_CERT_PATH)
+    : undefined,
   clientCertPassword: process.env.CLIENT_CERT_PASSWORD,
   rejectUnauthorized: false,
 };
