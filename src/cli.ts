@@ -1,11 +1,12 @@
 import { Command, Option } from "commander";
-import { FireflyApiClient } from "./api/client";
+import { FireflyApiClient } from "./api/FireflyApiClient";
 import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
 import { calculateUnbudgetedExpenses } from "./commands/calculateUnbudgetedExpenses";
 import { config } from "./config";
 import { TransactionService } from "./services/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
 import { calculateAdditionalIncome } from "./commands/calculateAdditionalIncome";
+import { updateDescriptions } from "./commands/updateCategory";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -48,6 +49,17 @@ export const createCli = (): Command => {
     .action((opts) =>
       calculateAdditionalIncome(additionalIncomeService, opts.month)
     );
+
+  program
+    .command("update-categories")
+    .description("Update categories for transactions")
+    .addOption(
+      new Option(
+        "-t, --tag <tag>",
+        "a tag must be specified <string>"
+      ).makeOptionMandatory()
+    )
+    .action((opts) => updateDescriptions(transactionService, opts.tag));
 
   return program;
 };

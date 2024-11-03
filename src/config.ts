@@ -1,5 +1,5 @@
 import path from "path";
-import { ApiClientConfig } from "./api/client";
+import { ApiClientConfig } from "./api/FireflyApiClient";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -19,6 +19,8 @@ export const config: ApiClientConfig = {
 };
 
 export const logLevel: string = process.env.LOG_LEVEL || "info";
+
+export const claudeAPIKey = process.env.ANTHROPIC_API_KEY;
 
 export enum Account {
   PRIMARY = "1",
