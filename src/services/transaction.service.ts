@@ -72,8 +72,11 @@ export class TransactionService {
   async updateTransaction(
     transaction: TransactionSplit,
     category: string,
-    budgetId?: string,
+    budgetId?: string
   ): Promise<boolean> {
+    logger.debug(
+      `Updating ${transaction.description}: ${category}, ${budgetId}`
+    );
     const transactionRead = this.getTransactionReadBySplit(transaction);
 
     if (!transactionRead) {
@@ -90,7 +93,7 @@ export class TransactionService {
             {
               transaction_journal_id: transaction.transaction_journal_id,
               category_name: category,
-              budget_id: budgetId ?? null,
+              budget_id: budgetId ?? undefined,
             },
           ],
         }
@@ -204,7 +207,7 @@ export class TransactionService {
   }
 
   private generateSplitTransactionKey(tx: TransactionSplit): string {
-    return `${tx.description}-${tx.date}`;
+    return `${tx.description}-${tx.date}-${tx.transaction_journal_id}`;
   }
 
   private handleError(

@@ -35,7 +35,7 @@ export class UpdateTransactionService {
         return [];
       }
 
-      let budgets: BudgetRead[];
+      let budgets: BudgetRead[] = [];
       let budgetNames;
       if (updateBudget) {
         budgets = await this.budgetService.getBudgets();
@@ -56,27 +56,8 @@ export class UpdateTransactionService {
         );
       }
 
-      await Promise.all(
-        transactions.map((transaction, index) => {
-          const aiResult = aiResults[index];
-          let budget;
-          if (!transaction.tags?.includes(Tag.BILLS)) {
-            budget = budgets?.find(
-              (budget) => budget.attributes.name === aiResult.budget
-            );
-          }
-
-          budgets?.find((budget) => budget.attributes.name === aiResult.budget);
-          this.transactionService.updateTransaction(
-            transaction,
-            aiResult.category,
-            budget?.id
-          );
-        })
-      );
-
+      this.updateTransactionsWithAIResults(transactions, aiResults, budgets);
       return this.mapToResults(transactions, aiResults);
-      return [];
     } catch (ex) {
       if (ex instanceof Error) {
         logger.error("Unable to get transactions by tag", ex.message);
@@ -84,6 +65,41 @@ export class UpdateTransactionService {
 
       return [];
     }
+  }
+
+  private updateTransactionsWithAIResults(
+    transactions: TransactionSplit[],
+    aiResults: AIResponse[],
+    budgets?: BudgetRead[]
+  ) {
+    transactions.map(async (transaction, index) => {
+      const aiResult = aiResults[index];
+      let budget;
+      if (this.shouldSetBudget(transaction)) {
+        budget = budgets?.find(
+          (budget) => budget.attributes.name === aiResult.budget
+        );
+      }
+
+      budgets?.find((budget) => budget.attributes.name === aiResult.budget);
+      await this.transactionService.updateTransaction(
+        transaction,
+        aiResult.category,
+        budget?.id
+      );
+    });
+  }
+
+  private shouldSetBudget(transaction: TransactionSplit): boolean {
+    if (transaction.tags?.includes(Tag.BILLS)) {
+      return false;
+    }
+
+    if (transaction.tags?.includes(Tag.DISPOSABLE_INCOME)) {
+      return false;
+    }
+
+    return true;
   }
 
   /**

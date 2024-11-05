@@ -1,5 +1,5 @@
 import { ClaudeClient } from "../api/claude.client";
-import { claudeAPIKey } from "../config";
+import { claudeAPIKey, llmModel } from "../config";
 import { AIService } from "../services/ai.service";
 import { BudgetService } from "../services/budget.service";
 import { CategoryService } from "../services/category.service";
@@ -22,7 +22,7 @@ export const updateDescriptions = async (
 
   const claudeClient = new ClaudeClient({
     apiKey: claudeAPIKey,
-    model: "claude-3-haiku-20240307",
+    model: llmModel,
     maxTokens: 20,
     maxRetries: 3,
     batchSize: 10,

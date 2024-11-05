@@ -21,6 +21,7 @@ export const config: ApiClientConfig = {
 export const logLevel: string = process.env.LOG_LEVEL || "info";
 
 export const claudeAPIKey = process.env.ANTHROPIC_API_KEY;
+export const llmModel = process.env.LLM_MODEL;
 
 export enum Account {
   PRIMARY = "1",

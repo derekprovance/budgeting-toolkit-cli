@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ContentBlock } from "@anthropic-ai/sdk/resources";
+import { logger } from "../logger";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -14,10 +15,7 @@ interface ClaudeConfig {
   maxRetries?: number;
 
   // Model Configuration
-  model?:
-    | "claude-3-opus-20240229"
-    | "claude-3-sonnet-20240229"
-    | "claude-3-haiku-20240307";
+  model?: string;
 
   // Message Parameters
   maxTokens?: number;
@@ -47,7 +45,7 @@ export class ClaudeClient {
     baseURL: "https://api.anthropic.com",
     timeout: 30000,
     maxRetries: 3,
-    model: "claude-3-haiku-20240307",
+    model: "claude-3-5-haiku-latest",
     maxTokens: 1024,
     temperature: 1.0,
     topP: 1.0,
@@ -69,6 +67,7 @@ export class ClaudeClient {
       maxRetries: this.config.maxRetries,
       timeout: this.config.timeout,
     });
+    logger.debug(`Initializing AI Client using ${this.config.model}`)
   }
 
   async chatBatch(
