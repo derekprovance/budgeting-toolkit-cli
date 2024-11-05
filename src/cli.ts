@@ -8,6 +8,7 @@ import { AdditionalIncomeService } from "./services/additional-income.service";
 import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
 import { updateDescriptions as updateTransactions } from "./commands/update-transaction.command";
 import { CategoryService } from "./services/category.service";
+import { BudgetService } from "./services/budget.service";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -15,6 +16,7 @@ export const createCli = (): Command => {
   const apiClient = new FireflyApiClient(config);
 
   const transactionService = new TransactionService(apiClient);
+  const budgetService = new BudgetService(apiClient);
   const additionalIncomeService = new AdditionalIncomeService(
     transactionService
   );
@@ -61,7 +63,8 @@ export const createCli = (): Command => {
         "a tag must be specified <string>"
       ).makeOptionMandatory()
     )
-    .action((opts) => updateTransactions(transactionService, categoryService, opts.tag));
+    .option("-b, --budget", "update the budget for transactions")
+    .action((opts) => updateTransactions(transactionService, categoryService, budgetService, opts.tag, opts.budget));
 
   return program;
 };

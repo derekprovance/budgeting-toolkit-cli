@@ -1,6 +1,7 @@
 import { ClaudeClient } from "../api/claude.client";
 import { claudeAPIKey } from "../config";
 import { AIService } from "../services/ai.service";
+import { BudgetService } from "../services/budget.service";
 import { CategoryService } from "../services/category.service";
 import { TransactionService } from "../services/transaction.service";
 import { UpdateTransactionService } from "../services/update-transaction.service";
@@ -8,7 +9,9 @@ import { UpdateTransactionService } from "../services/update-transaction.service
 export const updateDescriptions = async (
   transactionService: TransactionService,
   categoryService: CategoryService,
-  tag: string
+  budgetService: BudgetService,
+  tag: string,
+  updateBudget: boolean
 ) => {
   if (!claudeAPIKey) {
     console.log(
@@ -29,8 +32,10 @@ export const updateDescriptions = async (
   const updateCategoryService = new UpdateTransactionService(
     transactionService,
     categoryService,
+    budgetService,
     aiService
   );
-
-  console.log(await updateCategoryService.updateCategoriesByTag(tag));
+  console.log(
+    await updateCategoryService.updateTransactionsByTag(tag, updateBudget)
+  );
 };

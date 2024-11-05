@@ -69,17 +69,11 @@ export class TransactionService {
     }
   }
 
-  async updateTransactionWithCategory(
+  async updateTransaction(
     transaction: TransactionSplit,
-    category: string
+    category: string,
+    budgetId?: string,
   ): Promise<boolean> {
-    if (transaction.category_name === category) {
-      logger.debug(
-        `Transaction ${transaction.description} already has assigned category ${category}`
-      );
-      return false;
-    }
-
     const transactionRead = this.getTransactionReadBySplit(transaction);
 
     if (!transactionRead) {
@@ -96,7 +90,7 @@ export class TransactionService {
             {
               transaction_journal_id: transaction.transaction_journal_id,
               category_name: category,
-              budget_id: null,
+              budget_id: budgetId ?? null,
             },
           ],
         }

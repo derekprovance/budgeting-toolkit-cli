@@ -1,23 +1,28 @@
-import { TransactionSplit } from "firefly-iii-sdk";
+import { BudgetRead, TransactionSplit } from "firefly-iii-sdk";
 import { logger } from "../logger";
-import { AIService } from "./ai.service";
+import { AIResponse, AIService } from "./ai.service";
 import { CategoryService } from "./category.service";
 import { TransactionService } from "./transaction.service";
+import { BudgetService } from "./budget.service";
+import { Tag } from "../config";
 
 interface TransactionCategoryResult {
   name: string;
   category: string;
+  budget?: string;
 }
 
 export class UpdateTransactionService {
   constructor(
     private transactionService: TransactionService,
     private categoryService: CategoryService,
+    private budgetService: BudgetService,
     private aiService: AIService
   ) {}
 
-  async updateCategoriesByTag(
-    tag: string
+  async updateTransactionsByTag(
+    tag: string,
+    updateBudget = false
   ): Promise<TransactionCategoryResult[]> {
     try {
       const [transactions, categories] = await Promise.all([
@@ -30,11 +35,19 @@ export class UpdateTransactionService {
         return [];
       }
 
+      let budgets: BudgetRead[];
+      let budgetNames;
+      if (updateBudget) {
+        budgets = await this.budgetService.getBudgets();
+        budgetNames = budgets.map((b) => b.attributes.name);
+      }
+
       const categoryNames = categories.map((c) => c.name);
 
-      const aiResults = await this.aiService.categorizeTransactions(
+      const aiResults = await this.aiService.processTransactions(
+        transactions,
         categoryNames,
-        transactions
+        budgetNames
       );
 
       if (aiResults.length !== transactions.length) {
@@ -44,15 +57,26 @@ export class UpdateTransactionService {
       }
 
       await Promise.all(
-        transactions.map((transaction, index) =>
-          this.transactionService.updateTransactionWithCategory(
+        transactions.map((transaction, index) => {
+          const aiResult = aiResults[index];
+          let budget;
+          if (!transaction.tags?.includes(Tag.BILLS)) {
+            budget = budgets?.find(
+              (budget) => budget.attributes.name === aiResult.budget
+            );
+          }
+
+          budgets?.find((budget) => budget.attributes.name === aiResult.budget);
+          this.transactionService.updateTransaction(
             transaction,
-            aiResults[index].trim()
-          )
-        )
+            aiResult.category,
+            budget?.id
+          );
+        })
       );
 
       return this.mapToResults(transactions, aiResults);
+      return [];
     } catch (ex) {
       if (ex instanceof Error) {
         logger.error("Unable to get transactions by tag", ex.message);
@@ -67,11 +91,12 @@ export class UpdateTransactionService {
    */
   private mapToResults(
     transactions: TransactionSplit[],
-    categories: string[]
+    aiResults: AIResponse[]
   ): TransactionCategoryResult[] {
     return transactions.map((transaction, index) => ({
       name: transaction.description,
-      category: categories[index].trim(),
+      category: aiResults[index].category,
+      budget: aiResults[index].budget,
     }));
   }
 }
