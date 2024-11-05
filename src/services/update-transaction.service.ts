@@ -9,7 +9,7 @@ interface TransactionCategoryResult {
   category: string;
 }
 
-export class UpdateCategoryService {
+export class UpdateTransactionService {
   constructor(
     private transactionService: TransactionService,
     private categoryService: CategoryService,

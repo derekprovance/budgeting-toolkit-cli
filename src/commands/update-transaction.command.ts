@@ -3,7 +3,7 @@ import { claudeAPIKey } from "../config";
 import { AIService } from "../services/ai.service";
 import { CategoryService } from "../services/category.service";
 import { TransactionService } from "../services/transaction.service";
-import { UpdateCategoryService } from "../services/update-category.service";
+import { UpdateTransactionService } from "../services/update-transaction.service";
 
 export const updateDescriptions = async (
   transactionService: TransactionService,
@@ -26,7 +26,7 @@ export const updateDescriptions = async (
     maxConcurrent: 5,
   });
   const aiService = new AIService(claudeClient);
-  const updateCategoryService = new UpdateCategoryService(
+  const updateCategoryService = new UpdateTransactionService(
     transactionService,
     categoryService,
     aiService

@@ -6,7 +6,7 @@ import { config } from "./config";
 import { TransactionService } from "./services/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
 import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
-import { updateDescriptions } from "./commands/update-category.command";
+import { updateDescriptions as updateTransactions } from "./commands/update-transaction.command";
 import { CategoryService } from "./services/category.service";
 
 export const createCli = (): Command => {
@@ -53,15 +53,15 @@ export const createCli = (): Command => {
     );
 
   program
-    .command("update-categories")
-    .description("Update categories for transactions")
+    .command("update-transactions")
+    .description("Update transactions using an LLM")
     .addOption(
       new Option(
         "-t, --tag <tag>",
         "a tag must be specified <string>"
       ).makeOptionMandatory()
     )
-    .action((opts) => updateDescriptions(transactionService, categoryService, opts.tag));
+    .action((opts) => updateTransactions(transactionService, categoryService, opts.tag));
 
   return program;
 };
