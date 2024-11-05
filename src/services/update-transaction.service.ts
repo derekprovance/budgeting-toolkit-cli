@@ -1,4 +1,4 @@
-import { BudgetRead, TransactionSplit } from "firefly-iii-sdk";
+import { BudgetRead, Category, TransactionSplit } from "firefly-iii-sdk";
 import { logger } from "../logger";
 import { AIResponse, AIService } from "./ai.service";
 import { CategoryService } from "./category.service";
@@ -56,7 +56,12 @@ export class UpdateTransactionService {
         );
       }
 
-      this.updateTransactionsWithAIResults(transactions, aiResults, budgets);
+      this.updateTransactionsWithAIResults(
+        transactions,
+        aiResults,
+        categories,
+        budgets
+      );
       return this.mapToResults(transactions, aiResults);
     } catch (ex) {
       if (ex instanceof Error) {
@@ -70,6 +75,7 @@ export class UpdateTransactionService {
   private updateTransactionsWithAIResults(
     transactions: TransactionSplit[],
     aiResults: AIResponse[],
+    categories: Category[],
     budgets?: BudgetRead[]
   ) {
     transactions.map(async (transaction, index) => {
@@ -80,11 +86,14 @@ export class UpdateTransactionService {
           (budget) => budget.attributes.name === aiResult.budget
         );
       }
+      const category = categories.find(
+        (category) => category?.name === aiResult.category
+      );
 
       budgets?.find((budget) => budget.attributes.name === aiResult.budget);
       await this.transactionService.updateTransaction(
         transaction,
-        aiResult.category,
+        category?.name,
         budget?.id
       );
     });

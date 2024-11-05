@@ -71,7 +71,7 @@ export class TransactionService {
 
   async updateTransaction(
     transaction: TransactionSplit,
-    category: string,
+    category?: string,
     budgetId?: string
   ): Promise<boolean> {
     logger.debug(
@@ -92,7 +92,7 @@ export class TransactionService {
           transactions: [
             {
               transaction_journal_id: transaction.transaction_journal_id,
-              category_name: category,
+              category_name: category ?? undefined,
               budget_id: budgetId ?? undefined,
             },
           ],
@@ -103,7 +103,7 @@ export class TransactionService {
     } catch (error) {
       throw this.handleError(
         `Update transaction ${transactionRead.id} with category`,
-        category,
+        "undefined",
         error
       );
     }
