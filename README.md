@@ -1,12 +1,13 @@
-# Firefly III CLI
+# Firefly III CLI with Claude Integration
 
-A opinionated command-line interface (CLI) for interacting with the Firefly III Personal Finance Manager API. This CLI allows you to perform various budget related operations.
+A powerful command-line interface (CLI) for interacting with both the Firefly III Personal Finance Manager API and Claude AI for intelligent financial analysis. This CLI allows you to perform various budget-related operations with AI-enhanced capabilities.
 
 ## Features
 
 - Secure authentication using client certificates and API tokens
-- Fetch all accounts from your Firefly III instance
-- Create new transactions
+- Intelligent financial analysis powered by Claude AI
+- Batch processing support for multiple operations
+- Configurable retry mechanisms and concurrent request handling
 - Extensible architecture for adding more commands
 
 ## Prerequisites
@@ -16,74 +17,236 @@ Before you begin, ensure you have met the following requirements:
 - Node.js (v14.0.0 or later)
 - npm (v6.0.0 or later)
 - A Firefly III instance with API access
-- Client certificate, key, and CA certificate for authentication
+- An Anthropic API key for Claude integration
+- Client certificate, key, and CA certificate for Firefly III authentication (Optional)
 
 ## Installation
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/firefly-iii-cli.git
+   ```bash
+   git clone https://github.com/derekprovance/firefly-iii-cli.git
    cd firefly-iii-cli
    ```
 
 2. Install dependencies:
-   ```
+   ```bash
    npm install
    ```
 
-3. Copy the `.env.example` file in the project root and replace the values with your actual Firefly III API URL, API token, and paths to your certificate files.
-   ```
+3. Copy the `.env.example` file and configure your environment:
+   ```bash
    cp .env.example .env
    ```
+
+## Environment Configuration
+
+The CLI uses environment variables for configuration. Create a `.env` file in the project root with the following variables:
+
+### Required Environment Variables
+
+```bash
+# Firefly III Configuration
+FIREFLY_API_URL=https://your-firefly-instance.com/api/v1
+FIREFLY_API_TOKEN=your_api_token_here
+
+# Client Certificate Configuration
+CLIENT_CERT_CA_PATH=../certs/ca.pem
+CLIENT_CERT_PATH=../certs/client.p12
+CLIENT_CERT_PASSWORD=your_certificate_password
+
+# Claude AI Configuration
+ANTHROPIC_API_KEY=your_anthropic_key
+LLM_MODEL=claude-3-haiku-20240307
+
+# Application Configuration
+LOG_LEVEL=info
+```
+
+### Environment Variables Reference
+
+#### Firefly III Configuration
+- `FIREFLY_API_URL`: The complete URL to your Firefly III API endpoint
+  - Format: `https://your-instance.com/api/v1`
+  - Required: Yes
+  - Example: `https://finance.example.com/api/v1`
+
+- `FIREFLY_API_TOKEN`: Your personal access token for Firefly III
+  - Required: Yes
+  - How to obtain: Generate from your Firefly III instance under Profile > OAuth
+  - Format: String
+  - Security: Keep this secret!
+
+#### Certificate Configuration
+- `CLIENT_CERT_CA_PATH`: Path to your CA certificate file
+  - Required: Yes if server is protected by client credentials
+  - Format: Path relative to project root
+  - Example: `../certs/ca.pem`
+  - File type: `.pem`
+
+- `CLIENT_CERT_PATH`: Path to your client certificate file
+  - Required: Yes if server is protected by client credentials
+  - Format: Path relative to project root
+  - Example: `../certs/client.p12`
+  - File type: `.p12`
+
+- `CLIENT_CERT_PASSWORD`: Password for your client certificate
+  - Required: Yes if certificate is password-protected
+  - Format: String
+  - Security: Keep this secret!
+
+#### Claude AI Configuration
+- `ANTHROPIC_API_KEY`: Your Anthropic API key for Claude integration
+  - Required: Yes
+  - How to obtain: From your Anthropic account dashboard
+  - Format: String
+  - Security: Keep this secret!
+
+- `LLM_MODEL`: The Claude model version to use
+  - Required: No
+  - Default: `claude-3-5-sonnet-latest`
+
+For more information on what models you can use, please visit [this help page](https://docs.anthropic.com/en/docs/about-claude/models).
+
+#### Application Configuration
+- `LOG_LEVEL`: Determines the verbosity of application logging
+  - Required: No
+  - Valid values: `error`, `warn`, `info`, `debug`, `trace`
+  - Default: `info`
+  - Recommended: `info` for production, `debug` for development
+
+### Example .env File
+```bash
+# Firefly III Configuration
+FIREFLY_API_URL=https://your-firefly-instance.com/api/v1
+FIREFLY_API_TOKEN=your_api_token_here
+
+# Certificate Configuration
+CLIENT_CERT_CA_PATH=../certs/ca.pem
+CLIENT_CERT_PATH=../certs/client.p12
+CLIENT_CERT_PASSWORD=foobar
+
+# Application Configuration
+LOG_LEVEL=info
+
+# Claude AI Configuration
+ANTHROPIC_API_KEY=your_anthropic_key
+LLM_MODEL=claude-3-haiku-20240307
+```
+
+## Configuration Options
+
+### Claude Client Configuration
+
+The CLI supports the following configuration options for the Claude integration:
+
+```typescript
+interface ClaudeConfig {
+  // API and Client Configuration
+  apiKey?: string             // Your Anthropic API key
+  baseURL?: string           // API base URL (default: https://api.anthropic.com)
+  timeout?: number           // Request timeout in ms (default: 30000)
+  maxRetries?: number        // Max retry attempts (default: 3)
+
+  // Model Configuration
+  model?: string
+
+  // Message Parameters
+  maxTokens?: number         // Maximum tokens in response (default: 1024)
+  temperature?: number       // Response randomness (0-1, default: 1.0)
+  topP?: number             // Nucleus sampling (0-1, default: 1.0)
+  topK?: number             // Top-k sampling (default: 5)
+  stopSequences?: string[]   // Custom stop sequences
+
+  // System Configuration
+  systemPrompt?: string      // System prompt for context
+  metadata?: Record<string, string>  // Custom metadata
+
+  // Batch Processing Configuration
+  batchSize?: number         // Messages per batch (default: 10)
+  maxConcurrent?: number     // Max concurrent requests (default: 5)
+  retryDelayMs?: number      // Base retry delay (default: 1000)
+  maxRetryDelayMs?: number   // Maximum retry delay (default: 32000)
+}
+```
 
 ## Usage
 
 To use the Firefly III CLI, run the following command:
 
-```
+```bash
 npm start -- [command] [options]
 ```
 
-Available commands:
+### Available Commands
 
-1. Calculate unbudgeted transactions:
+1. Process Financial Data with Claude:
+   ```bash
+   npm start -- process-financial [options]
    ```
-   npm start -- calculate-unbudgeted
+   Options:
+   - `--batch-size`: Number of items to process in each batch
+   - `--max-concurrent`: Maximum number of concurrent requests
+   - `--model`: Specify Claude model version
+   - `--temperature`: Set response temperature (0-1)
 
-2. Calculate additional income transactions:
+2. Analyze Transactions:
+   ```bash
+   npm start -- analyze-transactions [options]
    ```
-   npm start -- calculate-additional
+   Options:
+   - `--date-range`: Specify date range for analysis
+   - `--categories`: Filter by specific categories
+   - `--system-prompt`: Custom system prompt for analysis
+
+3. Generate Financial Reports:
+   ```bash
+   npm start -- generate-report [options]
    ```
+   Options:
+   - `--format`: Report format (markdown/text)
+   - `--max-tokens`: Maximum response length
+   - `--template`: Report template name
 
 ## Development
 
 To set up the project for development:
 
 1. Install dependencies:
-   ```
+   ```bash
    npm install
    ```
 
 2. Run tests:
-   ```
+   ```bash
    npm test
    ```
 
-3. Run tests in watch mode:
+3. Build the project:
+   ```bash
+   npm run build
    ```
-   npm run test:watch
+
+4. Run in development mode:
+   ```bash
+   npm run dev
    ```
+
+## Error Handling
+
+The CLI implements exponential backoff with jitter for retries:
+- Base delay: 1000ms
+- Maximum delay: 32000ms
+- Retry attempts: 3 (configurable)
 
 ## Contributing
 
-Contributions to the Firefly III CLI are welcome. Please follow these steps to contribute:
+Contributions are welcome! Please follow these steps:
 
 1. Fork the repository
-2. Create a new branch (`git checkout -b feature/your-feature-name`)
-3. Make your changes
-4. Commit your changes (`git commit -am 'Add some feature'`)
-5. Push to the branch (`git push origin feature/your-feature-name`)
-6. Create a new Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -am 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
@@ -91,9 +254,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgements
 
-- [Firefly III](https://www.firefly-iii.org/) - The personal finance manager this CLI interacts with
-- [Commander.js](https://github.com/tj/commander.js/) - The complete solution for node.js command-line interfaces
-- [Axios](https://github.com/axios/axios) - Promise based HTTP client for the browser and node.js
+- [Firefly III](https://www.firefly-iii.org/) - Personal finance manager
+- [Anthropic Claude](https://www.anthropic.com/claude) - AI language model
+- [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) - Official Anthropic TypeScript SDK
+- [Commander.js](https://github.com/tj/commander.js/) - Node.js command-line interface solution
+- [Axios](https://github.com/axios/axios) - Promise based HTTP client
 
 ## Contact
 
