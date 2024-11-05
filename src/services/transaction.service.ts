@@ -90,12 +90,13 @@ export class TransactionService {
       await this.apiClient.put<TransactionArray>(
         `/transactions/${transactionRead.id}`,
         {
-          apply_rules: false,
-          fire_webhooks: false,
+          apply_rules: true,
+          fire_webhooks: true,
           transactions: [
             {
               transaction_journal_id: transaction.transaction_journal_id,
               category_name: category,
+              budget_id: null,
             },
           ],
         }
