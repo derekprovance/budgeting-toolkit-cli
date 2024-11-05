@@ -1,12 +1,13 @@
 import { Command, Option } from "commander";
-import { FireflyApiClient } from "./api/FireflyApiClient";
+import { FireflyApiClient } from "./api/firefly.client";
 import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
-import { calculateUnbudgetedExpenses } from "./commands/calculateUnbudgetedExpenses";
+import { calculateUnbudgetedExpenses } from "./commands/calculate-unbudgeted-expenses.command";
 import { config } from "./config";
 import { TransactionService } from "./services/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
-import { calculateAdditionalIncome } from "./commands/calculateAdditionalIncome";
-import { updateDescriptions } from "./commands/updateCategory";
+import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
+import { updateDescriptions } from "./commands/update-category.command";
+import { CategoryService } from "./services/category.service";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -20,6 +21,7 @@ export const createCli = (): Command => {
   const unbudgetedExpenseService = new UnbudgetedExpenseService(
     transactionService
   );
+  const categoryService = new CategoryService(apiClient);
 
   program
     .name("budgeting-toolkit-cli")
@@ -59,7 +61,7 @@ export const createCli = (): Command => {
         "a tag must be specified <string>"
       ).makeOptionMandatory()
     )
-    .action((opts) => updateDescriptions(transactionService, opts.tag));
+    .action((opts) => updateDescriptions(transactionService, categoryService, opts.tag));
 
   return program;
 };

@@ -1,6 +1,6 @@
 import { TransactionSplit } from "firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
-import { Account, Category, Description, ExpenseAccount, Tag } from "../config";
+import { Account, Description, ExpenseAccount, Tag } from "../config";
 import { PrinterService } from "./printer.service";
 
 export class UnbudgetedExpenseService {
@@ -31,7 +31,7 @@ export class UnbudgetedExpenseService {
         !this.isSupplementedByDisposable(transaction.tags) &&
         !this.isVanguard(transaction.description) &&
         this.isExpenseAccount(transaction.source_id)) ||
-      transaction.category_id == Category.BILLS_UTILITIES
+      transaction.tags?.includes(Tag.BILLS)
     );
   }
 

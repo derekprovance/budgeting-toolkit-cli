@@ -17,7 +17,7 @@ interface ClaudeConfig {
   model?:
     | "claude-3-opus-20240229"
     | "claude-3-sonnet-20240229"
-    | "claude-3-haiku-20240229";
+    | "claude-3-haiku-20240307";
 
   // Message Parameters
   maxTokens?: number;
@@ -47,7 +47,7 @@ export class ClaudeClient {
     baseURL: "https://api.anthropic.com",
     timeout: 30000,
     maxRetries: 3,
-    model: "claude-3-haiku-20240229",
+    model: "claude-3-haiku-20240307",
     maxTokens: 1024,
     temperature: 1.0,
     topP: 1.0,

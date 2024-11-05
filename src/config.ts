@@ -1,5 +1,5 @@
 import path from "path";
-import { ApiClientConfig } from "./api/FireflyApiClient";
+import { ApiClientConfig } from "./api/firefly.client";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -38,10 +38,7 @@ export enum ExpenseAccount {
 
 export enum Tag {
   DISPOSABLE_INCOME = "Disposable Income",
-}
-
-export enum Category {
-  BILLS_UTILITIES = "2",
+  BILLS = "Bills",
 }
 
 export enum Description {

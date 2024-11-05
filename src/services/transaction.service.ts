@@ -3,8 +3,8 @@ import {
   TransactionRead,
   TransactionSplit,
 } from "firefly-iii-sdk";
-import { DateRange } from "../dto/DateRange.dto";
-import { FireflyApiClient } from "../api/FireflyApiClient";
+import { DateRange } from "../dto/date-range.dto";
+import { FireflyApiClient } from "../api/firefly.client";
 import { logger } from "../logger";
 
 class TransactionError extends Error {
@@ -15,9 +15,11 @@ class TransactionError extends Error {
 }
 
 type TransactionCache = Map<string, TransactionRead[]>;
+type TransactionSplitIndex = Map<string, TransactionRead>;
 
 export class TransactionService {
   private readonly cache: TransactionCache;
+  private readonly splitTransactionIdx: TransactionSplitIndex;
   private readonly currentYear: number;
 
   constructor(
@@ -25,6 +27,7 @@ export class TransactionService {
     cacheImplementation: TransactionCache = new Map()
   ) {
     this.cache = cacheImplementation;
+    this.splitTransactionIdx = new Map();
     this.currentYear = new Date().getFullYear();
   }
 
@@ -55,10 +58,56 @@ export class TransactionService {
     }
 
     try {
-      const transactions = await this.fetchTransactionsByTag(tag);
+      const cacheKey = `tag-${tag}`;
+      const transactions = await this.getFromCacheOrFetch(cacheKey, () =>
+        this.fetchTransactionsByTag(tag)
+      );
+
       return this.flattenTransactions(transactions);
     } catch (error) {
       throw this.handleError("fetch transactions by tag", tag, error);
+    }
+  }
+
+  async updateTransactionWithCategory(
+    transaction: TransactionSplit,
+    category: string
+  ): Promise<boolean> {
+    if (transaction.category_name === category) {
+      logger.debug(
+        `Transaction ${transaction.description} already has assigned category ${category}`
+      );
+      return false;
+    }
+
+    const transactionRead = this.getTransactionReadBySplit(transaction);
+
+    if (!transactionRead) {
+      throw new Error("Unkown Error: Unable to find Transaction Id for Split");
+    }
+
+    try {
+      await this.apiClient.put<TransactionArray>(
+        `/transactions/${transactionRead.id}`,
+        {
+          apply_rules: false,
+          fire_webhooks: false,
+          transactions: [
+            {
+              transaction_journal_id: transaction.transaction_journal_id,
+              category_name: category,
+            },
+          ],
+        }
+      );
+
+      return true;
+    } catch (error) {
+      throw this.handleError(
+        `Update transaction ${transactionRead.id} with category`,
+        category,
+        error
+      );
     }
   }
 
@@ -80,7 +129,36 @@ export class TransactionService {
 
     const data = await fetchFn();
     this.cache.set(key, data);
+    this.storeTransactionSplitInIndex(data);
     return data;
+  }
+
+  private storeTransactionSplitInIndex(transactions: TransactionRead[]) {
+    transactions.forEach((tx) => {
+      const splitTransactions = tx.attributes.transactions;
+      splitTransactions.forEach((txSp) => {
+        const indexKey = this.generateSplitTransactionKey(txSp);
+
+        if (this.splitTransactionIdx.has(indexKey)) {
+          logger.warn(`Duplicate transaction found for key: ${indexKey}`);
+        }
+
+        this.splitTransactionIdx.set(
+          this.generateSplitTransactionKey(txSp),
+          tx
+        );
+      });
+    });
+  }
+
+  private getTransactionReadBySplit(
+    splitTransaction: TransactionSplit
+  ): TransactionRead | null {
+    const result = this.splitTransactionIdx.get(
+      this.generateSplitTransactionKey(splitTransaction)
+    );
+
+    return result ? result : null;
   }
 
   private async fetchTransactionsByTag(
@@ -128,6 +206,10 @@ export class TransactionService {
     if (!Number.isInteger(month) || month < 1 || month > 12) {
       throw new TransactionError("Month must be an integer between 1 and 12");
     }
+  }
+
+  private generateSplitTransactionKey(tx: TransactionSplit): string {
+    return `${tx.description}-${tx.date}`;
   }
 
   private handleError(

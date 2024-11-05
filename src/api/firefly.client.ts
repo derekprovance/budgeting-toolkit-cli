@@ -82,8 +82,8 @@ export class FireflyApiClient {
   private readCertFile(filePath: string, fileType: CertificateType): string {
     try {
       const fileContent = fs.readFileSync(filePath, "utf8");
-      logger.debug(`Reading ${fileType} from ${filePath}`);
-      logger.debug(
+      logger.trace(`Reading ${fileType} from ${filePath}`);
+      logger.trace(
         `File content (first 100 chars): ${fileContent.substring(0, 100)}...`
       );
 
@@ -173,6 +173,16 @@ export class FireflyApiClient {
   async post<T>(url: string, data: unknown): Promise<T> {
     try {
       const response = await this.client.post<T>(url, data);
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+      throw error;
+    }
+  }
+
+  async put<T>(url: string, data: unknown): Promise<T> {
+    try {
+      const response = await this.client.put<T>(url, data);
       return response.data;
     } catch (error) {
       this.handleApiError(error);
