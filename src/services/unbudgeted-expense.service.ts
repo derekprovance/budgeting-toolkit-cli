@@ -1,7 +1,7 @@
-import { TransactionSplit } from "firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
 import { Account, Description, ExpenseAccount, Tag } from "../config";
 import { PrinterService } from "./printer.service";
+import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 
 export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}

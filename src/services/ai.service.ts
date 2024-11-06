@@ -1,4 +1,4 @@
-import { TransactionSplit } from "firefly-iii-sdk";
+import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { ClaudeClient } from "../api/claude.client";
 import { logger } from "../logger";
 

@@ -1,4 +1,4 @@
-import { BudgetRead, Category, TransactionSplit } from "firefly-iii-sdk";
+import { BudgetRead, Category, TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { logger } from "../logger";
 import { AIResponse, AIService } from "./ai.service";
 import { CategoryService } from "./category.service";

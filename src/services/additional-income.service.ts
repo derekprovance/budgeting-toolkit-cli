@@ -1,4 +1,4 @@
-import { TransactionSplit, TransactionTypeProperty } from "firefly-iii-sdk";
+import { TransactionSplit, TransactionTypeProperty } from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
 import { Account, Description } from "../config";
 import { PrinterService } from "./printer.service";

@@ -2,7 +2,7 @@ import {
   TransactionArray,
   TransactionRead,
   TransactionSplit,
-} from "firefly-iii-sdk";
+} from "@derekprovance/firefly-iii-sdk";
 import { DateRange } from "../dto/date-range.dto";
 import { FireflyApiClient } from "../api/firefly.client";
 import { logger } from "../logger";

@@ -1,4 +1,4 @@
-import { BudgetArray, BudgetRead } from "firefly-iii-sdk";
+import { BudgetArray, BudgetRead } from "@derekprovance/firefly-iii-sdk";
 import { FireflyApiClient } from "../api/firefly.client";
 
 export class BudgetService {

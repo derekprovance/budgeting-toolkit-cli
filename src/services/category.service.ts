@@ -1,4 +1,4 @@
-import { Category, CategoryArray, CategoryRead } from "firefly-iii-sdk";
+import { Category, CategoryArray, CategoryRead } from "@derekprovance/firefly-iii-sdk";
 import { FireflyApiClient } from "../api/firefly.client";
 
 export class CategoryService {
