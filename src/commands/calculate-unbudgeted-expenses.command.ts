@@ -1,4 +1,5 @@
 import { logger } from "../logger";
+import { PrinterService } from "../services/printer.service";
 import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
 
 export const calculateUnbudgetedExpenses = async (
@@ -6,7 +7,10 @@ export const calculateUnbudgetedExpenses = async (
   queryMonth: number
 ): Promise<void> => {
   try {
-    await unbudgetedExpenseService.calculateUnbudgetedExpenses(queryMonth);
+    const results = await unbudgetedExpenseService.calculateUnbudgetedExpenses(
+      queryMonth
+    );
+    PrinterService.printTransactions(results, "Unbudgeted Expenses");
   } catch (ex) {
     if (ex instanceof Error) {
       logger.error("Failed to get unbudgeted expenses", ex.message);

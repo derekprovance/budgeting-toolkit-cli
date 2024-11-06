@@ -35,7 +35,10 @@ export const updateDescriptions = async (
     budgetService,
     aiService
   );
-  console.log(
-    await updateCategoryService.updateTransactionsByTag(tag, updateBudget)
+
+  const results = await updateCategoryService.updateTransactionsByTag(
+    tag,
+    updateBudget
   );
+  console.log(results);
 };

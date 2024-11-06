@@ -1,10 +1,14 @@
-import { BudgetRead, Category, TransactionSplit } from "@derekprovance/firefly-iii-sdk";
+import {
+  BudgetRead,
+  Category,
+  TransactionSplit,
+} from "@derekprovance/firefly-iii-sdk";
 import { logger } from "../logger";
 import { AIResponse, AIService } from "./ai.service";
 import { CategoryService } from "./category.service";
 import { TransactionService } from "./transaction.service";
 import { BudgetService } from "./budget.service";
-import { Tag } from "../config";
+import { Description, Tag } from "../config";
 
 interface TransactionCategoryResult {
   name: string;
@@ -108,12 +112,13 @@ export class UpdateTransactionService {
       return false;
     }
 
+    if (transaction.description.includes(Description.VANGUARD_INVESTMENT)) {
+      return false;
+    }
+
     return true;
   }
 
-  /**
-   * Maps transactions and AI results to the final result format
-   */
   private mapToResults(
     transactions: TransactionSplit[],
     aiResults: AIResponse[]

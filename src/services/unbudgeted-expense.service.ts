@@ -1,21 +1,18 @@
 import { TransactionService } from "./transaction.service";
 import { Account, Description, ExpenseAccount, Tag } from "../config";
-import { PrinterService } from "./printer.service";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 
 export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}
 
-  async calculateUnbudgetedExpenses(month: number): Promise<void> {
+  async calculateUnbudgetedExpenses(
+    month: number
+  ): Promise<TransactionSplit[]> {
     const transactions = await this.transactionService.getTransactionsForMonth(
       month
     );
     const filteredTransactions = this.filterExpenses(transactions);
-
-    PrinterService.printTransactions(
-      filteredTransactions,
-      "Unbudgeted Expenses"
-    );
+    return filteredTransactions;
   }
 
   private filterExpenses(transactions: TransactionSplit[]) {
@@ -24,14 +21,32 @@ export class UnbudgetedExpenseService {
     );
   }
 
-  private shouldCountExpense(transaction: TransactionSplit) {
+  private shouldCountExpense(transaction: TransactionSplit): boolean {
+    if (transaction.tags?.includes(Tag.BILLS)) {
+      return true;
+    }
+
+    const isRegularExpense = this.isRegularExpenseTransaction(transaction);
+    return isRegularExpense;
+  }
+
+  private isRegularExpenseTransaction(transaction: TransactionSplit): boolean {
+    const conditions = {
+      hasNoBudget: !transaction.budget_id,
+      hasNoDestination: this.hasNoDestination(transaction.destination_id),
+      isNotDisposableSupplemented: !this.isSupplementedByDisposable(
+        transaction.tags
+      ),
+      isNotVanguardTransaction: !this.isVanguard(transaction.description),
+      isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
+    };
+
     return (
-      (!transaction.budget_id &&
-        this.hasNoDestination(transaction.destination_id) &&
-        !this.isSupplementedByDisposable(transaction.tags) &&
-        !this.isVanguard(transaction.description) &&
-        this.isExpenseAccount(transaction.source_id)) ||
-      transaction.tags?.includes(Tag.BILLS)
+      conditions.hasNoBudget &&
+      conditions.hasNoDestination &&
+      conditions.isNotDisposableSupplemented &&
+      conditions.isNotVanguardTransaction &&
+      conditions.isFromExpenseAccount
     );
   }
 
