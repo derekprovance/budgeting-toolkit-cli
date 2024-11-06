@@ -1,5 +1,5 @@
 import { BudgetArray, BudgetRead } from "@derekprovance/firefly-iii-sdk";
-import { FireflyApiClient } from "../api/firefly.client";
+import { FireflyApiClient } from "../../api/firefly.client";
 
 export class BudgetService {
   constructor(private readonly apiClient: FireflyApiClient) {}

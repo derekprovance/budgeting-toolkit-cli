@@ -3,12 +3,12 @@ import { FireflyApiClient } from "./api/firefly.client";
 import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
 import { calculateUnbudgetedExpenses } from "./commands/calculate-unbudgeted-expenses.command";
 import { config } from "./config";
-import { TransactionService } from "./services/transaction.service";
+import { TransactionService } from "./services/core/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
 import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
 import { updateDescriptions as updateTransactions } from "./commands/update-transaction.command";
-import { CategoryService } from "./services/category.service";
-import { BudgetService } from "./services/budget.service";
+import { CategoryService } from "./services/core/category.service";
+import { BudgetService } from "./services/core/budget.service";
 
 export const createCli = (): Command => {
   const program = new Command();

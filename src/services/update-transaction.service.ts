@@ -4,10 +4,10 @@ import {
   TransactionSplit,
 } from "@derekprovance/firefly-iii-sdk";
 import { logger } from "../logger";
-import { AIResponse, AIService } from "./ai.service";
-import { CategoryService } from "./category.service";
-import { TransactionService } from "./transaction.service";
-import { BudgetService } from "./budget.service";
+import { AIResponse, AIService } from "./ai/ai.service";
+import { CategoryService } from "./core/category.service";
+import { TransactionService } from "./core/transaction.service";
+import { BudgetService } from "./core/budget.service";
 import { Description, Tag } from "../config";
 
 interface TransactionCategoryResult {

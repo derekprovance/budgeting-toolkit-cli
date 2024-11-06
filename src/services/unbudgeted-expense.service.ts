@@ -1,4 +1,4 @@
-import { TransactionService } from "./transaction.service";
+import { TransactionService } from "./core/transaction.service";
 import { Account, Description, ExpenseAccount, Tag } from "../config";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 

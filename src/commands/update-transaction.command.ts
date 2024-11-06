@@ -1,9 +1,9 @@
 import { ClaudeClient } from "../api/claude.client";
 import { claudeAPIKey, llmModel } from "../config";
-import { AIService } from "../services/ai.service";
-import { BudgetService } from "../services/budget.service";
-import { CategoryService } from "../services/category.service";
-import { TransactionService } from "../services/transaction.service";
+import { AIService } from "../services/ai/ai.service";
+import { BudgetService } from "../services/core/budget.service";
+import { CategoryService } from "../services/core/category.service";
+import { TransactionService } from "../services/core/transaction.service";
 import { UpdateTransactionService } from "../services/update-transaction.service";
 
 export const updateDescriptions = async (

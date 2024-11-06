@@ -1,6 +1,6 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { ClaudeClient } from "../api/claude.client";
-import { logger } from "../logger";
+import { ClaudeClient } from "../../api/claude.client";
+import { logger } from "../../logger";
 
 export interface AIResponse {
   category: string;
