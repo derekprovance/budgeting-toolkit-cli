@@ -20,6 +20,44 @@ Before you begin, ensure you have met the following requirements:
 - An Anthropic API key for Claude integration
 - Client certificate, key, and CA certificate for Firefly III authentication (Optional)
 
+## Installing Private Dependencies
+
+This project requires access to private GitHub packages. To install the private dependencies, follow these steps:
+
+1. Create a GitHub Personal Access Token (PAT):
+   - Go to GitHub Settings → Developer Settings → Personal Access Tokens
+   - Generate a new token with `read:packages` scope
+   - Copy the generated token
+
+2. Configure npm to use GitHub Packages:
+
+```bash
+npm config set @derekprovance:registry https://npm.pkg.github.com
+npm config set //npm.pkg.github.com/:_authToken YOUR_GITHUB_PAT
+```
+
+Replace `YOUR_GITHUB_PAT` with your personal access token.
+
+3. Install the private package:
+
+```bash
+npm install @derekprovance/firefly-iii-sdk@2.1.0
+```
+
+Alternatively, you can create a `.npmrc` file in your project root with the following content:
+
+```plaintext
+@derekprovance:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT
+```
+
+### Troubleshooting
+
+If you encounter access errors:
+- Verify your PAT has the correct permissions
+- Ensure you have access to the repository
+- Check that your `.npmrc` file or npm config settings are correct
+
 ## Installation
 
 1. Clone the repository:
