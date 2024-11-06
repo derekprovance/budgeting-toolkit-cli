@@ -84,6 +84,7 @@ export class UpdateTransactionService {
   ) {
     transactions.map(async (transaction, index) => {
       const aiResult = aiResults[index];
+
       let budget;
       if (this.shouldSetBudget(transaction)) {
         budget = budgets?.find(
@@ -104,20 +105,30 @@ export class UpdateTransactionService {
   }
 
   private shouldSetBudget(transaction: TransactionSplit): boolean {
-    if (transaction.tags?.includes(Tag.BILLS)) {
+    if (this.isABill(transaction)) {
       return false;
     }
 
-    if (transaction.tags?.includes(Tag.DISPOSABLE_INCOME)) {
+    if (this.isDisposableIncome(transaction)) {
       return false;
     }
 
-    if (transaction.description.includes(Description.VANGUARD_INVESTMENT)) {
+    if (this.isInvestmentDeposit(transaction)) {
       return false;
     }
 
     return true;
   }
+
+  private isABill(transaction: TransactionSplit): boolean {
+    return transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false
+  }
+
+  private isDisposableIncome = (transaction: TransactionSplit) =>
+    transaction.tags?.includes(Tag.DISPOSABLE_INCOME);
+
+  private isInvestmentDeposit = (transaction: TransactionSplit) => 
+    transaction.description.includes(Description.VANGUARD_INVESTMENT)
 
   private mapToResults(
     transactions: TransactionSplit[],

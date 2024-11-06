@@ -3,7 +3,7 @@ import {
   TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "./core/transaction.service";
-import { Account, Description } from "../config";
+import { Account, Description, Tag } from "../config";
 
 type ValidDestinationAccount = Extract<
   Account,
@@ -52,7 +52,8 @@ export class AdditionalIncomeService {
     return transactions
       .filter(this.isDeposit)
       .filter(this.hasValidDestinationAccount)
-      .filter(this.isNotPayroll);
+      .filter(this.isNotPayroll)
+      .filter(this.notDisposableIncome);
   }
 
   private isDeposit = (transaction: TransactionSplit): boolean =>
@@ -70,4 +71,7 @@ export class AdditionalIncomeService {
     !AdditionalIncomeService.CONFIG.excludedDescriptions.some((desc) =>
       transaction.description.includes(desc)
     );
+
+  private notDisposableIncome = (transaction: TransactionSplit) =>
+    !transaction.tags?.includes(Tag.DISPOSABLE_INCOME);
 }
