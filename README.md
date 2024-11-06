@@ -42,7 +42,7 @@ Before you begin, ensure you have met the following requirements:
 
 The CLI uses environment variables for configuration. Create a `.env` file in the project root with the following variables:
 
-### Required Environment Variables
+### Environment Variables
 
 ```bash
 # Firefly III Configuration
@@ -56,7 +56,7 @@ CLIENT_CERT_PASSWORD=your_certificate_password
 
 # Claude AI Configuration
 ANTHROPIC_API_KEY=your_anthropic_key
-LLM_MODEL=claude-3-haiku-20240307
+LLM_MODEL=claude-3-5-haiku-latest
 
 # Application Configuration
 LOG_LEVEL=info
@@ -114,25 +114,6 @@ For more information on what models you can use, please visit [this help page](h
   - Default: `info`
   - Recommended: `info` for production, `debug` for development
 
-### Example .env File
-```bash
-# Firefly III Configuration
-FIREFLY_API_URL=https://your-firefly-instance.com/api/v1
-FIREFLY_API_TOKEN=your_api_token_here
-
-# Certificate Configuration
-CLIENT_CERT_CA_PATH=../certs/ca.pem
-CLIENT_CERT_PATH=../certs/client.p12
-CLIENT_CERT_PASSWORD=foobar
-
-# Application Configuration
-LOG_LEVEL=info
-
-# Claude AI Configuration
-ANTHROPIC_API_KEY=your_anthropic_key
-LLM_MODEL=claude-3-haiku-20240307
-```
-
 ## Configuration Options
 
 ### Claude Client Configuration
@@ -179,33 +160,27 @@ npm start -- [command] [options]
 
 ### Available Commands
 
-1. Process Financial Data with Claude:
+1. Calculate additional income for a given month:
    ```bash
-   npm start -- process-financial [options]
+   npm start -- calculate-additional [options]
    ```
    Options:
-   - `--batch-size`: Number of items to process in each batch
-   - `--max-concurrent`: Maximum number of concurrent requests
-   - `--model`: Specify Claude model version
-   - `--temperature`: Set response temperature (0-1)
+   - `-m --month`: Month to run calculations (required)
 
-2. Analyze Transactions:
+2. Calculate unbudgeted expenses for a given month:
    ```bash
-   npm start -- analyze-transactions [options]
+   npm start -- calculate-unbudgeted [options]
    ```
    Options:
-   - `--date-range`: Specify date range for analysis
-   - `--categories`: Filter by specific categories
-   - `--system-prompt`: Custom system prompt for analysis
+   - `-m --month`: Month to run calculations (required)
 
 3. Generate Financial Reports:
    ```bash
-   npm start -- generate-report [options]
+   npm start -- update-transactions [options]
    ```
    Options:
-   - `--format`: Report format (markdown/text)
-   - `--max-tokens`: Maximum response length
-   - `--template`: Report template name
+   - `-t --tag`: Tag containing transactions you want updated (required)
+   - `-b --budget`: Flag denoting if we should process budgets in addition
 
 ## Development
 
