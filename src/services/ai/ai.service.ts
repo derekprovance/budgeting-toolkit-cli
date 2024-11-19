@@ -39,7 +39,7 @@ export class AIService {
         systemPrompt,
       });
     } catch (error) {
-      console.error("Error categorizing transactions:", error);
+      logger.error("Error categorizing transactions:", error);
       throw error;
     }
   }
@@ -58,12 +58,10 @@ export class AIService {
       
       Rules:
       1. Choose ONE budget from the provided list that best matches the transaction
-      2. If no budget applies, output an empty string ""
-      3. Copy-paste the exact budget name - do not modify or abbreviate it
-      4. Never include explanations, punctuation, or additional text
-      5. Never make up new budget categories
-      6. Never output anything except a budget name or empty string
-      
+      2. Copy-paste the exact budget name - do not modify or abbreviate it
+      3. Never include explanations, punctuation, or additional text
+      4. DO NOT explain your choice or add any other text
+
       Examples:
       Input: "Walmart groceries $50"
       Output: Groceries
@@ -89,7 +87,7 @@ export class AIService {
         systemPrompt,
       });
     } catch (error) {
-      console.error("Error assigning budgets:", error);
+      logger.error("Error assigning budgets:", error);
       throw error;
     }
   }
@@ -108,11 +106,16 @@ export class AIService {
       return assignedCategories.map((category) => ({ category }));
     }
 
-    const assignedBudgets = await this.assignBudgets(
-      budgets,
-      transactions,
-      assignedCategories
-    );
+    let assignedBudgets: string[] = [];
+    try {
+      assignedBudgets = await this.assignBudgets(
+        budgets,
+        transactions,
+        assignedCategories
+      );
+    } catch (ex) {
+      logger.error(ex, `Unable to assign buckets`);
+    }
 
     return assignedCategories.map((category, index) => ({
       category,

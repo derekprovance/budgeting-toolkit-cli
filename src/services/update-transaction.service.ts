@@ -90,12 +90,24 @@ export class UpdateTransactionService {
         budget = budgets?.find(
           (budget) => budget.attributes.name === aiResult.budget
         );
+
+        if (!budget) {
+          logger.info(
+            `Errant Budget Result from AI ${aiResult.budget} for transaction: ${transaction.description}`
+          );
+        }
       }
+
       const category = categories.find(
         (category) => category?.name === aiResult.category
       );
 
-      budgets?.find((budget) => budget.attributes.name === aiResult.budget);
+      if (!category) {
+        logger.info(
+          `Errant Category Result from AI ${aiResult.category} for transaction: ${transaction.description}`
+        );
+      }
+
       await this.transactionService.updateTransaction(
         transaction,
         category?.name,
@@ -121,14 +133,14 @@ export class UpdateTransactionService {
   }
 
   private isABill(transaction: TransactionSplit): boolean {
-    return transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false
+    return transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false;
   }
 
   private isDisposableIncome = (transaction: TransactionSplit) =>
     transaction.tags?.includes(Tag.DISPOSABLE_INCOME);
 
-  private isInvestmentDeposit = (transaction: TransactionSplit) => 
-    transaction.description.includes(Description.VANGUARD_INVESTMENT)
+  private isInvestmentDeposit = (transaction: TransactionSplit) =>
+    transaction.description.includes(Description.VANGUARD_INVESTMENT);
 
   private mapToResults(
     transactions: TransactionSplit[],
