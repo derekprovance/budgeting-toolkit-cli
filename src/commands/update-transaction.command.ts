@@ -6,7 +6,7 @@ import { CategoryService } from "../services/core/category.service";
 import { TransactionService } from "../services/core/transaction.service";
 import { UpdateTransactionService } from "../services/update-transaction.service";
 
-export const updateDescriptions = async (
+export const updateTransactions = async (
   transactionService: TransactionService,
   categoryService: CategoryService,
   budgetService: BudgetService,
@@ -19,6 +19,8 @@ export const updateDescriptions = async (
     );
     return;
   }
+
+  console.log("Categorizing transactions using an LLM...")
 
   const claudeClient = new ClaudeClient({
     apiKey: claudeAPIKey,

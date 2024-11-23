@@ -5,6 +5,10 @@ export const calculateAdditionalIncome = async (
   additionalIncomeService: AdditionalIncomeService,
   month: number
 ) => {
-  const results = await additionalIncomeService.calculateAdditionalIncome(month);
+  console.log("Calculating additional income...");
+
+  const results = await additionalIncomeService.calculateAdditionalIncome(
+    month
+  );
   PrinterService.printTransactions(results, "Additional Income");
 };

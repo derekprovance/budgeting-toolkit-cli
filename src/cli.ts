@@ -6,7 +6,7 @@ import { config } from "./config";
 import { TransactionService } from "./services/core/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
 import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
-import { updateDescriptions as updateTransactions } from "./commands/update-transaction.command";
+import { updateTransactions as updateTransactions } from "./commands/update-transaction.command";
 import { CategoryService } from "./services/core/category.service";
 import { BudgetService } from "./services/core/budget.service";
 
@@ -34,24 +34,32 @@ export const createCli = (): Command => {
     .command("calculate-unbudgeted")
     .description("Calculate unbudgeted expenses")
     .addOption(
-      new Option("-m, --month <month>", "a month must be specified <int>")
-        .argParser(parseInt)
-        .makeOptionMandatory()
+      new Option(
+        "-m, --month <month>",
+        "a month must be specified <int>"
+      ).argParser(parseInt)
     )
     .action((opts) =>
-      calculateUnbudgetedExpenses(unbudgetedExpenseService, opts.month)
+      calculateUnbudgetedExpenses(
+        unbudgetedExpenseService,
+        opts.month ?? getCurrentMonth()
+      )
     );
 
   program
     .command("calculate-additional")
     .description("Calculate the additional income")
     .addOption(
-      new Option("-m, --month <month>", "a month must be specified <int>")
-        .argParser(parseInt)
-        .makeOptionMandatory()
+      new Option(
+        "-m, --month <month>",
+        "a month must be specified <int>"
+      ).argParser(parseInt)
     )
     .action((opts) =>
-      calculateAdditionalIncome(additionalIncomeService, opts.month)
+      calculateAdditionalIncome(
+        additionalIncomeService,
+        opts.month ?? getCurrentMonth()
+      )
     );
 
   program
@@ -64,7 +72,19 @@ export const createCli = (): Command => {
       ).makeOptionMandatory()
     )
     .option("-b, --budget", "update the budget for transactions")
-    .action((opts) => updateTransactions(transactionService, categoryService, budgetService, opts.tag, opts.budget));
+    .action((opts) =>
+      updateTransactions(
+        transactionService,
+        categoryService,
+        budgetService,
+        opts.tag,
+        opts.budget
+      )
+    );
+
+  const getCurrentMonth = (): number => {
+    return new Date().getMonth();
+  };
 
   return program;
 };

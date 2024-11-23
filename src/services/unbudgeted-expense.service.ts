@@ -1,6 +1,7 @@
 import { TransactionService } from "./core/transaction.service";
-import { Account, Description, ExpenseAccount, Tag } from "../config";
+import { Account, Tag } from "../config";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
+import { TransactionProperty } from "./core/transaction-property.service";
 
 export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}
@@ -33,11 +34,14 @@ export class UnbudgetedExpenseService {
   private isRegularExpenseTransaction(transaction: TransactionSplit): boolean {
     const conditions = {
       hasNoBudget: !transaction.budget_id,
-      hasNoDestination: this.hasNoDestination(transaction.destination_id),
-      isNotDisposableSupplemented: !this.isSupplementedByDisposable(
-        transaction.tags
+      hasNoDestination: TransactionProperty.hasNoDestination(
+        transaction.destination_id
       ),
-      isNotVanguardTransaction: !this.isVanguard(transaction.description),
+      isNotDisposableSupplemented:
+        !TransactionProperty.isSupplementedByDisposable(
+          transaction.tags
+        ),
+      isNotVanguardTransaction: !TransactionProperty.isVanguard(transaction.description),
       isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
     };
 
@@ -48,18 +52,6 @@ export class UnbudgetedExpenseService {
       conditions.isNotVanguardTransaction &&
       conditions.isFromExpenseAccount
     );
-  }
-
-  private isVanguard(description: string): boolean {
-    return description === Description.VANGUARD_INVESTMENT;
-  }
-
-  private hasNoDestination(destinationId: string | null) {
-    return destinationId === ExpenseAccount.NO_NAME;
-  }
-
-  private isSupplementedByDisposable(tags: string[] | null | undefined) {
-    return tags?.includes(Tag.DISPOSABLE_INCOME);
   }
 
   private isExpenseAccount(sourceId: string | null) {

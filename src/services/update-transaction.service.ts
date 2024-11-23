@@ -8,7 +8,7 @@ import { AIResponse, AIService } from "./ai/ai.service";
 import { CategoryService } from "./core/category.service";
 import { TransactionService } from "./core/transaction.service";
 import { BudgetService } from "./core/budget.service";
-import { Description, Tag } from "../config";
+import { TransactionProperty } from "./core/transaction-property.service";
 
 interface TransactionCategoryResult {
   name: string;
@@ -116,31 +116,33 @@ export class UpdateTransactionService {
     });
   }
 
-  private shouldSetBudget(transaction: TransactionSplit): boolean {
-    if (this.isABill(transaction)) {
+  private shouldCategorizeTransaction(transaction: TransactionSplit): boolean {
+    if (TransactionProperty.isABill(transaction)) {
       return false;
     }
 
-    if (this.isDisposableIncome(transaction)) {
-      return false;
-    }
-
-    if (this.isInvestmentDeposit(transaction)) {
+    if (TransactionProperty.isTransfer(transaction)) {
       return false;
     }
 
     return true;
   }
 
-  private isABill(transaction: TransactionSplit): boolean {
-    return transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false;
+  private shouldSetBudget(transaction: TransactionSplit): boolean {
+    if (TransactionProperty.isABill(transaction)) {
+      return false;
+    }
+
+    if (TransactionProperty.isDisposableIncome(transaction)) {
+      return false;
+    }
+
+    if (TransactionProperty.isInvestmentDeposit(transaction)) {
+      return false;
+    }
+
+    return true;
   }
-
-  private isDisposableIncome = (transaction: TransactionSplit) =>
-    transaction.tags?.includes(Tag.DISPOSABLE_INCOME);
-
-  private isInvestmentDeposit = (transaction: TransactionSplit) =>
-    transaction.description.includes(Description.VANGUARD_INVESTMENT);
 
   private mapToResults(
     transactions: TransactionSplit[],

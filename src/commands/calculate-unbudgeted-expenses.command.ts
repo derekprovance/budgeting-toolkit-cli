@@ -7,6 +7,8 @@ export const calculateUnbudgetedExpenses = async (
   queryMonth: number
 ): Promise<void> => {
   try {
+    console.log("Calculating unbudgeted expenses...");
+
     const results = await unbudgetedExpenseService.calculateUnbudgetedExpenses(
       queryMonth
     );
