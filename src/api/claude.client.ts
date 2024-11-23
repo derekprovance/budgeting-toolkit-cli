@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ContentBlock } from "@anthropic-ai/sdk/resources";
 import { logger } from "../logger";
 
-interface ChatMessage {
+export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }

@@ -4,11 +4,14 @@ import {
   TransactionSplit,
 } from "@derekprovance/firefly-iii-sdk";
 import { logger } from "../logger";
-import { AIResponse, AIService } from "./ai/ai.service";
 import { CategoryService } from "./core/category.service";
 import { TransactionService } from "./core/transaction.service";
 import { BudgetService } from "./core/budget.service";
 import { TransactionProperty } from "./core/transaction-property.service";
+import {
+  AIResponse,
+  LLMTransactionProcessingService,
+} from "./ai/llm-transaction-processing.service";
 
 interface TransactionCategoryResult {
   name?: string;
@@ -23,7 +26,7 @@ export class UpdateTransactionService {
     private transactionService: TransactionService,
     private categoryService: CategoryService,
     private budgetService: BudgetService,
-    private aiService: AIService
+    private transactionProcessingService: LLMTransactionProcessingService
   ) {}
 
   async updateTransactionsByTag(
@@ -45,7 +48,7 @@ export class UpdateTransactionService {
         return [];
       }
 
-      let budgets: BudgetRead[] = [];
+      let budgets;
       let budgetNames;
       if (updateBudget) {
         budgets = await this.budgetService.getBudgets();
@@ -53,12 +56,12 @@ export class UpdateTransactionService {
       }
 
       const categoryNames = categories.map((c) => c.name);
-
-      const aiResults = await this.aiService.processTransactions(
-        transactions,
-        categoryNames,
-        budgetNames
-      );
+      const aiResults =
+        await this.transactionProcessingService.processTransactions(
+          transactions,
+          categoryNames,
+          budgetNames
+        );
 
       if (aiResults.length !== transactions.length) {
         throw new Error(
@@ -93,7 +96,7 @@ export class UpdateTransactionService {
       const aiResult = aiResults[index];
 
       let budget;
-      if (this.shouldSetBudget(transaction)) {
+      if (budgets && this.shouldSetBudget(transaction)) {
         budget = budgets?.find(
           (budget) => budget.attributes.name === aiResult.budget
         );

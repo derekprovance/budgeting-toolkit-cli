@@ -15,7 +15,7 @@ export const updateTransactions = async (
   results.forEach((result) => {
     let output = `${result.name}: `;
     const hasNewCategory = result.category !== result.updatedCategory;
-    const hasNewBudget = result.budget !== result.updatedBudget;
+    const hasNewBudget = updateBudget && result.budget !== result.updatedBudget;
 
     if (hasNewCategory)
       output += `${result.category || "<No Category>"} => ${
@@ -31,4 +31,5 @@ export const updateTransactions = async (
 
     if (hasNewCategory || hasNewBudget) console.log(output);
   });
+  console.log("Transactions successfully processed using LLM");
 };

@@ -10,9 +10,11 @@ import { updateTransactions as updateTransactions } from "./commands/update-tran
 import { CategoryService } from "./services/core/category.service";
 import { BudgetService } from "./services/core/budget.service";
 import { ClaudeClient } from "./api/claude.client";
-import { AIService } from "./services/ai/ai.service";
 import { UpdateTransactionService } from "./services/update-transaction.service";
 import { finalizeBudgetCommand } from "./commands/finalize-budget.command";
+import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-category.service";
+import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budget.service";
+import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -32,7 +34,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("1.6.0");
+    .version("1.6.1");
 
   program
     .command("calculate-unbudgeted")
@@ -109,12 +111,21 @@ export const createCli = (): Command => {
         batchSize: 10,
         maxConcurrent: 5,
       });
-      const aiService = new AIService(claudeClient);
+
+      const llmCategoryService = new LLMTransactionCategoryService(
+        claudeClient
+      );
+      const llmBudgetService = new LLMTransactionBudgetService(claudeClient);
+      const llmTransactionProcessor = new LLMTransactionProcessingService(
+        llmCategoryService,
+        llmBudgetService
+      );
+
       const updateCategoryService = new UpdateTransactionService(
         transactionService,
         categoryService,
         budgetService,
-        aiService
+        llmTransactionProcessor
       );
 
       updateTransactions(updateCategoryService, opts.tag, opts.budget);
