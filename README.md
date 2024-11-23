@@ -203,14 +203,14 @@ npm start -- [command] [options]
    npm start -- calculate-additional [options]
    ```
    Options:
-   - `-m --month`: Month to run calculations (required)
+   - `-m --month`: Month to run calculations
 
 2. Calculate unbudgeted expenses for a given month:
    ```bash
    npm start -- calculate-unbudgeted [options]
    ```
    Options:
-   - `-m --month`: Month to run calculations (required)
+   - `-m --month`: Month to run calculations
 
 3. Generate Financial Reports:
    ```bash

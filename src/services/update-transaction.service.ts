@@ -14,6 +14,8 @@ interface TransactionCategoryResult {
   name: string;
   category: string;
   budget?: string;
+  updatedCategory: string;
+  updatedBudget?: string;
 }
 
 export class UpdateTransactionService {
@@ -29,10 +31,14 @@ export class UpdateTransactionService {
     updateBudget = false
   ): Promise<TransactionCategoryResult[]> {
     try {
-      const [transactions, categories] = await Promise.all([
+      const [unfilteredTransactions, categories] = await Promise.all([
         this.transactionService.getTransactionsByTag(tag),
         this.categoryService.getCategories(),
       ]);
+
+      const transactions = unfilteredTransactions.filter(
+        this.shouldCategorizeTransaction
+      );
 
       if (!transactions.length) {
         logger.info(`No transactions found for tag: ${tag}`);
@@ -66,6 +72,7 @@ export class UpdateTransactionService {
         categories,
         budgets
       );
+
       return this.mapToResults(transactions, aiResults);
     } catch (ex) {
       if (ex instanceof Error) {
@@ -117,31 +124,26 @@ export class UpdateTransactionService {
   }
 
   private shouldCategorizeTransaction(transaction: TransactionSplit): boolean {
-    if (TransactionProperty.isABill(transaction)) {
-      return false;
-    }
+    const conditions = {
+      notABill: !TransactionProperty.isABill(transaction),
+      notATransfer: !TransactionProperty.isTransfer(transaction),
+    };
 
-    if (TransactionProperty.isTransfer(transaction)) {
-      return false;
-    }
-
-    return true;
+    return conditions.notABill && conditions.notATransfer;
   }
 
   private shouldSetBudget(transaction: TransactionSplit): boolean {
-    if (TransactionProperty.isABill(transaction)) {
-      return false;
-    }
+    const conditions = {
+      notABill: !TransactionProperty.isABill(transaction),
+      notDisposableIncome: !TransactionProperty.isDisposableIncome(transaction),
+      notAnInvestment: !TransactionProperty.isInvestmentDeposit(transaction),
+    };
 
-    if (TransactionProperty.isDisposableIncome(transaction)) {
-      return false;
-    }
-
-    if (TransactionProperty.isInvestmentDeposit(transaction)) {
-      return false;
-    }
-
-    return true;
+    return (
+      conditions.notABill &&
+      conditions.notAnInvestment &&
+      conditions.notDisposableIncome
+    );
   }
 
   private mapToResults(
@@ -150,8 +152,10 @@ export class UpdateTransactionService {
   ): TransactionCategoryResult[] {
     return transactions.map((transaction, index) => ({
       name: transaction.description,
-      category: aiResults[index].category,
-      budget: aiResults[index].budget,
+      category: transaction.category_name ?? "",
+      budget: transaction.budget_name ?? "",
+      updatedCategory: aiResults[index].category,
+      updatedBudget: aiResults[index].budget,
     }));
   }
 }

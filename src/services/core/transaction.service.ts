@@ -17,6 +17,7 @@ class TransactionError extends Error {
 type TransactionCache = Map<string, TransactionRead[]>;
 type TransactionSplitIndex = Map<string, TransactionRead>;
 
+//TODO(DEREK) - handle edge case where transactions stored in cache aren't updated when api POST call executed
 export class TransactionService {
   private readonly cache: TransactionCache;
   private readonly splitTransactionIdx: TransactionSplitIndex;

@@ -2,13 +2,16 @@ import { Command, Option } from "commander";
 import { FireflyApiClient } from "./api/firefly.client";
 import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
 import { calculateUnbudgetedExpenses } from "./commands/calculate-unbudgeted-expenses.command";
-import { config } from "./config";
+import { claudeAPIKey, config, llmModel } from "./config";
 import { TransactionService } from "./services/core/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
 import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
 import { updateTransactions as updateTransactions } from "./commands/update-transaction.command";
 import { CategoryService } from "./services/core/category.service";
 import { BudgetService } from "./services/core/budget.service";
+import { ClaudeClient } from "./api/claude.client";
+import { AIService } from "./services/ai/ai.service";
+import { UpdateTransactionService } from "./services/update-transaction.service";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -36,7 +39,7 @@ export const createCli = (): Command => {
     .addOption(
       new Option(
         "-m, --month <month>",
-        "a month must be specified <int>"
+        "month to run calculations <int>"
       ).argParser(parseInt)
     )
     .action((opts) =>
@@ -52,7 +55,7 @@ export const createCli = (): Command => {
     .addOption(
       new Option(
         "-m, --month <month>",
-        "a month must be specified <int>"
+        "month to run calculations <int>"
       ).argParser(parseInt)
     )
     .action((opts) =>
@@ -72,15 +75,32 @@ export const createCli = (): Command => {
       ).makeOptionMandatory()
     )
     .option("-b, --budget", "update the budget for transactions")
-    .action((opts) =>
-      updateTransactions(
+    .action((opts) => {
+      if (!claudeAPIKey) {
+        console.log(
+          "!!! Claude API Key is required to update categories. Please check your .env file. !!!"
+        );
+        return;
+      }
+
+      const claudeClient = new ClaudeClient({
+        apiKey: claudeAPIKey,
+        model: llmModel,
+        maxTokens: 20,
+        maxRetries: 3,
+        batchSize: 10,
+        maxConcurrent: 5,
+      });
+      const aiService = new AIService(claudeClient);
+      const updateCategoryService = new UpdateTransactionService(
         transactionService,
         categoryService,
         budgetService,
-        opts.tag,
-        opts.budget
-      )
-    );
+        aiService
+      );
+
+      updateTransactions(updateCategoryService, opts.tag, opts.budget);
+    });
 
   const getCurrentMonth = (): number => {
     return new Date().getMonth();

@@ -12,6 +12,7 @@ export const calculateUnbudgetedExpenses = async (
     const results = await unbudgetedExpenseService.calculateUnbudgetedExpenses(
       queryMonth
     );
+
     PrinterService.printTransactions(results, "Unbudgeted Expenses");
   } catch (ex) {
     if (ex instanceof Error) {

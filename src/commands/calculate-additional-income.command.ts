@@ -10,5 +10,6 @@ export const calculateAdditionalIncome = async (
   const results = await additionalIncomeService.calculateAdditionalIncome(
     month
   );
+
   PrinterService.printTransactions(results, "Additional Income");
 };
