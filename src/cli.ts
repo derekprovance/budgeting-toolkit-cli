@@ -12,6 +12,7 @@ import { BudgetService } from "./services/core/budget.service";
 import { ClaudeClient } from "./api/claude.client";
 import { AIService } from "./services/ai/ai.service";
 import { UpdateTransactionService } from "./services/update-transaction.service";
+import { finalizeBudgetCommand } from "./commands/finalize-budget.command";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -31,7 +32,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("1.5.1");
+    .version("1.6.0");
 
   program
     .command("calculate-unbudgeted")
@@ -61,6 +62,23 @@ export const createCli = (): Command => {
     .action((opts) =>
       calculateAdditionalIncome(
         additionalIncomeService,
+        opts.month ?? getCurrentMonth()
+      )
+    );
+
+  program
+    .command("finalize-budget")
+    .description("Runs calculations needed to finalize the budget")
+    .addOption(
+      new Option(
+        "-m, --month <month>",
+        "month to run calculations <int>"
+      ).argParser(parseInt)
+    )
+    .action((opts) =>
+      finalizeBudgetCommand(
+        additionalIncomeService,
+        unbudgetedExpenseService,
         opts.month ?? getCurrentMonth()
       )
     );

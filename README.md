@@ -200,21 +200,29 @@ npm start -- [command] [options]
 
 1. Calculate additional income for a given month:
    ```bash
-   npm start -- calculate-additional [options]
+   ./budget.sh calculate-additional [options]
    ```
    Options:
    - `-m --month`: Month to run calculations
 
 2. Calculate unbudgeted expenses for a given month:
    ```bash
-   npm start -- calculate-unbudgeted [options]
+   ./budget.sh calculate-unbudgeted [options]
    ```
    Options:
    - `-m --month`: Month to run calculations
 
-3. Generate Financial Reports:
+
+3. Calculate unbudgeted expenses for a given month:
    ```bash
-   npm start -- update-transactions [options]
+   ./budget.sh finalize-budget [options]
+   ```
+   Options:
+   - `-m --month`: Month to run calculations
+
+4. Generate Financial Reports:
+   ```bash
+   ./budget.sh update-transactions [options]
    ```
    Options:
    - `-t --tag`: Tag containing transactions you want updated (required)
