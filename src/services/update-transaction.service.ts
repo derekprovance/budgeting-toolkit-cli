@@ -11,10 +11,10 @@ import { BudgetService } from "./core/budget.service";
 import { TransactionProperty } from "./core/transaction-property.service";
 
 interface TransactionCategoryResult {
-  name: string;
-  category: string;
+  name?: string;
+  category?: string;
   budget?: string;
-  updatedCategory: string;
+  updatedCategory?: string;
   updatedBudget?: string;
 }
 
@@ -115,11 +115,16 @@ export class UpdateTransactionService {
         );
       }
 
-      await this.transactionService.updateTransaction(
-        transaction,
-        category?.name,
-        budget?.id
-      );
+      if (
+        transaction.category_name !== category?.name ||
+        transaction.budget_id != budget?.id
+      ) {
+        await this.transactionService.updateTransaction(
+          transaction,
+          category?.name,
+          budget?.id
+        );
+      }
     });
   }
 
@@ -150,12 +155,21 @@ export class UpdateTransactionService {
     transactions: TransactionSplit[],
     aiResults: AIResponse[]
   ): TransactionCategoryResult[] {
-    return transactions.map((transaction, index) => ({
-      name: transaction.description,
-      category: transaction.category_name ?? "",
-      budget: transaction.budget_name ?? "",
-      updatedCategory: aiResults[index].category,
-      updatedBudget: aiResults[index].budget,
-    }));
+    return transactions.map((transaction, index) => {
+      const aiResult = aiResults[index];
+
+      return {
+        ...(this.shouldCategorizeTransaction(transaction) && {
+          name: transaction.description,
+          category: transaction.category_name ?? "",
+          updatedCategory: aiResult.category,
+        }),
+        ...(this.shouldSetBudget(transaction) && {
+          name: transaction.description,
+          budget: transaction.budget_name ?? "",
+          updatedBudget: aiResult.budget,
+        }),
+      };
+    });
   }
 }

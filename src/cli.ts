@@ -78,7 +78,7 @@ export const createCli = (): Command => {
     .action((opts) => {
       if (!claudeAPIKey) {
         console.log(
-          "!!! Claude API Key is required to update categories. Please check your .env file. !!!"
+          "!!! Claude API Key is required to update transactions. Please check your .env file. !!!"
         );
         return;
       }
