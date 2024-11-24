@@ -103,8 +103,8 @@ export class TransactionService {
       return true;
     } catch (error) {
       throw this.handleError(
-        `Update transaction ${transactionRead.id} with category`,
-        "undefined",
+        `Update transaction <${transactionRead.id}> split <${transaction.transaction_journal_id}>`,
+        "transaction",
         error
       );
     }
