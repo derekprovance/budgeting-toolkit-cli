@@ -79,7 +79,7 @@ export class UpdateTransactionService {
       return this.mapToResults(transactions, aiResults);
     } catch (ex) {
       if (ex instanceof Error) {
-        logger.error("Unable to get transactions by tag", ex.message);
+        logger.error(`Unable to get transactions by tag: ${ex.message}`);
       }
 
       return [];
