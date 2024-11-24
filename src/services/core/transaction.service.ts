@@ -17,7 +17,12 @@ class TransactionError extends Error {
 type TransactionCache = Map<string, TransactionRead[]>;
 type TransactionSplitIndex = Map<string, TransactionRead>;
 
-//TODO(DEREK) - handle edge case where transactions stored in cache aren't updated when api POST call executed
+interface TransactionUpdateResult {
+  success: boolean;
+  error?: Error;
+  transactionId?: string;
+}
+
 export class TransactionService {
   private readonly cache: TransactionCache;
   private readonly splitTransactionIdx: TransactionSplitIndex;
@@ -74,39 +79,77 @@ export class TransactionService {
     transaction: TransactionSplit,
     category?: string,
     budgetId?: string
-  ): Promise<boolean> {
-    logger.debug(
-      `Updating ${transaction.description}: ${category}, ${budgetId}`
-    );
-    const transactionRead = this.getTransactionReadBySplit(transaction);
-
-    if (!transactionRead) {
-      throw new Error("Unkown Error: Unable to find Transaction Id for Split");
+  ): Promise<TransactionUpdateResult> {
+    if (!transaction?.transaction_journal_id) {
+      return {
+        success: false,
+        error: new Error("Invalid transaction: missing transaction_journal_id"),
+      };
     }
 
+    logger.debug(
+      {
+        description: transaction.description,
+        category,
+        budgetId,
+        journalId: transaction.transaction_journal_id,
+      },
+      "Updating transaction"
+    );
+
     try {
+      const transactionRead = await this.getTransactionReadBySplit(transaction);
+      if (!transactionRead?.id) {
+        return {
+          success: false,
+          error: new Error("Unable to find Transaction ID for Split"),
+        };
+      }
+
+      const updatePayload = {
+        apply_rules: true,
+        fire_webhooks: true,
+        transactions: [
+          {
+            transaction_journal_id: transaction.transaction_journal_id,
+            ...(category && { category_name: category }),
+            ...(budgetId && { budget_id: budgetId }),
+          },
+        ],
+      };
+
       await this.apiClient.put<TransactionArray>(
         `/transactions/${transactionRead.id}`,
-        {
-          apply_rules: true,
-          fire_webhooks: true,
-          transactions: [
-            {
-              transaction_journal_id: transaction.transaction_journal_id,
-              category_name: category ?? undefined,
-              budget_id: budgetId ?? undefined,
-            },
-          ],
-        }
+        updatePayload
       );
 
-      return true;
+      this.clearCache();
+
+      return {
+        success: true,
+        transactionId: transactionRead.id,
+      };
     } catch (error) {
-      throw this.handleError(
-        `Update transaction <${transactionRead.id}> split <${transaction.transaction_journal_id}>`,
-        "transaction",
-        error
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+
+      logger.error(
+        {
+          error: errorMessage,
+          transactionDetails: {
+            description: transaction.description,
+            journalId: transaction.transaction_journal_id,
+          },
+        },
+        "Transaction update failed"
       );
+
+      return {
+        success: false,
+        error: new Error(
+          `Transaction update failed for journal ID ${transaction.transaction_journal_id}: ${errorMessage}`
+        ),
+      };
     }
   }
 
@@ -115,6 +158,7 @@ export class TransactionService {
    */
   clearCache(): void {
     this.cache.clear();
+    this.splitTransactionIdx.clear();
   }
 
   private async getFromCacheOrFetch(
