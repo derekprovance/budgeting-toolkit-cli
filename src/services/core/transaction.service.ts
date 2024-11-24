@@ -2,6 +2,7 @@ import {
   TransactionArray,
   TransactionRead,
   TransactionSplit,
+  TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
 import { DateRange } from "../../dto/date-range.dto";
 import { FireflyApiClient } from "../../api/firefly.client";
@@ -87,6 +88,19 @@ export class TransactionService {
       };
     }
 
+    if (
+      ![
+        TransactionTypeProperty.DEPOSIT,
+        TransactionTypeProperty.WITHDRAWAL,
+      ].includes(transaction.type)
+    ) {
+      return {
+        success: false,
+        error: new Error(
+          `Unsupported transaction type ${transaction.type} for transaction_journal_id ${transaction.transaction_journal_id}`
+        ),
+      };
+    }
     logger.debug(
       {
         description: transaction.description,
