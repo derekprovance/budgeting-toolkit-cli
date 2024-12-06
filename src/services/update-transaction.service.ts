@@ -26,7 +26,8 @@ export class UpdateTransactionService {
     private transactionService: TransactionService,
     private categoryService: CategoryService,
     private budgetService: BudgetService,
-    private transactionProcessingService: LLMTransactionProcessingService
+    private transactionProcessingService: LLMTransactionProcessingService,
+    private processTransactionsWithCategories: boolean
   ) {}
 
   async updateTransactionsByTag(
@@ -39,8 +40,8 @@ export class UpdateTransactionService {
         this.categoryService.getCategories(),
       ]);
 
-      const transactions = unfilteredTransactions.filter(
-        this.shouldCategorizeTransaction
+      const transactions = unfilteredTransactions.filter((t) =>
+        this.shouldCategorizeTransaction(t)
       );
 
       if (!transactions.length) {
@@ -133,11 +134,13 @@ export class UpdateTransactionService {
 
   private shouldCategorizeTransaction(transaction: TransactionSplit): boolean {
     const conditions = {
-      notABill: !TransactionProperty.isABill(transaction),
       notATransfer: !TransactionProperty.isTransfer(transaction),
+      hasACategory: TransactionProperty.hasACategory(transaction),
     };
 
-    return conditions.notABill && conditions.notATransfer;
+    return this.processTransactionsWithCategories
+      ? conditions.notATransfer
+      : conditions.notATransfer && !conditions.hasACategory;
   }
 
   private shouldSetBudget(transaction: TransactionSplit): boolean {

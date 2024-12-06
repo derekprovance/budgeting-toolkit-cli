@@ -95,6 +95,7 @@ export const createCli = (): Command => {
       ).makeOptionMandatory()
     )
     .option("-b, --budget", "update the budget for transactions")
+    .option("-c, --category", "update all categories for transactions")
     .action((opts) => {
       if (!claudeAPIKey) {
         console.log(
@@ -125,7 +126,8 @@ export const createCli = (): Command => {
         transactionService,
         categoryService,
         budgetService,
-        llmTransactionProcessor
+        llmTransactionProcessor,
+        opts.categories
       );
 
       updateTransactions(updateCategoryService, opts.tag, opts.budget);
