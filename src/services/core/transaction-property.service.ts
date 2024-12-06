@@ -36,5 +36,5 @@ export class TransactionProperty {
     transaction.type === TransactionTypeProperty.DEPOSIT;
 
   static hasACategory = (transaction: TransactionSplit): boolean =>
-    transaction.category_id !== undefined || transaction.category_id !== null
+    !(transaction.category_id === undefined || transaction.category_id === null)
 }

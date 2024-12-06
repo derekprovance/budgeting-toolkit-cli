@@ -27,7 +27,7 @@ export class UpdateTransactionService {
     private categoryService: CategoryService,
     private budgetService: BudgetService,
     private transactionProcessingService: LLMTransactionProcessingService,
-    private processTransactionsWithCategories: boolean
+    private processTransactionsWithCategories = false
   ) {}
 
   async updateTransactionsByTag(

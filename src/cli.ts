@@ -127,7 +127,7 @@ export const createCli = (): Command => {
         categoryService,
         budgetService,
         llmTransactionProcessor,
-        opts.categories
+        opts.category
       );
 
       updateTransactions(updateCategoryService, opts.tag, opts.budget);
