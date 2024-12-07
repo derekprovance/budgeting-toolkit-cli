@@ -148,11 +148,12 @@ export class UpdateTransactionService {
           continue;
         }
 
-        await this.transactionService.updateTransaction(
+        const result = await this.transactionService.updateTransaction(
           transaction,
           category?.name,
           budget?.id
         );
+        logger.debug(result, "Transaction Update Result")
 
         updatedTransactions.push(transaction);
       }
@@ -187,6 +188,7 @@ export class UpdateTransactionService {
       "\nApply these changes?",
     ].join("\n");
 
+    console.log("\n");
     const answer = await inquirer.prompt([
       {
         type: "confirm",
