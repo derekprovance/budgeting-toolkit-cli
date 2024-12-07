@@ -12,6 +12,8 @@ import {
   AIResponse,
   LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
+import inquirer from "inquirer";
+import { UpdateTransactionMode } from "../update-transaction-mode.enum";
 
 interface TransactionCategoryResult {
   name?: string;
@@ -27,17 +29,20 @@ export class UpdateTransactionService {
     private categoryService: CategoryService,
     private budgetService: BudgetService,
     private transactionProcessingService: LLMTransactionProcessingService,
-    private processTransactionsWithCategories = false
+    private processTransactionsWithCategories = false,
+    private noConfirmation = false
   ) {}
 
   async updateTransactionsByTag(
     tag: string,
-    updateBudget = false
+    updateMode: UpdateTransactionMode
   ): Promise<TransactionCategoryResult[]> {
     try {
       const [unfilteredTransactions, categories] = await Promise.all([
         this.transactionService.getTransactionsByTag(tag),
-        this.categoryService.getCategories(),
+        updateMode !== UpdateTransactionMode.Budget
+          ? this.categoryService.getCategories()
+          : Promise.resolve([]),
       ]);
 
       const transactions = unfilteredTransactions.filter((t) =>
@@ -51,7 +56,7 @@ export class UpdateTransactionService {
 
       let budgets;
       let budgetNames;
-      if (updateBudget) {
+      if (updateMode !== UpdateTransactionMode.Category) {
         budgets = await this.budgetService.getBudgets();
         budgetNames = budgets.map((b) => b.attributes.name);
       }
@@ -60,8 +65,12 @@ export class UpdateTransactionService {
       const aiResults =
         await this.transactionProcessingService.processTransactions(
           transactions,
-          categoryNames,
-          budgetNames
+          updateMode !== UpdateTransactionMode.Budget
+            ? categoryNames
+            : undefined,
+          updateMode !== UpdateTransactionMode.Category
+            ? budgetNames
+            : undefined
         );
 
       if (aiResults.length !== transactions.length) {
@@ -70,14 +79,14 @@ export class UpdateTransactionService {
         );
       }
 
-      this.updateTransactionsWithAIResults(
+      const updatedTransactions = await this.updateTransactionsWithAIResults(
         transactions,
         aiResults,
         categories,
         budgets
       );
 
-      return this.mapToResults(transactions, aiResults);
+      return this.mapToResults(updatedTransactions, aiResults);
     } catch (ex) {
       if (ex instanceof Error) {
         logger.error(`Unable to get transactions by tag: ${ex.message}`);
@@ -87,14 +96,17 @@ export class UpdateTransactionService {
     }
   }
 
-  private updateTransactionsWithAIResults(
+  private async updateTransactionsWithAIResults(
     transactions: TransactionSplit[],
     aiResults: AIResponse[],
     categories: Category[],
     budgets?: BudgetRead[]
-  ) {
-    transactions.map(async (transaction, index) => {
-      const aiResult = aiResults[index];
+  ): Promise<TransactionSplit[]> {
+    const updatedTransactions: TransactionSplit[] = [];
+
+    for (let i = 0; i < transactions.length; i++) {
+      const transaction = transactions[i];
+      const aiResult = aiResults[i];
 
       let budget;
       if (budgets && this.shouldSetBudget(transaction)) {
@@ -120,16 +132,71 @@ export class UpdateTransactionService {
       }
 
       if (
-        transaction.category_name !== category?.name ||
-        transaction.budget_id != budget?.id
+        (transaction.category_name !== category?.name && category?.name) ||
+        (transaction.budget_id !== budget?.id && budget?.id)
       ) {
+        const answer = await this.askToUpdateTransaction(
+          transaction.description,
+          category?.name,
+          budget?.attributes.name
+        );
+
+        if (!answer) {
+          logger.debug(
+            `Skipping transaction ${transaction.description} due to user input`
+          );
+          continue;
+        }
+
         await this.transactionService.updateTransaction(
           transaction,
           category?.name,
           budget?.id
         );
+
+        updatedTransactions.push(transaction);
       }
-    });
+    }
+
+    return updatedTransactions;
+  }
+
+  private async askToUpdateTransaction(
+    description: string,
+    category: string | undefined,
+    budget: string | undefined
+  ): Promise<boolean> {
+    if (this.noConfirmation) {
+      return true;
+    }
+
+    const changes = [
+      category && `Category: ${category}`,
+      budget && `Budget: ${budget}`,
+    ].filter(Boolean);
+
+    const formattedDescription =
+      description.length > 50
+        ? `${description.substring(0, 47)}...`
+        : description;
+
+    const message = [
+      `Transaction: "${formattedDescription}"`,
+      "Proposed changes:",
+      ...changes.map((change) => `  • ${change}`),
+      "\nApply these changes?",
+    ].join("\n");
+
+    const answer = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "update",
+        message,
+        default: true,
+      },
+    ]);
+
+    return answer.update;
   }
 
   private shouldCategorizeTransaction(transaction: TransactionSplit): boolean {

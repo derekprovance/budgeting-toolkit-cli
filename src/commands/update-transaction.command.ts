@@ -1,21 +1,26 @@
 import { UpdateTransactionService } from "../services/update-transaction.service";
+import { UpdateTransactionMode } from "../update-transaction-mode.enum";
 
 export const updateTransactions = async (
   updateTransactionService: UpdateTransactionService,
   tag: string,
-  updateBudget: boolean
+  updateMode: UpdateTransactionMode
 ) => {
   console.log("Categorizing transactions using an LLM...");
 
   const results = await updateTransactionService.updateTransactionsByTag(
     tag,
-    updateBudget
+    updateMode
   );
 
   results.forEach((result) => {
     let output = `${result.name}: `;
-    const hasNewCategory = result.category !== result.updatedCategory;
-    const hasNewBudget = updateBudget && result.budget !== result.updatedBudget;
+    const hasNewCategory =
+      updateMode !== UpdateTransactionMode.Budget &&
+      result.category !== result.updatedCategory;
+    const hasNewBudget =
+      updateMode !== UpdateTransactionMode.Category &&
+      result.budget !== result.updatedBudget;
 
     if (hasNewCategory)
       output += `${result.category || "<No Category>"} => ${
@@ -23,7 +28,7 @@ export const updateTransactions = async (
       }`;
 
     output +=
-      updateBudget && hasNewBudget
+      updateMode !== UpdateTransactionMode.Category && hasNewBudget
         ? `${hasNewCategory ? " | " : ""}${result.budget || "<No Budget>"} => ${
             result.updatedBudget
           }`

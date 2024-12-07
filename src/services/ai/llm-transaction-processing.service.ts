@@ -12,7 +12,7 @@ interface ITransactionProcessor {
 }
 
 export interface AIResponse {
-  category: string;
+  category?: string;
   budget?: string;
 }
 
@@ -24,33 +24,61 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
   async processTransactions(
     transactions: TransactionSplit[],
-    categories: string[],
+    categories?: string[],
     budgets?: string[]
   ): Promise<AIResponse[]> {
-    const assignedCategories =
-      await this.llmCategoryService.categorizeTransactions(
+    if (!transactions.length) {
+      return [];
+    }
+
+    const [assignedCategories, assignedBudgets] = await Promise.all([
+      categories?.length
+        ? this.processCategoriesWithErrorHandling(transactions, categories)
+        : Promise.resolve([]),
+      budgets?.length
+        ? this.processBudgetsWithErrorHandling(
+            transactions,
+            budgets,
+            categories
+          )
+        : Promise.resolve([]),
+    ]);
+
+    return transactions.map((_t, index) => ({
+      ...(assignedCategories[index] && { category: assignedCategories[index] }),
+      ...(assignedBudgets[index] && { budget: assignedBudgets[index] }),
+    }));
+  }
+
+  private async processCategoriesWithErrorHandling(
+    transactions: TransactionSplit[],
+    categories: string[]
+  ): Promise<string[]> {
+    try {
+      return await this.llmCategoryService.categorizeTransactions(
         categories,
         transactions
       );
-
-    if (!budgets?.length) {
-      return assignedCategories.map((category) => ({ category }));
+    } catch (error) {
+      logger.error(error, "Unable to assign categories");
+      return new Array(transactions.length).fill("");
     }
+  }
 
-    let assignedBudgets: string[] = [];
+  private async processBudgetsWithErrorHandling(
+    transactions: TransactionSplit[],
+    budgets: string[],
+    categories?: string[]
+  ): Promise<string[]> {
     try {
-      assignedBudgets = await this.llmBudgetService.assignBudgets(
+      return await this.llmBudgetService.assignBudgets(
         budgets,
         transactions,
-        assignedCategories
+        categories || []
       );
-    } catch (ex) {
-      logger.error(ex, `Unable to assign buckets`);
+    } catch (error) {
+      logger.error(error, "Unable to assign budgets");
+      return new Array(transactions.length).fill("");
     }
-
-    return assignedCategories.map((category, index) => ({
-      category,
-      ...(assignedBudgets[index] ? { budget: assignedBudgets[index] } : {}),
-    }));
   }
 }

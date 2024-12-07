@@ -1,11 +1,9 @@
 import { Command, Option } from "commander";
 import { FireflyApiClient } from "./api/firefly.client";
 import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
-import { calculateUnbudgetedExpenses } from "./commands/calculate-unbudgeted-expenses.command";
 import { claudeAPIKey, config, llmModel } from "./config";
 import { TransactionService } from "./services/core/transaction.service";
 import { AdditionalIncomeService } from "./services/additional-income.service";
-import { calculateAdditionalIncome } from "./commands/calculate-additional-income.command";
 import { updateTransactions as updateTransactions } from "./commands/update-transaction.command";
 import { CategoryService } from "./services/core/category.service";
 import { BudgetService } from "./services/core/budget.service";
@@ -15,6 +13,7 @@ import { finalizeBudgetCommand } from "./commands/finalize-budget.command";
 import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-category.service";
 import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budget.service";
 import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
+import { UpdateTransactionMode } from "./update-transaction-mode.enum";
 
 export const createCli = (): Command => {
   const program = new Command();
@@ -34,39 +33,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("1.6.2");
-
-  program
-    .command("calculate-unbudgeted")
-    .description("Calculate unbudgeted expenses")
-    .addOption(
-      new Option(
-        "-m, --month <month>",
-        "month to run calculations <int>"
-      ).argParser(parseInt)
-    )
-    .action((opts) =>
-      calculateUnbudgetedExpenses(
-        unbudgetedExpenseService,
-        opts.month ?? getCurrentMonth()
-      )
-    );
-
-  program
-    .command("calculate-additional")
-    .description("Calculate the additional income")
-    .addOption(
-      new Option(
-        "-m, --month <month>",
-        "month to run calculations <int>"
-      ).argParser(parseInt)
-    )
-    .action((opts) =>
-      calculateAdditionalIncome(
-        additionalIncomeService,
-        opts.month ?? getCurrentMonth()
-      )
-    );
+    .version("2.0.0");
 
   program
     .command("finalize-budget")
@@ -94,8 +61,26 @@ export const createCli = (): Command => {
         "a tag must be specified <string>"
       ).makeOptionMandatory()
     )
-    .option("-b, --budget", "update the budget for transactions")
-    .option("-c, --category", "update all categories for transactions")
+    .addOption(
+      new Option(
+        "-m, --mode <mode>",
+        `specify what to update: '${UpdateTransactionMode.Category}', '${UpdateTransactionMode.Budget}', or '${UpdateTransactionMode.Both}'`
+      )
+        .choices([
+          UpdateTransactionMode.Category,
+          UpdateTransactionMode.Budget,
+          UpdateTransactionMode.Both,
+        ])
+        .default(UpdateTransactionMode.Category)
+    )
+    .option(
+      "-i, --includeClassified",
+      "process transactions that already have categories assigned"
+    )
+    .option(
+      "-y, --yes",
+      "automatically apply updates without confirmation prompts"
+    )
     .action((opts) => {
       if (!claudeAPIKey) {
         console.log(
@@ -127,10 +112,11 @@ export const createCli = (): Command => {
         categoryService,
         budgetService,
         llmTransactionProcessor,
-        opts.category
+        opts.includeClassified,
+        opts.yes
       );
 
-      updateTransactions(updateCategoryService, opts.tag, opts.budget);
+      updateTransactions(updateCategoryService, opts.tag, opts.mode);
     });
 
   const getCurrentMonth = (): number => {

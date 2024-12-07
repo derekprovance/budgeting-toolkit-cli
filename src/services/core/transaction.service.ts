@@ -101,6 +101,7 @@ export class TransactionService {
         ),
       };
     }
+
     logger.debug(
       {
         description: transaction.description,
