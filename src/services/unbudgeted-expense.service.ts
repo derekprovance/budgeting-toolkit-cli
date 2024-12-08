@@ -2,6 +2,7 @@ import { TransactionService } from "./core/transaction.service";
 import { Account, Tag } from "../config";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionProperty } from "./core/transaction-property.service";
+import { logger } from "../logger";
 
 export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}
@@ -34,22 +35,26 @@ export class UnbudgetedExpenseService {
   private isRegularExpenseTransaction(transaction: TransactionSplit): boolean {
     const conditions = {
       hasNoBudget: !transaction.budget_id,
-      hasNoDestination: TransactionProperty.hasNoDestination(
-        transaction.destination_id
-      ),
+      isNotTransfer: !TransactionProperty.isTransfer(transaction),
       isNotDisposableSupplemented:
-        !TransactionProperty.isSupplementedByDisposable(
-          transaction.tags
-        ),
-      isNotVanguardTransaction: !TransactionProperty.isVanguard(transaction.description),
+        !TransactionProperty.isSupplementedByDisposable(transaction.tags),
+      isNotMonthlyInvestment: !TransactionProperty.isMonthlyInvestment(
+        transaction.description,
+        transaction.amount
+      ),
       isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
     };
 
+    logger.trace(
+      conditions,
+      `isRegularExpenseTransaction: ${transaction.description}`
+    );
+
     return (
       conditions.hasNoBudget &&
-      conditions.hasNoDestination &&
+      conditions.isNotTransfer &&
       conditions.isNotDisposableSupplemented &&
-      conditions.isNotVanguardTransaction &&
+      conditions.isNotMonthlyInvestment &&
       conditions.isFromExpenseAccount
     );
   }

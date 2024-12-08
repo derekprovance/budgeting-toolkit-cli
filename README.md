@@ -98,6 +98,10 @@ LLM_MODEL=claude-3-5-haiku-latest
 
 # Application Configuration
 LOG_LEVEL=info
+
+# Monthly Investment Expense
+MONTHLY_INVESTMENT_AMOUNT=1500
+MONTHLY_INVESTMENT_DESC="VANGUARD BUY INVESTMENT"
 ```
 
 ### Environment Variables Reference
@@ -142,6 +146,16 @@ LOG_LEVEL=info
 - `LLM_MODEL`: The Claude model version to use
   - Required: No
   - Default: `claude-3-5-sonnet-latest`
+  - Format: String
+
+#### Monthly Investment Expense
+- `MONTHLY_INVESTMENT_AMOUNT`: Monthly amount that goes to an investment account
+  - Required: No
+  - Format: String
+
+- `MONTHLY_INVESTMENT_DESC`: The transaction description for the investment
+  - Required: No
+  - Format: String
 
 For more information on what models you can use, please visit [this help page](https://docs.anthropic.com/en/docs/about-claude/models).
 
@@ -198,35 +212,30 @@ npm start -- [command] [options]
 
 ### Available Commands
 
-1. Calculate additional income for a given month:
+1. Calculate unbudgeted expenses for a given month:
    ```bash
-   ./budget.sh calculate-additional [options]
-   ```
-   Options:
-   - `-m --month`: Month to run calculations
+   Usage: budgeting-toolkit-cli finalize-budget [options]
 
-2. Calculate unbudgeted expenses for a given month:
+   Runs calculations needed to finalize the budget
+
+   Options:
+   -m, --month <month>  month to run calculations <int>
+   -h, --help           display help for command
+   ```
+2. Generate Financial Reports:
    ```bash
-   ./budget.sh calculate-unbudgeted [options]
-   ```
-   Options:
-   - `-m --month`: Month to run calculations
+   Usage: budgeting-toolkit-cli update-transactions [options]
 
+   Update transactions using an LLM
 
-3. Calculate unbudgeted expenses for a given month:
-   ```bash
-   ./budget.sh finalize-budget [options]
-   ```
    Options:
-   - `-m --month`: Month to run calculations
-
-4. Generate Financial Reports:
-   ```bash
-   ./budget.sh update-transactions [options]
+   -t, --tag <tag>          a tag must be specified <string>
+   -m, --mode <mode>        specify what to update: 'category', 'budget', or 'both' (choices: "category", "budget",
+                              "both", default: "category")
+   -i, --includeClassified  process transactions that already have categories assigned
+   -y, --yes                automatically apply updates without confirmation prompts
+   -h, --help               display help for command
    ```
-   Options:
-   - `-t --tag`: Tag containing transactions you want updated (required)
-   - `-b --budget`: Flag denoting if we should process budgets in addition
 
 ## Development
 

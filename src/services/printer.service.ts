@@ -15,110 +15,104 @@ export class PrinterService {
   private static readonly DESCRIPTION_PADDING = 3;
   private static readonly TOTAL_DESCRIPTION_OUTPUT = "= Total: ";
 
-  static printTransactions(
-    transactions: TransactionSplit[],
-    title?: string
-  ): void {
-    if (!transactions) {
-      console.log(`No results were returned.`);
+  static printTransactions(transactions: TransactionSplit[], title?: string): void {
+    if (!transactions?.length) {
+      console.log("No results were returned.");
+      return;
     }
 
     const report = this.createReport(transactions);
-
     const maxDescriptionSize = this.calculateMaxDescription(report.items);
     const maxAmountSize = this.calculateMaxAmount(report.items);
-    const border = this.calculateBorderSize(maxDescriptionSize, maxAmountSize);
+    const borderSize = this.calculateBorderSize(maxDescriptionSize, maxAmountSize);
+    const border = "=".repeat(borderSize) + "\n";
 
-    let output = border;
-    if (title) {
-      output += this.createTitle(border.length, title);
-      output += border;
-    }
-    report.items.forEach((item) => {
-      output += `> ${this.formatDescriptionWithMax(
-        maxDescriptionSize,
-        item.description
-      )}: ${item.formattedAmount}\n`;
-    });
-    output += border;
-    output += this.generateTotalOutput(border.length, report.total);
-    output += border;
+    const output = [
+      border,
+      ...(title ? [this.createTitle(borderSize, title), border] : []),
+      ...report.items.map(item => this.formatLineItem(item, maxDescriptionSize)),
+      border,
+      this.generateTotalOutput(borderSize, report.total),
+      border
+    ].join("");
 
     console.log(output);
   }
 
-  private static generateTotalOutput(maxLength: number, total: number) {
-    const formattedTotal = this.formatCurrency(total);
-
-    return `${this.TOTAL_DESCRIPTION_OUTPUT.padEnd(
-      maxLength - this.TOTAL_DESCRIPTION_OUTPUT.length - 2
-    )}${formattedTotal} =\n`;
-  }
-
-  private static createTitle(maxLength: number, title: string): string {
-    const totalPadding = maxLength - title.length - 2;
-    const leftPadding = Math.floor(totalPadding / 2);
-
-    // Clearer approach
-    const centeredTitle = title
-      .padStart(title.length - 1 + leftPadding)
-      .padEnd(maxLength - 2);
-
-    return `=${centeredTitle}=\n`;
-  }
-
-  private static calculateBorderSize(
-    maxDescription: number,
-    maxAmount: number
-  ) {
-    let output = "".padEnd(
-      maxDescription + maxAmount + this.DESCRIPTION_PADDING + 2,
-      "="
+  private static formatLineItem(item: LineItem, maxDescriptionSize: number): string {
+    const formattedDescription = this.formatDescriptionWithMax(
+      maxDescriptionSize,
+      item.description
     );
-    output += "\n";
+    return `> ${formattedDescription}: ${item.formattedAmount}\n`;
+  }
 
-    return output;
+  private static generateTotalOutput(borderSize: number, total: number): string {
+    const formattedTotal = this.formatCurrency(total);
+    const paddingLength = borderSize - this.TOTAL_DESCRIPTION_OUTPUT.length - formattedTotal.length - 3;
+    
+    return [
+      this.TOTAL_DESCRIPTION_OUTPUT,
+      "".padEnd(paddingLength),
+      formattedTotal,
+      " =\n"
+    ].join("");
+  }
+
+  private static createTitle(borderSize: number, title: string): string {
+    const contentWidth = borderSize - 2; // Account for '=' on both sides
+    const paddingTotal = contentWidth - title.length;
+    const leftPadding = Math.floor(paddingTotal / 2);
+    const rightPadding = paddingTotal - leftPadding;
+
+    return [
+      "=",
+      "".padStart(leftPadding),
+      title,
+      "".padEnd(rightPadding),
+      "=\n"
+    ].join("");
+  }
+
+  private static calculateBorderSize(maxDescription: number, maxAmount: number): number {
+    return maxDescription + maxAmount + this.DESCRIPTION_PADDING + 2;
   }
 
   private static calculateMaxDescription(items: LineItem[]): number {
-    return Math.max(...items.map((l) => l.description.length));
+    return Math.max(...items.map(item => item.description.length));
   }
 
   private static calculateMaxAmount(items: LineItem[]): number {
-    return Math.max(...items.map((l) => l.formattedAmount.length));
+    return Math.max(...items.map(item => item.formattedAmount.length));
   }
 
   private static formatDescriptionWithMax(max: number, value: string): string {
     return value.padEnd(max + this.DESCRIPTION_PADDING);
   }
 
-  private static createReport(transactions: TransactionSplit[]) {
-    const newReport: Report = { items: [], total: 0 };
+  private static createReport(transactions: TransactionSplit[]): Report {
+    const items = transactions.map(item => ({
+      description: item.description?.trim() || "[No Description]",
+      amount: Number(item.amount),
+      formattedAmount: this.formatCurrency(item.amount)
+    }));
 
-    transactions.forEach((item) => {
-      const lineItem: LineItem = {
-        description: item.description?.trim() || "[No Description]",
-        amount: Number(item.amount),
-        formattedAmount: this.formatCurrency(item.amount),
-      };
-
-      newReport.items?.push(lineItem);
-    });
-
-    newReport.total = this.calculateTotal(transactions);
-
-    return newReport;
+    return {
+      items,
+      total: this.calculateTotal(transactions)
+    };
   }
 
-  private static formatCurrency(x: number | string): string {
+  private static formatCurrency(amount: number | string): string {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(Number(x));
+      minimumFractionDigits: 2
+    }).format(Number(amount));
   }
 
   private static calculateTotal(transactions: TransactionSplit[]): number {
-    return transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    return transactions.reduce((sum, transaction) => 
+      sum + Number(transaction.amount), 0);
   }
 }

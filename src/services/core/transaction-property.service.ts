@@ -2,7 +2,11 @@ import {
   TransactionSplit,
   TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
-import { Description, ExpenseAccount, Tag } from "../../config";
+import {
+  ExpenseAccount,
+  monthlyInvestment,
+  Tag,
+} from "../../config";
 
 export class TransactionProperty {
   static isTransfer = (transaction: TransactionSplit): boolean =>
@@ -20,7 +24,7 @@ export class TransactionProperty {
   }
 
   static isInvestmentDeposit = (transaction: TransactionSplit) =>
-    transaction.description.includes(Description.VANGUARD_INVESTMENT);
+    transaction.description.includes(monthlyInvestment.description);
 
   static hasNoDestination(destinationId: string | null) {
     return destinationId === ExpenseAccount.NO_NAME;
@@ -29,12 +33,31 @@ export class TransactionProperty {
   static isSupplementedByDisposable = (tags: string[] | null | undefined) =>
     tags?.includes(Tag.DISPOSABLE_INCOME);
 
-  static isVanguard = (description: string): boolean =>
-    description === Description.VANGUARD_INVESTMENT;
+  static isMonthlyInvestment = (
+    description: string,
+    amount: string
+  ): boolean => {
+    if(!monthlyInvestment.amount) {
+      return false;
+    }
+
+    return (
+      monthlyInvestment.description === description &&
+      this.convertCurrencyToFloat(amount) ===
+        this.convertCurrencyToFloat(monthlyInvestment.amount)
+    );
+  };
 
   static isDeposit = (transaction: TransactionSplit): boolean =>
     transaction.type === TransactionTypeProperty.DEPOSIT;
 
   static hasACategory = (transaction: TransactionSplit): boolean =>
-    !(transaction.category_id === undefined || transaction.category_id === null)
+    !(
+      transaction.category_id === undefined || transaction.category_id === null
+    );
+
+  private static convertCurrencyToFloat(amount: string): number {
+    const cleanAmount = amount.replace(/[$,]+/g, "");
+    return parseFloat(cleanAmount);
+  }
 }
