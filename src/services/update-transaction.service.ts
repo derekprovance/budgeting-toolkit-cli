@@ -218,12 +218,14 @@ export class UpdateTransactionService {
       notABill: !TransactionProperty.isABill(transaction),
       notDisposableIncome: !TransactionProperty.isDisposableIncome(transaction),
       notAnInvestment: !TransactionProperty.isInvestmentDeposit(transaction),
+      notADeposit: !TransactionProperty.isDeposit(transaction),
     };
 
     return (
       conditions.notABill &&
       conditions.notAnInvestment &&
-      conditions.notDisposableIncome
+      conditions.notDisposableIncome &&
+      conditions.notADeposit
     );
   }
 
