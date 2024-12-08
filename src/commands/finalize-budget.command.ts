@@ -14,12 +14,11 @@ export const finalizeBudgetCommand = async (
   const unbudgetedExpenseResults =
     await unbudgetedExpenseService.calculateUnbudgetedExpenses(queryMonth);
 
+  const currentYear = new Date().getFullYear();
   const monthName = Intl.DateTimeFormat("en", { month: "long" }).format(
-    new Date(queryMonth)
+    new Date(currentYear, queryMonth-1)
   );
-  console.log(
-    `\n${queryMonth}: ${monthName}\n====================\n`
-  );
+  console.log(`\n${queryMonth}: ${monthName}\n====================\n`);
   PrinterService.printTransactions(
     additionalIncomeResults,
     "Additional Income"

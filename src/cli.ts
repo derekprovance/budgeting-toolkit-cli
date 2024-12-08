@@ -130,7 +130,7 @@ export const createCli = (): Command => {
   };
 
   const getCurrentMonth = (): number => {
-    return new Date().getMonth();
+    return new Date().getMonth() + 1;
   };
 
   return program;
