@@ -73,9 +73,11 @@ export class UpdateTransactionService {
             : undefined
         );
 
-      if (aiResults.length !== transactions.length) {
+      if (Object.keys(aiResults).length !== transactions.length) {
         throw new Error(
-          `AI categorization result count (${aiResults.length}) doesn't match transaction count (${transactions.length})`
+          `AI categorization result count (${
+            Object.keys(aiResults).length
+          }) doesn't match transaction count (${transactions.length})`
         );
       }
 
@@ -98,7 +100,7 @@ export class UpdateTransactionService {
 
   private async updateTransactionsWithAIResults(
     transactions: TransactionSplit[],
-    aiResults: AIResponse[],
+    aiResults: AIResponse,
     categories: Category[],
     budgets?: BudgetRead[]
   ): Promise<TransactionSplit[]> {
@@ -106,30 +108,30 @@ export class UpdateTransactionService {
 
     for (let i = 0; i < transactions.length; i++) {
       const transaction = transactions[i];
-      const aiResult = aiResults[i];
+      const transactionJournalId = transaction.transaction_journal_id;
+
+      if (!transactionJournalId) {
+        continue;
+      }
 
       let budget;
       if (budgets && this.shouldSetBudget(transaction)) {
         budget = budgets?.find(
-          (budget) => budget.attributes.name === aiResult.budget
+          (budget) =>
+            budget.attributes.name === aiResults[transactionJournalId].budget
         );
 
         if (!budget) {
           logger.info(
-            `Errant Budget Result from AI ${aiResult.budget} for transaction: ${transaction.description}`
+            `Errant Budget Result from AI ${aiResults[transactionJournalId].budget} for transaction: ${transaction.description}`
           );
         }
       }
 
       const category = categories.find(
-        (category) => category?.name === aiResult.category
+        (category) =>
+          category?.name === aiResults[transactionJournalId].category
       );
-
-      if (!category) {
-        logger.info(
-          `Errant Category Result from AI ${aiResult.category} for transaction: ${transaction.description}`
-        );
-      }
 
       if (
         (transaction.category_name !== category?.name && category?.name) ||
@@ -148,12 +150,11 @@ export class UpdateTransactionService {
           continue;
         }
 
-        const result = await this.transactionService.updateTransaction(
+        await this.transactionService.updateTransaction(
           transaction,
           category?.name,
           budget?.id
         );
-        logger.debug(result, "Transaction Update Result")
 
         updatedTransactions.push(transaction);
       }
@@ -228,10 +229,15 @@ export class UpdateTransactionService {
 
   private mapToResults(
     transactions: TransactionSplit[],
-    aiResults: AIResponse[]
+    aiResults: AIResponse
   ): TransactionCategoryResult[] {
-    return transactions.map((transaction, index) => {
-      const aiResult = aiResults[index];
+    return transactions.map((transaction) => {
+      const transactionJournalId = transaction.transaction_journal_id;
+      if (!transactionJournalId) {
+        return {};
+      }
+
+      const aiResult = aiResults[transactionJournalId];
 
       return {
         ...(this.shouldCategorizeTransaction(transaction) && {

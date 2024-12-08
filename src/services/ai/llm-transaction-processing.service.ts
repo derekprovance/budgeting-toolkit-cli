@@ -8,12 +8,15 @@ interface ITransactionProcessor {
     transactions: TransactionSplit[],
     categories: string[],
     budgets?: string[]
-  ): Promise<AIResponse[]>;
+  ): Promise<AIResponse>;
 }
 
-export interface AIResponse {
+export interface AIResult {
   category?: string;
   budget?: string;
+}
+export interface AIResponse {
+  [key: string]: AIResult;
 }
 
 export class LLMTransactionProcessingService implements ITransactionProcessor {
@@ -26,9 +29,9 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
     transactions: TransactionSplit[],
     categories?: string[],
     budgets?: string[]
-  ): Promise<AIResponse[]> {
+  ): Promise<AIResponse> {
     if (!transactions.length) {
-      return [];
+      return {};
     }
 
     const [assignedCategories, assignedBudgets] = await Promise.all([
@@ -44,10 +47,15 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         : Promise.resolve([]),
     ]);
 
-    return transactions.map((_t, index) => ({
-      ...(assignedCategories[index] && { category: assignedCategories[index] }),
-      ...(assignedBudgets[index] && { budget: assignedBudgets[index] }),
-    }));
+    return transactions.reduce((acc, t, index) => {
+      acc[t.transaction_journal_id || ""] = {
+        ...(assignedCategories[index] && {
+          category: assignedCategories[index],
+        }),
+        ...(assignedBudgets[index] && { budget: assignedBudgets[index] }),
+      };
+      return acc;
+    }, {} as AIResponse);
   }
 
   private async processCategoriesWithErrorHandling(
