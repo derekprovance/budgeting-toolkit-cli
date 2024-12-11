@@ -1,6 +1,6 @@
 {
   "name": "budgeting-toolkit-cli",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "main": "index.js",
   "scripts": {
     "start": "ts-node src/index.ts",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
-    "@derekprovance/firefly-iii-sdk": "^2.1.0",
+    "@derekprovance/firefly-iii-sdk": "^6.1.24-v1",
     "@types/node": "^22.10.2",
     "axios": "^1.7.9",
     "commander": "^12.1.0",
