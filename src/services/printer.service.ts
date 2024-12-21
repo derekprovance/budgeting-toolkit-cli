@@ -1,5 +1,12 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 
+interface PrinterConfig {
+  descriptionPadding: number;
+  totalDescriptionOutput: string;
+  currency: string;
+  locale: string;
+}
+
 interface LineItem {
   description: string;
   amount: number;
@@ -9,79 +16,115 @@ interface LineItem {
 interface Report {
   items: LineItem[];
   total: number;
+  title?: string;
+}
+
+interface FormattingOptions {
+  maxDescriptionSize: number;
+  maxAmountSize: number;
+  borderSize: number;
 }
 
 export class PrinterService {
-  private static readonly DESCRIPTION_PADDING = 3;
-  private static readonly TOTAL_DESCRIPTION_OUTPUT = " Total: ";
+  private static readonly DEFAULT_CONFIG: PrinterConfig = {
+    descriptionPadding: 3,
+    totalDescriptionOutput: " Total: ",
+    currency: "USD",
+    locale: "en-US",
+  };
 
-  static printTransactions(
-    transactions: TransactionSplit[],
-    title?: string
-  ): void {
-    if (!transactions?.length) {
+  private static config: PrinterConfig = PrinterService.DEFAULT_CONFIG;
+
+  static setConfig(config: Partial<PrinterConfig>): void {
+    PrinterService.config = { ...PrinterService.DEFAULT_CONFIG, ...config };
+  }
+
+  static printTransactions(transactions: TransactionSplit[], title?: string): void {
+    if (!PrinterService.validateTransactions(transactions)) {
       console.log("No results were returned.");
       return;
     }
 
-    const report = this.createReport(transactions);
-    const maxDescriptionSize = this.calculateMaxDescription(report.items);
-    const maxAmountSize = this.calculateMaxAmount(report.items);
-    const borderSize = this.calculateBorderSize(
-      maxDescriptionSize,
-      maxAmountSize
-    );
-    const border = "=".repeat(borderSize) + "\n";
+    try {
+      const report = PrinterService.createReport(transactions, title);
+      const formattingOptions = PrinterService.calculateFormattingOptions(report.items);
+      const output = PrinterService.formatReport(report, formattingOptions);
+      console.log(output);
+    } catch (error) {
+      console.error("Error printing transactions:", error);
+    }
+  }
 
-    const output = [
-      border,
-      ...(title ? [this.createTitle(borderSize, title), border] : []),
+  private static validateTransactions(transactions: TransactionSplit[]): boolean {
+    return Array.isArray(transactions) && transactions.length > 0;
+  }
+
+  private static createReport(
+    transactions: TransactionSplit[],
+    title?: string
+  ): Report {
+    const items = transactions.map((item) => ({
+      description: item.description?.trim() || "[No Description]",
+      amount: Number(item.amount),
+      formattedAmount: PrinterService.formatCurrency(item.amount),
+    }));
+
+    return {
+      items,
+      total: PrinterService.calculateTotal(transactions),
+      title,
+    };
+  }
+
+  private static calculateFormattingOptions(items: LineItem[]): FormattingOptions {
+    const maxDescriptionSize = Math.max(
+      ...items.map((item) => item.description.length)
+    );
+    const maxAmountSize = Math.max(
+      ...items.map((item) => item.formattedAmount.length)
+    );
+    const borderSize =
+      maxDescriptionSize + maxAmountSize + PrinterService.config.descriptionPadding! + 2;
+
+    return { maxDescriptionSize, maxAmountSize, borderSize };
+  }
+
+  private static formatReport(report: Report, options: FormattingOptions): string {
+    const border = "=".repeat(options.borderSize) + "\n";
+    const sections = [border];
+
+    if (report.title) {
+      sections.push(PrinterService.formatTitle(report.title, options.borderSize), border);
+    }
+
+    sections.push(
       ...report.items.map((item) =>
-        this.formatLineItem(item, maxDescriptionSize)
+        PrinterService.formatLineItem(item, options.maxDescriptionSize)
       ),
       border,
-      this.generateTotalOutput(borderSize, report.total),
-      border,
-    ].join("");
-
-    console.log(output);
-  }
-
-  private static formatLineItem(
-    item: LineItem,
-    maxDescriptionSize: number
-  ): string {
-    const formattedDescription = this.formatDescriptionWithMax(
-      maxDescriptionSize,
-      item.description
+      PrinterService.formatTotal(report.total, options.borderSize),
+      border
     );
-    return `> ${formattedDescription}: ${item.formattedAmount}\n`;
+
+    return sections.join("");
   }
 
-  private static generateTotalOutput(
-    borderSize: number,
-    total: number
-  ): string {
-    const formattedTotal = this.formatCurrency(total);
-    const paddingLength =
-      borderSize -
-      this.TOTAL_DESCRIPTION_OUTPUT.length -
-      formattedTotal.length -
-      3;
-
-    return [
-      this.TOTAL_DESCRIPTION_OUTPUT,
-      "".padEnd(paddingLength),
-      formattedTotal,
-      "\n",
-    ].join("");
+  private static formatLineItem(item: LineItem, maxDescriptionSize: number): string {
+    const description = item.description.padEnd(
+      maxDescriptionSize + PrinterService.config.descriptionPadding!
+    );
+    return `> ${description}: ${item.formattedAmount}\n`;
   }
 
-  private static createTitle(borderSize: number, title: string): string {
+  private static formatTitle(title: string, borderSize: number): string {
     const contentWidth = borderSize - 2;
     const paddingTotal = contentWidth - title.length;
     const leftPadding = Math.floor(paddingTotal / 2);
     const rightPadding = paddingTotal - leftPadding;
+
+    if (title.length > contentWidth) {
+      title = title.substring(0, contentWidth - 3) + "...";
+    }
 
     return [
       " ",
@@ -92,42 +135,26 @@ export class PrinterService {
     ].join("");
   }
 
-  private static calculateBorderSize(
-    maxDescription: number,
-    maxAmount: number
-  ): number {
-    return maxDescription + maxAmount + this.DESCRIPTION_PADDING + 2;
-  }
+  private static formatTotal(total: number, borderSize: number): string {
+    const formattedTotal = PrinterService.formatCurrency(total);
+    const paddingLength =
+      borderSize -
+      PrinterService.config.totalDescriptionOutput!.length -
+      formattedTotal.length -
+      3;
 
-  private static calculateMaxDescription(items: LineItem[]): number {
-    return Math.max(...items.map((item) => item.description.length));
-  }
-
-  private static calculateMaxAmount(items: LineItem[]): number {
-    return Math.max(...items.map((item) => item.formattedAmount.length));
-  }
-
-  private static formatDescriptionWithMax(max: number, value: string): string {
-    return value.padEnd(max + this.DESCRIPTION_PADDING);
-  }
-
-  private static createReport(transactions: TransactionSplit[]): Report {
-    const items = transactions.map((item) => ({
-      description: item.description?.trim() || "[No Description]",
-      amount: Number(item.amount),
-      formattedAmount: this.formatCurrency(item.amount),
-    }));
-
-    return {
-      items,
-      total: this.calculateTotal(transactions),
-    };
+    return [
+      PrinterService.config.totalDescriptionOutput!,
+      "".padEnd(paddingLength),
+      formattedTotal,
+      "\n",
+    ].join("");
   }
 
   private static formatCurrency(amount: number | string): string {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(PrinterService.config.locale, {
       style: "currency",
-      currency: "USD",
+      currency: PrinterService.config.currency,
       minimumFractionDigits: 2,
     }).format(Number(amount));
   }

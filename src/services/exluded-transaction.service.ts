@@ -1,11 +1,14 @@
 import { createReadStream } from "fs";
 import { access, constants } from "fs/promises";
 import { parse } from "csv-parse";
-import { finished } from "stream/promises";
 import { ExcludedTransaction } from "../dto/excluded-transaction";
 import { join } from "path";
 import { logger } from "../logger";
 
+interface CsvRecord {
+  description: unknown;
+  amount: unknown;
+}
 export class ExcludedTransactionService {
   private static readonly csvPath = join(
     process.cwd(),
@@ -25,45 +28,52 @@ export class ExcludedTransactionService {
     return await this.parseExcludedTransactionCSV();
   }
 
-  private static async parseExcludedTransactionCSV(): Promise<
-    ExcludedTransaction[]
-  > {
+  private static async parseExcludedTransactionCSV(): Promise<ExcludedTransaction[]> {
     const records: ExcludedTransaction[] = [];
-    const csvPath = join(this.csvPath);
 
     try {
-      const parser = createReadStream(csvPath).pipe(
+      const parser = createReadStream(this.csvPath).pipe(
         parse({
-          from_line: 1,
+          columns: ['description', 'amount'],
           skip_empty_lines: true,
           trim: true,
           delimiter: ",",
-          relaxColumnCount: true,
-          skipEmptyLines: true,
+          cast: true,
         })
       );
 
-      parser.on("readable", function () {
-        let record;
-        while ((record = parser.read()) !== null) {
+      for await (const record of parser) {
+        if (this.isValidRecord(record)) {
           records.push({
-            description: record[0] || "",
-            amount: record[1] || "",
+            description: record.description.trim(),
+            amount: record.amount,
           });
+        } else {
+          logger.warn({
+            record,
+            reason: typeof record.amount === 'number' ? 'Invalid description' : 'Invalid amount'
+          }, 'Invalid record found in CSV');
         }
-      });
-
-      parser.on("error", (error) => {
-        console.error("Error parsing CSV:", error);
-        throw error;
-      });
-
-      await finished(parser);
+      }
 
       return records;
     } catch (error) {
-      console.error("Failed to read excluded transactions:", error);
+      logger.error({ error }, "Failed to read excluded transactions");
       throw error;
     }
+  }
+
+  private static isValidRecord(record: CsvRecord): record is ExcludedTransaction {
+    if (typeof record.description !== 'string' || !record.description.trim()) {
+      return false;
+    }
+
+    const amount = Number(record.amount);
+    if (isNaN(amount)) {
+      return false;
+    }
+
+    record.amount = amount.toFixed(2);
+    return true;
   }
 }

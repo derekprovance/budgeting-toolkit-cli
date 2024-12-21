@@ -25,7 +25,7 @@ export class TransactionPropertyService {
   }
 
   static isSupplementedByDisposable = (tags: string[] | null | undefined): boolean =>
-    tags ? tags.includes(Tag.DISPOSABLE_INCOME) : false;
+    tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
 
   static async isExcludedTransaction(
     description: string,
@@ -36,7 +36,7 @@ export class TransactionPropertyService {
 
     return excludedTransactions.some((transaction) => {
       const amountsMatch = transaction.amount
-        ? this.convertCurrencyToFloat(transaction.amount) ===
+        ? transaction.amount ===
           this.convertCurrencyToFloat(amount)
         : true;
 
@@ -56,8 +56,8 @@ export class TransactionPropertyService {
       transaction.category_id === undefined || transaction.category_id === null
     );
 
-  private static convertCurrencyToFloat(amount: string): number {
+  private static convertCurrencyToFloat(amount: string): string {
     const cleanAmount = amount.replace(/[$,]+/g, "");
-    return parseFloat(cleanAmount);
+    return parseFloat(cleanAmount).toFixed(2);
   }
 }
