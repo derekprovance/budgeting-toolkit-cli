@@ -6,8 +6,8 @@ import { join } from "path";
 import { logger } from "../logger";
 
 interface CsvRecord {
-  description: unknown;
-  amount: unknown;
+  description?: unknown;
+  amount?: unknown;
 }
 export class ExcludedTransactionService {
   private static readonly csvPath = join(
@@ -38,14 +38,14 @@ export class ExcludedTransactionService {
           skip_empty_lines: true,
           trim: true,
           delimiter: ",",
-          cast: true,
+          cast: false,
         })
       );
 
       for await (const record of parser) {
         if (this.isValidRecord(record)) {
           records.push({
-            description: record.description.trim(),
+            description: record?.description?.trim(),
             amount: record.amount,
           });
         } else {
@@ -64,8 +64,15 @@ export class ExcludedTransactionService {
   }
 
   private static isValidRecord(record: CsvRecord): record is ExcludedTransaction {
-    if (typeof record.description !== 'string' || !record.description.trim()) {
-      return false;
+    if (!record.description || typeof record.description !== 'string' || !record.description.trim()) {
+      record.description = undefined;
+    } else {
+      record.description = record.description.trim();
+    }
+
+    if (!record.amount) {
+      record.amount = undefined;
+      return true;
     }
 
     const amount = Number(record.amount);

@@ -1,4 +1,4 @@
 export interface ExcludedTransaction {
-  description: string;
-  amount: string;
+  description?: string;
+  amount?: string;
 }

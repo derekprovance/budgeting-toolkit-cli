@@ -32,19 +32,28 @@ export class TransactionPropertyService {
     description: string,
     amount: string
   ): Promise<boolean> {
-    const excludedTransactions =
-      await ExcludedTransactionService.getTransactions();
+    const excludedTransactions = await ExcludedTransactionService.getTransactions();
+    const convertedAmount = this.convertCurrencyToFloat(amount);
 
     return excludedTransactions.some((transaction) => {
-      const amountsMatch = transaction.amount
-        ? transaction.amount === this.convertCurrencyToFloat(amount)
-        : true;
+      if (!transaction.description && !transaction.amount) {
+        return false;
+      }
 
-      const descriptionsMatch = transaction.description
-        ? transaction.description === description
-        : true;
+      if (transaction.description && transaction.amount) {
+        return transaction.description === description && 
+               transaction.amount === convertedAmount;
+      }
 
-      return amountsMatch && descriptionsMatch;
+      if (transaction.description) {
+        return transaction.description === description;
+      }
+
+      if (transaction.amount) {
+        return transaction.amount === convertedAmount;
+      }
+
+      return false;
     });
   }
 
