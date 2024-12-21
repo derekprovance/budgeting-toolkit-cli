@@ -4,6 +4,7 @@ import {
 } from "@derekprovance/firefly-iii-sdk";
 import { ExpenseAccount, Tag } from "../../config";
 import { ExcludedTransactionService } from "../exluded-transaction.service";
+import { LLMResponseValidator } from "../ai/llm-response-validator.service";
 
 export class TransactionPropertyService {
   static isTransfer = (transaction: TransactionSplit): boolean =>

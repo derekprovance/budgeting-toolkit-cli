@@ -1,6 +1,7 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { ChatMessage, ClaudeClient } from "../../api/claude.client";
 import { logger } from "../../logger";
+import { LLMResponseValidator } from "../ai/llm-response-validator.service";
 
 export class LLMTransactionBudgetService {
   constructor(private claudeClient: ClaudeClient) {}
@@ -17,9 +18,13 @@ export class LLMTransactionBudgetService {
     );
 
     try {
-      return await this.claudeClient.chatBatch(messageBatches, {
+      const responses = await this.claudeClient.chatBatch(messageBatches, {
         systemPrompt,
       });
+
+      return LLMResponseValidator.validateBatchResponses(responses,
+        (response) => LLMResponseValidator.validateBudgetResponse(response, budgets)
+      );
     } catch (error) {
       logger.error("Error assigning budgets:", error);
       throw error;
