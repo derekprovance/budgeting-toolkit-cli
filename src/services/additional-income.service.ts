@@ -1,7 +1,7 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "./core/transaction.service";
 import { Account, Description } from "../config";
-import { TransactionProperty } from "./core/transaction-property.service";
+import { TransactionPropertyService } from "./core/transaction-property.service";
 
 type ValidDestinationAccount = Extract<
   Account,
@@ -48,10 +48,10 @@ export class AdditionalIncomeService {
     transactions: TransactionSplit[]
   ): TransactionSplit[] {
     return transactions
-      .filter(TransactionProperty.isDeposit)
+      .filter(TransactionPropertyService.isDeposit)
       .filter(this.hasValidDestinationAccount)
       .filter(this.isNotPayroll)
-      .filter((t) => !TransactionProperty.isDisposableIncome(t));
+      .filter((t) => !TransactionPropertyService.isDisposableIncome(t));
   }
 
   private hasValidDestinationAccount = (

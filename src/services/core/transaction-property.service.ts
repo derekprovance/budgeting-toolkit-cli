@@ -5,7 +5,7 @@ import {
 import { ExpenseAccount, Tag } from "../../config";
 import { ExcludedTransactionService } from "../exluded-transaction.service";
 
-export class TransactionProperty {
+export class TransactionPropertyService {
   static isTransfer = (transaction: TransactionSplit): boolean =>
     transaction.type === TransactionTypeProperty.TRANSFER;
 
@@ -24,15 +24,15 @@ export class TransactionProperty {
     return destinationId === ExpenseAccount.NO_NAME;
   }
 
-  static isSupplementedByDisposable = (tags: string[] | null | undefined) =>
-    tags?.includes(Tag.DISPOSABLE_INCOME);
+  static isSupplementedByDisposable = (tags: string[] | null | undefined): boolean =>
+    tags ? tags.includes(Tag.DISPOSABLE_INCOME) : false;
 
   static async isExcludedTransaction(
     description: string,
     amount: string
   ): Promise<boolean> {
     const excludedTransactions =
-      await ExcludedTransactionService.getInstance().getTransactions();
+      await ExcludedTransactionService.getTransactions();
 
     return excludedTransactions.some((transaction) => {
       const amountsMatch = transaction.amount

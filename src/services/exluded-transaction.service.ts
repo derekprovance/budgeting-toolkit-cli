@@ -7,21 +7,14 @@ import { join } from "path";
 import { logger } from "../logger";
 
 export class ExcludedTransactionService {
-  private static instance: ExcludedTransactionService;
-
-  private excludedTransactions: ExcludedTransaction[] | null = null;
-  private readonly csvPath = join(process.cwd(), "excluded_transactions.csv");
+  private static readonly csvPath = join(
+    process.cwd(),
+    "excluded_transactions.csv"
+  );
 
   private constructor() {}
 
-  public static getInstance(): ExcludedTransactionService {
-    if (!ExcludedTransactionService.instance) {
-      ExcludedTransactionService.instance = new ExcludedTransactionService();
-    }
-    return ExcludedTransactionService.instance;
-  }
-
-  async getTransactions(): Promise<ExcludedTransaction[]> {
+  static async getTransactions(): Promise<ExcludedTransaction[]> {
     try {
       await access(this.csvPath, constants.F_OK);
     } catch (ex) {
@@ -29,15 +22,12 @@ export class ExcludedTransactionService {
       return [];
     }
 
-    if (!this.excludedTransactions) {
-      this.excludedTransactions = await this.parseExcludedTransactionCSV();
-      logger.trace(this.excludedTransactions, "CSV saved to Cache");
-    }
-
-    return this.excludedTransactions;
+    return await this.parseExcludedTransactionCSV();
   }
 
-  private async parseExcludedTransactionCSV(): Promise<ExcludedTransaction[]> {
+  private static async parseExcludedTransactionCSV(): Promise<
+    ExcludedTransaction[]
+  > {
     const records: ExcludedTransaction[] = [];
     const csvPath = join(this.csvPath);
 

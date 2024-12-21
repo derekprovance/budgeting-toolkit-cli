@@ -7,7 +7,7 @@ import { logger } from "../logger";
 import { CategoryService } from "./core/category.service";
 import { TransactionService } from "./core/transaction.service";
 import { BudgetService } from "./core/budget.service";
-import { TransactionProperty } from "./core/transaction-property.service";
+import { TransactionPropertyService } from "./core/transaction-property.service";
 import {
   AIResponse,
   LLMTransactionProcessingService,
@@ -205,8 +205,8 @@ export class UpdateTransactionService {
 
   private shouldCategorizeTransaction(transaction: TransactionSplit): boolean {
     const conditions = {
-      notATransfer: !TransactionProperty.isTransfer(transaction),
-      hasACategory: TransactionProperty.hasACategory(transaction),
+      notATransfer: !TransactionPropertyService.isTransfer(transaction),
+      hasACategory: TransactionPropertyService.hasACategory(transaction),
     };
 
     return this.processTransactionsWithCategories
@@ -218,16 +218,16 @@ export class UpdateTransactionService {
     transaction: TransactionSplit
   ): Promise<boolean> {
     const isExcludedTransaction =
-      await TransactionProperty.isExcludedTransaction(
+      await TransactionPropertyService.isExcludedTransaction(
         transaction.description,
         transaction.amount
       );
 
     const conditions = {
-      notABill: !TransactionProperty.isABill(transaction),
-      notDisposableIncome: !TransactionProperty.isDisposableIncome(transaction),
+      notABill: !TransactionPropertyService.isABill(transaction),
+      notDisposableIncome: !TransactionPropertyService.isDisposableIncome(transaction),
       notAnExcludedTransaction: !isExcludedTransaction,
-      notADeposit: !TransactionProperty.isDeposit(transaction),
+      notADeposit: !TransactionPropertyService.isDeposit(transaction),
     };
 
     return (

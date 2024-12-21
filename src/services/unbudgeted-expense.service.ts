@@ -1,7 +1,7 @@
 import { TransactionService } from "./core/transaction.service";
 import { Account, Tag } from "../config";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { TransactionProperty } from "./core/transaction-property.service";
+import { TransactionPropertyService } from "./core/transaction-property.service";
 import { logger } from "../logger";
 
 export class UnbudgetedExpenseService {
@@ -42,16 +42,16 @@ export class UnbudgetedExpenseService {
     transaction: TransactionSplit
   ): Promise<boolean> {
     const isExcludedTransaction =
-      await TransactionProperty.isExcludedTransaction(
+      await TransactionPropertyService.isExcludedTransaction(
         transaction.description,
         transaction.amount
       );
 
     const conditions = {
       hasNoBudget: !transaction.budget_id,
-      isNotTransfer: !TransactionProperty.isTransfer(transaction),
+      isNotTransfer: !TransactionPropertyService.isTransfer(transaction),
       isNotDisposableSupplemented:
-        !TransactionProperty.isSupplementedByDisposable(transaction.tags),
+        !TransactionPropertyService.isSupplementedByDisposable(transaction.tags),
       isNotExcludedTransaction: !isExcludedTransaction,
       isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
     };
