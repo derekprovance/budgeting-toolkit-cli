@@ -137,23 +137,28 @@ npm start -- [command] [options]
 ### Command Reference
 
 #### Budget Finalization
-```bash
-npm start -- finalize-budget [options]
+```
+Usage: finalize-budget [options]
+
+Runs calculations needed to finalize the budget
 
 Options:
--m, --month <month>  Month to process (integer)
--h, --help          Show command help
+  -m, --month <month>  month to process (1-12, defaults to current month) (choices: "1", "2", "3", "4", "5", "6",
+                       "7", "8", "9", "10", "11", "12")
+  -h, --help           display help for command
 ```
 
 #### Transaction Updates
-```bash
-npm start -- update-transactions [options]
+```
+Usage: update-transactions [options] <tag>
+
+Update transactions using an LLM
 
 Options:
--t, --tag <tag>          Required tag
--m, --mode <mode>        Update mode: category|budget|both
--i, --includeClassified  Process classified transactions
--y, --yes               Skip confirmation prompts
+  -m, --mode <mode>        mode to update transactions (choices: "category", "budget", "both", default: "category")
+  -i, --includeClassified  include transactions that already have categories assigned (default: false)
+  -y, --yes                skip confirmation prompts and apply updates automatically (default: false)
+  -h, --help               display help for command
 ```
 
 ## Development

@@ -47,8 +47,12 @@ const initializeServices = (apiClient: FireflyApiClient) => {
   const transactionService = new TransactionService(apiClient);
   const budgetService = new BudgetService(apiClient);
   const categoryService = new CategoryService(apiClient);
-  const additionalIncomeService = new AdditionalIncomeService(transactionService);
-  const unbudgetedExpenseService = new UnbudgetedExpenseService(transactionService);
+  const additionalIncomeService = new AdditionalIncomeService(
+    transactionService
+  );
+  const unbudgetedExpenseService = new UnbudgetedExpenseService(
+    transactionService
+  );
 
   return {
     transactionService,
@@ -75,8 +79,23 @@ export const createCli = (): Command => {
     .addOption(
       new Option(
         "-m, --month <month>",
-        "month to run calculations <int>"
-      ).argParser(parseInt)
+        "month to process (1-12, defaults to current month)"
+      )
+        .argParser(parseInt)
+        .choices([
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+        ])
     )
     .action((opts) =>
       finalizeBudgetCommand(
@@ -87,19 +106,10 @@ export const createCli = (): Command => {
     );
 
   program
-    .command("update-transactions")
+    .command("update-transactions <tag>")
     .description("Update transactions using an LLM")
     .addOption(
-      new Option(
-        "-t, --tag <tag>",
-        "a tag must be specified <string>"
-      ).makeOptionMandatory()
-    )
-    .addOption(
-      new Option(
-        "-m, --mode <mode>",
-        `specify what to update: '${UpdateTransactionMode.Category}', '${UpdateTransactionMode.Budget}', or '${UpdateTransactionMode.Both}'`
-      )
+      new Option("-m, --mode <mode>", "mode to update transactions")
         .choices([
           UpdateTransactionMode.Category,
           UpdateTransactionMode.Budget,
@@ -109,11 +119,11 @@ export const createCli = (): Command => {
     )
     .option(
       "-i, --includeClassified",
-      "process transactions that already have categories assigned"
+      "include transactions that already have categories assigned (default: false)"
     )
     .option(
       "-y, --yes",
-      "automatically apply updates without confirmation prompts"
+      "skip confirmation prompts and apply updates automatically (default: false)"
     )
     .action((opts: UpdateTransactionOptions) => {
       try {
