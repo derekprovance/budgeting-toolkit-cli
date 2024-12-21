@@ -110,57 +110,89 @@ export class UpdateTransactionService {
       const transaction = transactions[i];
       const transactionJournalId = transaction.transaction_journal_id;
 
-      if (!transactionJournalId) {
-        continue;
-      }
-
-      let budget;
-      const shouldSetBudget = await this.shouldSetBudget(transaction);
-      if (budgets && shouldSetBudget) {
-        budget = budgets?.find(
-          (budget) =>
-            budget.attributes.name === aiResults[transactionJournalId].budget
-        );
-
-        if (!budget) {
-          logger.info(
-            `Errant Budget Result from AI ${aiResults[transactionJournalId].budget} for transaction: ${transaction.description}`
-          );
-        }
-      }
-
-      const category = categories.find(
-        (category) =>
-          category?.name === aiResults[transactionJournalId].category
-      );
-
-      if (
-        (transaction.category_name !== category?.name && category?.name) ||
-        (transaction.budget_id !== budget?.id && budget?.id)
-      ) {
-        const answer = await this.askToUpdateTransaction(
-          transaction.description,
-          category?.name,
-          budget?.attributes.name
-        );
-
-        if (!answer) {
-          logger.debug(
-            `Skipping transaction ${transaction.description} due to user input`
+      try {
+        if (!transactionJournalId) {
+          logger.warn(
+            `Missing journal ID for transaction: ${transaction.description} (amount: ${transaction.amount})`
           );
           continue;
         }
 
-        await this.transactionService.updateTransaction(
-          transaction,
-          category?.name,
-          budget?.id
+        if (!aiResults[transactionJournalId]) {
+          logger.warn(
+            `No AI results found for transaction ${transaction.description} (journal ID: ${transactionJournalId})`
+          );
+          continue;
+        }
+
+        let budget;
+        const shouldSetBudget = await this.shouldSetBudget(transaction);
+        if (budgets && shouldSetBudget) {
+          budget = budgets?.find(
+            (budget) =>
+              budget.attributes.name === aiResults[transactionJournalId].budget
+          );
+        }
+
+        const category = categories.find(
+          (category) =>
+            category?.name === aiResults[transactionJournalId]?.category
         );
 
-        updatedTransactions.push(transaction);
+        if (
+          (transaction.category_name !== category?.name && category?.name) ||
+          (transaction.budget_id !== budget?.id && budget?.id)
+        ) {
+          const answer = await this.askToUpdateTransaction(
+            transaction.description,
+            category?.name,
+            budget?.attributes.name
+          );
+
+          if (!answer) {
+            logger.debug({
+              transaction: transaction.description,
+              suggestedCategory: category?.name,
+              suggestedBudget: budget?.attributes.name
+            }, 'User skipped transaction update');
+            continue;
+          }
+
+          try {
+            await this.transactionService.updateTransaction(
+              transaction,
+              category?.name,
+              budget?.id
+            );
+            updatedTransactions.push(transaction);
+            logger.debug({
+              transaction: transaction.description,
+              newCategory: category?.name,
+              newBudget: budget?.attributes.name
+            }, 'Successfully updated transaction');
+          } catch (updateError) {
+            logger.error({
+              error: updateError,
+              transaction: transaction.description,
+              journalId: transactionJournalId
+            }, 'Failed to update transaction');
+          }
+        }
+      } catch (error) {
+        logger.error({
+          error,
+          transaction: transaction.description,
+          journalId: transactionJournalId,
+          index: i
+        }, 'Error processing transaction');
       }
     }
-
+    
+    logger.debug({
+      totalTransactions: transactions.length,
+      updatedCount: updatedTransactions.length
+    }, 'Finished processing transactions');
+    
     return updatedTransactions;
   }
 
@@ -250,6 +282,10 @@ export class UpdateTransactionService {
         }
 
         const aiResult = aiResults[transactionJournalId];
+        if (!aiResult) {
+          return {};
+        }
+
         const shouldSetBudget = await this.shouldSetBudget(transaction);
 
         return {
