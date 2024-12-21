@@ -7,24 +7,35 @@ export const finalizeBudgetCommand = async (
   unbudgetedExpenseService: UnbudgetedExpenseService,
   queryMonth: number
 ) => {
-  console.log("Running Budget Finalization Calculations...");
-  const additionalIncomeResults =
-    await additionalIncomeService.calculateAdditionalIncome(queryMonth);
+  console.log('\n=== Budget Finalization Report ===');
+  
+  try {
+    const additionalIncomeResults =
+      await additionalIncomeService.calculateAdditionalIncome(queryMonth);
 
-  const unbudgetedExpenseResults =
-    await unbudgetedExpenseService.calculateUnbudgetedExpenses(queryMonth);
+    const unbudgetedExpenseResults =
+      await unbudgetedExpenseService.calculateUnbudgetedExpenses(queryMonth);
 
-  const currentYear = new Date().getFullYear();
-  const monthName = Intl.DateTimeFormat("en", { month: "long" }).format(
-    new Date(currentYear, queryMonth-1)
-  );
-  console.log(`\n${queryMonth}: ${monthName}\n====================\n`);
-  PrinterService.printTransactions(
-    additionalIncomeResults,
-    "Additional Income"
-  );
-  PrinterService.printTransactions(
-    unbudgetedExpenseResults,
-    "Unbudgeted Expenses"
-  );
+    const currentYear = new Date().getFullYear();
+    const monthName = Intl.DateTimeFormat("en", { month: "long" }).format(
+      new Date(currentYear, queryMonth-1)
+    );
+    
+    console.log(`\n📅 ${monthName} ${currentYear}`);
+    console.log('='.repeat(30) + '\n');
+    
+    PrinterService.printTransactions(
+      additionalIncomeResults,
+      "💰 Additional Income"
+    );
+    
+    PrinterService.printTransactions(
+      unbudgetedExpenseResults,
+      "💸 Unbudgeted Expenses"
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ Error finalizing budget:', errorMessage);
+    throw error instanceof Error ? error : new Error('Unknown error occurred');
+  }
 };
