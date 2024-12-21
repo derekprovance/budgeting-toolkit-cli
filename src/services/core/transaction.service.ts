@@ -1,11 +1,12 @@
 import {
+  TagSingle,
   TransactionArray,
   TransactionRead,
   TransactionSplit,
   TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
 import { DateRange } from "../../dto/date-range.dto";
-import { FireflyApiClient } from "../../api/firefly.client";
+import { FireflyApiClient, FireflyApiError } from "../../api/firefly.client";
 import { logger } from "../../logger";
 
 class TransactionError extends Error {
@@ -67,6 +68,13 @@ export class TransactionService {
     } catch (error) {
       throw this.handleError("fetch transactions by tag", tag, error);
     }
+  }
+
+  async tagExists(tag: string): Promise<boolean> {
+    const response = await this.apiClient.get<TagSingle>(
+      `/tags/${encodeURIComponent(tag)}`
+    );
+    return response?.data !== undefined;
   }
 
   async updateTransaction(
@@ -210,6 +218,9 @@ export class TransactionService {
     const response = await this.apiClient.get<TransactionArray>(
       `/tags/${encodeURIComponent(tag)}/transactions`
     );
+    if (!response) {
+      throw new FireflyApiError(`Failed to fetch transactions for tag: ${tag}`);
+    }
     return response.data;
   }
 
@@ -220,6 +231,9 @@ export class TransactionService {
     const response = await this.apiClient.get<TransactionArray>(
       `/transactions?start=${range.start}&end=${range.end}`
     );
+    if (!response) {
+      throw new FireflyApiError(`Failed to fetch transactions for month: ${month}`);
+    }
     return response.data;
   }
 

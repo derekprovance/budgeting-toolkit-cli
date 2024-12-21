@@ -39,6 +39,11 @@ export class UpdateTransactionService {
     updateMode: UpdateTransactionMode
   ): Promise<TransactionCategoryResult[]> {
     try {
+      if (!await this.transactionService.tagExists(tag)) {
+        logger.debug(`Tag ${tag} does not exist`);
+        return [];
+      }
+
       const [unfilteredTransactions, categories] = await Promise.all([
         this.transactionService.getTransactionsByTag(tag),
         updateMode !== UpdateTransactionMode.Budget
@@ -51,7 +56,7 @@ export class UpdateTransactionService {
       );
 
       if (!transactions.length) {
-        logger.info(`No transactions found for tag: ${tag}`);
+        logger.debug(`No transactions found for tag: ${tag}`);
         return [];
       }
 

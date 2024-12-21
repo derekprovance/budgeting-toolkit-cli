@@ -12,12 +12,24 @@ export interface ApiClientConfig {
   clientCertPath?: string;
   clientCertPassword?: string;
   rejectUnauthorized?: boolean;
+  timeout?: number;
 }
 
 type CertificateType =
   | "CA certificate"
   | "client certificate"
   | "client private key";
+
+export class FireflyApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly response?: unknown
+  ) {
+    super(message);
+    this.name = 'FireflyApiError';
+  }
+}
 
 export class FireflyApiClient {
   private client: AxiosInstance;
@@ -31,6 +43,7 @@ export class FireflyApiClient {
     this.client = axios.create({
       baseURL: config.baseUrl,
       httpsAgent,
+      timeout: config.timeout || 30000,
       headers: {
         Authorization: `Bearer ${config.apiToken}`,
         "Content-Type": "application/json",
@@ -160,11 +173,18 @@ export class FireflyApiClient {
     }
   }
 
-  async get<T>(url: string): Promise<T> {
+  private isNotFoundError(error: unknown): boolean {
+    return axios.isAxiosError(error) && error.response?.status === 404;
+  }
+
+  async get<T>(url: string): Promise<T | null> {
     try {
       const response = await this.client.get<T>(url);
       return response.data;
     } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
       this.handleApiError(error);
       throw error;
     }
@@ -193,16 +213,24 @@ export class FireflyApiClient {
   private handleApiError(error: unknown): void {
     if (axios.isAxiosError(error)) {
       if (error.response) {
-        logger.error("API error:", error.response.status, error.response.data);
+        if (error.response.status === 404) {
+          throw new FireflyApiError(
+            `Resource not found: ${error.config?.url}`,
+            404,
+            error.response.data
+          );
+        }
+        const message = `API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`;
+        throw new FireflyApiError(message, error.response.status, error.response.data);
       } else if (error.request) {
-        logger.error("No response received:", error.message);
+        throw new FireflyApiError(`No response received: ${error.message}`);
       } else {
-        logger.error("Error setting up request:", error.message);
+        throw new FireflyApiError(`Request setup error: ${error.message}`);
       }
     } else if (error instanceof Error) {
-      logger.error("Unexpected error:", error.message);
+      throw new FireflyApiError(`Unexpected error: ${error.message}`);
     } else {
-      logger.error("Unknown error:", error);
+      throw new FireflyApiError(`Unknown error: ${String(error)}`);
     }
   }
 

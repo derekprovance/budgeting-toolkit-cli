@@ -14,6 +14,7 @@ import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-cat
 import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budget.service";
 import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
+import chalk from "chalk";
 
 const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
@@ -22,7 +23,7 @@ const getCurrentMonth = (): number => {
 const initializeLLMClient = (): ClaudeClient => {
   if (!claudeAPIKey) {
     throw new Error(
-      "!!! Claude API Key is required to update transactions. Please check your .env file. !!!"
+      `${chalk.redBright('!!!')} Claude API Key is required to update transactions. Please check your .env file. ${chalk.redBright('!!!')}`
     );
   }
 
@@ -125,7 +126,7 @@ export const createCli = (): Command => {
       "-y, --yes",
       "skip confirmation prompts and apply updates automatically (default: false)"
     )
-    .action((opts: UpdateTransactionOptions) => {
+    .action((tag: string,opts: UpdateTransactionOptions) => {
       try {
         const claudeClient = initializeLLMClient();
         const llmServices = {
@@ -147,7 +148,7 @@ export const createCli = (): Command => {
           opts.yes
         );
 
-        updateTransactions(updateCategoryService, opts.tag, opts.mode);
+        updateTransactions(updateCategoryService, tag, opts.mode);
       } catch (ex) {
         if (ex instanceof Error) {
           console.error(ex.message);
