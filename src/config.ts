@@ -1,7 +1,6 @@
 import path from "path";
 import { ApiClientConfig } from "./api/firefly.client";
 import dotenv from "dotenv";
-import { MonthlyInvestment } from "./dto/monthly-investment.dto";
 
 dotenv.config();
 
@@ -23,11 +22,6 @@ export const logLevel: string = process.env.LOG_LEVEL || "info";
 
 export const claudeAPIKey = process.env.ANTHROPIC_API_KEY;
 export const llmModel = process.env.LLM_MODEL;
-
-export const monthlyInvestment = {
-  description: process.env.MONTHLY_INVESTMENT_DESC,
-  amount: process.env.MONTHLY_INVESTMENT_AMOUNT,
-} as MonthlyInvestment;
 
 export enum Account {
   PRIMARY = "1",

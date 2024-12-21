@@ -6,3 +6,6 @@ dist/
 certs/
 *.cer
 *.pem
+
+# Excluded Transactions in Budget Reporting
+excluded_transactions.csv

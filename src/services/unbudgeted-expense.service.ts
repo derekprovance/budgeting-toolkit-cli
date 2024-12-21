@@ -13,35 +13,46 @@ export class UnbudgetedExpenseService {
     const transactions = await this.transactionService.getTransactionsForMonth(
       month
     );
-    const filteredTransactions = this.filterExpenses(transactions);
+    const filteredTransactions = await this.filterExpenses(transactions);
     return filteredTransactions;
   }
 
-  private filterExpenses(transactions: TransactionSplit[]) {
-    return transactions.filter((transaction) =>
-      this.shouldCountExpense(transaction)
+  private async filterExpenses(transactions: TransactionSplit[]) {
+    const results = await Promise.all(
+      transactions.map((transaction) => this.shouldCountExpense(transaction))
     );
+
+    return transactions.filter((_, index) => results[index]);
   }
 
-  private shouldCountExpense(transaction: TransactionSplit): boolean {
+  private async shouldCountExpense(
+    transaction: TransactionSplit
+  ): Promise<boolean> {
     if (transaction.tags?.includes(Tag.BILLS)) {
       return true;
     }
 
-    const isRegularExpense = this.isRegularExpenseTransaction(transaction);
+    const isRegularExpense = await this.isRegularExpenseTransaction(
+      transaction
+    );
     return isRegularExpense;
   }
 
-  private isRegularExpenseTransaction(transaction: TransactionSplit): boolean {
+  private async isRegularExpenseTransaction(
+    transaction: TransactionSplit
+  ): Promise<boolean> {
+    const isExcludedTransaction =
+      await TransactionProperty.isExcludedTransaction(
+        transaction.description,
+        transaction.amount
+      );
+
     const conditions = {
       hasNoBudget: !transaction.budget_id,
       isNotTransfer: !TransactionProperty.isTransfer(transaction),
       isNotDisposableSupplemented:
         !TransactionProperty.isSupplementedByDisposable(transaction.tags),
-      isNotMonthlyInvestment: !TransactionProperty.isMonthlyInvestment(
-        transaction.description,
-        transaction.amount
-      ),
+      isNotExcludedTransaction: !isExcludedTransaction,
       isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
     };
 
@@ -54,7 +65,7 @@ export class UnbudgetedExpenseService {
       conditions.hasNoBudget &&
       conditions.isNotTransfer &&
       conditions.isNotDisposableSupplemented &&
-      conditions.isNotMonthlyInvestment &&
+      conditions.isNotExcludedTransaction &&
       conditions.isFromExpenseAccount
     );
   }

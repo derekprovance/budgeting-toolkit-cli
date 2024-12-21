@@ -2,11 +2,8 @@ import {
   TransactionSplit,
   TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
-import {
-  ExpenseAccount,
-  monthlyInvestment,
-  Tag,
-} from "../../config";
+import { ExpenseAccount, Tag } from "../../config";
+import { ExcludedTransactionService } from "../exluded-transaction.service";
 
 export class TransactionProperty {
   static isTransfer = (transaction: TransactionSplit): boolean =>
@@ -23,9 +20,6 @@ export class TransactionProperty {
     return transaction.tags.includes(Tag.DISPOSABLE_INCOME);
   }
 
-  static isInvestmentDeposit = (transaction: TransactionSplit) =>
-    transaction.description.includes(monthlyInvestment.description);
-
   static hasNoDestination(destinationId: string | null) {
     return destinationId === ExpenseAccount.NO_NAME;
   }
@@ -33,20 +27,26 @@ export class TransactionProperty {
   static isSupplementedByDisposable = (tags: string[] | null | undefined) =>
     tags?.includes(Tag.DISPOSABLE_INCOME);
 
-  static isMonthlyInvestment = (
+  static async isExcludedTransaction(
     description: string,
     amount: string
-  ): boolean => {
-    if(!monthlyInvestment.amount) {
-      return false;
-    }
+  ): Promise<boolean> {
+    const excludedTransactions =
+      await ExcludedTransactionService.getInstance().getTransactions();
 
-    return (
-      monthlyInvestment.description === description &&
-      this.convertCurrencyToFloat(amount) ===
-        this.convertCurrencyToFloat(monthlyInvestment.amount)
-    );
-  };
+    return excludedTransactions.some((transaction) => {
+      const amountsMatch = transaction.amount
+        ? this.convertCurrencyToFloat(transaction.amount) ===
+          this.convertCurrencyToFloat(amount)
+        : true;
+
+      const descriptionsMatch = transaction.description
+        ? transaction.description === description
+        : true;
+
+      return amountsMatch && descriptionsMatch;
+    });
+  }
 
   static isDeposit = (transaction: TransactionSplit): boolean =>
     transaction.type === TransactionTypeProperty.DEPOSIT;

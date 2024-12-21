@@ -75,7 +75,7 @@ export class UpdateTransactionService {
 
       if (Object.keys(aiResults).length !== transactions.length) {
         throw new Error(
-          `AI categorization result count (${
+          `LLM categorization result count (${
             Object.keys(aiResults).length
           }) doesn't match transaction count (${transactions.length})`
         );
@@ -115,7 +115,8 @@ export class UpdateTransactionService {
       }
 
       let budget;
-      if (budgets && this.shouldSetBudget(transaction)) {
+      const shouldSetBudget = await this.shouldSetBudget(transaction);
+      if (budgets && shouldSetBudget) {
         budget = budgets?.find(
           (budget) =>
             budget.attributes.name === aiResults[transactionJournalId].budget
@@ -213,46 +214,57 @@ export class UpdateTransactionService {
       : conditions.notATransfer && !conditions.hasACategory;
   }
 
-  private shouldSetBudget(transaction: TransactionSplit): boolean {
+  private async shouldSetBudget(
+    transaction: TransactionSplit
+  ): Promise<boolean> {
+    const isExcludedTransaction =
+      await TransactionProperty.isExcludedTransaction(
+        transaction.description,
+        transaction.amount
+      );
+
     const conditions = {
       notABill: !TransactionProperty.isABill(transaction),
       notDisposableIncome: !TransactionProperty.isDisposableIncome(transaction),
-      notAnInvestment: !TransactionProperty.isInvestmentDeposit(transaction),
+      notAnExcludedTransaction: !isExcludedTransaction,
       notADeposit: !TransactionProperty.isDeposit(transaction),
     };
 
     return (
       conditions.notABill &&
-      conditions.notAnInvestment &&
+      conditions.notAnExcludedTransaction &&
       conditions.notDisposableIncome &&
       conditions.notADeposit
     );
   }
 
-  private mapToResults(
+  private async mapToResults(
     transactions: TransactionSplit[],
     aiResults: AIResponse
-  ): TransactionCategoryResult[] {
-    return transactions.map((transaction) => {
-      const transactionJournalId = transaction.transaction_journal_id;
-      if (!transactionJournalId) {
-        return {};
-      }
+  ): Promise<TransactionCategoryResult[]> {
+    return Promise.all(
+      transactions.map(async (transaction) => {
+        const transactionJournalId = transaction.transaction_journal_id;
+        if (!transactionJournalId) {
+          return {};
+        }
 
-      const aiResult = aiResults[transactionJournalId];
+        const aiResult = aiResults[transactionJournalId];
+        const shouldSetBudget = await this.shouldSetBudget(transaction);
 
-      return {
-        ...(this.shouldCategorizeTransaction(transaction) && {
-          name: transaction.description,
-          category: transaction.category_name ?? "",
-          updatedCategory: aiResult.category,
-        }),
-        ...(this.shouldSetBudget(transaction) && {
-          name: transaction.description,
-          budget: transaction.budget_name ?? "",
-          updatedBudget: aiResult.budget,
-        }),
-      };
-    });
+        return {
+          ...(this.shouldCategorizeTransaction(transaction) && {
+            name: transaction.description,
+            category: transaction.category_name ?? "",
+            updatedCategory: aiResult.category,
+          }),
+          ...(shouldSetBudget && {
+            name: transaction.description,
+            budget: transaction.budget_name ?? "",
+            updatedBudget: aiResult.budget,
+          }),
+        };
+      })
+    );
   }
 }
