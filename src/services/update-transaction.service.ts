@@ -14,6 +14,7 @@ import {
 } from "./ai/llm-transaction-processing.service";
 import inquirer from "inquirer";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
+import chalk from "chalk";
 
 interface TransactionCategoryResult {
   name?: string;
@@ -128,11 +129,15 @@ export class UpdateTransactionService {
         const approved = await this.askToUpdateTransaction(
           transaction.description,
           category?.name,
-          budget?.attributes.name
+          budget?.attributes.name,
+          transaction
         );
 
         if (!approved) {
-          logger.debug('User skipped transaction update:', transaction.description);
+          logger.debug(
+            "User skipped transaction update:",
+            transaction.description
+          );
           continue;
         }
 
@@ -141,34 +146,39 @@ export class UpdateTransactionService {
           category?.name,
           budget?.id
         );
-        
+
         updatedTransactions.push(transaction);
-        logger.debug('Successfully updated transaction:', transaction.description);
+        logger.debug(
+          "Successfully updated transaction:",
+          transaction.description
+        );
       } catch (error) {
-        logger.error('Error processing transaction:', {
+        logger.error("Error processing transaction:", {
           description: transaction.description,
-          error
+          error,
         });
       }
     }
-    
-    logger.debug(`Processed ${transactions.length} transactions, updated ${updatedTransactions.length}`);
+
+    logger.debug(
+      `Processed ${transactions.length} transactions, updated ${updatedTransactions.length}`
+    );
     return updatedTransactions;
   }
 
   private validateTransactionData(
-    transaction: TransactionSplit, 
+    transaction: TransactionSplit,
     aiResults: AIResponse
   ): boolean {
     const journalId = transaction.transaction_journal_id;
 
     if (!journalId) {
-      logger.warn('Missing journal ID:', transaction.description);
+      logger.warn("Missing journal ID:", transaction.description);
       return false;
     }
 
     if (!aiResults[journalId]) {
-      logger.warn('No AI results found:', transaction.description);
+      logger.warn("No AI results found:", transaction.description);
       return false;
     }
 
@@ -180,25 +190,37 @@ export class UpdateTransactionService {
     category?: Category,
     budget?: BudgetRead
   ): boolean {
-    const hasCategoryChange = category?.name && transaction.category_name !== category.name;
+    const hasCategoryChange =
+      category?.name && transaction.category_name !== category.name;
     const hasBudgetChange = budget?.id && transaction.budget_id !== budget.id;
-    
+
     return Boolean(hasCategoryChange || hasBudgetChange);
   }
 
   private async askToUpdateTransaction(
     description: string,
     category: string | undefined,
-    budget: string | undefined
+    budget: string | undefined,
+    transaction: TransactionSplit
   ): Promise<boolean> {
     if (this.noConfirmation) {
       return true;
     }
 
     const changes = [
-      category && `Category: ${category}`,
-      budget && `Budget: ${budget}`,
+      category && category !== transaction.category_name &&
+        `Category: ${chalk.redBright(
+          transaction.category_name || "None"
+        )} → ${chalk.cyan(category)}`,
+      budget && budget !== transaction.budget_name &&
+        `Budget: ${chalk.redBright(
+          transaction.budget_name || "None"
+        )} → ${chalk.cyan(budget)}`,
     ].filter(Boolean);
+
+    if (changes.length === 0) {
+      return false;
+    }
 
     const formattedDescription =
       description.length > 50
@@ -206,10 +228,10 @@ export class UpdateTransactionService {
         : description;
 
     const message = [
-      `Transaction: "${formattedDescription}"`,
-      "Proposed changes:",
-      ...changes.map((change) => `  • ${change}`),
-      "\nApply these changes?",
+      `${chalk.bold("Transaction:")} "${chalk.yellow(formattedDescription)}"`,
+      `${chalk.bold("Proposed changes:")}`,
+      ...changes.map((change) => chalk.gray(`  • ${change}`)),
+      `\n${chalk.bold("Apply these changes?")}`,
     ].join("\n");
 
     console.log("\n");
@@ -247,7 +269,8 @@ export class UpdateTransactionService {
 
     const conditions = {
       notABill: !TransactionPropertyService.isBill(transaction),
-      notDisposableIncome: !TransactionPropertyService.isDisposableIncome(transaction),
+      notDisposableIncome:
+        !TransactionPropertyService.isDisposableIncome(transaction),
       notAnExcludedTransaction: !isExcludedTransaction,
       notADeposit: !TransactionPropertyService.isDeposit(transaction),
     };
@@ -283,7 +306,8 @@ export class UpdateTransactionService {
             name: transaction.description,
             category: transaction.category_name ?? "",
             updatedCategory: aiResult.category,
-          }) || {}),
+          }) ||
+            {}),
           ...(shouldSetBudget && {
             name: transaction.description,
             budget: transaction.budget_name ?? "",

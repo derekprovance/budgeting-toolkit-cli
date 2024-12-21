@@ -1,13 +1,14 @@
 import { AdditionalIncomeService } from "../services/additional-income.service";
 import { PrinterService } from "../services/printer.service";
 import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
+import chalk from 'chalk';
 
 export const finalizeBudgetCommand = async (
   additionalIncomeService: AdditionalIncomeService,
   unbudgetedExpenseService: UnbudgetedExpenseService,
   queryMonth: number
 ) => {
-  console.log('\n=== Budget Finalization Report ===');
+  console.log('\n' + chalk.bold.blue('=== Budget Finalization Report ==='));
   
   try {
     const additionalIncomeResults =
@@ -21,21 +22,21 @@ export const finalizeBudgetCommand = async (
       new Date(currentYear, queryMonth-1)
     );
     
-    console.log(`\n📅 ${monthName} ${currentYear}`);
-    console.log('='.repeat(30) + '\n');
+    console.log(`\n📅 ${chalk.cyan(monthName)} ${chalk.cyan(currentYear)}`);
+    console.log(chalk.gray('='.repeat(30)) + '\n');
     
     PrinterService.printTransactions(
       additionalIncomeResults,
-      "💰 Additional Income"
+      chalk.green('💰 Additional Income')
     );
     
     PrinterService.printTransactions(
       unbudgetedExpenseResults,
-      "💸 Unbudgeted Expenses"
+      chalk.red('💸 Unbudgeted Expenses')
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('❌ Error finalizing budget:', errorMessage);
+    console.error(chalk.red('❌ Error finalizing budget:'), chalk.red.bold(errorMessage));
     throw error instanceof Error ? error : new Error('Unknown error occurred');
   }
 };

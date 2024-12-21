@@ -1,15 +1,16 @@
 import { UpdateTransactionService } from "../services/update-transaction.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
+import chalk from 'chalk';
 
 export const updateTransactions = async (
   updateTransactionService: UpdateTransactionService,
   tag: string,
   updateMode: UpdateTransactionMode
 ) => {
-  console.log("\n🔄 Categorizing transactions using LLM...");
-  console.log("Tag:", tag);
-  console.log("Mode:", updateMode);
-  console.log("─".repeat(50));
+  console.log(`\n${chalk.blueBright('🔄 Categorizing transactions using LLM...')}`);
+  console.log(`${chalk.gray('Tag:')} ${chalk.cyan(tag)}`);
+  console.log(`${chalk.gray('Mode:')} ${chalk.cyan(updateMode)}`);
+  console.log(chalk.gray('─'.repeat(50)));
 
   try {
     const results = await updateTransactionService.updateTransactionsByTag(
@@ -19,7 +20,7 @@ export const updateTransactions = async (
 
     let updatedCount = 0;
 
-    console.log("\nTransaction Updates:");
+    console.log(`\n${chalk.blueBright('Transaction Updates:')}`);
     results.forEach((result) => {
       const hasNewCategory =
         updateMode !== UpdateTransactionMode.Budget &&
@@ -34,33 +35,34 @@ export const updateTransactions = async (
 
         if (hasNewCategory) {
           changes.push(
-            `Category: ${result.category || "<No Category>"} ➜ ${
+            `${chalk.gray('Category:')} ${chalk.yellow(result.category || '<No Category>')} ${chalk.gray('➜')} ${chalk.green(
               result.updatedCategory
-            }`
+            )}`
           );
         }
 
         if (hasNewBudget) {
           changes.push(
-            `Budget: ${result.budget || "<No Budget>"} ➜ ${
+            `${chalk.gray('Budget:')} ${chalk.yellow(result.budget || '<No Budget>')} ${chalk.gray('➜')} ${chalk.green(
               result.updatedBudget
-            }`
+            )}`
           );
         }
 
-        console.log(`\n📝 ${result.name}:\n   ${changes.join("\n   ")}`);
+        console.log(`\n${chalk.blue('📝')} ${chalk.white(result.name)}:\n   ${changes.join('\n   ')}`);
       }
     });
 
-    console.log("\n");
-    console.log("─".repeat(50));
-    console.log(`✅ Processing complete`);
-    console.log(`   Total transactions: ${results.length}`);
-    console.log(`   Updates made: ${updatedCount}`);
+    console.log('\n');
+    console.log(chalk.gray('─'.repeat(50)));
+    console.log(chalk.green('✅ Processing complete'));
+    console.log(`   ${chalk.gray('Total transactions:')} ${chalk.white(results.length)}`);
+    console.log(`   ${chalk.gray('Updates made:')} ${chalk.white(updatedCount)}`);
     console.log();
   } catch (error) {
-    console.error("\n❌ Error processing transactions:");
-    console.error("  ", error instanceof Error ? error.message : String(error));
+    console.log('\n');
+    console.error(chalk.red('❌ Error processing transactions:'));
+    console.error(chalk.red('   ' + (error instanceof Error ? error.message : String(error))));
     throw error;
   }
 };
