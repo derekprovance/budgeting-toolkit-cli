@@ -15,20 +15,54 @@ import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budge
 import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "./update-transaction-mode.enum";
 
-export const createCli = (): Command => {
-  const program = new Command();
+const getCurrentMonth = (): number => {
+  return new Date().getMonth() + 1;
+};
 
-  const apiClient = new FireflyApiClient(config);
+const initializeLLMClient = (): ClaudeClient => {
+  if (!claudeAPIKey) {
+    throw new Error(
+      "!!! Claude API Key is required to update transactions. Please check your .env file. !!!"
+    );
+  }
 
+  return new ClaudeClient({
+    apiKey: claudeAPIKey,
+    model: llmModel,
+    maxTokens: 20,
+    maxRetries: 3,
+    batchSize: 10,
+    maxConcurrent: 5,
+  });
+};
+
+interface UpdateTransactionOptions {
+  tag: string;
+  mode: UpdateTransactionMode;
+  includeClassified?: boolean;
+  yes?: boolean;
+}
+
+const initializeServices = (apiClient: FireflyApiClient) => {
   const transactionService = new TransactionService(apiClient);
   const budgetService = new BudgetService(apiClient);
-  const additionalIncomeService = new AdditionalIncomeService(
-    transactionService
-  );
-  const unbudgetedExpenseService = new UnbudgetedExpenseService(
-    transactionService
-  );
   const categoryService = new CategoryService(apiClient);
+  const additionalIncomeService = new AdditionalIncomeService(transactionService);
+  const unbudgetedExpenseService = new UnbudgetedExpenseService(transactionService);
+
+  return {
+    transactionService,
+    budgetService,
+    categoryService,
+    additionalIncomeService,
+    unbudgetedExpenseService,
+  };
+};
+
+export const createCli = (): Command => {
+  const program = new Command();
+  const apiClient = new FireflyApiClient(config);
+  const services = initializeServices(apiClient);
 
   program
     .name("budgeting-toolkit-cli")
@@ -46,8 +80,8 @@ export const createCli = (): Command => {
     )
     .action((opts) =>
       finalizeBudgetCommand(
-        additionalIncomeService,
-        unbudgetedExpenseService,
+        services.additionalIncomeService,
+        services.unbudgetedExpenseService,
         opts.month ?? getCurrentMonth()
       )
     );
@@ -81,22 +115,23 @@ export const createCli = (): Command => {
       "-y, --yes",
       "automatically apply updates without confirmation prompts"
     )
-    .action((opts) => {
+    .action((opts: UpdateTransactionOptions) => {
       try {
         const claudeClient = initializeLLMClient();
-        const llmCategoryService = new LLMTransactionCategoryService(
-          claudeClient
-        );
-        const llmBudgetService = new LLMTransactionBudgetService(claudeClient);
+        const llmServices = {
+          category: new LLMTransactionCategoryService(claudeClient),
+          budget: new LLMTransactionBudgetService(claudeClient),
+        };
+
         const llmTransactionProcessor = new LLMTransactionProcessingService(
-          llmCategoryService,
-          llmBudgetService
+          llmServices.category,
+          llmServices.budget
         );
 
         const updateCategoryService = new UpdateTransactionService(
-          transactionService,
-          categoryService,
-          budgetService,
+          services.transactionService,
+          services.categoryService,
+          services.budgetService,
           llmTransactionProcessor,
           opts.includeClassified,
           opts.yes
@@ -105,33 +140,10 @@ export const createCli = (): Command => {
         updateTransactions(updateCategoryService, opts.tag, opts.mode);
       } catch (ex) {
         if (ex instanceof Error) {
-          console.log(ex.message);
+          console.error(ex.message);
         }
       }
     });
-
-  const initializeLLMClient = (): ClaudeClient => {
-    if (!claudeAPIKey) {
-      throw new Error(
-        "!!! Claude API Key is required to update transactions. Please check your .env file. !!!"
-      );
-    }
-
-    const claudeClient = new ClaudeClient({
-      apiKey: claudeAPIKey,
-      model: llmModel,
-      maxTokens: 20,
-      maxRetries: 3,
-      batchSize: 10,
-      maxConcurrent: 5,
-    });
-
-    return claudeClient;
-  };
-
-  const getCurrentMonth = (): number => {
-    return new Date().getMonth() + 1;
-  };
 
   return program;
 };
