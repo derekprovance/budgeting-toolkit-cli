@@ -37,11 +37,11 @@ export class UpdateTransactionService {
   async updateTransactionsByTag(
     tag: string,
     updateMode: UpdateTransactionMode
-  ): Promise<TransactionCategoryResult[]> {
+  ): Promise<TransactionCategoryResult[] | null> {
     try {
       if (!await this.transactionService.tagExists(tag)) {
         logger.debug(`Tag ${tag} does not exist`);
-        return [];
+        return null;
       }
 
       const [unfilteredTransactions, categories] = await Promise.all([

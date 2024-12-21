@@ -7,23 +7,28 @@ export const updateTransactions = async (
   tag: string,
   updateMode: UpdateTransactionMode
 ) => {
+  console.log(`\n${chalk.blueBright('🔄 Categorizing transactions using LLM...')}`);
+  console.log(`${chalk.gray('Tag:')} ${chalk.cyan(tag)}`);
+  console.log(`${chalk.gray('Mode:')} ${chalk.cyan(updateMode)}`);
+  console.log(chalk.gray('─'.repeat(50)));
+
   try {
     const results = await updateTransactionService.updateTransactionsByTag(
       tag,
       updateMode
     );
 
-    if (!results.length) {
-      console.log(`${chalk.redBright('!!!')} No transactions found for processing for tag: ${chalk.gray(tag)} ${chalk.redBright('!!!')}`);
+    if (!results) {
+      console.log(`\n${chalk.redBright('!!!')} Tag not found: ${chalk.gray(tag)} ${chalk.redBright('!!!')}`);
+      return;
+    }
+
+    if(!results.length) {
+      console.log(`\n${chalk.redBright('!!!')} No transactions found for tag: ${chalk.gray(tag)} ${chalk.redBright('!!!')}`);
       return;
     }
 
     let updatedCount = 0;
-
-    console.log(`\n${chalk.blueBright('🔄 Categorizing transactions using LLM...')}`);
-    console.log(`${chalk.gray('Tag:')} ${chalk.cyan(tag)}`);
-    console.log(`${chalk.gray('Mode:')} ${chalk.cyan(updateMode)}`);
-    console.log(chalk.gray('─'.repeat(50)));
 
     console.log(`\n${chalk.blueBright('Transaction Updates:')}`);
     results.forEach((result) => {
