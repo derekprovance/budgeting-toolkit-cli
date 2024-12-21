@@ -106,94 +106,84 @@ export class UpdateTransactionService {
   ): Promise<TransactionSplit[]> {
     const updatedTransactions: TransactionSplit[] = [];
 
-    for (let i = 0; i < transactions.length; i++) {
-      const transaction = transactions[i];
+    for (const transaction of transactions) {
       const transactionJournalId = transaction.transaction_journal_id;
 
+      if (!this.validateTransactionData(transaction, aiResults)) {
+        continue;
+      }
+
       try {
-        if (!transactionJournalId) {
-          logger.warn(
-            `Missing journal ID for transaction: ${transaction.description} (amount: ${transaction.amount})`
-          );
-          continue;
-        }
-
-        if (!aiResults[transactionJournalId]) {
-          logger.warn(
-            `No AI results found for transaction ${transaction.description} (journal ID: ${transactionJournalId})`
-          );
-          continue;
-        }
-
-        let budget;
-        const shouldSetBudget = await this.shouldSetBudget(transaction);
-        if (budgets && shouldSetBudget) {
-          budget = budgets?.find(
-            (budget) =>
-              budget.attributes.name === aiResults[transactionJournalId].budget
-          );
-        }
-
+        const budget = budgets?.find(
+          (b) => b.attributes.name === aiResults[transactionJournalId!].budget
+        );
         const category = categories.find(
-          (category) =>
-            category?.name === aiResults[transactionJournalId]?.category
+          (c) => c?.name === aiResults[transactionJournalId!]?.category
         );
 
-        if (
-          (transaction.category_name !== category?.name && category?.name) ||
-          (transaction.budget_id !== budget?.id && budget?.id)
-        ) {
-          const answer = await this.askToUpdateTransaction(
-            transaction.description,
-            category?.name,
-            budget?.attributes.name
-          );
-
-          if (!answer) {
-            logger.debug({
-              transaction: transaction.description,
-              suggestedCategory: category?.name,
-              suggestedBudget: budget?.attributes.name
-            }, 'User skipped transaction update');
-            continue;
-          }
-
-          try {
-            await this.transactionService.updateTransaction(
-              transaction,
-              category?.name,
-              budget?.id
-            );
-            updatedTransactions.push(transaction);
-            logger.debug({
-              transaction: transaction.description,
-              newCategory: category?.name,
-              newBudget: budget?.attributes.name
-            }, 'Successfully updated transaction');
-          } catch (updateError) {
-            logger.error({
-              error: updateError,
-              transaction: transaction.description,
-              journalId: transactionJournalId
-            }, 'Failed to update transaction');
-          }
+        if (!this.hasChanges(transaction, category, budget)) {
+          continue;
         }
+
+        const approved = await this.askToUpdateTransaction(
+          transaction.description,
+          category?.name,
+          budget?.attributes.name
+        );
+
+        if (!approved) {
+          logger.debug('User skipped transaction update:', transaction.description);
+          continue;
+        }
+
+        await this.transactionService.updateTransaction(
+          transaction,
+          category?.name,
+          budget?.id
+        );
+        
+        updatedTransactions.push(transaction);
+        logger.debug('Successfully updated transaction:', transaction.description);
       } catch (error) {
-        logger.error({
-          error,
-          transaction: transaction.description,
-          journalId: transactionJournalId,
-          index: i
-        }, 'Error processing transaction');
+        logger.error('Error processing transaction:', {
+          description: transaction.description,
+          error
+        });
       }
     }
     
-    logger.debug({
-      totalTransactions: transactions.length,
-      updatedCount: updatedTransactions.length
-    }, 'Finished processing transactions');
-    
+    logger.debug(`Processed ${transactions.length} transactions, updated ${updatedTransactions.length}`);
     return updatedTransactions;
+  }
+
+  private validateTransactionData(
+    transaction: TransactionSplit, 
+    aiResults: AIResponse
+  ): boolean {
+    const journalId = transaction.transaction_journal_id;
+
+    if (!journalId) {
+      logger.warn('Missing journal ID:', transaction.description);
+      return false;
+    }
+
+    if (!aiResults[journalId]) {
+      logger.warn('No AI results found:', transaction.description);
+      return false;
+    }
+
+    return true;
+  }
+
+  private hasChanges(
+    transaction: TransactionSplit,
+    category?: Category,
+    budget?: BudgetRead
+  ): boolean {
+    const hasCategoryChange = category?.name && transaction.category_name !== category.name;
+    const hasBudgetChange = budget?.id && transaction.budget_id !== budget.id;
+    
+    return Boolean(hasCategoryChange || hasBudgetChange);
   }
 
   private async askToUpdateTransaction(
@@ -289,11 +279,11 @@ export class UpdateTransactionService {
         const shouldSetBudget = await this.shouldSetBudget(transaction);
 
         return {
-          ...(this.shouldCategorizeTransaction(transaction) && {
+          ...((this.shouldCategorizeTransaction(transaction) && {
             name: transaction.description,
             category: transaction.category_name ?? "",
             updatedCategory: aiResult.category,
-          }),
+          }) || {}),
           ...(shouldSetBudget && {
             name: transaction.description,
             budget: transaction.budget_name ?? "",

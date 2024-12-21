@@ -4,7 +4,6 @@ import {
 } from "@derekprovance/firefly-iii-sdk";
 import { ExpenseAccount, Tag } from "../../config";
 import { ExcludedTransactionService } from "../exluded-transaction.service";
-import { LLMResponseValidator } from "../ai/llm-response-validator.service";
 
 export class TransactionPropertyService {
   static isTransfer = (transaction: TransactionSplit): boolean =>
@@ -25,8 +24,9 @@ export class TransactionPropertyService {
     return destinationId === ExpenseAccount.NO_NAME;
   }
 
-  static isSupplementedByDisposable = (tags: string[] | null | undefined): boolean =>
-    tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
+  static isSupplementedByDisposable = (
+    tags: string[] | null | undefined
+  ): boolean => tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
 
   static async isExcludedTransaction(
     description: string,
@@ -37,8 +37,7 @@ export class TransactionPropertyService {
 
     return excludedTransactions.some((transaction) => {
       const amountsMatch = transaction.amount
-        ? transaction.amount ===
-          this.convertCurrencyToFloat(amount)
+        ? transaction.amount === this.convertCurrencyToFloat(amount)
         : true;
 
       const descriptionsMatch = transaction.description
@@ -59,15 +58,15 @@ export class TransactionPropertyService {
 
   private static convertCurrencyToFloat(amount: string): string {
     if (!amount) {
-      throw new Error('Amount cannot be empty');
+      throw new Error("Amount cannot be empty");
     }
 
-    const isNegative = amount.includes('(') && amount.includes(')');
-    
+    const isNegative = amount.includes("(") && amount.includes(")");
+
     const cleanAmount = amount
-      .replace(/[()]/g, '')
-      .replace(/[$€£¥]/g, '')
-      .replace(/,/g, '')
+      .replace(/[()]/g, "")
+      .replace(/[$€£¥]/g, "")
+      .replace(/,/g, "")
       .trim();
 
     if (!/^-?\d*\.?\d+$/.test(cleanAmount)) {
