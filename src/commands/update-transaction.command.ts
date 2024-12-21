@@ -6,36 +6,61 @@ export const updateTransactions = async (
   tag: string,
   updateMode: UpdateTransactionMode
 ) => {
-  console.log("Categorizing transactions using an LLM...");
+  console.log("\n🔄 Categorizing transactions using LLM...");
+  console.log("Tag:", tag);
+  console.log("Mode:", updateMode);
+  console.log("─".repeat(50));
 
-  const results = await updateTransactionService.updateTransactionsByTag(
-    tag,
-    updateMode
-  );
+  try {
+    const results = await updateTransactionService.updateTransactionsByTag(
+      tag,
+      updateMode
+    );
 
-  console.log("\n\nUpdating Transactions:")
-  results.forEach((result) => {
-    let output = `${result.name}: `;
-    const hasNewCategory =
-      updateMode !== UpdateTransactionMode.Budget &&
-      result.category !== result.updatedCategory;
-    const hasNewBudget =
-      updateMode !== UpdateTransactionMode.Category &&
-      result.budget !== result.updatedBudget;
+    let updatedCount = 0;
 
-    if (hasNewCategory)
-      output += `${result.category || "<No Category>"} => ${
-        result.updatedCategory
-      }`;
+    console.log("\nTransaction Updates:");
+    results.forEach((result) => {
+      const hasNewCategory =
+        updateMode !== UpdateTransactionMode.Budget &&
+        result.category !== result.updatedCategory;
+      const hasNewBudget =
+        updateMode !== UpdateTransactionMode.Category &&
+        result.budget !== result.updatedBudget;
 
-    output +=
-      updateMode !== UpdateTransactionMode.Category && hasNewBudget
-        ? `${hasNewCategory ? " | " : ""}${result.budget || "<No Budget>"} => ${
-            result.updatedBudget
-          }`
-        : "";
+      if (hasNewCategory || hasNewBudget) {
+        updatedCount++;
+        const changes = [];
 
-    if (hasNewCategory || hasNewBudget) console.log(output);
-  });
-  console.log("Transactions successfully processed using LLM");
+        if (hasNewCategory) {
+          changes.push(
+            `Category: ${result.category || "<No Category>"} ➜ ${
+              result.updatedCategory
+            }`
+          );
+        }
+
+        if (hasNewBudget) {
+          changes.push(
+            `Budget: ${result.budget || "<No Budget>"} ➜ ${
+              result.updatedBudget
+            }`
+          );
+        }
+
+        console.log(`\n📝 ${result.name}:\n   ${changes.join("\n   ")}`);
+      }
+    });
+
+    console.log("\n");
+    console.log("─".repeat(50));
+    console.log(`✅ Processing complete`);
+    console.log(`   Total transactions: ${results.length}`);
+    console.log(`   Updates made: ${updatedCount}`);
+    console.log();
+  } catch (error) {
+    console.error("\n❌ Error processing transactions:");
+    console.error("  ", error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 };
