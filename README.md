@@ -14,42 +14,11 @@ A powerful command-line interface (CLI) for interacting with both the Firefly II
 
 Before you begin, ensure you have met the following requirements:
 
-- Node.js (v14.0.0 or later)
-- npm (v6.0.0 or later)
+- Node.js (v23.x or later)
+- npm (v10.x or later)
 - A Firefly III instance with API access
 - An Anthropic API key for Claude integration
-- Client certificate, key, and CA certificate for Firefly III authentication (Optional)
-
-## Installing Private Dependencies
-
-This project requires access to private GitHub packages. To install the private dependencies, follow these steps:
-
-1. Create a GitHub Personal Access Token (PAT):
-   - Go to GitHub Settings → Developer Settings → Personal Access Tokens
-   - Generate a new token with `read:packages` scope
-   - Copy the generated token
-
-2. Configure npm to use GitHub Packages:
-
-```bash
-npm config set @derekprovance:registry https://npm.pkg.github.com
-npm config set //npm.pkg.github.com/:_authToken YOUR_GITHUB_PAT
-```
-
-Replace `YOUR_GITHUB_PAT` with your personal access token.
-
-3. Install the private package:
-
-```bash
-npm install @derekprovance/firefly-iii-sdk@2.1.0
-```
-
-Alternatively, you can create a `.npmrc` file in your project root with the following content:
-
-```plaintext
-@derekprovance:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT
-```
+- (Optional) Client certificate, key, and CA certificate for Firefly III authentication
 
 ### Troubleshooting
 
@@ -110,7 +79,6 @@ MONTHLY_INVESTMENT_DESC="VANGUARD BUY INVESTMENT"
 - `FIREFLY_API_URL`: The complete URL to your Firefly III API endpoint
   - Format: `https://your-instance.com/api/v1`
   - Required: Yes
-  - Example: `https://finance.example.com/api/v1`
 
 - `FIREFLY_API_TOKEN`: Your personal access token for Firefly III
   - Required: Yes
@@ -120,25 +88,25 @@ MONTHLY_INVESTMENT_DESC="VANGUARD BUY INVESTMENT"
 
 #### Certificate Configuration
 - `CLIENT_CERT_CA_PATH`: Path to your CA certificate file
-  - Required: Yes if server is protected by client credentials
+  - Required: Yes, if server is protected by client credentials
   - Format: Path relative to project root
   - Example: `../certs/ca.pem`
   - File type: `.pem`
 
 - `CLIENT_CERT_PATH`: Path to your client certificate file
-  - Required: Yes if server is protected by client credentials
+  - Required: Yes, if server is protected by client credentials
   - Format: Path relative to project root
   - Example: `../certs/client.p12`
   - File type: `.p12`
 
 - `CLIENT_CERT_PASSWORD`: Password for your client certificate
-  - Required: Yes if certificate is password-protected
+  - Required: Yes, if certificate is password-protected
   - Format: String
   - Security: Keep this secret!
 
 #### Claude AI Configuration
 - `ANTHROPIC_API_KEY`: Your Anthropic API key for Claude integration
-  - Required: Yes
+  - Required: Yes, if using AI features
   - How to obtain: From your Anthropic account dashboard
   - Format: String
   - Security: Keep this secret!
@@ -241,32 +209,20 @@ npm start -- [command] [options]
 
 To set up the project for development:
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Run tests:
+1. Run tests:
    ```bash
    npm test
    ```
 
-3. Build the project:
+2. Build the project:
    ```bash
-   npm run build
+   npm run compile
    ```
 
-4. Run in development mode:
+3. Run in development mode:
    ```bash
-   npm run dev
+   npm run start
    ```
-
-## Error Handling
-
-The CLI implements exponential backoff with jitter for retries:
-- Base delay: 1000ms
-- Maximum delay: 32000ms
-- Retry attempts: 3 (configurable)
 
 ## Contributing
 
@@ -288,7 +244,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Anthropic Claude](https://www.anthropic.com/claude) - AI language model
 - [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) - Official Anthropic TypeScript SDK
 - [Commander.js](https://github.com/tj/commander.js/) - Node.js command-line interface solution
-- [Axios](https://github.com/axios/axios) - Promise based HTTP client
 
 ## Contact
 

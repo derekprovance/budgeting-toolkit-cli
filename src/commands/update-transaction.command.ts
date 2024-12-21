@@ -13,6 +13,7 @@ export const updateTransactions = async (
     updateMode
   );
 
+  console.log("\n\nUpdating Transactions:")
   results.forEach((result) => {
     let output = `${result.name}: `;
     const hasNewCategory =
