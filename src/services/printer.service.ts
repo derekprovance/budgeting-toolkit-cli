@@ -1,4 +1,6 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
+import chalk from "chalk";
+import { TransactionPropertyService } from "./core/transaction-property.service";
 
 interface PrinterConfig {
   descriptionPadding: number;
@@ -11,6 +13,9 @@ interface LineItem {
   description: string;
   amount: number;
   formattedAmount: string;
+  isBill: boolean;
+  isTransfer: boolean;
+  isDeposit: boolean;
 }
 
 interface Report {
@@ -39,7 +44,10 @@ export class PrinterService {
     PrinterService.config = { ...PrinterService.DEFAULT_CONFIG, ...config };
   }
 
-  static printTransactions(transactions: TransactionSplit[], title?: string): void {
+  static printTransactions(
+    transactions: TransactionSplit[],
+    title?: string
+  ): void {
     if (!PrinterService.validateTransactions(transactions)) {
       console.log("No results were returned.");
       return;
@@ -47,7 +55,9 @@ export class PrinterService {
 
     try {
       const report = PrinterService.createReport(transactions, title);
-      const formattingOptions = PrinterService.calculateFormattingOptions(report.items);
+      const formattingOptions = PrinterService.calculateFormattingOptions(
+        report.items
+      );
       const output = PrinterService.formatReport(report, formattingOptions);
       console.log(output);
     } catch (error) {
@@ -55,7 +65,9 @@ export class PrinterService {
     }
   }
 
-  private static validateTransactions(transactions: TransactionSplit[]): boolean {
+  private static validateTransactions(
+    transactions: TransactionSplit[]
+  ): boolean {
     return Array.isArray(transactions) && transactions.length > 0;
   }
 
@@ -67,6 +79,9 @@ export class PrinterService {
       description: item.description?.trim() || "[No Description]",
       amount: Number(item.amount),
       formattedAmount: PrinterService.formatCurrency(item.amount),
+      isBill: TransactionPropertyService.isBill(item),
+      isTransfer: TransactionPropertyService.isTransfer(item),
+      isDeposit: TransactionPropertyService.isDeposit(item),
     }));
 
     return {
@@ -76,7 +91,9 @@ export class PrinterService {
     };
   }
 
-  private static calculateFormattingOptions(items: LineItem[]): FormattingOptions {
+  private static calculateFormattingOptions(
+    items: LineItem[]
+  ): FormattingOptions {
     const maxDescriptionSize = Math.max(
       ...items.map((item) => item.description.length)
     );
@@ -84,17 +101,26 @@ export class PrinterService {
       ...items.map((item) => item.formattedAmount.length)
     );
     const borderSize =
-      maxDescriptionSize + maxAmountSize + PrinterService.config.descriptionPadding! + 2;
+      maxDescriptionSize +
+      maxAmountSize +
+      PrinterService.config.descriptionPadding! +
+      2;
 
     return { maxDescriptionSize, maxAmountSize, borderSize };
   }
 
-  private static formatReport(report: Report, options: FormattingOptions): string {
+  private static formatReport(
+    report: Report,
+    options: FormattingOptions
+  ): string {
     const border = "=".repeat(options.borderSize) + "\n";
     const sections = [border];
 
     if (report.title) {
-      sections.push(PrinterService.formatTitle(report.title, options.borderSize), border);
+      sections.push(
+        PrinterService.formatTitle(report.title, options.borderSize),
+        border
+      );
     }
 
     sections.push(
@@ -109,11 +135,26 @@ export class PrinterService {
     return sections.join("");
   }
 
-  private static formatLineItem(item: LineItem, maxDescriptionSize: number): string {
+  private static formatLineItem(
+    item: LineItem,
+    maxDescriptionSize: number
+  ): string {
     const description = item.description.padEnd(
       maxDescriptionSize + PrinterService.config.descriptionPadding!
     );
-    return `> ${description}: ${item.formattedAmount}\n`;
+
+    const colorMap = {
+      isBill: chalk.redBright,
+      isDeposit: chalk.greenBright,
+      isTransfer: chalk.magenta,
+      default: chalk.cyan
+    };
+
+    const colorFn = colorMap[
+      Object.keys(colorMap).find(key => key !== 'default' && item[key as keyof LineItem]) as keyof typeof colorMap
+    ] || colorMap.default;
+
+    return `> ${colorFn(description)}: ${item.formattedAmount}\n`;
   }
 
   private static formatTitle(title: string, borderSize: number): string {

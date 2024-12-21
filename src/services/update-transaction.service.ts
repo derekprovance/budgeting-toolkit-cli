@@ -13,7 +13,7 @@ import {
   LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import inquirer from "inquirer";
-import { UpdateTransactionMode } from "../update-transaction-mode.enum";
+import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
 
 interface TransactionCategoryResult {
   name?: string;
@@ -246,7 +246,7 @@ export class UpdateTransactionService {
       );
 
     const conditions = {
-      notABill: !TransactionPropertyService.isABill(transaction),
+      notABill: !TransactionPropertyService.isBill(transaction),
       notDisposableIncome: !TransactionPropertyService.isDisposableIncome(transaction),
       notAnExcludedTransaction: !isExcludedTransaction,
       notADeposit: !TransactionPropertyService.isDeposit(transaction),

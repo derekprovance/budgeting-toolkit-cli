@@ -9,7 +9,7 @@ export class TransactionPropertyService {
   static isTransfer = (transaction: TransactionSplit): boolean =>
     transaction.type === TransactionTypeProperty.TRANSFER;
 
-  static isABill = (transaction: TransactionSplit): boolean =>
+  static isBill = (transaction: TransactionSplit): boolean =>
     transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false;
 
   static isDisposableIncome(transaction: TransactionSplit): boolean {

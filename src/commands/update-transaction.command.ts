@@ -1,5 +1,5 @@
 import { UpdateTransactionService } from "../services/update-transaction.service";
-import { UpdateTransactionMode } from "../update-transaction-mode.enum";
+import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
 
 export const updateTransactions = async (
   updateTransactionService: UpdateTransactionService,

@@ -13,7 +13,7 @@ import { finalizeBudgetCommand } from "./commands/finalize-budget.command";
 import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-category.service";
 import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budget.service";
 import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
-import { UpdateTransactionMode } from "./update-transaction-mode.enum";
+import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
 
 const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
