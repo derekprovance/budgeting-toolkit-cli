@@ -39,7 +39,7 @@ export class UpdateTransactionService {
     updateMode: UpdateTransactionMode
   ): Promise<TransactionCategoryResult[] | null> {
     try {
-      if (!await this.transactionService.tagExists(tag)) {
+      if (!(await this.transactionService.tagExists(tag))) {
         logger.debug(`Tag ${tag} does not exist`);
         return null;
       }
@@ -52,7 +52,7 @@ export class UpdateTransactionService {
       ]);
 
       const transactions = unfilteredTransactions.filter((t) =>
-        this.shouldCategorizeTransaction(t)
+        this.shouldProcessTransaction(t)
       );
 
       if (!transactions.length) {
@@ -60,6 +60,7 @@ export class UpdateTransactionService {
         return [];
       }
 
+      //TODO - Checking if we should categorize but not if we should budget, we need to check for a budget
       let budgets;
       let budgetNames;
       if (updateMode !== UpdateTransactionMode.Category) {
@@ -120,9 +121,14 @@ export class UpdateTransactionService {
       }
 
       try {
-        const budget = budgets?.find(
-          (b) => b.attributes.name === aiResults[transactionJournalId!].budget
-        );
+        const shouldUpdateBudget = await this.shouldSetBudget(transaction);
+
+        let budget;
+        if (shouldUpdateBudget) {
+          budget = budgets?.find(
+            (b) => b.attributes.name === aiResults[transactionJournalId!].budget
+          );
+        }
         const category = categories.find(
           (c) => c?.name === aiResults[transactionJournalId!]?.category
         );
@@ -213,11 +219,13 @@ export class UpdateTransactionService {
     }
 
     const changes = [
-      category && category !== transaction.category_name &&
+      category &&
+        category !== transaction.category_name &&
         `Category: ${chalk.redBright(
           transaction.category_name || "None"
         )} → ${chalk.cyan(category)}`,
-      budget && budget !== transaction.budget_name &&
+      budget &&
+        budget !== transaction.budget_name &&
         `Budget: ${chalk.redBright(
           transaction.budget_name || "None"
         )} → ${chalk.cyan(budget)}`,
@@ -252,7 +260,7 @@ export class UpdateTransactionService {
     return answer.update;
   }
 
-  private shouldCategorizeTransaction(transaction: TransactionSplit): boolean {
+  private shouldProcessTransaction(transaction: TransactionSplit): boolean {
     const conditions = {
       notATransfer: !TransactionPropertyService.isTransfer(transaction),
       hasACategory: TransactionPropertyService.hasACategory(transaction),
@@ -304,10 +312,12 @@ export class UpdateTransactionService {
           return {};
         }
 
+        const shouldCategorizeTransaction =
+          this.shouldProcessTransaction(transaction);
         const shouldSetBudget = await this.shouldSetBudget(transaction);
 
         return {
-          ...((this.shouldCategorizeTransaction(transaction) && {
+          ...((shouldCategorizeTransaction && {
             name: transaction.description,
             category: transaction.category_name ?? "",
             updatedCategory: aiResult.category,
