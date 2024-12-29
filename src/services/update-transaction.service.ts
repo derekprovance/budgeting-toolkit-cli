@@ -15,8 +15,10 @@ import {
 import inquirer from "inquirer";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
 import chalk from "chalk";
+import { UpdateTransactionStatusDto } from "../dto/update-transaction-status.dto";
+import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 
-interface TransactionCategoryResult {
+export interface TransactionCategoryResult {
   name?: string;
   category?: string;
   budget?: string;
@@ -37,11 +39,15 @@ export class UpdateTransactionService {
   async updateTransactionsByTag(
     tag: string,
     updateMode: UpdateTransactionMode
-  ): Promise<TransactionCategoryResult[] | null> {
+  ): Promise<UpdateTransactionStatusDto> {
     try {
       if (!(await this.transactionService.tagExists(tag))) {
         logger.debug(`Tag ${tag} does not exist`);
-        return null;
+        return {
+          status: UpdateTransactionStatus.NO_TAG,
+          totalTransactions: 0,
+          data: null,
+        };
       }
 
       const [unfilteredTransactions, categories] = await Promise.all([
@@ -57,10 +63,13 @@ export class UpdateTransactionService {
 
       if (!transactions.length) {
         logger.debug(`No transactions found for tag: ${tag}`);
-        return [];
+        return {
+          status: UpdateTransactionStatus.EMPTY_TAG,
+          totalTransactions: 0,
+          data: [],
+        };
       }
 
-      //TODO - Checking if we should categorize but not if we should budget, we need to check for a budget
       let budgets;
       let budgetNames;
       if (updateMode !== UpdateTransactionMode.Category) {
@@ -95,13 +104,27 @@ export class UpdateTransactionService {
         budgets
       );
 
-      return this.mapToResults(updatedTransactions, aiResults);
+      const resultData = await this.mapToResults(
+        updatedTransactions,
+        aiResults
+      );
+
+      return {
+        status: UpdateTransactionStatus.HAS_RESULTS,
+        data: resultData,
+        totalTransactions: transactions.length,
+      };
     } catch (ex) {
       if (ex instanceof Error) {
         logger.error(`Unable to get transactions by tag: ${ex.message}`);
       }
 
-      return [];
+      return {
+        status: UpdateTransactionStatus.PROCESSING_FAILED,
+        data: null,
+        totalTransactions: 0,
+        error: "Unable to get transactions by tag",
+      };
     }
   }
 
@@ -300,7 +323,7 @@ export class UpdateTransactionService {
     transactions: TransactionSplit[],
     aiResults: AIResponse
   ): Promise<TransactionCategoryResult[]> {
-    return Promise.all(
+    return await Promise.all(
       transactions.map(async (transaction) => {
         const transactionJournalId = transaction.transaction_journal_id;
         if (!transactionJournalId) {
