@@ -274,7 +274,7 @@ export class TransactionService {
     error: unknown
   ): TransactionError {
     const message = `Failed to ${action} ${identifier}`;
-    logger.error(message, error);
+    logger.trace(message, error);
 
     if (error instanceof Error) {
       return new TransactionError(message, error);
