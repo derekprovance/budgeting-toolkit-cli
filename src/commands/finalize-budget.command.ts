@@ -6,23 +6,23 @@ import chalk from 'chalk';
 export const finalizeBudgetCommand = async (
   additionalIncomeService: AdditionalIncomeService,
   unbudgetedExpenseService: UnbudgetedExpenseService,
-  queryMonth: number
+  queryMonth: number,
+  queryYear: number,
 ) => {
   console.log('\n' + chalk.bold.blue('=== Budget Finalization Report ==='));
   
   try {
     const additionalIncomeResults =
-      await additionalIncomeService.calculateAdditionalIncome(queryMonth);
+      await additionalIncomeService.calculateAdditionalIncome(queryMonth, queryYear);
 
     const unbudgetedExpenseResults =
-      await unbudgetedExpenseService.calculateUnbudgetedExpenses(queryMonth);
+      await unbudgetedExpenseService.calculateUnbudgetedExpenses(queryMonth, queryYear);
 
-    const currentYear = new Date().getFullYear();
     const monthName = Intl.DateTimeFormat("en", { month: "long" }).format(
-      new Date(currentYear, queryMonth-1)
+      new Date(queryYear, queryMonth-1)
     );
     
-    console.log(`\n📅 ${chalk.cyan(monthName)} ${chalk.cyan(currentYear)}`);
+    console.log(`\n📅 ${chalk.cyan(monthName)} ${chalk.cyan(queryYear)}`);
     console.log(chalk.gray('='.repeat(30)) + '\n');
     
     PrinterService.printTransactions(

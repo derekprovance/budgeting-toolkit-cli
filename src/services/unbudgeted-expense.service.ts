@@ -8,10 +8,12 @@ export class UnbudgetedExpenseService {
   constructor(private transactionService: TransactionService) {}
 
   async calculateUnbudgetedExpenses(
-    month: number
+    month: number,
+    year: number
   ): Promise<TransactionSplit[]> {
     const transactions = await this.transactionService.getTransactionsForMonth(
-      month
+      month,
+      year
     );
     const filteredTransactions = await this.filterExpenses(transactions);
     return filteredTransactions;
@@ -51,7 +53,9 @@ export class UnbudgetedExpenseService {
       hasNoBudget: !transaction.budget_id,
       isNotTransfer: !TransactionPropertyService.isTransfer(transaction),
       isNotDisposableSupplemented:
-        !TransactionPropertyService.isSupplementedByDisposable(transaction.tags),
+        !TransactionPropertyService.isSupplementedByDisposable(
+          transaction.tags
+        ),
       isNotExcludedTransaction: !isExcludedTransaction,
       isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
     };

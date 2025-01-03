@@ -21,7 +21,6 @@ type TransactionSplitIndex = Map<string, TransactionRead>;
 export class TransactionService {
   private readonly cache: TransactionCache;
   private readonly splitTransactionIdx: TransactionSplitIndex;
-  private readonly currentYear: number;
 
   constructor(
     private readonly apiClient: FireflyApiClient,
@@ -29,19 +28,18 @@ export class TransactionService {
   ) {
     this.cache = cacheImplementation;
     this.splitTransactionIdx = new Map();
-    this.currentYear = new Date().getFullYear();
   }
 
   /**
    * Retrieves transactions for a specific month, using cache when available
    */
-  async getTransactionsForMonth(month: number): Promise<TransactionSplit[]> {
+  async getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]> {
     this.validateMonth(month);
 
     try {
-      const cacheKey = `month-${month}`;
+      const cacheKey = `month-${month}-year-${year}`;
       const transactions = await this.getFromCacheOrFetch(cacheKey, () =>
-        this.fetchTransactionsFromAPIByMonth(month)
+        this.fetchTransactionsFromAPIByMonth(month, year)
       );
 
       return this.flattenTransactions(transactions);
@@ -225,9 +223,10 @@ export class TransactionService {
   }
 
   private async fetchTransactionsFromAPIByMonth(
-    month: number
+    month: number,
+    year: number,
   ): Promise<TransactionRead[]> {
-    const range = this.getMonthDateRange(month);
+    const range = this.getMonthDateRange(month, year);
     const response = await this.apiClient.get<TransactionArray>(
       `/transactions?start=${range.start}&end=${range.end}`
     );
@@ -245,9 +244,9 @@ export class TransactionService {
     );
   }
 
-  private getMonthDateRange(month: number): DateRange {
-    const startDate = new Date(this.currentYear, month - 1, 1);
-    const endDate = new Date(this.currentYear, month, 0);
+  private getMonthDateRange(month: number, year: number): DateRange {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
 
     return {
       start: this.formatDate(startDate),

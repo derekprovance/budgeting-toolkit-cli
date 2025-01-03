@@ -20,6 +20,10 @@ const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
 };
 
+const getCurrentYear = (): number => {
+  return new Date().getFullYear();
+};
+
 const initializeLLMClient = (): ClaudeClient => {
   if (!claudeAPIKey) {
     throw new Error(
@@ -72,7 +76,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("2.2.2");
+    .version("2.2.3");
 
   program
     .command("finalize-budget")
@@ -83,26 +87,17 @@ export const createCli = (): Command => {
         "month to process (1-12, defaults to current month)"
       )
         .argParser(parseInt)
-        .choices([
-          "1",
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          "8",
-          "9",
-          "10",
-          "11",
-          "12",
-        ])
+    )
+    .option(
+      "-y, --year <year>",
+      "year to process (default: current year)"
     )
     .action((opts) =>
       finalizeBudgetCommand(
         services.additionalIncomeService,
         services.unbudgetedExpenseService,
-        opts.month ?? getCurrentMonth()
+        opts.month ?? getCurrentMonth(),
+        opts.year ?? getCurrentYear(),
       )
     );
 

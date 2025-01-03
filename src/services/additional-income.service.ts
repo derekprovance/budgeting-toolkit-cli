@@ -29,10 +29,13 @@ export class AdditionalIncomeService {
 
   constructor(private readonly transactionService: TransactionService) {}
 
-  async calculateAdditionalIncome(month: number): Promise<TransactionSplit[]> {
+  async calculateAdditionalIncome(
+    month: number,
+    year: number
+  ): Promise<TransactionSplit[]> {
     try {
       const transactions =
-        await this.transactionService.getTransactionsForMonth(month);
+        await this.transactionService.getTransactionsForMonth(month, year);
       const additionalIncome = this.filterTransactions(transactions);
 
       return additionalIncome;
