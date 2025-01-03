@@ -33,7 +33,10 @@ export class TransactionService {
   /**
    * Retrieves transactions for a specific month, using cache when available
    */
-  async getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]> {
+  async getTransactionsForMonth(
+    month: number,
+    year: number
+  ): Promise<TransactionSplit[]> {
     this.validateMonth(month);
 
     try {
@@ -224,14 +227,16 @@ export class TransactionService {
 
   private async fetchTransactionsFromAPIByMonth(
     month: number,
-    year: number,
+    year: number
   ): Promise<TransactionRead[]> {
     const range = this.getMonthDateRange(month, year);
     const response = await this.apiClient.get<TransactionArray>(
       `/transactions?start=${range.start}&end=${range.end}`
     );
     if (!response) {
-      throw new FireflyApiError(`Failed to fetch transactions for month: ${month}`);
+      throw new FireflyApiError(
+        `Failed to fetch transactions for month: ${month}`
+      );
     }
     return response.data;
   }

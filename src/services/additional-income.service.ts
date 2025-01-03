@@ -41,7 +41,12 @@ export class AdditionalIncomeService {
 
       return additionalIncome;
     } catch (error) {
-      logger.trace("Error calculating additional income:", error);
+      logger.trace(error, "Error calculating additional income");
+      if (error instanceof Error) {
+        throw new Error(
+          `Failed to calculate additional income for month ${month}: ${error.message}`
+        );
+      }
       throw new Error(
         `Failed to calculate additional income for month ${month}`
       );
