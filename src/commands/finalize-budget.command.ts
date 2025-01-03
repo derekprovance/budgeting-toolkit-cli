@@ -37,6 +37,5 @@ export const finalizeBudgetCommand = async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(chalk.red('❌ Error finalizing budget:'), chalk.red.bold(errorMessage));
-    throw error instanceof Error ? error : new Error('Unknown error occurred');
   }
 };

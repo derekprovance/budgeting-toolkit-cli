@@ -2,6 +2,7 @@ import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "./core/transaction.service";
 import { Account, Description } from "../config";
 import { TransactionPropertyService } from "./core/transaction-property.service";
+import { logger } from "../logger";
 
 type ValidDestinationAccount = Extract<
   Account,
@@ -40,7 +41,7 @@ export class AdditionalIncomeService {
 
       return additionalIncome;
     } catch (error) {
-      console.error("Error calculating additional income:", error);
+      logger.trace("Error calculating additional income:", error);
       throw new Error(
         `Failed to calculate additional income for month ${month}`
       );
