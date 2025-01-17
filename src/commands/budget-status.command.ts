@@ -36,14 +36,46 @@ const createProgressBar = (percentage: number, width: number = 20): string => {
   return percentage > 100 ? `[${bar}] +${(percentage - 100).toFixed(0)}%` : `[${bar}]`;
 };
 
-const getDaysLeftInfo = (month: number, year: number): { daysLeft: number, percentageLeft: number } => {
+const getDaysLeftInfo = (month: number, year: number): { 
+  daysLeft: number, 
+  percentageLeft: number,
+  currentDay: number,
+  totalDays: number 
+} => {
   const today = new Date();
   const lastDay = new Date(year, month, 0).getDate();
   const currentDay = today.getDate();
   const daysLeft = lastDay - currentDay;
   const percentageLeft = ((lastDay - currentDay) / lastDay) * 100;
   
-  return { daysLeft, percentageLeft };
+  return { 
+    daysLeft, 
+    percentageLeft, 
+    currentDay,
+    totalDays: lastDay 
+  };
+};
+
+const getDailyRateIndicator = (
+  spent: number, 
+  amount: number, 
+  currentDay: number, 
+  totalDays: number
+): string => {
+  const idealSpentByNow = (amount / totalDays) * currentDay;
+  const actualSpent = Math.abs(spent);
+  const difference = actualSpent - idealSpentByNow;
+  
+  if (Math.abs(difference) < 1) {
+    return chalk.gray('(on track) ');
+  }
+  
+  const differenceFormatted = formatCurrency(Math.abs(difference));
+  if (difference > 0) {
+    return chalk.cyanBright(`(${differenceFormatted} over ideal) `);
+  } else {
+    return chalk.cyanBright(`(${differenceFormatted} under ideal) `);
+  }
 };
 
 export const budgetStatusCommand = async (
@@ -55,9 +87,9 @@ export const budgetStatusCommand = async (
   const isCurrentMonth = new Date().getMonth() + 1 === month && 
                         new Date().getFullYear() === year;
   
-  const { daysLeft, percentageLeft } = isCurrentMonth ? 
+  const { daysLeft, percentageLeft, currentDay, totalDays } = isCurrentMonth ? 
     getDaysLeftInfo(month, year) : 
-    { daysLeft: 0, percentageLeft: 0 };
+    { daysLeft: 0, percentageLeft: 0, currentDay: 0, totalDays: 0 };
 
   // Calculate totals
   const totalBudget = budgetStatuses.reduce((sum, status) => sum + status.amount, 0);
@@ -81,6 +113,11 @@ export const budgetStatusCommand = async (
     const remaining = status.amount + status.spent;
     const progressBar = createProgressBar(percentage);
     
+    // Add daily rate indicator for current month
+    const dailyRateInfo = isCurrentMonth ? 
+      getDailyRateIndicator(status.spent, status.amount, currentDay, totalDays) : 
+      '';
+    
     console.log(
       chalk.bold(status.name.padEnd(nameWidth)) +
       color(formatCurrency(Math.abs(status.spent)).padStart(12)) + ' of ' +
@@ -88,7 +125,8 @@ export const budgetStatusCommand = async (
       color(` (${percentage.toFixed(1)}%)`.padStart(8)) +
       '  ' + color(progressBar) +
       '\n' + ' '.repeat(nameWidth) +
-      chalk.gray(`Remaining: ${formatCurrency(remaining)}`)
+      chalk.gray(`Remaining: ${formatCurrency(remaining)}`) +
+      (dailyRateInfo ? '\n' + ' '.repeat(nameWidth) + dailyRateInfo : '')
     );
     console.log(); // Add spacing between items
   });
@@ -97,12 +135,18 @@ export const budgetStatusCommand = async (
   console.log('─'.repeat(nameWidth + 50));
   const summaryColor = getColorForPercentage(totalPercentage, isCurrentMonth ? 100 - percentageLeft : undefined);
   
+  // Add daily rate indicator for total
+  const totalDailyRateInfo = isCurrentMonth ? 
+    getDailyRateIndicator(totalSpent, totalBudget, currentDay, totalDays) : 
+    '';
+  
   console.log(
     chalk.bold('TOTAL'.padEnd(nameWidth)) +
     summaryColor(formatCurrency(Math.abs(totalSpent)).padStart(12)) + ' of ' +
     chalk.bold(formatCurrency(totalBudget).padStart(12)) +
     summaryColor(` (${totalPercentage.toFixed(1)}%)`.padStart(8)) +
-    '  ' + summaryColor(createProgressBar(totalPercentage))
+    '  ' + summaryColor(createProgressBar(totalPercentage)) +
+    (totalDailyRateInfo ? '\n' + ' '.repeat(nameWidth) + totalDailyRateInfo : '')
   );
 
   // Print spend rate warning for current month if necessary
