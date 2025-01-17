@@ -5,9 +5,9 @@ import {
   TransactionSplit,
   TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
-import { DateRange } from "../../dto/date-range.dto";
 import { FireflyApiClient, FireflyApiError } from "../../api/firefly.client";
 import { logger } from "../../logger";
+import { DateRangeService } from "./date-range.service";
 
 class TransactionError extends Error {
   constructor(message: string, public readonly originalError?: Error) {
@@ -37,8 +37,6 @@ export class TransactionService {
     month: number,
     year: number
   ): Promise<TransactionSplit[]> {
-    this.validateMonth(month);
-
     try {
       const cacheKey = `month-${month}-year-${year}`;
       const transactions = await this.getFromCacheOrFetch(cacheKey, () =>
@@ -229,7 +227,7 @@ export class TransactionService {
     month: number,
     year: number
   ): Promise<TransactionRead[]> {
-    const range = this.getMonthDateRange(month, year);
+    const range = DateRangeService.getMonthDateRange(month, year);
     const response = await this.apiClient.get<TransactionArray>(
       `/transactions?start=${range.start}&end=${range.end}`
     );
@@ -247,26 +245,6 @@ export class TransactionService {
     return transactions.flatMap(
       (transaction) => transaction.attributes?.transactions ?? []
     );
-  }
-
-  private getMonthDateRange(month: number, year: number): DateRange {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-
-    return {
-      start: this.formatDate(startDate),
-      end: this.formatDate(endDate),
-    };
-  }
-
-  private formatDate(date: Date): string {
-    return date.toISOString().split("T")[0];
-  }
-
-  private validateMonth(month: number): void {
-    if (!Number.isInteger(month) || month < 1 || month > 12) {
-      throw new TransactionError("Month must be an integer between 1 and 12");
-    }
   }
 
   private generateSplitTransactionKey(tx: TransactionSplit): string {

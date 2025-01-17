@@ -15,6 +15,8 @@ import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budge
 import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
 import chalk from "chalk";
+import { budgetStatusCommand } from "./commands/budget-status.command";
+import { BudgetStatusService } from "./services/budget-status.service";
 
 const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
@@ -27,7 +29,11 @@ const getCurrentYear = (): number => {
 const initializeLLMClient = (): ClaudeClient => {
   if (!claudeAPIKey) {
     throw new Error(
-      `${chalk.redBright('!!!')} Claude API Key is required to update transactions. Please check your .env file. ${chalk.redBright('!!!')}`
+      `${chalk.redBright(
+        "!!!"
+      )} Claude API Key is required to update transactions. Please check your .env file. ${chalk.redBright(
+        "!!!"
+      )}`
     );
   }
 
@@ -59,12 +65,15 @@ const initializeServices = (apiClient: FireflyApiClient) => {
     transactionService
   );
 
+  const budgetStatus = new BudgetStatusService(budgetService);
+
   return {
     transactionService,
     budgetService,
     categoryService,
     additionalIncomeService,
     unbudgetedExpenseService,
+    budgetStatus,
   };
 };
 
@@ -85,19 +94,33 @@ export const createCli = (): Command => {
       new Option(
         "-m, --month <month>",
         "month to process (1-12, defaults to current month)"
-      )
-        .argParser(parseInt)
+      ).argParser(parseInt)
     )
-    .option(
-      "-y, --year <year>",
-      "year to process (default: current year)"
-    )
+    .option("-y, --year <year>", "year to process (default: current year)")
     .action((opts) =>
       finalizeBudgetCommand(
         services.additionalIncomeService,
         services.unbudgetedExpenseService,
         opts.month ?? getCurrentMonth(),
-        opts.year ?? getCurrentYear(),
+        opts.year ?? getCurrentYear()
+      )
+    );
+
+  program
+    .command("budget-status")
+    .description("Calculates the status of a budget")
+    .addOption(
+      new Option(
+        "-m, --month <month>",
+        "month to process (1-12, defaults to current month)"
+      ).argParser(parseInt)
+    )
+    .option("-y, --year <year>", "year to process (default: current year)")
+    .action((opts) =>
+      budgetStatusCommand(
+        services.budgetStatus,
+        opts.month ?? getCurrentMonth(),
+        opts.year ?? getCurrentYear()
       )
     );
 
@@ -121,7 +144,7 @@ export const createCli = (): Command => {
       "-y, --yes",
       "skip confirmation prompts and apply updates automatically (default: false)"
     )
-    .action((tag: string,opts: UpdateTransactionOptions) => {
+    .action((tag: string, opts: UpdateTransactionOptions) => {
       try {
         const claudeClient = initializeLLMClient();
         const llmServices = {
