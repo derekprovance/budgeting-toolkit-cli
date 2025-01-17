@@ -1,6 +1,6 @@
 {
   "name": "budgeting-toolkit-cli",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "main": "index.js",
   "scripts": {
     "start": "ts-node src/index.ts",

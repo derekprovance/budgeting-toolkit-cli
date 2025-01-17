@@ -76,7 +76,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("2.2.4");
+    .version("2.2.5");
 
   program
     .command("finalize-budget")
@@ -111,7 +111,7 @@ export const createCli = (): Command => {
           UpdateTransactionMode.Budget,
           UpdateTransactionMode.Both,
         ])
-        .default(UpdateTransactionMode.Category)
+        .default(UpdateTransactionMode.Both)
     )
     .option(
       "-i, --includeClassified",
