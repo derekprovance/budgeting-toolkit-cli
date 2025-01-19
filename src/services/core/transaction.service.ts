@@ -1,11 +1,11 @@
 import {
+  FireflyApiClient,
+  FireflyApiError,
   TagSingle,
   TransactionArray,
   TransactionRead,
   TransactionSplit,
-  TransactionTypeProperty,
 } from "@derekprovance/firefly-iii-sdk";
-import { FireflyApiClient, FireflyApiError } from "../../api/firefly.client";
 import { logger } from "../../logger";
 import { DateRangeService } from "./date-range.service";
 
@@ -87,12 +87,7 @@ export class TransactionService {
       );
     }
 
-    if (
-      ![
-        TransactionTypeProperty.DEPOSIT,
-        TransactionTypeProperty.WITHDRAWAL,
-      ].includes(transaction.type)
-    ) {
+    if (!["deposit", "withdrawal"].includes(transaction.type)) {
       throw new TransactionError(
         `Unsupported transaction type ${transaction.type} for transaction_journal_id ${transaction.transaction_journal_id}`
       );

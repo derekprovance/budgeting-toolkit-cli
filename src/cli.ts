@@ -1,5 +1,4 @@
 import { Command, Option } from "commander";
-import { FireflyApiClient } from "./api/firefly.client";
 import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
 import { claudeAPIKey, config, llmModel } from "./config";
 import { TransactionService } from "./services/core/transaction.service";
@@ -17,6 +16,7 @@ import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum
 import chalk from "chalk";
 import { budgetStatusCommand } from "./commands/budget-status.command";
 import { BudgetStatusService } from "./services/budget-status.service";
+import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
 
 const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
@@ -85,7 +85,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("2.2.5");
+    .version("2.3.0");
 
   program
     .command("finalize-budget")

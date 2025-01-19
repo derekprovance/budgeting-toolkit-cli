@@ -1,5 +1,4 @@
-import { Category, CategoryArray, CategoryRead } from "@derekprovance/firefly-iii-sdk";
-import { FireflyApiClient, FireflyApiError } from "../../api/firefly.client";
+import { Category, CategoryArray, CategoryRead, FireflyApiClient, FireflyApiError } from "@derekprovance/firefly-iii-sdk";
 
 export class CategoryService {
   constructor(private readonly apiClient: FireflyApiClient) {}

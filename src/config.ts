@@ -1,6 +1,6 @@
 import path from "path";
-import { ApiClientConfig } from "./api/firefly.client";
 import dotenv from "dotenv";
+import { ApiClientConfig } from "@derekprovance/firefly-iii-sdk";
 
 dotenv.config();
 

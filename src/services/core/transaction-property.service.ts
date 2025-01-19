@@ -1,13 +1,10 @@
-import {
-  TransactionSplit,
-  TransactionTypeProperty,
-} from "@derekprovance/firefly-iii-sdk";
+import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { ExpenseAccount, Tag } from "../../config";
 import { ExcludedTransactionService } from "../exluded-transaction.service";
 
 export class TransactionPropertyService {
   static isTransfer = (transaction: TransactionSplit): boolean =>
-    transaction.type === TransactionTypeProperty.TRANSFER;
+    transaction.type === "transfer";
 
   static isBill = (transaction: TransactionSplit): boolean =>
     transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false;
@@ -32,7 +29,8 @@ export class TransactionPropertyService {
     description: string,
     amount: string
   ): Promise<boolean> {
-    const excludedTransactions = await ExcludedTransactionService.getTransactions();
+    const excludedTransactions =
+      await ExcludedTransactionService.getTransactions();
     const convertedAmount = this.convertCurrencyToFloat(amount);
 
     return excludedTransactions.some((transaction) => {
@@ -41,8 +39,10 @@ export class TransactionPropertyService {
       }
 
       if (transaction.description && transaction.amount) {
-        return transaction.description === description && 
-               transaction.amount === convertedAmount;
+        return (
+          transaction.description === description &&
+          transaction.amount === convertedAmount
+        );
       }
 
       if (transaction.description) {
@@ -58,7 +58,7 @@ export class TransactionPropertyService {
   }
 
   static isDeposit = (transaction: TransactionSplit): boolean =>
-    transaction.type === TransactionTypeProperty.DEPOSIT;
+    transaction.type === "deposit";
 
   static hasACategory = (transaction: TransactionSplit): boolean =>
     !(
