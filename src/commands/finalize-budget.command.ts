@@ -33,12 +33,12 @@ export const finalizeBudgetCommand = async (
 
     PrinterService.printTransactions(
       additionalIncomeResults,
-      chalk.green("💰 Additional Income")
+      "💰 Additional Income"
     );
 
     PrinterService.printTransactions(
       unbudgetedExpenseResults,
-      chalk.red("💸 Unbudgeted Expenses")
+      "💸 Unbudgeted Expenses"
     );
   } catch (error) {
     const errorMessage =

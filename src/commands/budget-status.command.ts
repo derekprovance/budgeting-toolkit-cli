@@ -10,7 +10,8 @@ const formatCurrency = (amount: number): string => {
 };
 
 const getPercentageSpent = (spent: number, amount: number): number => {
-  return (Math.abs(spent) / amount) * 100;
+  const percentage = Math.abs(spent) / amount;
+  return percentage ? (percentage) * 100 : 0;
 };
 
 const getColorForPercentage = (
@@ -86,6 +87,7 @@ const getDailyRateIndicator = (
   }
 };
 
+//TODO(DEREK) - Use updatedOn instead of today here
 export const budgetStatusCommand = async (
   budgetStatusService: BudgetStatusService,
   month: number,

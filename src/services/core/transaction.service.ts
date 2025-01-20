@@ -49,6 +49,19 @@ export class TransactionService {
     }
   }
 
+  async getMostRecentTransactionDate(): Promise<Date | null> {
+    const response = await this.apiClient.get<TransactionArray>(
+      `/transactions?limit=1`
+    );
+    if (!response) {
+      throw new FireflyApiError(`Failed to fetch transactions`);
+    }
+    const transaction = response.data[0];
+    return transaction.attributes && transaction.attributes.created_at
+      ? new Date(transaction.attributes.created_at)
+      : null;
+  }
+
   /**
    * Retrieves transactions by tag
    */

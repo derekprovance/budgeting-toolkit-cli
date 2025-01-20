@@ -65,7 +65,10 @@ const initializeServices = (apiClient: FireflyApiClient) => {
     transactionService
   );
 
-  const budgetStatus = new BudgetStatusService(budgetService);
+  const budgetStatus = new BudgetStatusService(
+    budgetService,
+    transactionService
+  );
 
   return {
     transactionService,
@@ -85,7 +88,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("2.3.0");
+    .version("2.3.1");
 
   program
     .command("finalize-budget")
