@@ -135,10 +135,10 @@ export const budgetStatusCommand = async (
       )
     );
     console.log(
-      chalk.gray(
-        `Last Updated: ${lastUpdatedOn.toISOString().split('T')[0]}\n`
-      )
+      chalk.gray(`Last Updated: ${lastUpdatedOn.toISOString().split("T")[0]}\n`)
     );
+  } else {
+    console.log();
   }
 
   // Print individual budget items
