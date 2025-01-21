@@ -1,5 +1,6 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { AdditionalIncomeService } from "../services/additional-income.service";
+import { TransactionPropertyService } from "../services/core/transaction-property.service";
 import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
 import chalk from "chalk";
 
@@ -31,6 +32,18 @@ export const finalizeBudgetCommand = async (
     // Print report header with month and year
     console.log(chalk.cyan(`\nBudget Report for ${monthName} ${queryYear}`));
 
+    // Helper function to get transaction type indicator
+    const getTransactionTypeIndicator = (transaction: TransactionSplit) => {
+      if (TransactionPropertyService.isBill(transaction)) {
+        return chalk.magenta("📄 [Bill]");
+      } else if (TransactionPropertyService.isTransfer(transaction)) {
+        return chalk.blue("↔️  [Transfer]");
+      } else if (TransactionPropertyService.isDeposit(transaction)) {
+        return chalk.green("⬇️  [Deposit]");
+      }
+      return chalk.gray("•");
+    };
+
     // Display Additional Income Section
     console.log(chalk.yellow("\n=== Additional Income ==="));
 
@@ -42,9 +55,10 @@ export const finalizeBudgetCommand = async (
       additionalIncomeResults.forEach((transaction: TransactionSplit) => {
         const amount = parseFloat(transaction.amount);
         totalAdditionalIncome += amount;
+        const typeIndicator = getTransactionTypeIndicator(transaction);
 
         console.log(
-          `\n${chalk.green("+")} ${chalk.white(transaction.description)}`
+          `\n${typeIndicator} ${chalk.white(transaction.description)}`
         );
         console.log(
           chalk.green(
@@ -60,6 +74,13 @@ export const finalizeBudgetCommand = async (
         }
         if (transaction.category_name) {
           console.log(chalk.dim(`  Category: ${transaction.category_name}`));
+        }
+        if (transaction.source_name && transaction.destination_name) {
+          console.log(
+            chalk.dim(
+              `  From: ${transaction.source_name} → To: ${transaction.destination_name}`
+            )
+          );
         }
       });
 
@@ -83,9 +104,10 @@ export const finalizeBudgetCommand = async (
       unbudgetedExpenseResults.forEach((transaction: TransactionSplit) => {
         const amount = parseFloat(transaction.amount);
         totalUnbudgetedExpenses += amount;
+        const typeIndicator = getTransactionTypeIndicator(transaction);
 
         console.log(
-          `\n${chalk.red("-")} ${chalk.white(transaction.description)}`
+          `\n${typeIndicator} ${chalk.white(transaction.description)}`
         );
         console.log(
           chalk.red(
@@ -101,6 +123,13 @@ export const finalizeBudgetCommand = async (
         }
         if (transaction.category_name) {
           console.log(chalk.dim(`  Category: ${transaction.category_name}`));
+        }
+        if (transaction.source_name && transaction.destination_name) {
+          console.log(
+            chalk.dim(
+              `  From: ${transaction.source_name} → To: ${transaction.destination_name}`
+            )
+          );
         }
       });
 
@@ -130,6 +159,45 @@ export const finalizeBudgetCommand = async (
       unbudgetedExpenseResults[0]?.currency_symbol ||
       "$";
 
+    // Display transaction type counts in summary
+    const incomeCounts = {
+      bills: additionalIncomeResults.filter((t) =>
+        TransactionPropertyService.isBill(t)
+      ).length,
+      transfers: additionalIncomeResults.filter((t) =>
+        TransactionPropertyService.isTransfer(t)
+      ).length,
+      deposits: additionalIncomeResults.filter((t) =>
+        TransactionPropertyService.isDeposit(t)
+      ).length,
+    };
+
+    const expenseCounts = {
+      bills: unbudgetedExpenseResults.filter((t) =>
+        TransactionPropertyService.isBill(t)
+      ).length,
+      transfers: unbudgetedExpenseResults.filter((t) =>
+        TransactionPropertyService.isTransfer(t)
+      ).length,
+      deposits: unbudgetedExpenseResults.filter((t) =>
+        TransactionPropertyService.isDeposit(t)
+      ).length,
+    };
+
+    console.log(chalk.cyan("\nTransaction Types:"));
+    console.log(
+      chalk.magenta(`Bills: ${incomeCounts.bills + expenseCounts.bills}`)
+    );
+    console.log(
+      chalk.blue(
+        `Transfers: ${incomeCounts.transfers + expenseCounts.transfers}`
+      )
+    );
+    console.log(
+      chalk.green(`Deposits: ${incomeCounts.deposits + expenseCounts.deposits}`)
+    );
+
+    console.log(chalk.cyan("\nTotals:"));
     console.log(
       chalk.green(
         `Total Additional Income: ${currencySymbol}${totalAdditionalIncome.toFixed(
