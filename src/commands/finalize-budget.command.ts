@@ -4,13 +4,28 @@ import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service
 import chalk from "chalk";
 import { TransactionPropertyService } from "../services/core/transaction-property.service";
 
+const generateBoxHeader = (text: string): string => {
+  const padding = 2;
+  const textLength = text.length;
+  const totalLength = textLength + padding * 2;
+
+  const topBorder = "╔" + "═".repeat(totalLength) + "╗";
+  const middleLine =
+    "║" + " ".repeat(padding) + text + " ".repeat(padding) + "║";
+  const bottomBorder = "╚" + "═".repeat(totalLength) + "╝";
+
+  return `\n${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(
+    bottomBorder
+  )}`;
+};
+
 export const finalizeBudgetCommand = async (
   additionalIncomeService: AdditionalIncomeService,
   unbudgetedExpenseService: UnbudgetedExpenseService,
   queryMonth: number,
   queryYear: number
 ) => {
-  console.log("\n" + chalk.bold.cyan("=== Budget Finalization Report ==="));
+  console.log(generateBoxHeader("Budget Finalization Report"));
 
   try {
     const additionalIncomeResults =
@@ -34,11 +49,11 @@ export const finalizeBudgetCommand = async (
     // Helper function to get transaction type indicator
     const getTransactionTypeIndicator = (transaction: TransactionSplit) => {
       if (TransactionPropertyService.isBill(transaction)) {
-        return chalk.magenta("[BILL]");
+        return chalk.redBright("[BILL]");
       } else if (TransactionPropertyService.isTransfer(transaction)) {
-        return chalk.cyan("[TRANSFER]");
+        return chalk.yellowBright("[TRANSFER]");
       } else if (TransactionPropertyService.isDeposit(transaction)) {
-        return chalk.yellow("[DEPOSIT]");
+        return chalk.greenBright("[DEPOSIT]");
       }
       return chalk.gray("[OTHER]");
     };
@@ -65,7 +80,7 @@ export const finalizeBudgetCommand = async (
         console.log(`${type} ${chalk.white(transaction.description)}`);
         console.log(
           chalk.dim(`    Date: ${date}`).padEnd(35) +
-            chalk.blue(`Amount: ${amountStr}`)
+            chalk.yellow(`Amount: ${amountStr}`)
         );
         if (transaction.category_name) {
           console.log(chalk.dim(`    Category: ${transaction.category_name}`));
@@ -144,9 +159,9 @@ export const finalizeBudgetCommand = async (
 
     console.log(chalk.bold("\n=== Summary ===\n"));
     console.log("Transaction Types:");
-    console.log(`  ${chalk.magenta("Bills:")}\t${counts.bills}`);
+    console.log(`  ${chalk.redBright("Bills:")}\t${counts.bills}`);
     console.log(`  ${chalk.cyan("Transfers:")}\t${counts.transfers}`);
-    console.log(`  ${chalk.yellow("Deposits:")}\t${counts.deposits}`);
+    console.log(`  ${chalk.greenBright("Deposits:")}\t${counts.deposits}`);
     console.log(); // Add spacing
     console.log("Final Totals:");
     const totalAdditionalIncome = additionalIncomeResults.reduce(
