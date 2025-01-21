@@ -1,5 +1,6 @@
 import { BudgetStatusService } from "../services/budget-status.service";
 import chalk from "chalk";
+import { TransactionService } from "../services/core/transaction.service";
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("en-US", {
@@ -11,7 +12,7 @@ const formatCurrency = (amount: number): string => {
 
 const getPercentageSpent = (spent: number, amount: number): number => {
   const percentage = Math.abs(spent) / amount;
-  return percentage ? (percentage) * 100 : 0;
+  return percentage ? percentage * 100 : 0;
 };
 
 const getColorForPercentage = (
@@ -44,16 +45,16 @@ const createProgressBar = (percentage: number, width: number = 20): string => {
 
 const getDaysLeftInfo = (
   month: number,
-  year: number
+  year: number,
+  lastUpdatedOn: Date
 ): {
   daysLeft: number;
   percentageLeft: number;
   currentDay: number;
   totalDays: number;
 } => {
-  const today = new Date();
   const lastDay = new Date(year, month, 0).getDate();
-  const currentDay = today.getDate();
+  const currentDay = lastUpdatedOn.getDate();
   const daysLeft = lastDay - currentDay;
   const percentageLeft = ((lastDay - currentDay) / lastDay) * 100;
 
@@ -90,15 +91,18 @@ const getDailyRateIndicator = (
 //TODO(DEREK) - Use updatedOn instead of today here
 export const budgetStatusCommand = async (
   budgetStatusService: BudgetStatusService,
+  transactionService: TransactionService,
   month: number,
   year: number
 ) => {
   const budgetStatuses = await budgetStatusService.getBudgetStatus(month, year);
+  const lastUpdatedOn =
+    (await transactionService.getMostRecentTransactionDate()) || new Date();
   const isCurrentMonth =
     new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
   const { daysLeft, percentageLeft, currentDay, totalDays } = isCurrentMonth
-    ? getDaysLeftInfo(month, year)
+    ? getDaysLeftInfo(month, year, lastUpdatedOn)
     : { daysLeft: 0, percentageLeft: 0, currentDay: 0, totalDays: 0 };
 
   // Calculate totals
@@ -127,7 +131,12 @@ export const budgetStatusCommand = async (
       chalk.gray(
         `${daysLeft} days remaining (${percentageLeft.toFixed(
           1
-        )}% of month left)\n`
+        )}% of month left)`
+      )
+    );
+    console.log(
+      chalk.gray(
+        `Last Updated: ${lastUpdatedOn.toISOString().split('T')[0]}\n`
       )
     );
   }

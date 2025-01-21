@@ -1,11 +1,9 @@
 import { BudgetStatusDto } from "../dto/budget-status.dto";
 import { BudgetService } from "./core/budget.service";
-import { TransactionService } from "./core/transaction.service";
 
 export class BudgetStatusService {
   constructor(
     private budgetService: BudgetService,
-    private transactionService: TransactionService
   ) {}
 
   async getBudgetStatus(
@@ -20,8 +18,6 @@ export class BudgetStatusService {
       year
     );
     const budgetLimits = await this.budgetService.getBudgetLimits(month, year);
-    const updatedOn =
-      await this.transactionService.getMostRecentTransactionDate();
 
     budgets.forEach((budget) => {
       const budgetName = budget.attributes.name;
@@ -36,7 +32,6 @@ export class BudgetStatusService {
         name: budgetName,
         amount: budgetLimit ? Number(budgetLimit.attributes.amount) : 0.0,
         spent: insight ? insight.difference_float : 0.0,
-        updatedOn,
       } as BudgetStatusDto);
     });
 

@@ -65,10 +65,7 @@ const initializeServices = (apiClient: FireflyApiClient) => {
     transactionService
   );
 
-  const budgetStatus = new BudgetStatusService(
-    budgetService,
-    transactionService
-  );
+  const budgetStatus = new BudgetStatusService(budgetService);
 
   return {
     transactionService,
@@ -122,6 +119,7 @@ export const createCli = (): Command => {
     .action((opts) =>
       budgetStatusCommand(
         services.budgetStatus,
+        services.transactionService,
         opts.month ?? getCurrentMonth(),
         opts.year ?? getCurrentYear()
       )
