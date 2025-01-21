@@ -1,8 +1,8 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { AdditionalIncomeService } from "../services/additional-income.service";
-import { TransactionPropertyService } from "../services/core/transaction-property.service";
 import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
 import chalk from "chalk";
+import { TransactionPropertyService } from "../services/core/transaction-property.service";
 
 export const finalizeBudgetCommand = async (
   additionalIncomeService: AdditionalIncomeService,
@@ -10,7 +10,7 @@ export const finalizeBudgetCommand = async (
   queryMonth: number,
   queryYear: number
 ) => {
-  console.log("\n" + chalk.bold.blue("=== Budget Finalization Report ==="));
+  console.log("\n" + chalk.bold.cyan("=== Budget Finalization Report ==="));
 
   try {
     const additionalIncomeResults =
@@ -29,64 +29,53 @@ export const finalizeBudgetCommand = async (
       new Date(queryYear, queryMonth - 1)
     );
 
-    // Print report header with month and year
     console.log(chalk.cyan(`\nBudget Report for ${monthName} ${queryYear}`));
 
     // Helper function to get transaction type indicator
     const getTransactionTypeIndicator = (transaction: TransactionSplit) => {
       if (TransactionPropertyService.isBill(transaction)) {
-        return chalk.magenta("📄 [Bill]");
+        return chalk.magenta("[BILL]");
       } else if (TransactionPropertyService.isTransfer(transaction)) {
-        return chalk.blue("↔️  [Transfer]");
+        return chalk.cyan("[TRANSFER]");
       } else if (TransactionPropertyService.isDeposit(transaction)) {
-        return chalk.green("⬇️  [Deposit]");
+        return chalk.yellow("[DEPOSIT]");
       }
-      return chalk.gray("•");
+      return chalk.gray("[OTHER]");
     };
 
     // Display Additional Income Section
-    console.log(chalk.yellow("\n=== Additional Income ==="));
+    console.log(chalk.bold("\n=== Additional Income ===\n"));
 
     if (additionalIncomeResults.length === 0) {
       console.log(chalk.dim("No additional income transactions found"));
     } else {
-      let totalAdditionalIncome = 0;
+      const totalAdditionalIncome = additionalIncomeResults.reduce(
+        (sum, transaction) => sum + parseFloat(transaction.amount),
+        0
+      );
 
       additionalIncomeResults.forEach((transaction: TransactionSplit) => {
+        const type = getTransactionTypeIndicator(transaction);
         const amount = parseFloat(transaction.amount);
-        totalAdditionalIncome += amount;
-        const typeIndicator = getTransactionTypeIndicator(transaction);
+        const date = new Date(transaction.date).toLocaleDateString();
+        const amountStr = `${transaction.currency_symbol}${Math.abs(
+          amount
+        ).toFixed(2)}`;
 
+        console.log(`${type} ${chalk.white(transaction.description)}`);
         console.log(
-          `\n${typeIndicator} ${chalk.white(transaction.description)}`
+          chalk.dim(`    Date: ${date}`).padEnd(35) +
+            chalk.blue(`Amount: ${amountStr}`)
         );
-        console.log(
-          chalk.green(
-            `  Amount: ${transaction.currency_symbol}${amount.toFixed(2)}`
-          )
-        );
-        if (transaction.date) {
-          console.log(
-            chalk.dim(
-              `  Date: ${new Date(transaction.date).toLocaleDateString()}`
-            )
-          );
-        }
         if (transaction.category_name) {
-          console.log(chalk.dim(`  Category: ${transaction.category_name}`));
+          console.log(chalk.dim(`    Category: ${transaction.category_name}`));
         }
-        if (transaction.source_name && transaction.destination_name) {
-          console.log(
-            chalk.dim(
-              `  From: ${transaction.source_name} → To: ${transaction.destination_name}`
-            )
-          );
-        }
+        console.log(); // Add extra spacing between transactions
       });
 
       console.log(
-        chalk.green.bold(
-          `\nTotal Additional Income: ${
+        chalk.cyan.bold(
+          `Total Additional Income: ${
             additionalIncomeResults[0]?.currency_symbol
           }${totalAdditionalIncome.toFixed(2)}`
         )
@@ -94,56 +83,72 @@ export const finalizeBudgetCommand = async (
     }
 
     // Display Unbudgeted Expenses Section
-    console.log(chalk.yellow("\n=== Unbudgeted Expenses ==="));
+    console.log(chalk.bold("\n=== Unbudgeted Expenses ===\n"));
 
     if (unbudgetedExpenseResults.length === 0) {
       console.log(chalk.dim("No unbudgeted expense transactions found"));
     } else {
-      let totalUnbudgetedExpenses = 0;
+      const totalUnbudgetedExpenses = unbudgetedExpenseResults.reduce(
+        (sum, transaction) => sum + parseFloat(transaction.amount),
+        0
+      );
 
       unbudgetedExpenseResults.forEach((transaction: TransactionSplit) => {
+        const type = getTransactionTypeIndicator(transaction);
         const amount = parseFloat(transaction.amount);
-        totalUnbudgetedExpenses += amount;
-        const typeIndicator = getTransactionTypeIndicator(transaction);
+        const date = new Date(transaction.date).toLocaleDateString();
+        const amountStr = `${transaction.currency_symbol}${Math.abs(
+          amount
+        ).toFixed(2)}`;
 
+        console.log(`${type} ${chalk.white(transaction.description)}`);
         console.log(
-          `\n${typeIndicator} ${chalk.white(transaction.description)}`
+          chalk.dim(`    Date: ${date}`).padEnd(35) +
+            chalk.yellow(`Amount: ${amountStr}`)
         );
-        console.log(
-          chalk.red(
-            `  Amount: ${transaction.currency_symbol}${amount.toFixed(2)}`
-          )
-        );
-        if (transaction.date) {
-          console.log(
-            chalk.dim(
-              `  Date: ${new Date(transaction.date).toLocaleDateString()}`
-            )
-          );
-        }
         if (transaction.category_name) {
-          console.log(chalk.dim(`  Category: ${transaction.category_name}`));
+          console.log(chalk.dim(`    Category: ${transaction.category_name}`));
         }
-        if (transaction.source_name && transaction.destination_name) {
-          console.log(
-            chalk.dim(
-              `  From: ${transaction.source_name} → To: ${transaction.destination_name}`
-            )
-          );
-        }
+        console.log(); // Add extra spacing between transactions
       });
 
       console.log(
-        chalk.red.bold(
-          `\nTotal Unbudgeted Expenses: ${
+        chalk.yellow.bold(
+          `Total Unbudgeted Expenses: ${
             unbudgetedExpenseResults[0]?.currency_symbol
           }${totalUnbudgetedExpenses.toFixed(2)}`
         )
       );
     }
 
-    // Display Summary
-    console.log(chalk.cyan("\n=== Summary ==="));
+    const currencySymbol =
+      additionalIncomeResults[0]?.currency_symbol ||
+      unbudgetedExpenseResults[0]?.currency_symbol ||
+      "$";
+
+    // Get transaction counts
+    const allTransactions = [
+      ...additionalIncomeResults,
+      ...unbudgetedExpenseResults,
+    ];
+    const counts = {
+      bills: allTransactions.filter((t) => TransactionPropertyService.isBill(t))
+        .length,
+      transfers: allTransactions.filter((t) =>
+        TransactionPropertyService.isTransfer(t)
+      ).length,
+      deposits: allTransactions.filter((t) =>
+        TransactionPropertyService.isDeposit(t)
+      ).length,
+    };
+
+    console.log(chalk.bold("\n=== Summary ===\n"));
+    console.log("Transaction Types:");
+    console.log(`  ${chalk.magenta("Bills:")}\t${counts.bills}`);
+    console.log(`  ${chalk.cyan("Transfers:")}\t${counts.transfers}`);
+    console.log(`  ${chalk.yellow("Deposits:")}\t${counts.deposits}`);
+    console.log(); // Add spacing
+    console.log("Final Totals:");
     const totalAdditionalIncome = additionalIncomeResults.reduce(
       (sum, transaction) => sum + parseFloat(transaction.amount),
       0
@@ -152,72 +157,16 @@ export const finalizeBudgetCommand = async (
       (sum, transaction) => sum + parseFloat(transaction.amount),
       0
     );
-    const netAmount = totalAdditionalIncome - totalUnbudgetedExpenses;
 
-    const currencySymbol =
-      additionalIncomeResults[0]?.currency_symbol ||
-      unbudgetedExpenseResults[0]?.currency_symbol ||
-      "$";
-
-    // Display transaction type counts in summary
-    const incomeCounts = {
-      bills: additionalIncomeResults.filter((t) =>
-        TransactionPropertyService.isBill(t)
-      ).length,
-      transfers: additionalIncomeResults.filter((t) =>
-        TransactionPropertyService.isTransfer(t)
-      ).length,
-      deposits: additionalIncomeResults.filter((t) =>
-        TransactionPropertyService.isDeposit(t)
-      ).length,
-    };
-
-    const expenseCounts = {
-      bills: unbudgetedExpenseResults.filter((t) =>
-        TransactionPropertyService.isBill(t)
-      ).length,
-      transfers: unbudgetedExpenseResults.filter((t) =>
-        TransactionPropertyService.isTransfer(t)
-      ).length,
-      deposits: unbudgetedExpenseResults.filter((t) =>
-        TransactionPropertyService.isDeposit(t)
-      ).length,
-    };
-
-    console.log(chalk.cyan("\nTransaction Types:"));
     console.log(
-      chalk.magenta(`Bills: ${incomeCounts.bills + expenseCounts.bills}`)
+      `  Additional Income:     ${chalk.cyanBright(
+        `${currencySymbol}${totalAdditionalIncome.toFixed(2)}`
+      )}`
     );
     console.log(
-      chalk.blue(
-        `Transfers: ${incomeCounts.transfers + expenseCounts.transfers}`
-      )
-    );
-    console.log(
-      chalk.green(`Deposits: ${incomeCounts.deposits + expenseCounts.deposits}`)
-    );
-
-    console.log(chalk.cyan("\nTotals:"));
-    console.log(
-      chalk.green(
-        `Total Additional Income: ${currencySymbol}${totalAdditionalIncome.toFixed(
-          2
-        )}`
-      )
-    );
-    console.log(
-      chalk.red(
-        `Total Unbudgeted Expenses: ${currencySymbol}${totalUnbudgetedExpenses.toFixed(
-          2
-        )}`
-      )
-    );
-    console.log(
-      chalk.bold(
-        netAmount >= 0
-          ? chalk.green(`Net Amount: ${currencySymbol}${netAmount.toFixed(2)}`)
-          : chalk.red(`Net Amount: ${currencySymbol}${netAmount.toFixed(2)}`)
-      )
+      `  Unbudgeted Expenses:   ${chalk.cyanBright(
+        `${currencySymbol}${Math.abs(totalUnbudgetedExpenses).toFixed(2)}`
+      )}`
     );
   } catch (error) {
     const errorMessage =
