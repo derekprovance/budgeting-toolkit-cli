@@ -82,13 +82,12 @@ const getDailyRateIndicator = (
 
   const differenceFormatted = formatCurrency(Math.abs(difference));
   if (difference > 0) {
-    return chalk.redBright(`↑${differenceFormatted}`);
+    return chalk.redBright(`↓${differenceFormatted}`);
   } else {
-    return chalk.cyanBright(`↓${differenceFormatted}`);
+    return chalk.cyanBright(`↑${differenceFormatted}`);
   }
 };
 
-//TODO(DEREK) - Use updatedOn instead of today here
 export const budgetStatusCommand = async (
   budgetStatusService: BudgetStatusService,
   transactionService: TransactionService,
@@ -105,7 +104,6 @@ export const budgetStatusCommand = async (
     ? getDaysLeftInfo(month, year, lastUpdatedOn)
     : { daysLeft: 0, percentageLeft: 0, currentDay: 0, totalDays: 0 };
 
-  // Calculate totals
   const totalBudget = budgetStatuses.reduce(
     (sum, status) => sum + status.amount,
     0
@@ -116,7 +114,6 @@ export const budgetStatusCommand = async (
   );
   const totalPercentage = getPercentageSpent(totalSpent, totalBudget);
 
-  // Print header
   console.log(
     "\n" +
       chalk.bold("Budget Status Report") +
@@ -180,7 +177,7 @@ export const budgetStatusCommand = async (
         " ".repeat(nameWidth) +
         chalk.gray(`Remaining: ${formatCurrency(remaining)}`)
     );
-    console.log(); // Add spacing between items
+    console.log();
   });
 
   // Print summary
