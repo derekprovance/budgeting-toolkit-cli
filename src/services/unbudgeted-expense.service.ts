@@ -21,7 +21,15 @@ export class UnbudgetedExpenseService {
 
   private async filterExpenses(transactions: TransactionSplit[]) {
     const results = await Promise.all(
-      transactions.map((transaction) => this.shouldCountExpense(transaction))
+      transactions.map(async (transaction) => {
+        const isTransfer = TransactionPropertyService.isTransfer(transaction);
+        const shouldCountExpense = await this.shouldCountExpense(transaction);
+
+        return (
+          (!isTransfer && shouldCountExpense) ||
+          (shouldCountExpense && this.shouldCountTransfer(transaction))
+        );
+      })
     );
 
     return transactions.filter((_, index) => results[index]);
@@ -40,6 +48,17 @@ export class UnbudgetedExpenseService {
     return isRegularExpense;
   }
 
+  private shouldCountTransfer(transaction: TransactionSplit): boolean {
+    if (!transaction.destination_id) {
+      return true;
+    }
+
+    return (
+      transaction.source_id === Account.PRIMARY &&
+      [Account.MONEY_MARKET].includes(transaction.destination_id as Account)
+    );
+  }
+
   private async isRegularExpenseTransaction(
     transaction: TransactionSplit
   ): Promise<boolean> {
@@ -51,7 +70,6 @@ export class UnbudgetedExpenseService {
 
     const conditions = {
       hasNoBudget: !transaction.budget_id,
-      isNotTransfer: !TransactionPropertyService.isTransfer(transaction),
       isNotDisposableSupplemented:
         !TransactionPropertyService.isSupplementedByDisposable(
           transaction.tags
@@ -67,7 +85,6 @@ export class UnbudgetedExpenseService {
 
     return (
       conditions.hasNoBudget &&
-      conditions.isNotTransfer &&
       conditions.isNotDisposableSupplemented &&
       conditions.isNotExcludedTransaction &&
       conditions.isFromExpenseAccount
