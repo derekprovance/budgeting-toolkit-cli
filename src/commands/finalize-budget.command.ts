@@ -46,7 +46,7 @@ export const finalizeBudgetCommand = async (
 
     console.log(chalk.cyan(`\nBudget Report for ${monthName} ${queryYear}`));
 
-    // Helper function to get transaction type indicator
+    let otherCount = 0;
     const getTransactionTypeIndicator = (transaction: TransactionSplit) => {
       if (TransactionPropertyService.isBill(transaction)) {
         return chalk.redBright("[BILL]");
@@ -55,6 +55,7 @@ export const finalizeBudgetCommand = async (
       } else if (TransactionPropertyService.isDeposit(transaction)) {
         return chalk.greenBright("[DEPOSIT]");
       }
+      otherCount++;
       return chalk.gray("[OTHER]");
     };
 
@@ -162,6 +163,7 @@ export const finalizeBudgetCommand = async (
     console.log(`  ${chalk.redBright("Bills:")}\t${counts.bills}`);
     console.log(`  ${chalk.cyan("Transfers:")}\t${counts.transfers}`);
     console.log(`  ${chalk.greenBright("Deposits:")}\t${counts.deposits}`);
+    console.log(`  ${chalk.gray("Other:")}\t${otherCount}`);
     console.log(); // Add spacing
     console.log("Final Totals:");
     const totalAdditionalIncome = additionalIncomeResults.reduce(
