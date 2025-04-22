@@ -85,7 +85,7 @@ export const createCli = (): Command => {
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("2.3.3");
+    .version("2.3.4");
 
   program
     .command("finalize-budget")
