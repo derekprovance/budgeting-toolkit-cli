@@ -8,8 +8,10 @@ import {
   InsightGroup,
 } from "@derekprovance/firefly-iii-sdk";
 import { DateRangeService } from "../../types/interface/date-range.service.interface";
+import { DateUtils } from "../../utils/date.utils";
+import { BudgetService as IBudgetService } from "../../types/interface/budget.service.interface";
 
-export class BudgetService {
+export class BudgetService implements IBudgetService {
   constructor(private readonly apiClient: FireflyApiClient) {}
 
   async getBudgets(): Promise<BudgetRead[]> {
@@ -21,30 +23,54 @@ export class BudgetService {
     month: number,
     year: number
   ): Promise<InsightGroup> {
-    const range = DateRangeService.getDateRange(month, year);
+    try {
+      DateUtils.validateMonthYear(month, year);
+      const range = DateRangeService.getDateRange(month, year);
 
-    const results = await this.apiClient.get<InsightGroup>(
-      `/insight/expense/budget?start=${range.startDate}&end=${range.endDate}`
-    );
-    if (!results) {
-      throw new FireflyApiError("Failed to fetch expense insights for budget");
+      const results = await this.apiClient.get<InsightGroup>(
+        `/insight/expense/budget?start=${range.startDate}&end=${range.endDate}`
+      );
+      if (!results) {
+        throw new FireflyApiError("Failed to fetch expense insights for budget");
+      }
+      return results;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(
+          `Failed to get budget expense insights for month ${month}: ${error.message}`
+        );
+      }
+      throw new Error(
+        `Failed to get budget expense insights for month ${month}`
+      );
     }
-    return results;
   }
 
   async getBudgetLimits(
     month: number,
     year: number
   ): Promise<BudgetLimitRead[]> {
-    const range = DateRangeService.getDateRange(month, year);
+    try {
+      DateUtils.validateMonthYear(month, year);
+      const range = DateRangeService.getDateRange(month, year);
 
-    const results = await this.apiClient.get<BudgetLimitArray>(
-      `/budget-limits?start=${range.startDate}&end=${range.endDate}`
-    );
-    if (!results) {
-      throw new FireflyApiError("Failed to fetch expense insights for budget");
+      const results = await this.apiClient.get<BudgetLimitArray>(
+        `/budget-limits?start=${range.startDate}&end=${range.endDate}`
+      );
+      if (!results) {
+        throw new FireflyApiError("Failed to fetch expense insights for budget");
+      }
+      return results.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(
+          `Failed to get budget limits for month ${month}: ${error.message}`
+        );
+      }
+      throw new Error(
+        `Failed to get budget limits for month ${month}`
+      );
     }
-    return results.data;
   }
 
   private async fetchBudgets(): Promise<BudgetRead[]> {

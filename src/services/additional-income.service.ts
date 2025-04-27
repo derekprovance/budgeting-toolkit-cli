@@ -3,6 +3,7 @@ import { TransactionService } from "./core/transaction.service";
 import { Account, Description } from "../config";
 import { TransactionPropertyService } from "./core/transaction-property.service";
 import { logger } from "../logger";
+import { DateUtils } from "../utils/date.utils";
 
 type ValidDestinationAccount = Extract<
   Account,
@@ -53,7 +54,7 @@ export class AdditionalIncomeService {
     year: number
   ): Promise<TransactionSplit[]> {
     try {
-      this.validateInput(month, year);
+      DateUtils.validateMonthYear(month, year);
       const transactions =
         await this.transactionService.getTransactionsForMonth(month, year);
       
@@ -97,15 +98,6 @@ export class AdditionalIncomeService {
 
     if (this.config.minTransactionAmount !== undefined && this.config.minTransactionAmount < 0) {
       throw new Error("Minimum transaction amount cannot be negative");
-    }
-  }
-
-  private validateInput(month: number, year: number): void {
-    if (!Number.isInteger(month) || month < 1 || month > 12) {
-      throw new Error("Month must be an integer between 1 and 12");
-    }
-    if (!Number.isInteger(year) || year < 1900 || year > 9999) {
-      throw new Error("Year must be a valid 4-digit year");
     }
   }
 

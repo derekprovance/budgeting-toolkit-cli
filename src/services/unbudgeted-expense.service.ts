@@ -3,6 +3,7 @@ import { Account } from "../config";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionPropertyService } from "./core/transaction-property.service";
 import { logger } from "../logger";
+import { DateUtils } from "../utils/date.utils";
 
 export class UnbudgetedExpenseService {
   constructor(
@@ -15,6 +16,7 @@ export class UnbudgetedExpenseService {
     year: number
   ): Promise<TransactionSplit[]> {
     try {
+      DateUtils.validateMonthYear(month, year);
       const transactions = await this.transactionService.getTransactionsForMonth(
         month,
         year
@@ -23,7 +25,11 @@ export class UnbudgetedExpenseService {
 
       return expenses;
     } catch (error) {
-      logger.trace(error, "Error calculating unbudgeted expenses");
+      logger.trace(error, "Error calculating unbudgeted expenses", {
+        month,
+        year,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       if (error instanceof Error) {
         throw new Error(
           `Failed to calculate unbudgeted expenses for month ${month}: ${error.message}`
