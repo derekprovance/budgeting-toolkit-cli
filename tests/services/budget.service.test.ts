@@ -1,8 +1,10 @@
 import { BudgetService } from "../../src/services/core/budget.service";
 import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
 import { BudgetLimitRead, BudgetRead, InsightGroup } from "@derekprovance/firefly-iii-sdk";
+import { DateRangeService } from "../../src/types/interface/date-range.service.interface";
 
 jest.mock("@derekprovance/firefly-iii-sdk");
+jest.mock("../../src/types/interface/date-range.service.interface");
 
 describe("BudgetService", () => {
   let budgetService: BudgetService;
@@ -50,6 +52,14 @@ describe("BudgetService", () => {
 
   describe("getBudgetExpenseInsights", () => {
     it("should return budget expense insights", async () => {
+      const mockStartDate = new Date("2024-01-01T00:00:00.000Z");
+      const mockEndDate = new Date("2024-01-31T23:59:59.999Z");
+
+      (DateRangeService.getDateRange as jest.Mock).mockReturnValue({
+        startDate: mockStartDate,
+        endDate: mockEndDate,
+      });
+
       const mockInsights = {
         data: [
           {
@@ -65,7 +75,25 @@ describe("BudgetService", () => {
 
       expect(result).toEqual(mockInsights);
       expect(mockApiClient.get).toHaveBeenCalledWith(
-        expect.stringContaining("/insight/expense/budget")
+        `/insight/expense/budget?start=${mockStartDate.toISOString()}&end=${mockEndDate.toISOString()}`
+      );
+    });
+
+    it("should format dates correctly in API call", async () => {
+      const mockStartDate = new Date("2024-01-01T00:00:00.000Z");
+      const mockEndDate = new Date("2024-01-31T23:59:59.999Z");
+
+      (DateRangeService.getDateRange as jest.Mock).mockReturnValue({
+        startDate: mockStartDate,
+        endDate: mockEndDate,
+      });
+
+      mockApiClient.get.mockResolvedValueOnce({} as InsightGroup);
+
+      await budgetService.getBudgetExpenseInsights(1, 2024);
+
+      expect(mockApiClient.get).toHaveBeenCalledWith(
+        `/insight/expense/budget?start=${mockStartDate.toISOString()}&end=${mockEndDate.toISOString()}`
       );
     });
 
@@ -101,6 +129,26 @@ describe("BudgetService", () => {
       expect(result).toEqual(mockLimits);
       expect(mockApiClient.get).toHaveBeenCalledWith(
         expect.stringContaining("/budget-limits")
+      );
+    });
+
+    it("should format dates correctly in API call", async () => {
+      const mockStartDate = new Date("2024-01-01T00:00:00.000Z");
+      const mockEndDate = new Date("2024-01-31T23:59:59.999Z");
+
+      (DateRangeService.getDateRange as jest.Mock).mockReturnValue({
+        startDate: mockStartDate,
+        endDate: mockEndDate,
+      });
+
+      mockApiClient.get.mockResolvedValueOnce({
+        data: [],
+      });
+
+      await budgetService.getBudgetLimits(1, 2024);
+
+      expect(mockApiClient.get).toHaveBeenCalledWith(
+        `/budget-limits?start=${mockStartDate.toISOString()}&end=${mockEndDate.toISOString()}`
       );
     });
 

@@ -80,7 +80,7 @@ export const createCli = (): Command => {
           year: opts.year ?? getCurrentYear(),
         });
       } catch (error) {
-        logger.error("Error getting budget status:", error);
+        logger.error(error, "Error getting budget status");
         process.exit(1);
       }
     });

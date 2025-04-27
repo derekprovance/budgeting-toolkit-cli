@@ -28,7 +28,7 @@ export class BudgetService implements IBudgetService {
       const range = DateRangeService.getDateRange(month, year);
 
       const results = await this.apiClient.get<InsightGroup>(
-        `/insight/expense/budget?start=${range.startDate}&end=${range.endDate}`
+        `/insight/expense/budget?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
       );
       if (!results) {
         throw new FireflyApiError("Failed to fetch expense insights for budget");
@@ -55,7 +55,7 @@ export class BudgetService implements IBudgetService {
       const range = DateRangeService.getDateRange(month, year);
 
       const results = await this.apiClient.get<BudgetLimitArray>(
-        `/budget-limits?start=${range.startDate}&end=${range.endDate}`
+        `/budget-limits?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
       );
       if (!results) {
         throw new FireflyApiError("Failed to fetch expense insights for budget");
