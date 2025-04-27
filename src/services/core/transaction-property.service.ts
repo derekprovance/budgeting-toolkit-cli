@@ -1,15 +1,19 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { ExpenseAccount, Tag } from "../../config";
-import { ExcludedTransactionService } from "../exluded-transaction.service";
+import { ExcludedTransactionService } from "../excluded-transaction.service";
 
 export class TransactionPropertyService {
-  static isTransfer = (transaction: TransactionSplit): boolean =>
-    transaction.type === "transfer";
+  constructor(private readonly excludedTransactionService: ExcludedTransactionService) {}
 
-  static isBill = (transaction: TransactionSplit): boolean =>
-    transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false;
+  isTransfer(transaction: TransactionSplit): boolean {
+    return transaction.type === "transfer";
+  }
 
-  static isDisposableIncome(transaction: TransactionSplit): boolean {
+  isBill(transaction: TransactionSplit): boolean {
+    return transaction.tags ? transaction.tags?.includes(Tag.BILLS) : false;
+  }
+
+  isDisposableIncome(transaction: TransactionSplit): boolean {
     if (!transaction.tags) {
       return false;
     }
@@ -17,55 +21,27 @@ export class TransactionPropertyService {
     return transaction.tags.includes(Tag.DISPOSABLE_INCOME);
   }
 
-  static hasNoDestination(destinationId: string | null) {
+  hasNoDestination(destinationId: string | null): boolean {
     return destinationId === ExpenseAccount.NO_NAME;
   }
 
-  static isSupplementedByDisposable = (
-    tags: string[] | null | undefined
-  ): boolean => tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
-
-  static async isExcludedTransaction(
-    description: string,
-    amount: string
-  ): Promise<boolean> {
-    const excludedTransactions =
-      await ExcludedTransactionService.getTransactions();
-    const convertedAmount = this.convertCurrencyToFloat(amount);
-
-    return excludedTransactions.some((transaction) => {
-      if (!transaction.description && !transaction.amount) {
-        return false;
-      }
-
-      if (transaction.description && transaction.amount) {
-        return (
-          transaction.description === description &&
-          transaction.amount === convertedAmount
-        );
-      }
-
-      if (transaction.description) {
-        return transaction.description === description;
-      }
-
-      if (transaction.amount) {
-        return transaction.amount === convertedAmount;
-      }
-
-      return false;
-    });
+  isSupplementedByDisposable(tags: string[] | null | undefined): boolean {
+    return tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
   }
 
-  static isDeposit = (transaction: TransactionSplit): boolean =>
-    transaction.type === "deposit";
+  async isExcludedTransaction(description: string, amount: string): Promise<boolean> {
+    return this.excludedTransactionService.isExcludedTransaction(description, amount);
+  }
 
-  static hasACategory = (transaction: TransactionSplit): boolean =>
-    !(
-      transaction.category_id === undefined || transaction.category_id === null
-    );
+  isDeposit(transaction: TransactionSplit): boolean {
+    return transaction.type === "deposit";
+  }
 
-  private static convertCurrencyToFloat(amount: string): string {
+  hasACategory(transaction: TransactionSplit): boolean {
+    return !(transaction.category_id === undefined || transaction.category_id === null);
+  }
+
+  private convertCurrencyToFloat(amount: string): string {
     if (!amount) {
       throw new Error("Amount cannot be empty");
     }

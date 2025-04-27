@@ -7,7 +7,7 @@ import {
   TransactionSplit,
 } from "@derekprovance/firefly-iii-sdk";
 import { logger } from "../../logger";
-import { DateRangeService } from "./date-range.service";
+import { DateRangeService } from "../../types/interface/date-range.service.interface";
 
 class TransactionError extends Error {
   constructor(message: string, public readonly originalError?: Error) {
@@ -235,9 +235,9 @@ export class TransactionService {
     month: number,
     year: number
   ): Promise<TransactionRead[]> {
-    const range = DateRangeService.getMonthDateRange(month, year);
+    const range = DateRangeService.getDateRange(month, year);
     const response = await this.apiClient.get<TransactionArray>(
-      `/transactions?start=${range.start}&end=${range.end}`
+      `/transactions?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
     );
     if (!response) {
       throw new FireflyApiError(

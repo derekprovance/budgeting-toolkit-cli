@@ -13,9 +13,10 @@ import {
   LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatusDto } from "../dto/update-transaction-status.dto";
+import { UpdateTransactionStatusDto, UpdateTransactionResult } from "../types/dto/update-transaction-status.dto";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 import { UserInputService } from "./user-input.service";
+import { UpdateTransactionService as IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
 
 export interface TransactionCategoryResult {
   name?: string;
@@ -25,12 +26,13 @@ export interface TransactionCategoryResult {
   updatedBudget?: string;
 }
 
-export class UpdateTransactionService {
+export class UpdateTransactionService implements IUpdateTransactionService {
   constructor(
     private transactionService: TransactionService,
     private categoryService: CategoryService,
     private budgetService: BudgetService,
     private llmTransactionProcessingService: LLMTransactionProcessingService,
+    private transactionPropertyService: TransactionPropertyService,
     private processTransactionsWithCategories = false,
     private noConfirmation = false
   ) {}
@@ -45,7 +47,7 @@ export class UpdateTransactionService {
         return {
           status: UpdateTransactionStatus.NO_TAG,
           totalTransactions: 0,
-          data: null,
+          data: []
         };
       }
 
@@ -61,7 +63,7 @@ export class UpdateTransactionService {
         return {
           status: UpdateTransactionStatus.EMPTY_TAG,
           totalTransactions: 0,
-          data: [],
+          data: []
         };
       }
 
@@ -106,7 +108,7 @@ export class UpdateTransactionService {
 
       return {
         status: UpdateTransactionStatus.PROCESSING_FAILED,
-        data: null,
+        data: [],
         totalTransactions: 0,
         error: "Unable to get transactions by tag",
       };
@@ -271,8 +273,8 @@ export class UpdateTransactionService {
 
   private shouldProcessTransaction(transaction: TransactionSplit): boolean {
     const conditions = {
-      notATransfer: !TransactionPropertyService.isTransfer(transaction),
-      hasACategory: TransactionPropertyService.hasACategory(transaction),
+      notATransfer: !this.transactionPropertyService.isTransfer(transaction),
+      hasACategory: this.transactionPropertyService.hasACategory(transaction),
     };
 
     return this.processTransactionsWithCategories
@@ -284,17 +286,17 @@ export class UpdateTransactionService {
     transaction: TransactionSplit
   ): Promise<boolean> {
     const isExcludedTransaction =
-      await TransactionPropertyService.isExcludedTransaction(
+      await this.transactionPropertyService.isExcludedTransaction(
         transaction.description,
         transaction.amount
       );
 
     const conditions = {
-      notABill: !TransactionPropertyService.isBill(transaction),
+      notABill: !this.transactionPropertyService.isBill(transaction),
       notDisposableIncome:
-        !TransactionPropertyService.isDisposableIncome(transaction),
+        !this.transactionPropertyService.isDisposableIncome(transaction),
       notAnExcludedTransaction: !isExcludedTransaction,
-      notADeposit: !TransactionPropertyService.isDeposit(transaction),
+      notADeposit: !this.transactionPropertyService.isDeposit(transaction),
     };
 
     return (
@@ -308,37 +310,18 @@ export class UpdateTransactionService {
   private async transformToTransactionCategoryResult(
     transactions: TransactionSplit[],
     aiResults: AIResponse
-  ): Promise<TransactionCategoryResult[]> {
-    return await Promise.all(
-      transactions.map(async (transaction) => {
-        const transactionJournalId = transaction.transaction_journal_id;
-        if (!transactionJournalId) {
-          return {};
-        }
+  ): Promise<UpdateTransactionResult[]> {
+    return transactions.map((transaction) => {
+      const journalId = transaction.transaction_journal_id;
+      const aiResult = journalId ? aiResults[journalId] : undefined;
 
-        const aiResult = aiResults[transactionJournalId];
-        if (!aiResult) {
-          return {};
-        }
-
-        const shouldCategorizeTransaction =
-          this.shouldProcessTransaction(transaction);
-        const shouldSetBudget = await this.shouldSetBudget(transaction);
-
-        return {
-          ...((shouldCategorizeTransaction && {
-            name: transaction.description,
-            category: transaction.category_name ?? "",
-            updatedCategory: aiResult.category,
-          }) ||
-            {}),
-          ...(shouldSetBudget && {
-            name: transaction.description,
-            budget: transaction.budget_name ?? "",
-            updatedBudget: aiResult.budget,
-          }),
-        };
-      })
-    );
+      return {
+        name: transaction.description || "",
+        category: transaction.category_name,
+        updatedCategory: aiResult?.category,
+        budget: transaction.budget_name,
+        updatedBudget: aiResult?.budget,
+      };
+    });
   }
 }

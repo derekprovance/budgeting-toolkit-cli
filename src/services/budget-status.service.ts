@@ -1,7 +1,8 @@
-import { BudgetStatusDto } from "../dto/budget-status.dto";
+import { BudgetStatusDto } from "../types/dto/budget-status.dto";
 import { BudgetService } from "./core/budget.service";
+import { BudgetStatusService as IBudgetStatusService } from "../types/interface/budget-status.service.interface";
 
-export class BudgetStatusService {
+export class BudgetStatusService implements IBudgetStatusService {
   constructor(
     private budgetService: BudgetService,
   ) {}

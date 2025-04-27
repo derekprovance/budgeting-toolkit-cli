@@ -28,7 +28,10 @@ export class AdditionalIncomeService {
     excludedDescriptions: [Description.PAYROLL],
   };
 
-  constructor(private readonly transactionService: TransactionService) {}
+  constructor(
+    private readonly transactionService: TransactionService,
+    private readonly transactionPropertyService: TransactionPropertyService
+  ) {}
 
   async calculateAdditionalIncome(
     month: number,
@@ -57,10 +60,10 @@ export class AdditionalIncomeService {
     transactions: TransactionSplit[]
   ): TransactionSplit[] {
     return transactions
-      .filter(TransactionPropertyService.isDeposit)
+      .filter(t => this.transactionPropertyService.isDeposit(t))
       .filter(this.hasValidDestinationAccount)
       .filter(this.isNotPayroll)
-      .filter((t) => !TransactionPropertyService.isDisposableIncome(t));
+      .filter(t => !this.transactionPropertyService.isDisposableIncome(t));
   }
 
   private hasValidDestinationAccount = (

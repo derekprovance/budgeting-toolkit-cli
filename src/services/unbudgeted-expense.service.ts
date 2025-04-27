@@ -1,28 +1,44 @@
 import { TransactionService } from "./core/transaction.service";
-import { Account, Tag } from "../config";
+import { Account } from "../config";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionPropertyService } from "./core/transaction-property.service";
 import { logger } from "../logger";
 
 export class UnbudgetedExpenseService {
-  constructor(private transactionService: TransactionService) {}
+  constructor(
+    private readonly transactionService: TransactionService,
+    private readonly transactionPropertyService: TransactionPropertyService
+  ) {}
 
   async calculateUnbudgetedExpenses(
     month: number,
     year: number
   ): Promise<TransactionSplit[]> {
-    const transactions = await this.transactionService.getTransactionsForMonth(
-      month,
-      year
-    );
-    const filteredTransactions = await this.filterExpenses(transactions);
-    return filteredTransactions;
+    try {
+      const transactions = await this.transactionService.getTransactionsForMonth(
+        month,
+        year
+      );
+      const expenses = await this.filterExpenses(transactions);
+
+      return expenses;
+    } catch (error) {
+      logger.trace(error, "Error calculating unbudgeted expenses");
+      if (error instanceof Error) {
+        throw new Error(
+          `Failed to calculate unbudgeted expenses for month ${month}: ${error.message}`
+        );
+      }
+      throw new Error(
+        `Failed to calculate unbudgeted expenses for month ${month}`
+      );
+    }
   }
 
   private async filterExpenses(transactions: TransactionSplit[]) {
     const results = await Promise.all(
       transactions.map(async (transaction) => {
-        const isTransfer = TransactionPropertyService.isTransfer(transaction);
+        const isTransfer = this.transactionPropertyService.isTransfer(transaction);
         const shouldCountExpense = await this.shouldCountExpense(transaction);
 
         return (
@@ -33,19 +49,6 @@ export class UnbudgetedExpenseService {
     );
 
     return transactions.filter((_, index) => results[index]);
-  }
-
-  private async shouldCountExpense(
-    transaction: TransactionSplit
-  ): Promise<boolean> {
-    if (transaction.tags?.includes(Tag.BILLS)) {
-      return true;
-    }
-
-    const isRegularExpense = await this.isRegularExpenseTransaction(
-      transaction
-    );
-    return isRegularExpense;
   }
 
   private shouldCountTransfer(transaction: TransactionSplit): boolean {
@@ -59,11 +62,15 @@ export class UnbudgetedExpenseService {
     );
   }
 
+  private async shouldCountExpense(transaction: TransactionSplit): Promise<boolean> {
+    return this.isRegularExpenseTransaction(transaction);
+  }
+
   private async isRegularExpenseTransaction(
     transaction: TransactionSplit
   ): Promise<boolean> {
     const isExcludedTransaction =
-      await TransactionPropertyService.isExcludedTransaction(
+      await this.transactionPropertyService.isExcludedTransaction(
         transaction.description,
         transaction.amount
       );
@@ -71,7 +78,7 @@ export class UnbudgetedExpenseService {
     const conditions = {
       hasNoBudget: !transaction.budget_id,
       isNotDisposableSupplemented:
-        !TransactionPropertyService.isSupplementedByDisposable(
+        !this.transactionPropertyService.isSupplementedByDisposable(
           transaction.tags
         ),
       isNotExcludedTransaction: !isExcludedTransaction,
@@ -91,16 +98,7 @@ export class UnbudgetedExpenseService {
     );
   }
 
-  private isExpenseAccount(sourceId: string | null) {
-    if (!sourceId) {
-      return false;
-    }
-
-    return [
-      Account.CHASE_AMAZON.toString(),
-      Account.CHASE_SAPPHIRE.toString(),
-      Account.CITIBANK_DOUBLECASH.toString(),
-      Account.PRIMARY.toString(),
-    ].includes(sourceId);
+  private isExpenseAccount(accountId: string | null): boolean {
+    return accountId === Account.PRIMARY;
   }
 }

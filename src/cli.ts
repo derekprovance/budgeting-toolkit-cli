@@ -1,22 +1,18 @@
 import { Command, Option } from "commander";
-import { UnbudgetedExpenseService } from "./services/unbudgeted-expense.service";
-import { claudeAPIKey, config, llmModel } from "./config";
-import { TransactionService } from "./services/core/transaction.service";
-import { AdditionalIncomeService } from "./services/additional-income.service";
-import { updateTransactions as updateTransactions } from "./commands/update-transaction.command";
-import { CategoryService } from "./services/core/category.service";
-import { BudgetService } from "./services/core/budget.service";
-import { ClaudeClient } from "./api/claude.client";
-import { UpdateTransactionService } from "./services/update-transaction.service";
-import { finalizeBudgetCommand } from "./commands/finalize-budget.command";
+import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
+import { config } from "./config";
+import { FinalizeBudgetCommand } from "./commands/finalize-budget.command";
+import { BudgetStatusCommand } from "./commands/budget-status.command";
+import { UpdateTransactionsCommand } from "./commands/update-transaction.command";
+import { ServiceFactory } from "./factories/service.factory";
+import { LLMConfig } from "./config/llm.config";
+import { BudgetDateOptions, UpdateTransactionOptions } from "./types/interface/command-options.interface";
+import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
+import { logger } from "./logger";
 import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-category.service";
 import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budget.service";
 import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
-import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
-import chalk from "chalk";
-import { budgetStatusCommand } from "./commands/budget-status.command";
-import { BudgetStatusService } from "./services/budget-status.service";
-import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
+import { UpdateTransactionService } from "./services/update-transaction.service";
 
 const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
@@ -26,66 +22,15 @@ const getCurrentYear = (): number => {
   return new Date().getFullYear();
 };
 
-const initializeLLMClient = (): ClaudeClient => {
-  if (!claudeAPIKey) {
-    throw new Error(
-      `${chalk.redBright(
-        "!!!"
-      )} Claude API Key is required to update transactions. Please check your .env file. ${chalk.redBright(
-        "!!!"
-      )}`
-    );
-  }
-
-  return new ClaudeClient({
-    apiKey: claudeAPIKey,
-    model: llmModel,
-    maxTokens: 20,
-    maxRetries: 3,
-    batchSize: 10,
-    maxConcurrent: 5,
-  });
-};
-
-interface UpdateTransactionOptions {
-  tag: string;
-  mode: UpdateTransactionMode;
-  includeClassified?: boolean;
-  yes?: boolean;
-}
-
-const initializeServices = (apiClient: FireflyApiClient) => {
-  const transactionService = new TransactionService(apiClient);
-  const budgetService = new BudgetService(apiClient);
-  const categoryService = new CategoryService(apiClient);
-  const additionalIncomeService = new AdditionalIncomeService(
-    transactionService
-  );
-  const unbudgetedExpenseService = new UnbudgetedExpenseService(
-    transactionService
-  );
-
-  const budgetStatus = new BudgetStatusService(budgetService);
-
-  return {
-    transactionService,
-    budgetService,
-    categoryService,
-    additionalIncomeService,
-    unbudgetedExpenseService,
-    budgetStatus,
-  };
-};
-
 export const createCli = (): Command => {
   const program = new Command();
   const apiClient = new FireflyApiClient(config);
-  const services = initializeServices(apiClient);
+  const services = ServiceFactory.createServices(apiClient);
 
   program
     .name("budgeting-toolkit-cli")
     .description("CLI to perform budgeting operations with Firefly III API")
-    .version("2.3.4");
+    .version("2.4.0");
 
   program
     .command("finalize-budget")
@@ -97,14 +42,22 @@ export const createCli = (): Command => {
       ).argParser(parseInt)
     )
     .option("-y, --year <year>", "year to process (default: current year)")
-    .action((opts) =>
-      finalizeBudgetCommand(
-        services.additionalIncomeService,
-        services.unbudgetedExpenseService,
-        opts.month ?? getCurrentMonth(),
-        opts.year ?? getCurrentYear()
-      )
-    );
+    .action(async (opts: BudgetDateOptions) => {
+      try {
+        const command = new FinalizeBudgetCommand(
+          services.additionalIncomeService,
+          services.unbudgetedExpenseService,
+          services.transactionPropertyService
+        );
+        await command.execute({
+          month: opts.month ?? getCurrentMonth(),
+          year: opts.year ?? getCurrentYear(),
+        });
+      } catch (error) {
+        logger.error("Error finalizing budget:", error);
+        process.exit(1);
+      }
+    });
 
   program
     .command("budget-status")
@@ -116,14 +69,21 @@ export const createCli = (): Command => {
       ).argParser(parseInt)
     )
     .option("-y, --year <year>", "year to process (default: current year)")
-    .action((opts) =>
-      budgetStatusCommand(
-        services.budgetStatus,
-        services.transactionService,
-        opts.month ?? getCurrentMonth(),
-        opts.year ?? getCurrentYear()
-      )
-    );
+    .action(async (opts: BudgetDateOptions) => {
+      try {
+        const command = new BudgetStatusCommand(
+          services.budgetStatus,
+          services.transactionService
+        );
+        await command.execute({
+          month: opts.month ?? getCurrentMonth(),
+          year: opts.year ?? getCurrentYear(),
+        });
+      } catch (error) {
+        logger.error("Error getting budget status:", error);
+        process.exit(1);
+      }
+    });
 
   program
     .command("update-transactions <tag>")
@@ -145,9 +105,9 @@ export const createCli = (): Command => {
       "-y, --yes",
       "skip confirmation prompts and apply updates automatically (default: false)"
     )
-    .action((tag: string, opts: UpdateTransactionOptions) => {
+    .action(async (tag: string, opts: UpdateTransactionOptions) => {
       try {
-        const claudeClient = initializeLLMClient();
+        const claudeClient = LLMConfig.createClient();
         const llmServices = {
           category: new LLMTransactionCategoryService(claudeClient),
           budget: new LLMTransactionBudgetService(claudeClient),
@@ -163,15 +123,19 @@ export const createCli = (): Command => {
           services.categoryService,
           services.budgetService,
           llmTransactionProcessor,
+          services.transactionPropertyService,
           opts.includeClassified,
           opts.yes
         );
 
-        updateTransactions(updateCategoryService, tag, opts.mode);
-      } catch (ex) {
-        if (ex instanceof Error) {
-          console.error(ex.message);
-        }
+        const command = new UpdateTransactionsCommand(updateCategoryService);
+        await command.execute({
+          tag,
+          updateMode: opts.mode,
+        });
+      } catch (error) {
+        logger.error("Error updating transactions:", error);
+        process.exit(1);
       }
     });
 
