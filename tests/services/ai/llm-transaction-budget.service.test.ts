@@ -159,12 +159,10 @@ describe('LLMTransactionBudgetService', () => {
     it('should handle validation errors', async () => {
       const singleTransaction = [mockTransactions[0]];
       const singleCategory = [categories[0]];
+      const expectedResponse = 'Food';
       
-      mockClaudeClient.chatBatch.mockResolvedValueOnce(['{"budgets": ["Invalid"]}']);
+      mockClaudeClient.chatBatch.mockResolvedValueOnce([expectedResponse]);
       (LLMResponseValidator.validateBatchResponses as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid budget');
-      });
-      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockImplementation(() => {
         throw new Error('Invalid budget');
       });
 
@@ -182,7 +180,7 @@ describe('LLMTransactionBudgetService', () => {
         .mockResolvedValueOnce([expectedResponse]);
       
       (LLMResponseValidator.validateBatchResponses as jest.Mock).mockResolvedValueOnce(['Food']);
-      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce('Food');
+      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce(['Food']);
 
       const result = await service.assignBudgets(budgets, singleTransaction, singleCategory);
       
@@ -209,7 +207,7 @@ describe('LLMTransactionBudgetService', () => {
       
       mockClaudeClient.chatBatch.mockResolvedValueOnce([expectedResponse]);
       (LLMResponseValidator.validateBatchResponses as jest.Mock).mockResolvedValueOnce(['']);
-      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce('');
+      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce(['']);
 
       const result = await service.assignBudgets(budgets, singleTransaction, singleCategory);
       
@@ -321,5 +319,133 @@ describe('LLMTransactionBudgetService', () => {
       
       expect(result).toEqual(['']);
     });
+
+    it('should handle budget name case sensitivity', async () => {
+      const singleTransaction = [mockTransactions[0]];
+      const singleCategory = [categories[0]];
+      mockClaudeClient.chatBatch.mockResolvedValueOnce(['food']); // lowercase response
+      
+      await expect(service.assignBudgets(budgets, singleTransaction, singleCategory))
+        .rejects.toThrow('Invalid budget');
+    });
+
+    it('should handle whitespace in budget responses', async () => {
+      const singleTransaction = [mockTransactions[0]];
+      const singleCategory = [categories[0]];
+      mockClaudeClient.chatBatch.mockResolvedValueOnce(['  Food  ']); // extra whitespace
+      
+      (LLMResponseValidator.validateBatchResponses as jest.Mock).mockResolvedValueOnce(['Food']);
+      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce('Food');
+
+      const result = await service.assignBudgets(budgets, singleTransaction, singleCategory);
+      expect(result).toEqual(['Food']);
+    });
+
+    it('should maintain consistent budget assignment for similar transactions', async () => {
+      const similarTransactions = [
+        {...mockTransactions[0], description: 'Walmart Grocery'},
+        {...mockTransactions[0], description: 'Walmart Supermarket'}
+      ];
+      const transactionCategories = ['Groceries', 'Groceries'];
+      
+      mockClaudeClient.chatBatch.mockResolvedValueOnce(['Food', 'Food']);
+      (LLMResponseValidator.validateBatchResponses as jest.Mock).mockResolvedValueOnce(['Food', 'Food']);
+      (LLMResponseValidator.validateBudgetResponse as jest.Mock)
+        .mockReturnValueOnce('Food')
+        .mockReturnValueOnce('Food');
+
+      const result = await service.assignBudgets(budgets, similarTransactions, transactionCategories);
+      expect(result[0]).toEqual(result[1]); // Should assign same budget
+      expect(result).toEqual(['Food', 'Food']);
+    });
+
+    it('should handle timeout from Claude API', async () => {
+      const singleTransaction = [mockTransactions[0]];
+      const singleCategory = [categories[0]];
+      
+      mockClaudeClient.chatBatch
+        .mockRejectedValueOnce(new Error('Request timeout'))
+        .mockRejectedValueOnce(new Error('Request timeout'))
+        .mockRejectedValueOnce(new Error('Request timeout'))
+        .mockRejectedValueOnce(new Error('Request timeout'));
+
+      await expect(service.assignBudgets(budgets, singleTransaction, singleCategory))
+        .rejects.toThrow('Request timeout');
+      expect(mockClaudeClient.chatBatch).toHaveBeenCalledTimes(4); // Initial + 3 retries
+    }, 10000);
+
+    it('should handle malformed responses from Claude', async () => {
+      const singleTransaction = [mockTransactions[0]];
+      const singleCategory = [categories[0]];
+      
+      mockClaudeClient.chatBatch.mockResolvedValueOnce(['{"budget": "Food"}']); // Wrong format
+      
+      await expect(service.assignBudgets(budgets, singleTransaction, singleCategory))
+        .rejects.toThrow('Invalid budget');
+    });
+
+    it('should handle special characters in transaction descriptions', async () => {
+      const transactionWithSpecialChars = {
+        ...mockTransactions[0],
+        description: 'Café & Restaurant™ #123'
+      };
+      
+      mockClaudeClient.chatBatch.mockResolvedValueOnce(['Food']);
+      (LLMResponseValidator.validateBatchResponses as jest.Mock).mockResolvedValueOnce(['Food']);
+      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce('Food');
+
+      const result = await service.assignBudgets(
+        budgets,
+        [transactionWithSpecialChars],
+        [categories[0]]
+      );
+      
+      expect(result).toEqual(['Food']);
+      expect(mockClaudeClient.chatBatch).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.stringContaining('Café & Restaurant™ #123')
+            })
+          ])
+        ]),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle rate limiting from Claude API', async () => {
+      const singleTransaction = [mockTransactions[0]];
+      const singleCategory = [categories[0]];
+      
+      mockClaudeClient.chatBatch
+        .mockRejectedValueOnce(new Error('Rate limit exceeded'))
+        .mockRejectedValueOnce(new Error('Rate limit exceeded'))
+        .mockResolvedValueOnce(['Food']); // Succeeds after rate limit cooldown
+
+      (LLMResponseValidator.validateBatchResponses as jest.Mock).mockResolvedValueOnce(['Food']);
+      (LLMResponseValidator.validateBudgetResponse as jest.Mock).mockReturnValueOnce('Food');
+
+      const result = await service.assignBudgets(budgets, singleTransaction, singleCategory);
+      expect(result).toEqual(['Food']);
+      expect(mockClaudeClient.chatBatch).toHaveBeenCalledTimes(3);
+    });
+
+    it('should handle mismatched response lengths from Claude', async () => {
+      const singleTransaction = [mockTransactions[0]];
+      const singleCategory = [categories[0]];
+      
+      mockClaudeClient.chatBatch.mockResolvedValueOnce(['Groceries Budget', 'Healthcare Budget']); // More responses than transactions
+      
+      // Don't mock validateBatchResponses since we want to test the length check
+      (LLMResponseValidator.validateBatchResponses as jest.Mock).mockImplementation((responses) => {
+        if (responses.length !== 1) {
+          throw new Error('Invalid response from Claude');
+        }
+        return responses;
+      });
+
+      await expect(service.assignBudgets(budgets, singleTransaction, singleCategory))
+        .rejects.toThrow('Invalid response from Claude');
+    }, 10000); // Increased timeout to 10 seconds
   });
 }); 

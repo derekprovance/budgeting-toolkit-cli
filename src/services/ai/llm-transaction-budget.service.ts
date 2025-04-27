@@ -36,6 +36,12 @@ export class LLMTransactionBudgetService {
       return [];
     }
 
+    // Handle empty budgets
+    if (!budgets.length) {
+      logger.trace("No budgets provided, returning empty strings");
+      return new Array(transactions.length).fill("");
+    }
+
     // Handle mismatched lengths
     if (transactions.length !== categories.length) {
       logger.warn(
@@ -50,12 +56,6 @@ export class LLMTransactionBudgetService {
         "Mismatched transaction and category counts"
       );
       throw new Error("Number of transactions and categories must match");
-    }
-
-    // Handle empty budgets
-    if (!budgets.length) {
-      logger.trace("No budgets provided, returning empty strings");
-      return new Array(transactions.length).fill("");
     }
 
     const systemPrompt = this.buildBudgetPrompt(budgets);
@@ -79,6 +79,10 @@ export class LLMTransactionBudgetService {
         const rawResponses = await this.claudeClient.chatBatch(messageBatches, {
           systemPrompt,
         });
+
+        if (!rawResponses) {
+          throw new Error("Invalid response from Claude");
+        }
 
         logger.trace(
           {
@@ -110,57 +114,51 @@ export class LLMTransactionBudgetService {
           "Cleaned responses"
         );
 
-        const validatedResponses = LLMResponseValidator.validateBatchResponses(
-          cleanedResponses,
-          (response) =>
-            LLMResponseValidator.validateBudgetResponse(response, budgets)
-        );
+        let validatedResponses: string[];
+        try {
+          validatedResponses = LLMResponseValidator.validateBatchResponses(
+            cleanedResponses,
+            (response) =>
+              LLMResponseValidator.validateBudgetResponse(response, budgets)
+          );
 
-        logger.trace(
-          {
-            validatedResponses,
-            transactionDetails: transactions.map((tx, idx) => ({
-              id: tx.transaction_journal_id,
-              description: tx.description,
-              category: categories[idx],
-              finalBudget: validatedResponses[idx],
-            })),
-          },
-          "Validated responses"
-        );
+          logger.trace(
+            {
+              validatedResponses,
+              transactionDetails: transactions.map((tx, idx) => ({
+                id: tx.transaction_journal_id,
+                description: tx.description,
+                category: categories[idx],
+                finalBudget: validatedResponses[idx],
+              })),
+            },
+            "Validated responses"
+          );
 
-        return validatedResponses;
+          return validatedResponses;
+        } catch (error) {
+          if (error instanceof Error && error.message === 'Invalid budget') {
+            throw error;
+          }
+          throw new Error("Invalid response from Claude");
+        }
       });
 
       return responses;
     } catch (error) {
-      if (error instanceof Error) {
-        logger.error(
-          {
-            error: error.message,
-            type: error.constructor.name,
-            stack: error.stack,
-            transactions: transactions.map((tx, idx) => ({
-              id: tx.transaction_journal_id,
-              description: tx.description,
-              category: categories[idx],
-            })),
-          },
-          "Error assigning budgets"
-        );
-      } else {
-        logger.error(
-          {
-            error,
-            transactions: transactions.map((tx, idx) => ({
-              id: tx.transaction_journal_id,
-              description: tx.description,
-              category: categories[idx],
-            })),
-          },
-          "Unknown error assigning budgets"
-        );
-      }
+      logger.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          type: error instanceof Error ? error.constructor.name : typeof error,
+          stack: error instanceof Error ? error.stack : undefined,
+          transactions: transactions.map((tx, idx) => ({
+            id: tx.transaction_journal_id,
+            description: tx.description,
+            category: categories[idx],
+          })),
+        },
+        "Error assigning budgets"
+      );
       throw error;
     }
   }
@@ -173,6 +171,10 @@ export class LLMTransactionBudgetService {
     try {
       return await operation();
     } catch (error) {
+      if (error instanceof Error && error.message === 'Invalid budget') {
+        throw error;
+      }
+
       if (retries === 0) {
         throw error;
       }

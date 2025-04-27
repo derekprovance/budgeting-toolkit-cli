@@ -27,6 +27,18 @@ export class LLMTransactionCategoryService {
       "Starting category assignment"
     );
 
+    // Handle empty transactions
+    if (!transactions.length) {
+      logger.trace("No transactions to process");
+      return [];
+    }
+
+    // Handle empty categories
+    if (!categories.length) {
+      logger.trace("No categories provided, returning empty strings");
+      return new Array(transactions.length).fill("");
+    }
+
     const systemPrompt = this.buildCategoryPrompt(categories);
     const messageBatches = this.prepareTransactionBatches(transactions);
 
@@ -45,6 +57,10 @@ export class LLMTransactionCategoryService {
         const rawResponses = await this.claudeClient.chatBatch(messageBatches, {
           systemPrompt,
         });
+
+        if (!rawResponses) {
+          throw new Error("Invalid response from Claude");
+        }
 
         logger.trace(
           {
@@ -74,25 +90,33 @@ export class LLMTransactionCategoryService {
           "Cleaned responses"
         );
 
-        const validatedResponses = LLMResponseValidator.validateBatchResponses(
-          cleanedResponses,
-          (response) =>
-            LLMResponseValidator.validateCategoryResponse(response, categories)
-        );
+        let validatedResponses: string[];
+        try {
+          validatedResponses = LLMResponseValidator.validateBatchResponses(
+            cleanedResponses,
+            (response) =>
+              LLMResponseValidator.validateCategoryResponse(response, categories)
+          );
 
-        logger.trace(
-          {
-            validatedResponses,
-            transactionDetails: transactions.map((tx, idx) => ({
-              id: tx.transaction_journal_id,
-              description: tx.description,
-              finalCategory: validatedResponses[idx],
-            })),
-          },
-          "Validated responses"
-        );
+          logger.trace(
+            {
+              validatedResponses,
+              transactionDetails: transactions.map((tx, idx) => ({
+                id: tx.transaction_journal_id,
+                description: tx.description,
+                finalCategory: validatedResponses[idx],
+              })),
+            },
+            "Validated responses"
+          );
 
-        return validatedResponses;
+          return validatedResponses;
+        } catch (error) {
+          if (error instanceof Error && error.message === 'Invalid category') {
+            throw error;
+          }
+          throw new Error("Invalid response from Claude");
+        }
       });
 
       return responses;
@@ -111,6 +135,10 @@ export class LLMTransactionCategoryService {
       const result = await operation();
       return result;
     } catch (error) {
+      if (error instanceof Error && error.message === 'Invalid category') {
+        throw error;
+      }
+
       if (retries === 0) {
         throw error;
       }
