@@ -17,10 +17,8 @@ export class UnbudgetedExpenseService {
   ): Promise<TransactionSplit[]> {
     try {
       DateUtils.validateMonthYear(month, year);
-      const transactions = await this.transactionService.getTransactionsForMonth(
-        month,
-        year
-      );
+      const transactions =
+        await this.transactionService.getTransactionsForMonth(month, year);
       const expenses = await this.filterExpenses(transactions);
 
       return expenses;
@@ -44,7 +42,8 @@ export class UnbudgetedExpenseService {
   private async filterExpenses(transactions: TransactionSplit[]) {
     const results = await Promise.all(
       transactions.map(async (transaction) => {
-        const isTransfer = this.transactionPropertyService.isTransfer(transaction);
+        const isTransfer =
+          this.transactionPropertyService.isTransfer(transaction);
         const shouldCountExpense = await this.shouldCountExpense(transaction);
 
         return (
@@ -68,7 +67,12 @@ export class UnbudgetedExpenseService {
     );
   }
 
-  private async shouldCountExpense(transaction: TransactionSplit): Promise<boolean> {
+  private async shouldCountExpense(
+    transaction: TransactionSplit
+  ): Promise<boolean> {
+    if (this.transactionPropertyService.isBill(transaction)) {
+      return true;
+    }
     return this.isRegularExpenseTransaction(transaction);
   }
 
@@ -105,6 +109,15 @@ export class UnbudgetedExpenseService {
   }
 
   private isExpenseAccount(accountId: string | null): boolean {
-    return accountId === Account.PRIMARY;
+    if (!accountId) {
+      return false;
+    }
+
+    return [
+      Account.CHASE_AMAZON,
+      Account.CHASE_SAPPHIRE,
+      Account.CITIBANK_DOUBLECASH,
+      Account.PRIMARY,
+    ].includes(accountId as Account);
   }
 }
