@@ -2,7 +2,11 @@ import { TransactionUpdaterService } from "../../../src/services/core/transactio
 import { TransactionService } from "../../../src/services/core/transaction.service";
 import { TransactionValidatorService } from "../../../src/services/core/transaction-validator.service";
 import { UserInputService } from "../../../src/services/user-input.service";
-import { TransactionSplit, Category, BudgetRead } from "@derekprovance/firefly-iii-sdk";
+import {
+  TransactionSplit,
+  Category,
+  BudgetRead,
+} from "@derekprovance/firefly-iii-sdk";
 
 // Mock the logger to prevent console output during tests
 jest.mock("../../../src/logger", () => ({
@@ -32,9 +36,7 @@ describe("TransactionUpdaterService", () => {
     budget_name: "Old Budget",
   };
 
-  const mockCategories: Partial<Category>[] = [
-    { name: "New Category" },
-  ];
+  const mockCategories: Partial<Category>[] = [{ name: "New Category" }];
 
   const mockBudgets: Partial<BudgetRead>[] = [
     { id: "2", type: "budget", attributes: { name: "New Budget" } },
@@ -55,7 +57,9 @@ describe("TransactionUpdaterService", () => {
       categoryOrBudgetChanged: jest.fn(),
     } as unknown as jest.Mocked<TransactionValidatorService>;
 
-    jest.spyOn(UserInputService, 'askToUpdateTransaction').mockImplementation(async () => true);
+    jest
+      .spyOn(UserInputService, "askToUpdateTransaction")
+      .mockImplementation(async () => true);
 
     service = new TransactionUpdaterService(
       mockTransactionService,
@@ -80,7 +84,10 @@ describe("TransactionUpdaterService", () => {
       );
 
       expect(result).toBeUndefined();
-      expect(mockValidator.validateTransactionData).toHaveBeenCalledWith(mockTransaction, mockAIResults);
+      expect(mockValidator.validateTransactionData).toHaveBeenCalledWith(
+        mockTransaction,
+        mockAIResults
+      );
       expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
     });
 
@@ -145,7 +152,9 @@ describe("TransactionUpdaterService", () => {
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.shouldSetBudget.mockResolvedValue(true);
       mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-      jest.spyOn(UserInputService, 'askToUpdateTransaction').mockImplementation(async () => false);
+      jest
+        .spyOn(UserInputService, "askToUpdateTransaction")
+        .mockImplementation(async () => false);
 
       const result = await service.updateTransaction(
         mockTransaction as TransactionSplit,
@@ -186,7 +195,9 @@ describe("TransactionUpdaterService", () => {
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.shouldSetBudget.mockResolvedValue(true);
       mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-      mockTransactionService.updateTransaction.mockRejectedValue(new Error("Update failed"));
+      mockTransactionService.updateTransaction.mockRejectedValue(
+        new Error("Update failed")
+      );
 
       const result = await service.updateTransaction(
         mockTransaction as TransactionSplit,
@@ -198,4 +209,4 @@ describe("TransactionUpdaterService", () => {
       expect(result).toBeUndefined();
     });
   });
-}); 
+});

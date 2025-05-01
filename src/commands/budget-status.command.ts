@@ -19,16 +19,28 @@ export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
    * @param params The month and year to display budget status for
    */
   async execute({ month, year }: BudgetDateParams): Promise<void> {
-    const budgetStatuses = await this.budgetStatusService.getBudgetStatus(month, year);
-    const lastUpdatedOn = await this.transactionService.getMostRecentTransactionDate() || new Date();
-    const isCurrentMonth = new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
+    const budgetStatuses = await this.budgetStatusService.getBudgetStatus(
+      month,
+      year
+    );
+    const lastUpdatedOn =
+      (await this.transactionService.getMostRecentTransactionDate()) ||
+      new Date();
+    const isCurrentMonth =
+      new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
     const { daysLeft, percentageLeft, currentDay, totalDays } = isCurrentMonth
       ? this.getDaysLeftInfo(month, year, lastUpdatedOn)
       : { daysLeft: 0, percentageLeft: 0, currentDay: 0, totalDays: 0 };
 
-    const totalBudget = budgetStatuses.reduce((sum, status) => sum + status.amount, 0);
-    const totalSpent = budgetStatuses.reduce((sum, status) => sum + status.spent, 0);
+    const totalBudget = budgetStatuses.reduce(
+      (sum, status) => sum + status.amount,
+      0
+    );
+    const totalSpent = budgetStatuses.reduce(
+      (sum, status) => sum + status.spent,
+      0
+    );
     const totalPercentage = this.getPercentageSpent(totalSpent, totalBudget);
 
     // Display header
@@ -43,7 +55,10 @@ export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
     );
 
     // Display individual budget items
-    const nameWidth = Math.max(...budgetStatuses.map((status) => status.name.length), 20);
+    const nameWidth = Math.max(
+      ...budgetStatuses.map((status) => status.name.length),
+      20
+    );
 
     budgetStatuses.forEach((status) => {
       console.log(
@@ -73,7 +88,10 @@ export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
 
     // Display warning if necessary
     if (isCurrentMonth) {
-      const warning = this.displayService.getSpendRateWarning(totalPercentage, percentageLeft);
+      const warning = this.displayService.getSpendRateWarning(
+        totalPercentage,
+        percentageLeft
+      );
       if (warning) {
         console.log(warning);
       }

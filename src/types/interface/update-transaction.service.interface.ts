@@ -12,4 +12,4 @@ export interface IUpdateTransactionService {
     tag: string,
     updateMode: UpdateTransactionMode
   ): Promise<UpdateTransactionStatusDto>;
-} 
+}

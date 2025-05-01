@@ -59,7 +59,11 @@ export class UserInputService {
         ),
       options.budget &&
         options.budget !== transaction.budget_name &&
-        this.formatChange("Budget", transaction.budget_name ?? undefined, options.budget),
+        this.formatChange(
+          "Budget",
+          transaction.budget_name ?? undefined,
+          options.budget
+        ),
     ].filter(Boolean) as string[];
   }
 

@@ -66,7 +66,9 @@ describe("FinalizeBudgetDisplayService", () => {
     });
 
     it("should format additional income section with transactions", () => {
-      const result = service.formatAdditionalIncomeSection([mockTransaction as TransactionSplit]);
+      const result = service.formatAdditionalIncomeSection([
+        mockTransaction as TransactionSplit,
+      ]);
       expect(result).toContain("=== Additional Income ===");
       expect(result).toContain("Test Transaction");
       expect(result).toContain("$100.00");
@@ -82,7 +84,9 @@ describe("FinalizeBudgetDisplayService", () => {
     });
 
     it("should format unbudgeted expenses section with transactions", () => {
-      const result = service.formatUnbudgetedExpensesSection([mockTransaction as TransactionSplit]);
+      const result = service.formatUnbudgetedExpensesSection([
+        mockTransaction as TransactionSplit,
+      ]);
       expect(result).toContain("=== Unbudgeted Expenses ===");
       expect(result).toContain("Test Transaction");
       expect(result).toContain("$100.00");
@@ -124,19 +128,19 @@ describe("FinalizeBudgetDisplayService", () => {
 
       // Set up mock implementations for each transaction
       const transactions = Array(4).fill(mockTransaction) as TransactionSplit[];
-      
+
       // Transaction 1: Bill
       transactionPropertyService.isBill.mockImplementationOnce(() => true);
-      
+
       // Transaction 2: Transfer
       transactionPropertyService.isBill.mockImplementationOnce(() => false);
       transactionPropertyService.isTransfer.mockImplementationOnce(() => true);
-      
+
       // Transaction 3: Deposit
       transactionPropertyService.isBill.mockImplementationOnce(() => false);
       transactionPropertyService.isTransfer.mockImplementationOnce(() => false);
       transactionPropertyService.isDeposit.mockImplementationOnce(() => true);
-      
+
       // Transaction 4: Other
       transactionPropertyService.isBill.mockImplementationOnce(() => false);
       transactionPropertyService.isTransfer.mockImplementationOnce(() => false);
@@ -156,4 +160,4 @@ describe("FinalizeBudgetDisplayService", () => {
       expect(transactionPropertyService.isDeposit).toHaveBeenCalledTimes(2);
     });
   });
-}); 
+});

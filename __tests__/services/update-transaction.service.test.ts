@@ -125,11 +125,21 @@ describe("UpdateTransactionService", () => {
     } as unknown as jest.Mocked<TransactionUpdaterService>;
 
     // Mock the services directly
-    jest.spyOn(TransactionValidatorService.prototype, 'shouldProcessTransaction').mockImplementation(mockValidator.shouldProcessTransaction);
-    jest.spyOn(TransactionValidatorService.prototype, 'shouldSetBudget').mockImplementation(mockValidator.shouldSetBudget);
-    jest.spyOn(TransactionValidatorService.prototype, 'validateTransactionData').mockImplementation(mockValidator.validateTransactionData);
-    jest.spyOn(TransactionValidatorService.prototype, 'categoryOrBudgetChanged').mockImplementation(mockValidator.categoryOrBudgetChanged);
-    jest.spyOn(TransactionUpdaterService.prototype, 'updateTransaction').mockImplementation(mockUpdater.updateTransaction);
+    jest
+      .spyOn(TransactionValidatorService.prototype, "shouldProcessTransaction")
+      .mockImplementation(mockValidator.shouldProcessTransaction);
+    jest
+      .spyOn(TransactionValidatorService.prototype, "shouldSetBudget")
+      .mockImplementation(mockValidator.shouldSetBudget);
+    jest
+      .spyOn(TransactionValidatorService.prototype, "validateTransactionData")
+      .mockImplementation(mockValidator.validateTransactionData);
+    jest
+      .spyOn(TransactionValidatorService.prototype, "categoryOrBudgetChanged")
+      .mockImplementation(mockValidator.categoryOrBudgetChanged);
+    jest
+      .spyOn(TransactionUpdaterService.prototype, "updateTransaction")
+      .mockImplementation(mockUpdater.updateTransaction);
 
     service = new UpdateTransactionService(
       mockTransactionService,
@@ -146,7 +156,10 @@ describe("UpdateTransactionService", () => {
     it("should return NO_TAG status when tag does not exist", async () => {
       mockTransactionService.tagExists.mockResolvedValue(false);
 
-      const result = await service.updateTransactionsByTag("nonexistent", UpdateTransactionMode.Both);
+      const result = await service.updateTransactionsByTag(
+        "nonexistent",
+        UpdateTransactionMode.Both
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.NO_TAG);
       expect(result.totalTransactions).toBe(0);
@@ -157,7 +170,10 @@ describe("UpdateTransactionService", () => {
       mockTransactionService.tagExists.mockResolvedValue(true);
       mockTransactionService.getTransactionsByTag.mockResolvedValue([]);
 
-      const result = await service.updateTransactionsByTag("empty", UpdateTransactionMode.Both);
+      const result = await service.updateTransactionsByTag(
+        "empty",
+        UpdateTransactionMode.Both
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
       expect(result.totalTransactions).toBe(0);
@@ -166,28 +182,46 @@ describe("UpdateTransactionService", () => {
 
     it("should process transactions and return HAS_RESULTS status", async () => {
       mockTransactionService.tagExists.mockResolvedValue(true);
-      mockTransactionService.getTransactionsByTag.mockResolvedValue(mockTransactions as TransactionSplit[]);
-      mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
-      mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
+      mockTransactionService.getTransactionsByTag.mockResolvedValue(
+        mockTransactions as TransactionSplit[]
+      );
+      mockCategoryService.getCategories.mockResolvedValue(
+        mockCategories as Category[]
+      );
+      mockBudgetService.getBudgets.mockResolvedValue(
+        mockBudgets as BudgetRead[]
+      );
       mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
       mockValidator.shouldProcessTransaction.mockReturnValue(true);
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-      mockUpdater.updateTransaction.mockResolvedValue(mockTransactions[0] as TransactionSplit);
+      mockUpdater.updateTransaction.mockResolvedValue(
+        mockTransactions[0] as TransactionSplit
+      );
 
-      const result = await service.updateTransactionsByTag("test", UpdateTransactionMode.Both);
+      const result = await service.updateTransactionsByTag(
+        "test",
+        UpdateTransactionMode.Both
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
       expect(result.totalTransactions).toBe(mockTransactions.length);
       expect(result.data).toHaveLength(mockTransactions.length);
-      expect(mockUpdater.updateTransaction).toHaveBeenCalledTimes(mockTransactions.length);
+      expect(mockUpdater.updateTransaction).toHaveBeenCalledTimes(
+        mockTransactions.length
+      );
     });
 
     it("should handle processing failures and return PROCESSING_FAILED status", async () => {
       mockTransactionService.tagExists.mockResolvedValue(true);
-      mockTransactionService.getTransactionsByTag.mockRejectedValue(new Error("Processing failed"));
+      mockTransactionService.getTransactionsByTag.mockRejectedValue(
+        new Error("Processing failed")
+      );
 
-      const result = await service.updateTransactionsByTag("test", UpdateTransactionMode.Both);
+      const result = await service.updateTransactionsByTag(
+        "test",
+        UpdateTransactionMode.Both
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.PROCESSING_FAILED);
       expect(result.totalTransactions).toBe(0);
@@ -197,13 +231,22 @@ describe("UpdateTransactionService", () => {
 
     it("should skip transactions that are transfers", async () => {
       mockTransactionService.tagExists.mockResolvedValue(true);
-      mockTransactionService.getTransactionsByTag.mockResolvedValue(mockTransactions as TransactionSplit[]);
-      mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
-      mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
+      mockTransactionService.getTransactionsByTag.mockResolvedValue(
+        mockTransactions as TransactionSplit[]
+      );
+      mockCategoryService.getCategories.mockResolvedValue(
+        mockCategories as Category[]
+      );
+      mockBudgetService.getBudgets.mockResolvedValue(
+        mockBudgets as BudgetRead[]
+      );
       mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
       mockValidator.shouldProcessTransaction.mockReturnValue(false);
 
-      const result = await service.updateTransactionsByTag("test", UpdateTransactionMode.Both);
+      const result = await service.updateTransactionsByTag(
+        "test",
+        UpdateTransactionMode.Both
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
       expect(result.totalTransactions).toBe(0);
@@ -213,15 +256,24 @@ describe("UpdateTransactionService", () => {
 
     it("should handle category-only update mode", async () => {
       mockTransactionService.tagExists.mockResolvedValue(true);
-      mockTransactionService.getTransactionsByTag.mockResolvedValue(mockTransactions as TransactionSplit[]);
-      mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+      mockTransactionService.getTransactionsByTag.mockResolvedValue(
+        mockTransactions as TransactionSplit[]
+      );
+      mockCategoryService.getCategories.mockResolvedValue(
+        mockCategories as Category[]
+      );
       mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
       mockValidator.shouldProcessTransaction.mockReturnValue(true);
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-      mockUpdater.updateTransaction.mockResolvedValue(mockTransactions[0] as TransactionSplit);
+      mockUpdater.updateTransaction.mockResolvedValue(
+        mockTransactions[0] as TransactionSplit
+      );
 
-      const result = await service.updateTransactionsByTag("test", UpdateTransactionMode.Category);
+      const result = await service.updateTransactionsByTag(
+        "test",
+        UpdateTransactionMode.Category
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
       expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
@@ -235,15 +287,24 @@ describe("UpdateTransactionService", () => {
 
     it("should handle budget-only update mode", async () => {
       mockTransactionService.tagExists.mockResolvedValue(true);
-      mockTransactionService.getTransactionsByTag.mockResolvedValue(mockTransactions as TransactionSplit[]);
-      mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
+      mockTransactionService.getTransactionsByTag.mockResolvedValue(
+        mockTransactions as TransactionSplit[]
+      );
+      mockBudgetService.getBudgets.mockResolvedValue(
+        mockBudgets as BudgetRead[]
+      );
       mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
       mockValidator.shouldProcessTransaction.mockReturnValue(true);
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-      mockUpdater.updateTransaction.mockResolvedValue(mockTransactions[0] as TransactionSplit);
+      mockUpdater.updateTransaction.mockResolvedValue(
+        mockTransactions[0] as TransactionSplit
+      );
 
-      const result = await service.updateTransactionsByTag("test", UpdateTransactionMode.Budget);
+      const result = await service.updateTransactionsByTag(
+        "test",
+        UpdateTransactionMode.Budget
+      );
 
       expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
       expect(mockCategoryService.getCategories).not.toHaveBeenCalled();
@@ -255,4 +316,4 @@ describe("UpdateTransactionService", () => {
       );
     });
   });
-}); 
+});

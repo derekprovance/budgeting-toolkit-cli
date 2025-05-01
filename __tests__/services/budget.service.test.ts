@@ -1,6 +1,10 @@
 import { BudgetService } from "../../src/services/core/budget.service";
 import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
-import { BudgetLimitRead, BudgetRead, InsightGroup } from "@derekprovance/firefly-iii-sdk";
+import {
+  BudgetLimitRead,
+  BudgetRead,
+  InsightGroup,
+} from "@derekprovance/firefly-iii-sdk";
 import { DateRangeService } from "../../src/types/interface/date-range.service.interface";
 
 jest.mock("@derekprovance/firefly-iii-sdk");
@@ -11,9 +15,9 @@ describe("BudgetService", () => {
   let mockApiClient: jest.Mocked<FireflyApiClient>;
 
   beforeEach(() => {
-    mockApiClient = new FireflyApiClient({ 
+    mockApiClient = new FireflyApiClient({
       baseUrl: "http://localhost",
-      apiToken: "test-token"
+      apiToken: "test-token",
     }) as jest.Mocked<FireflyApiClient>;
     budgetService = new BudgetService(mockApiClient);
   });
@@ -65,8 +69,8 @@ describe("BudgetService", () => {
           {
             id: "1",
             difference_float: 100.0,
-          }
-        ]
+          },
+        ],
       } as unknown as InsightGroup;
 
       mockApiClient.get.mockResolvedValueOnce(mockInsights);
@@ -100,14 +104,18 @@ describe("BudgetService", () => {
     it("should throw error when API call fails", async () => {
       mockApiClient.get.mockRejectedValueOnce(new Error("API Error"));
 
-      await expect(budgetService.getBudgetExpenseInsights(1, 2024)).rejects.toThrow(
-        "Failed to get budget expense insights for month 1"
-      );
+      await expect(
+        budgetService.getBudgetExpenseInsights(1, 2024)
+      ).rejects.toThrow("Failed to get budget expense insights for month 1");
     });
 
     it("should validate month and year", async () => {
-      await expect(budgetService.getBudgetExpenseInsights(0, 2024)).rejects.toThrow();
-      await expect(budgetService.getBudgetExpenseInsights(13, 2024)).rejects.toThrow();
+      await expect(
+        budgetService.getBudgetExpenseInsights(0, 2024)
+      ).rejects.toThrow();
+      await expect(
+        budgetService.getBudgetExpenseInsights(13, 2024)
+      ).rejects.toThrow();
     });
   });
 
@@ -165,4 +173,4 @@ describe("BudgetService", () => {
       await expect(budgetService.getBudgetLimits(13, 2024)).rejects.toThrow();
     });
   });
-}); 
+});

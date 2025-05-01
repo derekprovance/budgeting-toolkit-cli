@@ -95,7 +95,10 @@ export class LLMTransactionCategoryService {
           validatedResponses = LLMResponseValidator.validateBatchResponses(
             cleanedResponses,
             (response) =>
-              LLMResponseValidator.validateCategoryResponse(response, categories)
+              LLMResponseValidator.validateCategoryResponse(
+                response,
+                categories
+              )
           );
 
           logger.trace(
@@ -112,7 +115,7 @@ export class LLMTransactionCategoryService {
 
           return validatedResponses;
         } catch (error) {
-          if (error instanceof Error && error.message === 'Invalid category') {
+          if (error instanceof Error && error.message === "Invalid category") {
             throw error;
           }
           throw new Error("Invalid response from Claude");
@@ -135,7 +138,7 @@ export class LLMTransactionCategoryService {
       const result = await operation();
       return result;
     } catch (error) {
-      if (error instanceof Error && error.message === 'Invalid category') {
+      if (error instanceof Error && error.message === "Invalid category") {
         throw error;
       }
 

@@ -3,7 +3,9 @@ import { TransactionPropertyService } from "./transaction-property.service";
 import { logger } from "../../logger";
 
 export class TransactionValidatorService {
-  constructor(private readonly transactionPropertyService: TransactionPropertyService) {}
+  constructor(
+    private readonly transactionPropertyService: TransactionPropertyService
+  ) {}
 
   /**
    * Validates if a transaction should be processed
@@ -96,4 +98,4 @@ export class TransactionValidatorService {
 
     return Boolean(hasCategoryChange || hasBudgetChange);
   }
-} 
+}

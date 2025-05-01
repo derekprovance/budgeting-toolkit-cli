@@ -1,5 +1,11 @@
 import { TransactionService } from "../../../src/services/core/transaction.service";
-import { FireflyApiClient, TransactionArray, TransactionRead, TransactionSplit, TransactionTypeProperty } from "@derekprovance/firefly-iii-sdk";
+import {
+  FireflyApiClient,
+  TransactionArray,
+  TransactionRead,
+  TransactionSplit,
+  TransactionTypeProperty,
+} from "@derekprovance/firefly-iii-sdk";
 import { logger } from "../../../src/logger";
 
 jest.mock("@derekprovance/firefly-iii-sdk");
@@ -59,7 +65,9 @@ describe("TransactionService", () => {
         date: "2024-01-01",
         type: "withdrawal",
       });
-      expect(mockApiClient.get).toHaveBeenCalledWith("/tags/test-tag/transactions");
+      expect(mockApiClient.get).toHaveBeenCalledWith(
+        "/tags/test-tag/transactions"
+      );
     });
 
     it("should throw error when tag is empty", async () => {
@@ -124,7 +132,10 @@ describe("TransactionService", () => {
     });
 
     it("should throw error when transaction has no journal ID", async () => {
-      const invalidTransaction = { ...mockTransaction, transaction_journal_id: undefined };
+      const invalidTransaction = {
+        ...mockTransaction,
+        transaction_journal_id: undefined,
+      };
 
       await expect(
         service.updateTransaction(invalidTransaction, "New Category")
@@ -132,7 +143,10 @@ describe("TransactionService", () => {
     });
 
     it("should throw error for unsupported transaction type", async () => {
-      const invalidTransaction = { ...mockTransaction, type: "invalid" as TransactionTypeProperty };
+      const invalidTransaction = {
+        ...mockTransaction,
+        type: "invalid" as TransactionTypeProperty,
+      };
 
       await expect(
         service.updateTransaction(invalidTransaction, "New Category")
@@ -175,4 +189,4 @@ describe("TransactionService", () => {
       expect(mockSplitIndex.size).toBe(0);
     });
   });
-}); 
+});

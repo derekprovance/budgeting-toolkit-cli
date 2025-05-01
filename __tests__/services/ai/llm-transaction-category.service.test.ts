@@ -89,15 +89,24 @@ describe("LLMTransactionCategoryService", () => {
     });
 
     it("should process multiple transactions in batches", async () => {
-      const expectedResponses = [mockCategories.groceries, mockCategories.healthcare];
+      const expectedResponses = [
+        mockCategories.groceries,
+        mockCategories.healthcare,
+      ];
 
       mockClaudeClient.chatBatch.mockResolvedValueOnce(expectedResponses);
       (
         LLMResponseValidator.validateBatchResponses as jest.Mock
-      ).mockResolvedValueOnce([mockCategories.groceries, mockCategories.healthcare]);
+      ).mockResolvedValueOnce([
+        mockCategories.groceries,
+        mockCategories.healthcare,
+      ]);
       (
         LLMResponseValidator.validateCategoryResponse as jest.Mock
-      ).mockReturnValueOnce([mockCategories.groceries, mockCategories.healthcare]);
+      ).mockReturnValueOnce([
+        mockCategories.groceries,
+        mockCategories.healthcare,
+      ]);
 
       const result = await service.categorizeTransactions(
         mockCategoriesList,
@@ -115,7 +124,10 @@ describe("LLMTransactionCategoryService", () => {
         ]),
         expect.any(Object)
       );
-      expect(result).toEqual([mockCategories.groceries, mockCategories.healthcare]);
+      expect(result).toEqual([
+        mockCategories.groceries,
+        mockCategories.healthcare,
+      ]);
     });
 
     it("should return empty string for transactions without matching category", async () => {
@@ -268,13 +280,19 @@ describe("LLMTransactionCategoryService", () => {
     }, 10000);
 
     it("should handle empty transactions array", async () => {
-      const result = await service.categorizeTransactions(mockCategoriesList, []);
+      const result = await service.categorizeTransactions(
+        mockCategoriesList,
+        []
+      );
       expect(result).toEqual([]);
       expect(mockClaudeClient.chatBatch).not.toHaveBeenCalled();
     }, 10000);
 
     it("should handle empty categories array", async () => {
-      const result = await service.categorizeTransactions([], mockTransactionsList);
+      const result = await service.categorizeTransactions(
+        [],
+        mockTransactionsList
+      );
       expect(result).toEqual(["", "", ""]);
       expect(mockClaudeClient.chatBatch).not.toHaveBeenCalled();
     }, 10000);
@@ -472,7 +490,10 @@ describe("LLMTransactionCategoryService", () => {
       ]);
       (
         LLMResponseValidator.validateBatchResponses as jest.Mock
-      ).mockResolvedValueOnce([mockCategories.groceries, mockCategories.groceries]);
+      ).mockResolvedValueOnce([
+        mockCategories.groceries,
+        mockCategories.groceries,
+      ]);
       (LLMResponseValidator.validateCategoryResponse as jest.Mock)
         .mockReturnValueOnce(mockCategories.groceries)
         .mockReturnValueOnce(mockCategories.groceries);
@@ -482,7 +503,10 @@ describe("LLMTransactionCategoryService", () => {
         similarTransactions
       );
       expect(result[0]).toEqual(result[1]); // Should assign same category
-      expect(result).toEqual([mockCategories.groceries, mockCategories.groceries]);
+      expect(result).toEqual([
+        mockCategories.groceries,
+        mockCategories.groceries,
+      ]);
     });
   });
 });

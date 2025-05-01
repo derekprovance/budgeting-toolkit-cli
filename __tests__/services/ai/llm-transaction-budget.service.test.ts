@@ -138,7 +138,11 @@ describe("LLMTransactionBudgetService", () => {
       });
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, singleCategory)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          singleCategory
+        )
       ).rejects.toThrow("Invalid budget");
     }, 10000);
 
@@ -176,7 +180,11 @@ describe("LLMTransactionBudgetService", () => {
       mockClaudeClient.chatBatch.mockRejectedValue(new Error("API Error"));
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, singleCategory)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          singleCategory
+        )
       ).rejects.toThrow("API Error");
       expect(mockClaudeClient.chatBatch).toHaveBeenCalledTimes(4);
     }, 10000);
@@ -214,7 +222,11 @@ describe("LLMTransactionBudgetService", () => {
       const multipleCategories = ["Groceries", "Healthcare"];
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, multipleCategories)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          multipleCategories
+        )
       ).rejects.toThrow("Number of transactions and categories must match");
       expect(mockClaudeClient.chatBatch).not.toHaveBeenCalled();
     });
@@ -336,7 +348,11 @@ describe("LLMTransactionBudgetService", () => {
       mockClaudeClient.chatBatch.mockResolvedValueOnce(["food"]); // lowercase response
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, singleCategory)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          singleCategory
+        )
       ).rejects.toThrow("Invalid budget");
     });
 
@@ -398,7 +414,11 @@ describe("LLMTransactionBudgetService", () => {
         .mockRejectedValueOnce(new Error("Request timeout"));
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, singleCategory)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          singleCategory
+        )
       ).rejects.toThrow("Request timeout");
       expect(mockClaudeClient.chatBatch).toHaveBeenCalledTimes(4); // Initial + 3 retries
     }, 10000);
@@ -410,7 +430,11 @@ describe("LLMTransactionBudgetService", () => {
       mockClaudeClient.chatBatch.mockResolvedValueOnce(['{"budget": "Food"}']); // Wrong format
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, singleCategory)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          singleCategory
+        )
       ).rejects.toThrow("Invalid budget");
     });
 
@@ -492,7 +516,11 @@ describe("LLMTransactionBudgetService", () => {
       });
 
       await expect(
-        service.assignBudgets(mockBudgetsList, singleTransaction, singleCategory)
+        service.assignBudgets(
+          mockBudgetsList,
+          singleTransaction,
+          singleCategory
+        )
       ).rejects.toThrow("Invalid response from Claude");
     }, 10000); // Increased timeout to 10 seconds
   });

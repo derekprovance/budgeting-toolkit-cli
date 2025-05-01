@@ -23,4 +23,4 @@ export class LLMConfig {
       maxConcurrent: 5,
     });
   }
-} 
+}

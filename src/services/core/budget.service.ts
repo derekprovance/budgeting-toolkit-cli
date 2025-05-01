@@ -31,7 +31,9 @@ export class BudgetService implements IBudgetService {
         `/insight/expense/budget?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
       );
       if (!results) {
-        throw new FireflyApiError("Failed to fetch expense insights for budget");
+        throw new FireflyApiError(
+          "Failed to fetch expense insights for budget"
+        );
       }
       return results;
     } catch (error) {
@@ -58,7 +60,9 @@ export class BudgetService implements IBudgetService {
         `/budget-limits?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
       );
       if (!results) {
-        throw new FireflyApiError("Failed to fetch expense insights for budget");
+        throw new FireflyApiError(
+          "Failed to fetch expense insights for budget"
+        );
       }
       return results.data;
     } catch (error) {
@@ -67,9 +71,7 @@ export class BudgetService implements IBudgetService {
           `Failed to get budget limits for month ${month}: ${error.message}`
         );
       }
-      throw new Error(
-        `Failed to get budget limits for month ${month}`
-      );
+      throw new Error(`Failed to get budget limits for month ${month}`);
     }
   }
 

@@ -1,4 +1,8 @@
-import { TransactionSplit, Category, BudgetRead } from "@derekprovance/firefly-iii-sdk";
+import {
+  TransactionSplit,
+  Category,
+  BudgetRead,
+} from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
 import { TransactionValidatorService } from "./transaction-validator.service";
 import { UserInputService } from "../user-input.service";
@@ -30,15 +34,14 @@ export class TransactionUpdaterService {
     }
 
     try {
-      const shouldUpdateBudget = await this.validator.shouldSetBudget(transaction);
+      const shouldUpdateBudget = await this.validator.shouldSetBudget(
+        transaction
+      );
       const journalId = transaction.transaction_journal_id!;
 
       let budget;
       if (shouldUpdateBudget) {
-        budget = this.getValidBudget(
-          budgets,
-          aiResults[journalId].budget
-        );
+        budget = this.getValidBudget(budgets, aiResults[journalId].budget);
       }
 
       const category = this.getValidCategory(
@@ -46,17 +49,18 @@ export class TransactionUpdaterService {
         aiResults[journalId]?.category
       );
 
-      if (!this.validator.categoryOrBudgetChanged(transaction, category, budget)) {
+      if (
+        !this.validator.categoryOrBudgetChanged(transaction, category, budget)
+      ) {
         return undefined;
       }
 
-      const approved = this.noConfirmation || await UserInputService.askToUpdateTransaction(
-        transaction,
-        {
+      const approved =
+        this.noConfirmation ||
+        (await UserInputService.askToUpdateTransaction(transaction, {
           category: category?.name,
-          budget: budget?.attributes.name
-        }
-      );
+          budget: budget?.attributes.name,
+        }));
 
       if (!approved) {
         logger.debug(
@@ -120,4 +124,4 @@ export class TransactionUpdaterService {
 
     return categories?.find((c) => c?.name === value);
   }
-} 
+}

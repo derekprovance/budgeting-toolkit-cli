@@ -13,4 +13,4 @@ export interface UpdateTransactionResult {
   updatedCategory?: string;
   budget?: string | null;
   updatedBudget?: string;
-} 
+}

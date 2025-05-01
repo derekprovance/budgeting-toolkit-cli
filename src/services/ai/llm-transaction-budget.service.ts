@@ -137,7 +137,7 @@ export class LLMTransactionBudgetService {
 
           return validatedResponses;
         } catch (error) {
-          if (error instanceof Error && error.message === 'Invalid budget') {
+          if (error instanceof Error && error.message === "Invalid budget") {
             throw error;
           }
           throw new Error("Invalid response from Claude");
@@ -171,7 +171,7 @@ export class LLMTransactionBudgetService {
     try {
       return await operation();
     } catch (error) {
-      if (error instanceof Error && error.message === 'Invalid budget') {
+      if (error instanceof Error && error.message === "Invalid budget") {
         throw error;
       }
 

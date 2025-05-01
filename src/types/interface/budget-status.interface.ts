@@ -5,4 +5,4 @@ export interface BudgetStatus {
   name: string;
   amount: number;
   spent: number;
-} 
+}

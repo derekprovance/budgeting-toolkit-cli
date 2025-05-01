@@ -3,7 +3,9 @@ import { ExpenseAccount, Tag } from "../../config";
 import { ExcludedTransactionService } from "../excluded-transaction.service";
 
 export class TransactionPropertyService {
-  constructor(private readonly excludedTransactionService: ExcludedTransactionService) {}
+  constructor(
+    private readonly excludedTransactionService: ExcludedTransactionService
+  ) {}
 
   isTransfer(transaction: TransactionSplit): boolean {
     return transaction.type === "transfer";
@@ -29,8 +31,14 @@ export class TransactionPropertyService {
     return tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
   }
 
-  async isExcludedTransaction(description: string, amount: string): Promise<boolean> {
-    return this.excludedTransactionService.isExcludedTransaction(description, amount);
+  async isExcludedTransaction(
+    description: string,
+    amount: string
+  ): Promise<boolean> {
+    return this.excludedTransactionService.isExcludedTransaction(
+      description,
+      amount
+    );
   }
 
   isDeposit(transaction: TransactionSplit): boolean {
@@ -38,7 +46,9 @@ export class TransactionPropertyService {
   }
 
   hasACategory(transaction: TransactionSplit): boolean {
-    return !(transaction.category_id === undefined || transaction.category_id === null);
+    return !(
+      transaction.category_id === undefined || transaction.category_id === null
+    );
   }
 
   private convertCurrencyToFloat(amount: string): string {

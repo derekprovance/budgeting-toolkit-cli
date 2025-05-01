@@ -67,7 +67,7 @@ export class ClaudeClient {
       maxRetries: this.config.maxRetries,
       timeout: this.config.timeout,
     });
-    logger.debug(`Initializing AI Client using ${this.config.model}`)
+    logger.debug(`Initializing AI Client using ${this.config.model}`);
   }
 
   async chatBatch(

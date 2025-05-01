@@ -14,7 +14,9 @@ export class ServiceFactory {
     const budgetService = new BudgetService(apiClient);
     const categoryService = new CategoryService(apiClient);
     const excludedTransactionService = new ExcludedTransactionService();
-    const transactionPropertyService = new TransactionPropertyService(excludedTransactionService);
+    const transactionPropertyService = new TransactionPropertyService(
+      excludedTransactionService
+    );
     const additionalIncomeService = new AdditionalIncomeService(
       transactionService,
       transactionPropertyService
@@ -36,4 +38,4 @@ export class ServiceFactory {
       excludedTransactionService,
     };
   }
-} 
+}

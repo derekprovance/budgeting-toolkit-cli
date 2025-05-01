@@ -4,9 +4,7 @@ import { BudgetStatusService as IBudgetStatusService } from "../types/interface/
 import { DateUtils } from "../utils/date.utils";
 
 export class BudgetStatusService implements IBudgetStatusService {
-  constructor(
-    private budgetService: BudgetService,
-  ) {}
+  constructor(private budgetService: BudgetService) {}
 
   async getBudgetStatus(
     month: number,
@@ -21,7 +19,10 @@ export class BudgetStatusService implements IBudgetStatusService {
         month,
         year
       );
-      const budgetLimits = await this.budgetService.getBudgetLimits(month, year);
+      const budgetLimits = await this.budgetService.getBudgetLimits(
+        month,
+        year
+      );
 
       budgets.forEach((budget) => {
         const budgetName = budget.attributes.name;
@@ -46,9 +47,7 @@ export class BudgetStatusService implements IBudgetStatusService {
           `Failed to get budget status for month ${month}: ${error.message}`
         );
       }
-      throw new Error(
-        `Failed to get budget status for month ${month}`
-      );
+      throw new Error(`Failed to get budget status for month ${month}`);
     }
   }
 }

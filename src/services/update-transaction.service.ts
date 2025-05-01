@@ -32,7 +32,9 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     private readonly processTransactionsWithCategories = false,
     private readonly noConfirmation = false
   ) {
-    this.validator = new TransactionValidatorService(transactionPropertyService);
+    this.validator = new TransactionValidatorService(
+      transactionPropertyService
+    );
     this.updater = new TransactionUpdaterService(
       transactionService,
       this.validator,
@@ -58,7 +60,10 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         await this.transactionService.getTransactionsByTag(tag);
 
       const transactions = unfilteredTransactions.filter((t) =>
-        this.validator.shouldProcessTransaction(t, this.processTransactionsWithCategories)
+        this.validator.shouldProcessTransaction(
+          t,
+          this.processTransactionsWithCategories
+        )
       );
 
       if (!transactions.length) {
@@ -175,7 +180,15 @@ export class UpdateTransactionService implements IUpdateTransactionService {
   private async transformToTransactionCategoryResult(
     transactions: TransactionSplit[],
     aiResults: AIResponse
-  ): Promise<Array<{ name: string; category?: string; updatedCategory?: string; budget?: string; updatedBudget?: string }>> {
+  ): Promise<
+    Array<{
+      name: string;
+      category?: string;
+      updatedCategory?: string;
+      budget?: string;
+      updatedBudget?: string;
+    }>
+  > {
     return transactions.map((transaction) => {
       const journalId = transaction.transaction_journal_id;
       const aiResult = journalId ? aiResults[journalId] : undefined;

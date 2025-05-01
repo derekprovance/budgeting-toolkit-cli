@@ -15,9 +15,20 @@ const createChalkMock = () => {
   }
 
   const chainedFn = ((text: string) => text) as unknown as ChalkChain;
-  const methods = ['bold', 'cyan', 'yellow', 'blue', 'blueBright', 'gray', 'green', 'red', 'redBright', 'white'] as const;
-  
-  methods.forEach(method => {
+  const methods = [
+    "bold",
+    "cyan",
+    "yellow",
+    "blue",
+    "blueBright",
+    "gray",
+    "green",
+    "red",
+    "redBright",
+    "white",
+  ] as const;
+
+  methods.forEach((method) => {
     chainedFn[method] = ((text?: string) => {
       if (text === undefined) {
         return chainedFn;
@@ -44,7 +55,10 @@ describe("UpdateTransactionDisplayService", () => {
 
   describe("formatProcessingHeader", () => {
     it("should format the processing header correctly", () => {
-      const result = service.formatProcessingHeader("test-tag", UpdateTransactionMode.Both);
+      const result = service.formatProcessingHeader(
+        "test-tag",
+        UpdateTransactionMode.Both
+      );
       expect(result).toContain("Categorizing transactions using LLM");
       expect(result).toContain("Tag: test-tag");
       expect(result).toContain("Mode: both");
@@ -70,10 +84,13 @@ describe("UpdateTransactionDisplayService", () => {
       const results = {
         status: UpdateTransactionStatus.HAS_RESULTS,
         totalTransactions: 0,
-        data: []
+        data: [],
       };
 
-      const [text, count] = service.formatTransactionUpdates(results, UpdateTransactionMode.Both);
+      const [text, count] = service.formatTransactionUpdates(
+        results,
+        UpdateTransactionMode.Both
+      );
       expect(text).toContain("Transaction Updates");
       expect(count).toBe(0);
     });
@@ -82,14 +99,19 @@ describe("UpdateTransactionDisplayService", () => {
       const results = {
         status: UpdateTransactionStatus.HAS_RESULTS,
         totalTransactions: 1,
-        data: [{
-          name: "Test Transaction",
-          category: "Old Category",
-          updatedCategory: "New Category"
-        }]
+        data: [
+          {
+            name: "Test Transaction",
+            category: "Old Category",
+            updatedCategory: "New Category",
+          },
+        ],
       };
 
-      const [text, count] = service.formatTransactionUpdates(results, UpdateTransactionMode.Category);
+      const [text, count] = service.formatTransactionUpdates(
+        results,
+        UpdateTransactionMode.Category
+      );
       expect(text).toContain("Test Transaction");
       expect(text).toContain("Category: Old Category ➜ New Category");
       expect(count).toBe(1);
@@ -99,14 +121,19 @@ describe("UpdateTransactionDisplayService", () => {
       const results = {
         status: UpdateTransactionStatus.HAS_RESULTS,
         totalTransactions: 1,
-        data: [{
-          name: "Test Transaction",
-          budget: "Old Budget",
-          updatedBudget: "New Budget"
-        }]
+        data: [
+          {
+            name: "Test Transaction",
+            budget: "Old Budget",
+            updatedBudget: "New Budget",
+          },
+        ],
       };
 
-      const [text, count] = service.formatTransactionUpdates(results, UpdateTransactionMode.Budget);
+      const [text, count] = service.formatTransactionUpdates(
+        results,
+        UpdateTransactionMode.Budget
+      );
       expect(text).toContain("Test Transaction");
       expect(text).toContain("Budget: Old Budget ➜ New Budget");
       expect(count).toBe(1);
@@ -118,7 +145,7 @@ describe("UpdateTransactionDisplayService", () => {
       const results = {
         status: UpdateTransactionStatus.HAS_RESULTS,
         totalTransactions: 5,
-        data: []
+        data: [],
       };
 
       const result = service.formatSummary(results, 2);
@@ -142,4 +169,4 @@ describe("UpdateTransactionDisplayService", () => {
       expect(result).toContain("Test error");
     });
   });
-}); 
+});

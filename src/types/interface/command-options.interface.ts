@@ -10,4 +10,4 @@ export interface UpdateTransactionOptions {
   mode: UpdateTransactionMode;
   includeClassified?: boolean;
   yes?: boolean;
-} 
+}

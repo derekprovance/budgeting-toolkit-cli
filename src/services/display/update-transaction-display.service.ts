@@ -6,12 +6,15 @@ export class UpdateTransactionDisplayService {
   /**
    * Formats the processing header
    */
-  formatProcessingHeader(tag: string, updateMode: UpdateTransactionMode): string {
+  formatProcessingHeader(
+    tag: string,
+    updateMode: UpdateTransactionMode
+  ): string {
     return [
       `\n${chalk.blueBright("🔄 Categorizing transactions using LLM...")}`,
       `${chalk.gray("Tag:")} ${chalk.cyan(tag)}`,
       `${chalk.gray("Mode:")} ${chalk.cyan(updateMode)}`,
-      chalk.gray("─".repeat(50))
+      chalk.gray("─".repeat(50)),
     ].join("\n");
   }
 
@@ -19,21 +22,30 @@ export class UpdateTransactionDisplayService {
    * Formats the error message for tag not found
    */
   formatTagNotFound(tag: string): string {
-    return `\n${chalk.redBright("!!!")} Tag not found: ${chalk.gray(tag)} ${chalk.redBright("!!!")}`;
+    return `\n${chalk.redBright("!!!")} Tag not found: ${chalk.gray(
+      tag
+    )} ${chalk.redBright("!!!")}`;
   }
 
   /**
    * Formats the error message for empty tag
    */
   formatEmptyTag(tag: string): string {
-    return `\n${chalk.redBright("!!!")} No transactions found for tag: ${chalk.gray(tag)} ${chalk.redBright("!!!")}`;
+    return `\n${chalk.redBright(
+      "!!!"
+    )} No transactions found for tag: ${chalk.gray(tag)} ${chalk.redBright(
+      "!!!"
+    )}`;
   }
 
   /**
    * Formats the transaction updates section
    * @returns A tuple containing the formatted string and the number of updates
    */
-  formatTransactionUpdates(results: UpdateTransactionStatusDto, updateMode: UpdateTransactionMode): [string, number] {
+  formatTransactionUpdates(
+    results: UpdateTransactionStatusDto,
+    updateMode: UpdateTransactionMode
+  ): [string, number] {
     const lines: string[] = [`\n${chalk.blueBright("Transaction Updates:")}`];
     let updatedCount = 0;
 
@@ -66,7 +78,9 @@ export class UpdateTransactionDisplayService {
         }
 
         lines.push(
-          `\n${chalk.blue("📝")} ${chalk.white(result.name)}:\n   ${changes.join("\n   ")}`
+          `\n${chalk.blue("📝")} ${chalk.white(
+            result.name
+          )}:\n   ${changes.join("\n   ")}`
         );
       }
     });
@@ -77,14 +91,19 @@ export class UpdateTransactionDisplayService {
   /**
    * Formats the summary section
    */
-  formatSummary(results: UpdateTransactionStatusDto, updatedCount: number): string {
+  formatSummary(
+    results: UpdateTransactionStatusDto,
+    updatedCount: number
+  ): string {
     return [
       "\n",
       chalk.gray("─".repeat(50)),
       chalk.green("✅ Processing complete"),
-      `   ${chalk.gray("Total transactions:")} ${chalk.white(results.totalTransactions)}`,
+      `   ${chalk.gray("Total transactions:")} ${chalk.white(
+        results.totalTransactions
+      )}`,
       `   ${chalk.gray("Updates made:")} ${chalk.white(updatedCount)}`,
-      ""
+      "",
     ].join("\n");
   }
 
@@ -95,7 +114,9 @@ export class UpdateTransactionDisplayService {
     return [
       "\n",
       chalk.red("❌ Error processing transactions:"),
-      chalk.red("   " + (error instanceof Error ? error.message : String(error)))
+      chalk.red(
+        "   " + (error instanceof Error ? error.message : String(error))
+      ),
     ].join("\n");
   }
-} 
+}

@@ -43,7 +43,8 @@ describe("LLMTransactionProcessingService", () => {
                   return mockCategories.groceries;
                 if (tx.description.includes("Walmart Pharmacy"))
                   return mockCategories.healthcare;
-                if (tx.description.includes("Amazon Fresh")) return mockCategories.shopping;
+                if (tx.description.includes("Amazon Fresh"))
+                  return mockCategories.shopping;
                 return mockCategories.other;
               })
             );
@@ -87,7 +88,8 @@ describe("LLMTransactionProcessingService", () => {
                   return mockBudgets.food;
                 if (tx.description.includes("Walmart Pharmacy"))
                   return mockBudgets.medical;
-                if (tx.description.includes("Amazon Fresh")) return mockBudgets.shopping;
+                if (tx.description.includes("Amazon Fresh"))
+                  return mockBudgets.shopping;
                 return mockBudgets.other;
               })
             );

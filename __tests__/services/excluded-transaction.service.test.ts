@@ -16,7 +16,7 @@ jest.mock("../../src/logger", () => ({
 // Mock fs/promises
 jest.mock("fs/promises", () => ({
   access: jest.fn(),
-  constants: { F_OK: 0 }
+  constants: { F_OK: 0 },
 }));
 
 // Mock fs
@@ -28,9 +28,9 @@ jest.mock("fs", () => ({
 jest.mock("csv-parse", () => ({
   parse: jest.fn().mockReturnValue({
     [Symbol.asyncIterator]: () => ({
-      next: jest.fn()
-    })
-  })
+      next: jest.fn(),
+    }),
+  }),
 }));
 
 describe("ExcludedTransactionService", () => {
@@ -51,7 +51,9 @@ describe("ExcludedTransactionService", () => {
       const result = await service.getExcludedTransactions();
 
       expect(result).toEqual([]);
-      expect(logger.debug).toHaveBeenCalledWith("No excluded transactions file found, returning empty array");
+      expect(logger.debug).toHaveBeenCalledWith(
+        "No excluded transactions file found, returning empty array"
+      );
     });
 
     it("should parse valid CSV file and return transactions", async () => {
@@ -79,10 +81,21 @@ describe("ExcludedTransactionService", () => {
       const result = await service.getExcludedTransactions();
 
       expect(result).toEqual([
-        { description: "VANGUARD BUY INVESTMENT", amount: "4400.00", reason: "Excluded from processing" },
-        { description: "CRT Management", amount: "1047.66", reason: "Excluded from processing" },
+        {
+          description: "VANGUARD BUY INVESTMENT",
+          amount: "4400.00",
+          reason: "Excluded from processing",
+        },
+        {
+          description: "CRT Management",
+          amount: "1047.66",
+          reason: "Excluded from processing",
+        },
       ]);
-      expect(logger.trace).toHaveBeenCalledWith({ records: result }, "Excluded transactions parsed successfully");
+      expect(logger.trace).toHaveBeenCalledWith(
+        { records: result },
+        "Excluded transactions parsed successfully"
+      );
     });
 
     it("should skip invalid records and log warnings", async () => {
@@ -110,7 +123,11 @@ describe("ExcludedTransactionService", () => {
       const result = await service.getExcludedTransactions();
 
       expect(result).toEqual([
-        { description: "VANGUARD BUY INVESTMENT", amount: "4400.00", reason: "Excluded from processing" },
+        {
+          description: "VANGUARD BUY INVESTMENT",
+          amount: "4400.00",
+          reason: "Excluded from processing",
+        },
       ]);
       expect(logger.warn).toHaveBeenCalledWith(
         `Invalid excluded transaction record: ${JSON.stringify(mockRecords[0])}`
@@ -130,44 +147,71 @@ describe("ExcludedTransactionService", () => {
         },
       });
 
-      await expect(service.getExcludedTransactions()).rejects.toThrow("Failed to parse excluded transactions file");
+      await expect(service.getExcludedTransactions()).rejects.toThrow(
+        "Failed to parse excluded transactions file"
+      );
       expect(logger.error).toHaveBeenCalled();
     });
   });
 
   describe("isExcludedTransaction", () => {
     const mockTransactions: ExcludedTransactionDto[] = [
-      { description: "VANGUARD BUY INVESTMENT", amount: "4400.00", reason: "Excluded from processing" },
-      { description: "CRT Management", amount: "1047.66", reason: "Excluded from processing" },
+      {
+        description: "VANGUARD BUY INVESTMENT",
+        amount: "4400.00",
+        reason: "Excluded from processing",
+      },
+      {
+        description: "CRT Management",
+        amount: "1047.66",
+        reason: "Excluded from processing",
+      },
     ];
 
     beforeEach(() => {
       // Mock getExcludedTransactions to return test data
-      jest.spyOn(service, "getExcludedTransactions").mockResolvedValue(mockTransactions);
+      jest
+        .spyOn(service, "getExcludedTransactions")
+        .mockResolvedValue(mockTransactions);
     });
 
     it("should return true for matching description and amount", async () => {
-      const result = await service.isExcludedTransaction("VANGUARD BUY INVESTMENT", "4400.00");
+      const result = await service.isExcludedTransaction(
+        "VANGUARD BUY INVESTMENT",
+        "4400.00"
+      );
       expect(result).toBe(true);
     });
 
     it("should return false for non-matching description", async () => {
-      const result = await service.isExcludedTransaction("NON-MATCHING", "4400.00");
+      const result = await service.isExcludedTransaction(
+        "NON-MATCHING",
+        "4400.00"
+      );
       expect(result).toBe(false);
     });
 
     it("should return false for non-matching amount", async () => {
-      const result = await service.isExcludedTransaction("VANGUARD BUY INVESTMENT", "1000.00");
+      const result = await service.isExcludedTransaction(
+        "VANGUARD BUY INVESTMENT",
+        "1000.00"
+      );
       expect(result).toBe(false);
     });
 
     it("should handle amount conversion with currency symbols", async () => {
-      const result = await service.isExcludedTransaction("VANGUARD BUY INVESTMENT", "$4,400.00");
+      const result = await service.isExcludedTransaction(
+        "VANGUARD BUY INVESTMENT",
+        "$4,400.00"
+      );
       expect(result).toBe(true);
     });
 
     it("should handle negative amounts", async () => {
-      const result = await service.isExcludedTransaction("VANGUARD BUY INVESTMENT", "-4400.00");
+      const result = await service.isExcludedTransaction(
+        "VANGUARD BUY INVESTMENT",
+        "-4400.00"
+      );
       expect(result).toBe(true);
     });
   });
@@ -177,8 +221,11 @@ describe("ExcludedTransactionService", () => {
 
     beforeEach(() => {
       // Access the private method through the prototype and bind it to the service instance
-      convertCurrencyToFloat = (service as unknown as { convertCurrencyToFloat: (amount: string) => string })
-        .convertCurrencyToFloat.bind(service);
+      convertCurrencyToFloat = (
+        service as unknown as {
+          convertCurrencyToFloat: (amount: string) => string;
+        }
+      ).convertCurrencyToFloat.bind(service);
     });
 
     it("should convert currency string to float", () => {
@@ -197,11 +244,15 @@ describe("ExcludedTransactionService", () => {
     });
 
     it("should throw error for invalid amount format", () => {
-      expect(() => convertCurrencyToFloat("invalid")).toThrow("Invalid amount format");
+      expect(() => convertCurrencyToFloat("invalid")).toThrow(
+        "Invalid amount format"
+      );
     });
 
     it("should throw error for empty amount", () => {
-      expect(() => convertCurrencyToFloat("")).toThrow("Amount cannot be empty");
+      expect(() => convertCurrencyToFloat("")).toThrow(
+        "Amount cannot be empty"
+      );
     });
   });
-}); 
+});

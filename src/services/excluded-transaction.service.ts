@@ -9,19 +9,24 @@ export class ExcludedTransactionService {
   private readonly excludedTransactionsPath: string;
 
   constructor() {
-    this.excludedTransactionsPath = join(process.cwd(), "excluded_transactions.csv");
+    this.excludedTransactionsPath = join(
+      process.cwd(),
+      "excluded_transactions.csv"
+    );
   }
 
   async getExcludedTransactions(): Promise<ExcludedTransactionDto[]> {
     try {
       await access(this.excludedTransactionsPath, constants.F_OK);
     } catch {
-      logger.debug("No excluded transactions file found, returning empty array");
+      logger.debug(
+        "No excluded transactions file found, returning empty array"
+      );
       return [];
     }
 
     const parser = parse({
-      columns: ['description', 'amount'],
+      columns: ["description", "amount"],
       skip_empty_lines: true,
       trim: true,
     });
@@ -35,10 +40,12 @@ export class ExcludedTransactionService {
           records.push({
             description: record.description,
             amount: this.convertCurrencyToFloat(record.amount),
-            reason: 'Excluded from processing'
+            reason: "Excluded from processing",
           });
         } else {
-          logger.warn(`Invalid excluded transaction record: ${JSON.stringify(record)}`);
+          logger.warn(
+            `Invalid excluded transaction record: ${JSON.stringify(record)}`
+          );
         }
       }
     } catch (error) {
@@ -46,11 +53,14 @@ export class ExcludedTransactionService {
       throw new Error("Failed to parse excluded transactions file");
     }
 
-    logger.trace({ records },"Excluded transactions parsed successfully");
+    logger.trace({ records }, "Excluded transactions parsed successfully");
     return records;
   }
 
-  async isExcludedTransaction(description: string, amount: string): Promise<boolean> {
+  async isExcludedTransaction(
+    description: string,
+    amount: string
+  ): Promise<boolean> {
     const excludedTransactions = await this.getExcludedTransactions();
     const convertedAmount = this.convertCurrencyToFloat(amount);
 
@@ -62,7 +72,8 @@ export class ExcludedTransactionService {
       if (transaction.description && transaction.amount) {
         return (
           transaction.description === description &&
-          Math.abs(parseFloat(transaction.amount)) === Math.abs(parseFloat(convertedAmount))
+          Math.abs(parseFloat(transaction.amount)) ===
+            Math.abs(parseFloat(convertedAmount))
         );
       }
 
@@ -71,24 +82,29 @@ export class ExcludedTransactionService {
       }
 
       if (transaction.amount) {
-        return Math.abs(parseFloat(transaction.amount)) === Math.abs(parseFloat(convertedAmount));
+        return (
+          Math.abs(parseFloat(transaction.amount)) ===
+          Math.abs(parseFloat(convertedAmount))
+        );
       }
 
       return false;
     });
   }
 
-  private isValidExcludedTransaction(record: unknown): record is { description: string; amount: string } {
-    if (!record || typeof record !== 'object') {
+  private isValidExcludedTransaction(
+    record: unknown
+  ): record is { description: string; amount: string } {
+    if (!record || typeof record !== "object") {
       return false;
     }
 
     const dto = record as { description: string; amount: string };
     return (
-      typeof dto.description === 'string' &&
-      typeof dto.amount === 'string' &&
-      dto.description.trim() !== '' &&
-      dto.amount.trim() !== ''
+      typeof dto.description === "string" &&
+      typeof dto.amount === "string" &&
+      dto.description.trim() !== "" &&
+      dto.amount.trim() !== ""
     );
   }
 
@@ -114,4 +130,4 @@ export class ExcludedTransactionService {
 
     return (Math.round(finalAmount * 100) / 100).toFixed(2);
   }
-} 
+}

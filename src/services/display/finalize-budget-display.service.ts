@@ -29,10 +29,13 @@ export class FinalizeBudgetDisplayService {
     const totalLength = textLength + padding * 2;
 
     const topBorder = "╔" + "═".repeat(totalLength) + "╗";
-    const middleLine = "║" + " ".repeat(padding) + text + " ".repeat(padding) + "║";
+    const middleLine =
+      "║" + " ".repeat(padding) + text + " ".repeat(padding) + "║";
     const bottomBorder = "╚" + "═".repeat(totalLength) + "╝";
 
-    return `\n${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
+    return `\n${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(
+      bottomBorder
+    )}`;
   }
 
   /**
@@ -60,7 +63,9 @@ export class FinalizeBudgetDisplayService {
       });
       lines.push(
         chalk.cyan.bold(
-          `Total Additional Income: ${transactions[0]?.currency_symbol}${totalIncome.toFixed(2)}`
+          `Total Additional Income: ${
+            transactions[0]?.currency_symbol
+          }${totalIncome.toFixed(2)}`
         )
       );
     }
@@ -83,7 +88,9 @@ export class FinalizeBudgetDisplayService {
       });
       lines.push(
         chalk.yellow.bold(
-          `Total Unbudgeted Expenses: ${transactions[0]?.currency_symbol}${totalExpenses.toFixed(2)}`
+          `Total Unbudgeted Expenses: ${
+            transactions[0]?.currency_symbol
+          }${totalExpenses.toFixed(2)}`
         )
       );
     }
@@ -136,7 +143,7 @@ export class FinalizeBudgetDisplayService {
     let deposits = 0;
     let other = 0;
 
-    transactions.forEach(t => {
+    transactions.forEach((t) => {
       if (this.transactionPropertyService.isBill(t)) {
         bills++;
       } else if (this.transactionPropertyService.isTransfer(t)) {
@@ -160,11 +167,14 @@ export class FinalizeBudgetDisplayService {
     const type = this.getTransactionTypeIndicator(transaction);
     const amount = parseFloat(transaction.amount);
     const date = new Date(transaction.date).toLocaleDateString();
-    const amountStr = `${transaction.currency_symbol}${Math.abs(amount).toFixed(2)}`;
+    const amountStr = `${transaction.currency_symbol}${Math.abs(amount).toFixed(
+      2
+    )}`;
 
     const lines = [
       `${type} ${chalk.white(transaction.description)}`,
-      chalk.dim(`    Date: ${date}`).padEnd(35) + chalk.yellow(`Amount: ${amountStr}`),
+      chalk.dim(`    Date: ${date}`).padEnd(35) +
+        chalk.yellow(`Amount: ${amountStr}`),
     ];
 
     if (transaction.category_name) {
@@ -192,4 +202,4 @@ export class FinalizeBudgetDisplayService {
       0
     );
   }
-} 
+}

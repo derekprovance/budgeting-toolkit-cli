@@ -9,7 +9,9 @@ interface UpdateTransactionsParams {
   updateMode: UpdateTransactionMode;
 }
 
-export class UpdateTransactionsCommand implements Command<void, UpdateTransactionsParams> {
+export class UpdateTransactionsCommand
+  implements Command<void, UpdateTransactionsParams>
+{
   private readonly displayService: UpdateTransactionDisplayService;
 
   constructor(
@@ -22,10 +24,11 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
     console.log(this.displayService.formatProcessingHeader(tag, updateMode));
 
     try {
-      const results = await this.updateTransactionService.updateTransactionsByTag(
-        tag,
-        updateMode
-      );
+      const results =
+        await this.updateTransactionService.updateTransactionsByTag(
+          tag,
+          updateMode
+        );
 
       if (results.status === UpdateTransactionStatus.NO_TAG) {
         console.log(this.displayService.formatTagNotFound(tag));
@@ -37,7 +40,8 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
         return;
       }
 
-      const [updatesText, updatedCount] = this.displayService.formatTransactionUpdates(results, updateMode);
+      const [updatesText, updatedCount] =
+        this.displayService.formatTransactionUpdates(results, updateMode);
       console.log(updatesText);
       console.log(this.displayService.formatSummary(results, updatedCount));
     } catch (error) {
