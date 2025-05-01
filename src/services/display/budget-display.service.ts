@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { BudgetStatus } from "../types/interface/budget-status.interface";
+import { BudgetStatus } from "../../types/interface/budget-status.interface";
 
 /**
  * Service for formatting and displaying budget information

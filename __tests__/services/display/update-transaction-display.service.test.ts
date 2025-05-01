@@ -31,9 +31,9 @@ const createChalkMock = () => {
 
 jest.mock("chalk", () => createChalkMock());
 
-import { UpdateTransactionDisplayService } from "../../src/services/update-transaction-display.service";
-import { UpdateTransactionMode } from "../../src/types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatus } from "../../src/types/enum/update-transaction-status.enum";
+import { UpdateTransactionDisplayService } from "../../../src/services/display/update-transaction-display.service";
+import { UpdateTransactionMode } from "../../../src/types/enum/update-transaction-mode.enum";
+import { UpdateTransactionStatus } from "../../../src/types/enum/update-transaction-status.enum";
 
 describe("UpdateTransactionDisplayService", () => {
   let service: UpdateTransactionDisplayService;

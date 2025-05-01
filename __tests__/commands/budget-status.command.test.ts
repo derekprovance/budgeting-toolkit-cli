@@ -1,13 +1,13 @@
 import { BudgetStatusCommand } from '../../src/commands/budget-status.command';
 import { BudgetStatusService } from '../../src/services/budget-status.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
-import { BudgetDisplayService } from '../../src/services/budget-display.service';
+import { BudgetDisplayService } from '../../src/services/display/budget-display.service';
 import { BudgetStatus } from '../../src/types/interface/budget-status.interface';
 
 // Mock services
 jest.mock('../../src/services/budget-status.service');
 jest.mock('../../src/services/core/transaction.service');
-jest.mock('../../src/services/budget-display.service');
+jest.mock('../../src/services/display/budget-display.service');
 
 describe('BudgetStatusCommand', () => {
   let command: BudgetStatusCommand;

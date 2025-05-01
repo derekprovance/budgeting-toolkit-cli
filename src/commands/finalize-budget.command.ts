@@ -3,7 +3,7 @@ import { BudgetDateParams } from "../types/interface/budget-date-params.interfac
 import { AdditionalIncomeService } from "../services/additional-income.service";
 import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
 import { TransactionPropertyService } from "../services/core/transaction-property.service";
-import { FinalizeBudgetDisplayService } from "../services/finalize-budget-display.service";
+import { FinalizeBudgetDisplayService } from "../services/display/finalize-budget-display.service";
 import chalk from "chalk";
 
 /**

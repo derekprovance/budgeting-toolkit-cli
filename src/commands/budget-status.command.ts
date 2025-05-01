@@ -2,7 +2,7 @@ import { BudgetStatusService } from "../services/budget-status.service";
 import { TransactionService } from "../services/core/transaction.service";
 import { Command } from "../types/interface/command.interface";
 import { BudgetDateParams } from "../types/interface/budget-date-params.interface";
-import { BudgetDisplayService } from "../services/budget-display.service";
+import { BudgetDisplayService } from "../services/display/budget-display.service";
 
 /**
  * Command for displaying budget status

@@ -1,6 +1,6 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import chalk from "chalk";
-import { TransactionPropertyService } from "./core/transaction-property.service";
+import { TransactionPropertyService } from "../core/transaction-property.service";
 
 /**
  * Interface for transaction counts

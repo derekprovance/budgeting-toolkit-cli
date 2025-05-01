@@ -1,6 +1,6 @@
 import chalk from "chalk";
-import { UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
-import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
+import { UpdateTransactionStatusDto } from "../../types/dto/update-transaction-status.dto";
+import { UpdateTransactionMode } from "../../types/enum/update-transaction-mode.enum";
 
 export class UpdateTransactionDisplayService {
   /**

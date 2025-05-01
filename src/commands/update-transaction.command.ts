@@ -2,7 +2,7 @@ import { UpdateTransactionService } from "../services/update-transaction.service
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 import { Command } from "../types/interface/command.interface";
-import { UpdateTransactionDisplayService } from "../services/update-transaction-display.service";
+import { UpdateTransactionDisplayService } from "../services/display/update-transaction-display.service";
 
 interface UpdateTransactionsParams {
   tag: string;

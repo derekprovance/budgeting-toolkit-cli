@@ -8,7 +8,7 @@ import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 jest.mock("../../src/services/additional-income.service");
 jest.mock("../../src/services/unbudgeted-expense.service");
 jest.mock("../../src/services/core/transaction-property.service");
-jest.mock("../../src/services/finalize-budget-display.service");
+jest.mock("../../src/services/display/finalize-budget-display.service");
 
 describe("FinalizeBudgetCommand", () => {
   let command: FinalizeBudgetCommand;

@@ -15,8 +15,8 @@ jest.mock("chalk", () => {
 });
 
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { FinalizeBudgetDisplayService } from "../../src/services/finalize-budget-display.service";
-import { TransactionPropertyService } from "../../src/services/core/transaction-property.service";
+import { FinalizeBudgetDisplayService } from "../../../src/services/display/finalize-budget-display.service";
+import { TransactionPropertyService } from "../../../src/services/core/transaction-property.service";
 
 describe("FinalizeBudgetDisplayService", () => {
   let service: FinalizeBudgetDisplayService;
