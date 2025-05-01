@@ -5,6 +5,7 @@ import {
 import { LLMTransactionProcessingService } from "../../../src/services/ai/llm-transaction-processing.service";
 import { LLMTransactionCategoryService } from "../../../src/services/ai/llm-transaction-category.service";
 import { LLMTransactionBudgetService } from "../../../src/services/ai/llm-transaction-budget.service";
+import { mockCategories, mockBudgets } from "../../shared/test-data";
 
 interface MockTransactionBatch {
   transactions: TransactionSplit[];
@@ -39,11 +40,11 @@ describe("LLMTransactionProcessingService", () => {
             return Promise.resolve(
               transactions.map((tx) => {
                 if (tx.description.includes("Walmart Supercenter"))
-                  return "Groceries";
+                  return mockCategories.groceries;
                 if (tx.description.includes("Walmart Pharmacy"))
-                  return "Healthcare";
-                if (tx.description.includes("Amazon Fresh")) return "Shopping";
-                return "Other";
+                  return mockCategories.healthcare;
+                if (tx.description.includes("Amazon Fresh")) return mockCategories.shopping;
+                return mockCategories.other;
               })
             );
           }
@@ -65,29 +66,29 @@ describe("LLMTransactionProcessingService", () => {
                 if (categories && categories[index]) {
                   const category = categories[index];
                   if (
-                    category === "Groceries" &&
+                    category === mockCategories.groceries &&
                     tx.description.includes("Walmart")
                   )
-                    return "Food";
+                    return mockBudgets.food;
                   if (
-                    category === "Healthcare" &&
+                    category === mockCategories.healthcare &&
                     tx.description.includes("Pharmacy")
                   )
-                    return "Medical";
+                    return mockBudgets.medical;
                   if (
-                    category === "Shopping" &&
+                    category === mockCategories.shopping &&
                     tx.description.includes("Amazon")
                   )
-                    return "Shopping";
+                    return mockBudgets.shopping;
                 }
 
                 // Fallback to transaction-only logic if categories aren't available
                 if (tx.description.includes("Walmart Supercenter"))
-                  return "Food";
+                  return mockBudgets.food;
                 if (tx.description.includes("Walmart Pharmacy"))
-                  return "Medical";
-                if (tx.description.includes("Amazon Fresh")) return "Shopping";
-                return "Other";
+                  return mockBudgets.medical;
+                if (tx.description.includes("Amazon Fresh")) return mockBudgets.shopping;
+                return mockBudgets.other;
               })
             );
           }
