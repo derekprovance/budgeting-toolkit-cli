@@ -198,7 +198,7 @@ export class TransactionService {
         const indexKey = this.generateSplitTransactionKey(txSp);
 
         if (this.splitTransactionIdx.has(indexKey)) {
-          logger.warn(`Duplicate transaction found for key: ${indexKey}`);
+          logger.debug(`Duplicate transaction found for key: ${indexKey}`);
         }
 
         this.splitTransactionIdx.set(
