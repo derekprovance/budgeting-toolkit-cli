@@ -1,0 +1,201 @@
+import { TransactionUpdaterService } from "../../../src/services/core/transaction-updater.service";
+import { TransactionService } from "../../../src/services/core/transaction.service";
+import { TransactionValidatorService } from "../../../src/services/core/transaction-validator.service";
+import { UserInputService } from "../../../src/services/user-input.service";
+import { TransactionSplit, Category, BudgetRead } from "@derekprovance/firefly-iii-sdk";
+
+// Mock the logger to prevent console output during tests
+jest.mock("../../../src/logger", () => ({
+  logger: {
+    debug: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    trace: jest.fn(),
+  },
+}));
+
+jest.mock("../../../src/services/core/transaction.service");
+jest.mock("../../../src/services/core/transaction-validator.service");
+jest.mock("../../../src/services/user-input.service");
+
+describe("TransactionUpdaterService", () => {
+  let service: TransactionUpdaterService;
+  let mockTransactionService: jest.Mocked<TransactionService>;
+  let mockValidator: jest.Mocked<TransactionValidatorService>;
+
+  const mockTransaction: Partial<TransactionSplit> = {
+    transaction_journal_id: "1",
+    description: "Test Transaction",
+    amount: "100.00",
+    category_name: "Old Category",
+    budget_id: "1",
+    budget_name: "Old Budget",
+  };
+
+  const mockCategories: Partial<Category>[] = [
+    { name: "New Category" },
+  ];
+
+  const mockBudgets: Partial<BudgetRead>[] = [
+    { id: "2", type: "budget", attributes: { name: "New Budget" } },
+  ];
+
+  const mockAIResults = {
+    "1": { category: "New Category", budget: "New Budget" },
+  };
+
+  beforeEach(() => {
+    mockTransactionService = {
+      updateTransaction: jest.fn(),
+    } as unknown as jest.Mocked<TransactionService>;
+
+    mockValidator = {
+      validateTransactionData: jest.fn(),
+      shouldSetBudget: jest.fn(),
+      categoryOrBudgetChanged: jest.fn(),
+    } as unknown as jest.Mocked<TransactionValidatorService>;
+
+    jest.spyOn(UserInputService, 'askToUpdateTransaction').mockImplementation(async () => true);
+
+    service = new TransactionUpdaterService(
+      mockTransactionService,
+      mockValidator,
+      false
+    );
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe("updateTransaction", () => {
+    it("should return undefined when transaction data is invalid", async () => {
+      mockValidator.validateTransactionData.mockReturnValue(false);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockValidator.validateTransactionData).toHaveBeenCalledWith(mockTransaction, mockAIResults);
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should update transaction with new category and budget when all conditions are met", async () => {
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+      mockTransactionService.updateTransaction.mockResolvedValue(undefined);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBe(mockTransaction);
+      expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+        mockTransaction,
+        "New Category",
+        "2"
+      );
+    });
+
+    it("should not update budget when shouldSetBudget returns false", async () => {
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(false);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+      mockTransactionService.updateTransaction.mockResolvedValue(undefined);
+
+      await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+        mockTransaction,
+        "New Category",
+        undefined
+      );
+    });
+
+    it("should return undefined when no changes are detected", async () => {
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(false);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should return undefined when user rejects the update", async () => {
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+      jest.spyOn(UserInputService, 'askToUpdateTransaction').mockImplementation(async () => false);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should skip user confirmation when noConfirmation is true", async () => {
+      const serviceWithNoConfirmation = new TransactionUpdaterService(
+        mockTransactionService,
+        mockValidator,
+        true
+      );
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+      mockTransactionService.updateTransaction.mockResolvedValue(undefined);
+
+      const result = await serviceWithNoConfirmation.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBe(mockTransaction);
+      expect(UserInputService.askToUpdateTransaction).not.toHaveBeenCalled();
+      expect(mockTransactionService.updateTransaction).toHaveBeenCalled();
+    });
+
+    it("should handle errors during update", async () => {
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+      mockTransactionService.updateTransaction.mockRejectedValue(new Error("Update failed"));
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+    });
+  });
+}); 

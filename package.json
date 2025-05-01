@@ -1,11 +1,12 @@
 {
   "name": "budgeting-toolkit-cli",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "main": "index.js",
   "scripts": {
     "start": "ts-node src/index.ts",
     "compile": "rm -Rf ./dist && tsc",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "test:watch": "jest --watch"
   },
   "keywords": [],

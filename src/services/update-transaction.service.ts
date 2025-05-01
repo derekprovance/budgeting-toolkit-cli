@@ -13,29 +13,32 @@ import {
   LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatusDto, UpdateTransactionResult } from "../types/dto/update-transaction-status.dto";
+import { UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
-import { UserInputService } from "./user-input.service";
-import { UpdateTransactionService as IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
-
-export interface TransactionCategoryResult {
-  name?: string;
-  category?: string;
-  budget?: string;
-  updatedCategory?: string;
-  updatedBudget?: string;
-}
+import { IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
+import { TransactionValidatorService } from "./core/transaction-validator.service";
+import { TransactionUpdaterService } from "./core/transaction-updater.service";
 
 export class UpdateTransactionService implements IUpdateTransactionService {
+  private readonly validator: TransactionValidatorService;
+  private readonly updater: TransactionUpdaterService;
+
   constructor(
-    private transactionService: TransactionService,
-    private categoryService: CategoryService,
-    private budgetService: BudgetService,
-    private llmTransactionProcessingService: LLMTransactionProcessingService,
-    private transactionPropertyService: TransactionPropertyService,
-    private processTransactionsWithCategories = false,
-    private noConfirmation = false
-  ) {}
+    private readonly transactionService: TransactionService,
+    private readonly categoryService: CategoryService,
+    private readonly budgetService: BudgetService,
+    private readonly llmTransactionProcessingService: LLMTransactionProcessingService,
+    private readonly transactionPropertyService: TransactionPropertyService,
+    private readonly processTransactionsWithCategories = false,
+    private readonly noConfirmation = false
+  ) {
+    this.validator = new TransactionValidatorService(transactionPropertyService);
+    this.updater = new TransactionUpdaterService(
+      transactionService,
+      this.validator,
+      noConfirmation
+    );
+  }
 
   async updateTransactionsByTag(
     tag: string,
@@ -47,7 +50,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         return {
           status: UpdateTransactionStatus.NO_TAG,
           totalTransactions: 0,
-          data: []
+          data: [],
         };
       }
 
@@ -55,7 +58,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         await this.transactionService.getTransactionsByTag(tag);
 
       const transactions = unfilteredTransactions.filter((t) =>
-        this.shouldProcessTransaction(t)
+        this.validator.shouldProcessTransaction(t, this.processTransactionsWithCategories)
       );
 
       if (!transactions.length) {
@@ -63,7 +66,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         return {
           status: UpdateTransactionStatus.EMPTY_TAG,
           totalTransactions: 0,
-          data: []
+          data: [],
         };
       }
 
@@ -120,7 +123,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     updateMode: UpdateTransactionMode,
     categories?: Category[],
     budgets?: BudgetRead[]
-  ) {
+  ): Promise<AIResponse> {
     const categoryNames = categories?.map((c) => c.name);
     const budgetNames = budgets?.map((b) => b.attributes.name);
 
@@ -151,64 +154,15 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     const updatedTransactions: TransactionSplit[] = [];
 
     for (const transaction of transactions) {
-      const transactionJournalId = transaction.transaction_journal_id;
+      const updatedTransaction = await this.updater.updateTransaction(
+        transaction,
+        aiResults,
+        categories,
+        budgets
+      );
 
-      if (!this.validateTransactionData(transaction, aiResults)) {
-        continue;
-      }
-
-      try {
-        const shouldUpdateBudget = await this.shouldSetBudget(transaction);
-
-        let budget;
-        if (shouldUpdateBudget) {
-          budget = this.getValidBudget(
-            budgets,
-            aiResults[transactionJournalId!].budget
-          );
-        }
-
-        const category = await this.getValidCategory(
-          categories,
-          aiResults[transactionJournalId!]?.category
-        );
-
-        if (!this.categoryOrBudgetChanged(transaction, category, budget)) {
-          continue;
-        }
-
-        const approved =
-          !this.noConfirmation &&
-          (await UserInputService.askToUpdateTransaction(
-            transaction,
-            category?.name,
-            budget?.attributes.name
-          ));
-
-        if (!approved) {
-          logger.debug(
-            "User skipped transaction update:",
-            transaction.description
-          );
-          continue;
-        }
-
-        await this.transactionService.updateTransaction(
-          transaction,
-          category?.name,
-          budget?.id
-        );
-
-        updatedTransactions.push(transaction);
-        logger.debug(
-          "Successfully updated transaction:",
-          transaction.description
-        );
-      } catch (error) {
-        logger.error("Error processing transaction:", {
-          description: transaction.description,
-          error,
-        });
+      if (updatedTransaction) {
+        updatedTransactions.push(updatedTransaction);
       }
     }
 
@@ -218,108 +172,19 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     return updatedTransactions;
   }
 
-  private getValidBudget(
-    budgets: BudgetRead[] | undefined,
-    value: string | undefined
-  ): BudgetRead | undefined {
-    if (!value) {
-      return;
-    }
-
-    return budgets?.find((b) => b.attributes.name === value);
-  }
-
-  private getValidCategory(
-    categories: Category[] | undefined,
-    value: string | undefined
-  ): Category | undefined {
-    if (!value) {
-      return;
-    }
-
-    return categories?.find((c) => c?.name === value);
-  }
-
-  private validateTransactionData(
-    transaction: TransactionSplit,
-    aiResults: AIResponse
-  ): boolean {
-    const journalId = transaction.transaction_journal_id;
-
-    if (!journalId) {
-      logger.warn("Missing journal ID:", transaction.description);
-      return false;
-    }
-
-    if (!aiResults[journalId]) {
-      logger.warn("No AI results found:", transaction.description);
-      return false;
-    }
-
-    return true;
-  }
-
-  private categoryOrBudgetChanged(
-    transaction: TransactionSplit,
-    category?: Category,
-    budget?: BudgetRead
-  ): boolean {
-    const hasCategoryChange =
-      category?.name && transaction.category_name !== category.name;
-    const hasBudgetChange = budget?.id && transaction.budget_id !== budget.id;
-
-    return Boolean(hasCategoryChange || hasBudgetChange);
-  }
-
-  private shouldProcessTransaction(transaction: TransactionSplit): boolean {
-    const conditions = {
-      notATransfer: !this.transactionPropertyService.isTransfer(transaction),
-      hasACategory: this.transactionPropertyService.hasACategory(transaction),
-    };
-
-    return this.processTransactionsWithCategories
-      ? conditions.notATransfer
-      : conditions.notATransfer && !conditions.hasACategory;
-  }
-
-  private async shouldSetBudget(
-    transaction: TransactionSplit
-  ): Promise<boolean> {
-    const isExcludedTransaction =
-      await this.transactionPropertyService.isExcludedTransaction(
-        transaction.description,
-        transaction.amount
-      );
-
-    const conditions = {
-      notABill: !this.transactionPropertyService.isBill(transaction),
-      notDisposableIncome:
-        !this.transactionPropertyService.isDisposableIncome(transaction),
-      notAnExcludedTransaction: !isExcludedTransaction,
-      notADeposit: !this.transactionPropertyService.isDeposit(transaction),
-    };
-
-    return (
-      conditions.notABill &&
-      conditions.notAnExcludedTransaction &&
-      conditions.notDisposableIncome &&
-      conditions.notADeposit
-    );
-  }
-
   private async transformToTransactionCategoryResult(
     transactions: TransactionSplit[],
     aiResults: AIResponse
-  ): Promise<UpdateTransactionResult[]> {
+  ): Promise<Array<{ name: string; category?: string; updatedCategory?: string; budget?: string; updatedBudget?: string }>> {
     return transactions.map((transaction) => {
       const journalId = transaction.transaction_journal_id;
       const aiResult = journalId ? aiResults[journalId] : undefined;
 
       return {
         name: transaction.description || "",
-        category: transaction.category_name,
+        category: transaction.category_name || undefined,
         updatedCategory: aiResult?.category,
-        budget: transaction.budget_name,
+        budget: transaction.budget_name || undefined,
         updatedBudget: aiResult?.budget,
       };
     });
