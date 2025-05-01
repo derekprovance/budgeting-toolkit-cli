@@ -5,6 +5,10 @@ import { TransactionPropertyService } from "./core/transaction-property.service"
 import { logger } from "../logger";
 import { DateUtils } from "../utils/date.utils";
 
+/**
+ * Valid destination accounts for additional income.
+ * These are the accounts where additional income can be deposited.
+ */
 type ValidDestinationAccount = Extract<
   Account,
   | Account.PRIMARY
@@ -13,6 +17,14 @@ type ValidDestinationAccount = Extract<
   | Account.CITIBANK_DOUBLECASH
 >;
 
+/**
+ * Configuration for filtering additional income transactions.
+ * 
+ * 1. validDestinationAccounts: Where the income can be deposited
+ * 2. excludedDescriptions: What descriptions to exclude (e.g., payroll)
+ * 3. excludeDisposableIncome: Whether to exclude disposable income
+ * 4. minTransactionAmount: Minimum amount to consider as additional income
+ */
 interface AdditionalIncomeConfig {
   validDestinationAccounts: readonly ValidDestinationAccount[];
   excludedDescriptions: readonly string[];
@@ -20,6 +32,21 @@ interface AdditionalIncomeConfig {
   minTransactionAmount?: number;
 }
 
+/**
+ * Service for calculating additional income.
+ * 
+ * 1. A transaction is considered additional income if:
+ *    - It is a deposit (not a withdrawal or transfer)
+ *    - It goes to a valid destination account
+ *    - It is not payroll
+ *    - It meets the minimum amount requirement (if specified)
+ *    - It is not disposable income (if configured)
+ * 
+ * 2. Description matching is normalized to handle variations:
+ *    - Case insensitive
+ *    - Trims whitespace
+ *    - Normalizes special characters and spaces
+ */
 export class AdditionalIncomeService {
   private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
     validDestinationAccounts: [
@@ -49,6 +76,17 @@ export class AdditionalIncomeService {
     this.validateConfig();
   }
 
+  /**
+   * Calculates additional income for a given month and year.
+   * 
+   * 1. Get all transactions for the month
+   * 2. Filter transactions based on criteria:
+   *    - Must be deposits
+   *    - Must go to valid accounts
+   *    - Must not be payroll
+   *    - Must meet minimum amount
+   *    - Must not be disposable income (if configured)
+   */
   async calculateAdditionalIncome(
     month: number,
     year: number
@@ -87,6 +125,12 @@ export class AdditionalIncomeService {
     }
   }
 
+  /**
+   * Validates the configuration to ensure it's valid.
+   * 
+   * 1. Must have at least one valid destination account
+   * 2. Minimum transaction amount cannot be negative
+   */
   private validateConfig(): void {
     if (!this.config.validDestinationAccounts.length) {
       throw new Error("At least one valid destination account must be specified");
@@ -101,6 +145,15 @@ export class AdditionalIncomeService {
     }
   }
 
+  /**
+   * Filters transactions to find additional income.
+   * 
+   * 1. Must be a deposit
+   * 2. Must go to a valid destination account
+   * 3. Must not be payroll
+   * 4. Must meet minimum amount requirement
+   * 5. Must not be disposable income (if configured)
+   */
   private filterTransactions(
     transactions: TransactionSplit[]
   ): TransactionSplit[] {
@@ -115,6 +168,12 @@ export class AdditionalIncomeService {
       );
   }
 
+  /**
+   * Checks if a transaction goes to a valid destination account.
+   * 
+   * 1. Must have a destination account
+   * 2. Destination account must be in the valid accounts list
+   */
   private hasValidDestinationAccount = (
     transaction: TransactionSplit
   ): boolean =>
@@ -123,6 +182,13 @@ export class AdditionalIncomeService {
       transaction.destination_id as ValidDestinationAccount
     );
 
+  /**
+   * Checks if a transaction is not payroll.
+   * 
+   * 1. Normalizes the description
+   * 2. Checks if it matches any excluded descriptions
+   * 3. Returns true if it doesn't match any excluded descriptions
+   */
   private isNotPayroll = (transaction: TransactionSplit): boolean => {
     if (!transaction.description) {
       logger.warn("Transaction found with no description", { transaction });
@@ -135,15 +201,35 @@ export class AdditionalIncomeService {
     );
   };
 
+  /**
+   * Checks if a transaction meets the minimum amount requirement.
+   * 
+   * Core Logic:
+   * 1. If no minimum amount is set, all positive amounts are valid
+   * 2. Otherwise, amount must be greater than or equal to minimum
+   * 3. Zero and negative amounts are always excluded
+   */
   private meetsMinimumAmount = (transaction: TransactionSplit): boolean => {
+    const amount = parseFloat(transaction.amount);
+    if (isNaN(amount) || amount <= 0) {
+      return false;
+    }
+
     if (!this.config.minTransactionAmount) {
       return true;
     }
 
-    const amount = parseFloat(transaction.amount);
-    return !isNaN(amount) && amount >= this.config.minTransactionAmount;
+    return amount >= this.config.minTransactionAmount;
   };
 
+  /**
+   * Normalizes a string for comparison.
+   * 
+   * Core Logic:
+   * 1. Converts to lowercase
+   * 2. Trims whitespace
+   * 3. Normalizes spaces and special characters
+   */
   private normalizeString(input: string): string {
     return input
       .toLowerCase()

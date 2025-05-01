@@ -226,6 +226,215 @@ describe("AdditionalIncomeService", () => {
         );
       });
     });
+
+    describe("description matching", () => {
+      it("should handle case-insensitive description matching", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "payroll",
+            amount: "1000.00",
+          }),
+          createMockTransaction({
+            description: "PAYROLL",
+            amount: "1000.00",
+          }),
+          createMockTransaction({
+            description: "Payroll",
+            amount: "1000.00",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle partial description matches", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Monthly Payroll Bonus",
+            amount: "1000.00",
+          }),
+          createMockTransaction({
+            description: "Payroll Advance",
+            amount: "1000.00",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle special characters in descriptions", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Payroll!@#$%^&*()",
+            amount: "1000.00",
+          }),
+          createMockTransaction({
+            description: "PAYROLL-123",
+            amount: "1000.00",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+    });
+
+    describe("amount validation", () => {
+      it("should handle zero amounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Zero Amount",
+            amount: "0.00",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle negative amounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Negative Amount",
+            amount: "-100.00",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle very large amounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Large Amount",
+            amount: "999999999.99",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].description).toBe("Large Amount");
+      });
+
+      it("should handle decimal precision", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Precise Amount",
+            amount: "100.123456789",
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].description).toBe("Precise Amount");
+      });
+    });
+
+    describe("account validation", () => {
+      it("should handle all valid destination accounts", async () => {
+        const validAccounts = [
+          Account.PRIMARY,
+          Account.CHASE_SAPPHIRE,
+          Account.CHASE_AMAZON,
+          Account.CITIBANK_DOUBLECASH,
+        ];
+
+        const mockTransactions = validAccounts.map((account) =>
+          createMockTransaction({
+            description: `Transaction to ${account}`,
+            destination_id: account,
+          })
+        );
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(validAccounts.length);
+        result.forEach((transaction, index) => {
+          expect(transaction.destination_id).toBe(validAccounts[index]);
+        });
+      });
+
+      it("should exclude transactions to invalid destination accounts", async () => {
+        const invalidAccounts = [
+          Account.MONEY_MARKET,
+          "INVALID_ACCOUNT",
+        ];
+
+        const mockTransactions = invalidAccounts.map((account) =>
+          createMockTransaction({
+            description: `Transaction to ${account}`,
+            destination_id: account,
+          })
+        );
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle transactions with null destination accounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Null Destination Account",
+            destination_id: null,
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+        mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+
+        const result = await service.calculateAdditionalIncome(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+    });
   });
 });
 

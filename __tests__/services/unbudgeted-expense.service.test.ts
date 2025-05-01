@@ -347,6 +347,202 @@ describe("UnbudgetedExpenseService", () => {
         }
       });
     });
+
+    describe("bill edge cases", () => {
+      it("should include bills even with disposable income tags", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Bill with Disposable",
+            source_id: Account.CHASE_SAPPHIRE,
+            tags: ["Bills", "Disposable"],
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(true);
+        mockTransactionPropertyService.isBill.mockReturnValue(true);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].description).toBe("Bill with Disposable");
+      });
+
+      it("should include bills from non-expense accounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Bill from Non-Expense",
+            source_id: Account.MONEY_MARKET,
+            tags: ["Bills"],
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+        mockTransactionPropertyService.isBill.mockReturnValue(true);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].description).toBe("Bill from Non-Expense");
+      });
+
+      it("should include bills even if they are excluded transactions", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Excluded Bill",
+            source_id: Account.PRIMARY,
+            tags: ["Bills"],
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(true);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+        mockTransactionPropertyService.isBill.mockReturnValue(true);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].description).toBe("Excluded Bill");
+      });
+    });
+
+    describe("transfer edge cases", () => {
+      it("should handle transfers with no source account", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "No Source Transfer",
+            source_id: null,
+            destination_id: Account.MONEY_MARKET,
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(true);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle transfers with no destination account", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "No Destination Transfer",
+            source_id: Account.PRIMARY,
+            destination_id: null,
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(true);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].description).toBe("No Destination Transfer");
+      });
+
+      it("should exclude transfers between invalid accounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Invalid Transfer",
+            source_id: Account.CHASE_SAPPHIRE,
+            destination_id: Account.MONEY_MARKET,
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(true);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+    });
+
+    describe("account validation", () => {
+      it("should handle transactions from all valid expense accounts", async () => {
+        const validAccounts = [
+          Account.PRIMARY,
+          Account.CHASE_AMAZON,
+          Account.CHASE_SAPPHIRE,
+          Account.CITIBANK_DOUBLECASH,
+        ];
+
+        const mockTransactions = validAccounts.map((account) =>
+          createMockTransaction({
+            description: `Transaction from ${account}`,
+            source_id: account,
+          })
+        );
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(validAccounts.length);
+        result.forEach((transaction, index) => {
+          expect(transaction.source_id).toBe(validAccounts[index]);
+        });
+      });
+
+      it("should exclude transactions from invalid accounts", async () => {
+        const invalidAccounts = [
+          Account.MONEY_MARKET,
+          "INVALID_ACCOUNT",
+        ];
+
+        const mockTransactions = invalidAccounts.map((account) =>
+          createMockTransaction({
+            description: `Transaction from ${account}`,
+            source_id: account,
+          })
+        );
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("should handle transactions with null source accounts", async () => {
+        const mockTransactions = [
+          createMockTransaction({
+            description: "Null Source Account",
+            source_id: null,
+          }),
+        ];
+
+        mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+        mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+        mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+        mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+
+        const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+        expect(result).toHaveLength(0);
+      });
+    });
   });
 });
 
