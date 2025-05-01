@@ -52,8 +52,10 @@ export class TransactionUpdaterService {
 
       const approved = this.noConfirmation || await UserInputService.askToUpdateTransaction(
         transaction,
-        category?.name,
-        budget?.attributes.name
+        {
+          category: category?.name,
+          budget: budget?.attributes.name
+        }
       );
 
       if (!approved) {
