@@ -9,7 +9,7 @@ export class ExcludedTransactionService {
   private readonly excludedTransactionsPath: string;
 
   constructor() {
-    this.excludedTransactionsPath = join(process.cwd(), "excluded-transactions.csv");
+    this.excludedTransactionsPath = join(process.cwd(), "excluded_transactions.csv");
   }
 
   async getExcludedTransactions(): Promise<ExcludedTransactionDto[]> {
@@ -21,8 +21,9 @@ export class ExcludedTransactionService {
     }
 
     const parser = parse({
-      columns: true,
+      columns: ['description', 'amount'],
       skip_empty_lines: true,
+      trim: true,
     });
 
     const records: ExcludedTransactionDto[] = [];
@@ -31,7 +32,11 @@ export class ExcludedTransactionService {
     try {
       for await (const record of stream.pipe(parser)) {
         if (this.isValidExcludedTransaction(record)) {
-          records.push(record as ExcludedTransactionDto);
+          records.push({
+            description: record.description,
+            amount: this.convertCurrencyToFloat(record.amount),
+            reason: 'Excluded from processing'
+          });
         } else {
           logger.warn(`Invalid excluded transaction record: ${JSON.stringify(record)}`);
         }
@@ -41,6 +46,7 @@ export class ExcludedTransactionService {
       throw new Error("Failed to parse excluded transactions file");
     }
 
+    logger.trace({ records },"Excluded transactions parsed successfully");
     return records;
   }
 
@@ -56,7 +62,7 @@ export class ExcludedTransactionService {
       if (transaction.description && transaction.amount) {
         return (
           transaction.description === description &&
-          transaction.amount === convertedAmount
+          Math.abs(parseFloat(transaction.amount)) === Math.abs(parseFloat(convertedAmount))
         );
       }
 
@@ -65,23 +71,24 @@ export class ExcludedTransactionService {
       }
 
       if (transaction.amount) {
-        return transaction.amount === convertedAmount;
+        return Math.abs(parseFloat(transaction.amount)) === Math.abs(parseFloat(convertedAmount));
       }
 
       return false;
     });
   }
 
-  private isValidExcludedTransaction(record: unknown): record is ExcludedTransactionDto {
+  private isValidExcludedTransaction(record: unknown): record is { description: string; amount: string } {
     if (!record || typeof record !== 'object') {
       return false;
     }
 
-    const dto = record as ExcludedTransactionDto;
+    const dto = record as { description: string; amount: string };
     return (
       typeof dto.description === 'string' &&
-      typeof dto.reason === 'string' &&
-      (dto.amount === undefined || typeof dto.amount === 'string')
+      typeof dto.amount === 'string' &&
+      dto.description.trim() !== '' &&
+      dto.amount.trim() !== ''
     );
   }
 
