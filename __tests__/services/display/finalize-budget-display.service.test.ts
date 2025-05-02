@@ -66,11 +66,54 @@ describe("FinalizeBudgetDisplayService", () => {
       expect(result).toContain("No additional income transactions found");
     });
 
-    it("should format additional income section with transactions", () => {
+    it("should format additional income section with bill transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(true);
       const result = service.formatAdditionalIncomeSection([
         mockTransaction as TransactionSplit,
       ]);
       expect(result).toContain("=== Additional Income ===");
+      expect(result).toContain("[BILL]");
+      expect(result).toContain("Test Transaction");
+      expect(result).toContain("$100.00");
+      expect(result).toContain("Total Additional Income");
+    });
+
+    it("should format additional income section with transfer transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(false);
+      transactionPropertyService.isTransfer.mockReturnValueOnce(true);
+      const result = service.formatAdditionalIncomeSection([
+        mockTransaction as TransactionSplit,
+      ]);
+      expect(result).toContain("=== Additional Income ===");
+      expect(result).toContain("[TRANSFER]");
+      expect(result).toContain("Test Transaction");
+      expect(result).toContain("$100.00");
+      expect(result).toContain("Total Additional Income");
+    });
+
+    it("should format additional income section with deposit transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(false);
+      transactionPropertyService.isTransfer.mockReturnValueOnce(false);
+      transactionPropertyService.isDeposit.mockReturnValueOnce(true);
+      const result = service.formatAdditionalIncomeSection([
+        mockTransaction as TransactionSplit,
+      ]);
+      expect(result).toContain("=== Additional Income ===");
+      expect(result).toContain("[DEPOSIT]");
+      expect(result).toContain("Test Transaction");
+      expect(result).toContain("$100.00");
+      expect(result).toContain("Total Additional Income");
+    });
+
+    it("should format additional income section with other transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(false);
+      transactionPropertyService.isTransfer.mockReturnValueOnce(false);
+      transactionPropertyService.isDeposit.mockReturnValueOnce(false);
+      const result = service.formatAdditionalIncomeSection([
+        mockTransaction as TransactionSplit,
+      ]);
+      expect(result).toContain("=== Additional Income ===");
+      expect(result).toContain("[OTHER]");
       expect(result).toContain("Test Transaction");
       expect(result).toContain("$100.00");
       expect(result).toContain("Total Additional Income");
@@ -84,11 +127,54 @@ describe("FinalizeBudgetDisplayService", () => {
       expect(result).toContain("No unbudgeted expense transactions found");
     });
 
-    it("should format unbudgeted expenses section with transactions", () => {
+    it("should format unbudgeted expenses section with bill transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(true);
       const result = service.formatUnbudgetedExpensesSection([
         mockTransaction as TransactionSplit,
       ]);
       expect(result).toContain("=== Unbudgeted Expenses ===");
+      expect(result).toContain("[BILL]");
+      expect(result).toContain("Test Transaction");
+      expect(result).toContain("$100.00");
+      expect(result).toContain("Total Unbudgeted Expenses");
+    });
+
+    it("should format unbudgeted expenses section with transfer transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(false);
+      transactionPropertyService.isTransfer.mockReturnValueOnce(true);
+      const result = service.formatUnbudgetedExpensesSection([
+        mockTransaction as TransactionSplit,
+      ]);
+      expect(result).toContain("=== Unbudgeted Expenses ===");
+      expect(result).toContain("[TRANSFER]");
+      expect(result).toContain("Test Transaction");
+      expect(result).toContain("$100.00");
+      expect(result).toContain("Total Unbudgeted Expenses");
+    });
+
+    it("should format unbudgeted expenses section with deposit transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(false);
+      transactionPropertyService.isTransfer.mockReturnValueOnce(false);
+      transactionPropertyService.isDeposit.mockReturnValueOnce(true);
+      const result = service.formatUnbudgetedExpensesSection([
+        mockTransaction as TransactionSplit,
+      ]);
+      expect(result).toContain("=== Unbudgeted Expenses ===");
+      expect(result).toContain("[DEPOSIT]");
+      expect(result).toContain("Test Transaction");
+      expect(result).toContain("$100.00");
+      expect(result).toContain("Total Unbudgeted Expenses");
+    });
+
+    it("should format unbudgeted expenses section with other transaction", () => {
+      transactionPropertyService.isBill.mockReturnValueOnce(false);
+      transactionPropertyService.isTransfer.mockReturnValueOnce(false);
+      transactionPropertyService.isDeposit.mockReturnValueOnce(false);
+      const result = service.formatUnbudgetedExpensesSection([
+        mockTransaction as TransactionSplit,
+      ]);
+      expect(result).toContain("=== Unbudgeted Expenses ===");
+      expect(result).toContain("[OTHER]");
       expect(result).toContain("Test Transaction");
       expect(result).toContain("$100.00");
       expect(result).toContain("Total Unbudgeted Expenses");
@@ -136,48 +222,6 @@ describe("FinalizeBudgetDisplayService", () => {
       expect(result).toContain("Additional Income:     $100.00");
       expect(result).toContain("Unbudgeted Expenses:   $50.00");
       expect(result).toContain("Paycheck Surplus:      $500.00");
-    });
-  });
-
-  describe("getTransactionCounts", () => {
-    it("should count transactions by type", () => {
-      // Reset mock implementations
-      transactionPropertyService.isBill.mockReset();
-      transactionPropertyService.isTransfer.mockReset();
-      transactionPropertyService.isDeposit.mockReset();
-
-      // Set up mock implementations for each transaction
-      const transactions = Array(4).fill(mockTransaction) as TransactionSplit[];
-
-      // Transaction 1: Bill
-      transactionPropertyService.isBill.mockImplementationOnce(() => true);
-
-      // Transaction 2: Transfer
-      transactionPropertyService.isBill.mockImplementationOnce(() => false);
-      transactionPropertyService.isTransfer.mockImplementationOnce(() => true);
-
-      // Transaction 3: Deposit
-      transactionPropertyService.isBill.mockImplementationOnce(() => false);
-      transactionPropertyService.isTransfer.mockImplementationOnce(() => false);
-      transactionPropertyService.isDeposit.mockImplementationOnce(() => true);
-
-      // Transaction 4: Other
-      transactionPropertyService.isBill.mockImplementationOnce(() => false);
-      transactionPropertyService.isTransfer.mockImplementationOnce(() => false);
-      transactionPropertyService.isDeposit.mockImplementationOnce(() => false);
-
-      const result = service.getTransactionCounts(transactions);
-
-      expect(result).toEqual({
-        bills: 1,
-        transfers: 1,
-        deposits: 1,
-        other: 1,
-      });
-
-      expect(transactionPropertyService.isBill).toHaveBeenCalledTimes(4);
-      expect(transactionPropertyService.isTransfer).toHaveBeenCalledTimes(3);
-      expect(transactionPropertyService.isDeposit).toHaveBeenCalledTimes(2);
     });
   });
 });

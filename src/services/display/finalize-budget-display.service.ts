@@ -138,35 +138,6 @@ export class FinalizeBudgetDisplayService {
     return lines.join("\n");
   }
 
-  /**
-   * Gets transaction counts by type
-   */
-  getTransactionCounts(transactions: TransactionSplit[]): TransactionCounts {
-    let bills = 0;
-    let transfers = 0;
-    let deposits = 0;
-    let other = 0;
-
-    transactions.forEach((t) => {
-      if (this.transactionPropertyService.isBill(t)) {
-        bills++;
-      } else if (this.transactionPropertyService.isTransfer(t)) {
-        transfers++;
-      } else if (this.transactionPropertyService.isDeposit(t)) {
-        deposits++;
-      } else {
-        other++;
-      }
-    });
-
-    return {
-      bills,
-      transfers,
-      deposits,
-      other,
-    };
-  }
-
   private formatTransaction(transaction: TransactionSplit): string {
     const type = this.getTransactionTypeIndicator(transaction);
     const amount = parseFloat(transaction.amount);

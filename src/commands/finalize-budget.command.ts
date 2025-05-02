@@ -5,6 +5,8 @@ import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service
 import { TransactionPropertyService } from "../services/core/transaction-property.service";
 import { FinalizeBudgetDisplayService } from "../services/display/finalize-budget-display.service";
 import { PaycheckSurplusService } from "../services/paycheck-surplus.service";
+import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
+import { TransactionCounts } from "../services/display/finalize-budget-display.service";
 import chalk from "chalk";
 
 /**
@@ -60,7 +62,7 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
         ...additionalIncomeResults,
         ...unbudgetedExpenseResults,
       ];
-      const counts = this.displayService.getTransactionCounts(allTransactions);
+      const counts = this.getTransactionCounts(allTransactions);
       console.log(
         this.displayService.formatSummary(
           counts,
@@ -78,5 +80,31 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
       );
       throw error; // Re-throw to allow proper error handling up the chain
     }
+  }
+
+  private getTransactionCounts(transactions: TransactionSplit[]): TransactionCounts {
+    let bills = 0;
+    let transfers = 0;
+    let deposits = 0;
+    let other = 0;
+
+    transactions.forEach((t) => {
+      if (this.transactionPropertyService.isBill(t)) {
+        bills++;
+      } else if (this.transactionPropertyService.isTransfer(t)) {
+        transfers++;
+      } else if (this.transactionPropertyService.isDeposit(t)) {
+        deposits++;
+      } else {
+        other++;
+      }
+    });
+
+    return {
+      bills,
+      transfers,
+      deposits,
+      other,
+    };
   }
 }

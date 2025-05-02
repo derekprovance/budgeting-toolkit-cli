@@ -2,6 +2,7 @@ import { FinalizeBudgetCommand } from "../../src/commands/finalize-budget.comman
 import { AdditionalIncomeService } from "../../src/services/additional-income.service";
 import { UnbudgetedExpenseService } from "../../src/services/unbudgeted-expense.service";
 import { TransactionPropertyService } from "../../src/services/core/transaction-property.service";
+import { PaycheckSurplusService } from "../../src/services/paycheck-surplus.service";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 
 // Mock services
@@ -9,12 +10,14 @@ jest.mock("../../src/services/additional-income.service");
 jest.mock("../../src/services/unbudgeted-expense.service");
 jest.mock("../../src/services/core/transaction-property.service");
 jest.mock("../../src/services/display/finalize-budget-display.service");
+jest.mock("../../src/services/paycheck-surplus.service");
 
 describe("FinalizeBudgetCommand", () => {
   let command: FinalizeBudgetCommand;
   let additionalIncomeService: jest.Mocked<AdditionalIncomeService>;
   let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
   let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
+  let paycheckSurplusService: jest.Mocked<PaycheckSurplusService>;
   let consoleLogSpy: jest.SpyInstance;
   let consoleErrorSpy: jest.SpyInstance;
 
@@ -45,11 +48,16 @@ describe("FinalizeBudgetCommand", () => {
       isDeposit: jest.fn().mockReturnValue(false),
     } as unknown as jest.Mocked<TransactionPropertyService>;
 
+    paycheckSurplusService = {
+      calculatePaycheckSurplus: jest.fn().mockResolvedValue(500.00),
+    } as unknown as jest.Mocked<PaycheckSurplusService>;
+
     // Create command instance
     command = new FinalizeBudgetCommand(
       additionalIncomeService,
       unbudgetedExpenseService,
-      transactionPropertyService
+      transactionPropertyService,
+      paycheckSurplusService
     );
 
     // Spy on console methods
@@ -68,6 +76,7 @@ describe("FinalizeBudgetCommand", () => {
 
       expect(additionalIncomeService.calculateAdditionalIncome).toHaveBeenCalledWith(5, 2024);
       expect(unbudgetedExpenseService.calculateUnbudgetedExpenses).toHaveBeenCalledWith(5, 2024);
+      expect(paycheckSurplusService.calculatePaycheckSurplus).toHaveBeenCalledWith(5, 2024);
       expect(consoleLogSpy).toHaveBeenCalled();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
@@ -75,11 +84,13 @@ describe("FinalizeBudgetCommand", () => {
     it("should execute successfully with no data", async () => {
       additionalIncomeService.calculateAdditionalIncome.mockResolvedValueOnce([]);
       unbudgetedExpenseService.calculateUnbudgetedExpenses.mockResolvedValueOnce([]);
+      paycheckSurplusService.calculatePaycheckSurplus.mockResolvedValueOnce(0);
 
       await command.execute({ month: 5, year: 2024 });
 
       expect(additionalIncomeService.calculateAdditionalIncome).toHaveBeenCalledWith(5, 2024);
       expect(unbudgetedExpenseService.calculateUnbudgetedExpenses).toHaveBeenCalledWith(5, 2024);
+      expect(paycheckSurplusService.calculatePaycheckSurplus).toHaveBeenCalledWith(5, 2024);
       expect(consoleLogSpy).toHaveBeenCalled();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
@@ -105,6 +116,18 @@ describe("FinalizeBudgetCommand", () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error finalizing budget"),
         expect.stringContaining("Unbudgeted expense error")
+      );
+    });
+
+    it("should handle errors from paycheck surplus service", async () => {
+      const error = new Error("Paycheck surplus error");
+      paycheckSurplusService.calculatePaycheckSurplus.mockRejectedValueOnce(error);
+
+      await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(error);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error finalizing budget"),
+        expect.stringContaining("Paycheck surplus error")
       );
     });
   });
