@@ -104,7 +104,8 @@ export class FinalizeBudgetDisplayService {
   formatSummary(
     counts: TransactionCounts,
     additionalIncome: TransactionSplit[],
-    unbudgetedExpenses: TransactionSplit[]
+    unbudgetedExpenses: TransactionSplit[],
+    paycheckSurplus: number
   ): string {
     const currencySymbol =
       additionalIncome[0]?.currency_symbol ||
@@ -128,6 +129,9 @@ export class FinalizeBudgetDisplayService {
       )}`,
       `  Unbudgeted Expenses:   ${chalk.cyanBright(
         `${currencySymbol}${Math.abs(totalExpenses).toFixed(2)}`
+      )}`,
+      `  Paycheck Surplus:      ${chalk.cyanBright(
+        `${currencySymbol}${paycheckSurplus.toFixed(2)}`
       )}`,
     ];
 

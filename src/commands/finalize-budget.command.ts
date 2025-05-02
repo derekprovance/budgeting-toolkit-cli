@@ -4,6 +4,7 @@ import { AdditionalIncomeService } from "../services/additional-income.service";
 import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
 import { TransactionPropertyService } from "../services/core/transaction-property.service";
 import { FinalizeBudgetDisplayService } from "../services/display/finalize-budget-display.service";
+import { PaycheckSurplusService } from "../services/paycheck-surplus.service";
 import chalk from "chalk";
 
 /**
@@ -15,11 +16,10 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
   constructor(
     private readonly additionalIncomeService: AdditionalIncomeService,
     private readonly unbudgetedExpenseService: UnbudgetedExpenseService,
-    private readonly transactionPropertyService: TransactionPropertyService
+    private readonly transactionPropertyService: TransactionPropertyService,
+    private readonly paycheckSurplusService: PaycheckSurplusService
   ) {
-    this.displayService = new FinalizeBudgetDisplayService(
-      transactionPropertyService
-    );
+    this.displayService = new FinalizeBudgetDisplayService(transactionPropertyService);
   }
 
   /**
@@ -32,13 +32,11 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
         this.displayService.formatHeader("Budget Finalization Report")
       );
 
-      const [additionalIncomeResults, unbudgetedExpenseResults] =
+      const [additionalIncomeResults, unbudgetedExpenseResults, paycheckSurplus] =
         await Promise.all([
           this.additionalIncomeService.calculateAdditionalIncome(month, year),
-          this.unbudgetedExpenseService.calculateUnbudgetedExpenses(
-            month,
-            year
-          ),
+          this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
+          this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
         ]);
 
       console.log(this.displayService.formatMonthHeader(month, year));
@@ -67,7 +65,8 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
         this.displayService.formatSummary(
           counts,
           additionalIncomeResults,
-          unbudgetedExpenseResults
+          unbudgetedExpenseResults,
+          paycheckSurplus
         )
       );
     } catch (error) {

@@ -6,7 +6,10 @@ import { BudgetStatusCommand } from "./commands/budget-status.command";
 import { UpdateTransactionsCommand } from "./commands/update-transaction.command";
 import { ServiceFactory } from "./factories/service.factory";
 import { LLMConfig } from "./config/llm.config";
-import { BudgetDateOptions, UpdateTransactionOptions } from "./types/interface/command-options.interface";
+import {
+  BudgetDateOptions,
+  UpdateTransactionOptions,
+} from "./types/interface/command-options.interface";
 import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
 import { logger } from "./logger";
 import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-category.service";
@@ -47,7 +50,8 @@ export const createCli = (): Command => {
         const command = new FinalizeBudgetCommand(
           services.additionalIncomeService,
           services.unbudgetedExpenseService,
-          services.transactionPropertyService
+          services.transactionPropertyService,
+          services.paycheckSurplusService
         );
         await command.execute({
           month: opts.month ?? getCurrentMonth(),

@@ -17,10 +17,15 @@ jest.mock("chalk", () => {
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { FinalizeBudgetDisplayService } from "../../../src/services/display/finalize-budget-display.service";
 import { TransactionPropertyService } from "../../../src/services/core/transaction-property.service";
+import { ExcludedTransactionService } from "../../../src/services/excluded-transaction.service";
+
+jest.mock("../../../src/services/core/transaction-property.service");
+jest.mock("../../../src/services/excluded-transaction.service");
 
 describe("FinalizeBudgetDisplayService", () => {
   let service: FinalizeBudgetDisplayService;
   let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
+  let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
   const mockTransaction: Partial<TransactionSplit> = {
     description: "Test Transaction",
@@ -31,12 +36,8 @@ describe("FinalizeBudgetDisplayService", () => {
   };
 
   beforeEach(() => {
-    transactionPropertyService = {
-      isBill: jest.fn().mockReturnValue(false),
-      isTransfer: jest.fn().mockReturnValue(false),
-      isDeposit: jest.fn().mockReturnValue(false),
-    } as unknown as jest.Mocked<TransactionPropertyService>;
-
+    excludedTransactionService = new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
+    transactionPropertyService = new TransactionPropertyService(excludedTransactionService) as jest.Mocked<TransactionPropertyService>;
     service = new FinalizeBudgetDisplayService(transactionPropertyService);
   });
 
@@ -95,27 +96,46 @@ describe("FinalizeBudgetDisplayService", () => {
   });
 
   describe("formatSummary", () => {
-    it("should format summary correctly", () => {
+    it("should format summary with all transaction types", () => {
+      // Arrange
       const counts = {
-        bills: 1,
-        transfers: 2,
-        deposits: 3,
-        other: 4,
+        bills: 2,
+        transfers: 3,
+        deposits: 4,
+        other: 1,
       };
 
+      const additionalIncome = [
+        {
+          amount: "100.00",
+          currency_symbol: "$",
+        } as TransactionSplit,
+      ];
+
+      const unbudgetedExpenses = [
+        {
+          amount: "-50.00",
+          currency_symbol: "$",
+        } as TransactionSplit,
+      ];
+
+      // Act
       const result = service.formatSummary(
         counts,
-        [mockTransaction as TransactionSplit],
-        [mockTransaction as TransactionSplit]
+        additionalIncome,
+        unbudgetedExpenses,
+        500.00
       );
 
+      // Assert
       expect(result).toContain("=== Summary ===");
-      expect(result).toContain("Bills:\t1");
-      expect(result).toContain("Transfers:\t2");
-      expect(result).toContain("Deposits:\t3");
-      expect(result).toContain("Other:\t4");
-      expect(result).toContain("Additional Income");
-      expect(result).toContain("Unbudgeted Expenses");
+      expect(result).toContain("Bills:\t2");
+      expect(result).toContain("Transfers:\t3");
+      expect(result).toContain("Deposits:\t4");
+      expect(result).toContain("Other:\t1");
+      expect(result).toContain("Additional Income:     $100.00");
+      expect(result).toContain("Unbudgeted Expenses:   $50.00");
+      expect(result).toContain("Paycheck Surplus:      $500.00");
     });
   });
 
