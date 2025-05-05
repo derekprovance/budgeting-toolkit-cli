@@ -3,10 +3,11 @@
     "target": "ES2018",
     "module": "commonjs",
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": "."
   },
-  "include": ["src/**/*", "__tests__/**/*"],
-  "exclude": ["**/*.test.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["**/*.test.ts", "__tests__/**/*"]
 }
