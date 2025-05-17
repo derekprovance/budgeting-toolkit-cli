@@ -108,9 +108,10 @@ export class TransactionService {
 
     logger.debug(
       {
+        transactionId: transaction.transaction_journal_id,
+        type: transaction.type,
         category,
         budgetId,
-        journalId: transaction.transaction_journal_id,
       },
       `Updating transaction: ${transaction.description}`
     );
@@ -120,11 +121,8 @@ export class TransactionService {
       if (!transactionRead?.id) {
         logger.error(
           {
-            transaction: {
-              transactionJournalId: transaction.transaction_journal_id,
-              description: transaction.description,
-            },
-            transactionRead,
+            transactionId: transaction.transaction_journal_id,
+            description: transaction.description,
           },
           "Unable to find Transaction ID for Split"
         );
@@ -143,13 +141,16 @@ export class TransactionService {
         ],
       };
 
-      const results = await this.apiClient.put<TransactionArray>(
+      await this.apiClient.put<TransactionArray>(
         `/transactions/${transactionRead.id}`,
         updatePayload
       );
-      logger.trace(
-        { updatePayload, results },
-        `Transaction Update results for ${transaction.transaction_journal_id}:${transaction.description}`
+      logger.debug(
+        {
+          transactionId: transaction.transaction_journal_id,
+          updatedFields: Object.keys(updatePayload.transactions[0]),
+        },
+        `Transaction updated successfully`
       );
     } catch (error) {
       const errorMessage =
@@ -158,10 +159,8 @@ export class TransactionService {
       logger.error(
         {
           error: errorMessage,
-          transactionDetails: {
-            description: transaction.description,
-            journalId: transaction.transaction_journal_id,
-          },
+          transactionId: transaction.transaction_journal_id,
+          description: transaction.description,
         },
         "Transaction update failed"
       );
@@ -198,7 +197,13 @@ export class TransactionService {
         const indexKey = this.generateSplitTransactionKey(txSp);
 
         if (this.splitTransactionIdx.has(indexKey)) {
-          logger.debug(`Duplicate transaction found for key: ${indexKey}`);
+          logger.debug(
+            {
+              transactionId: txSp.transaction_journal_id,
+              description: txSp.description,
+            },
+            "Duplicate transaction found in index"
+          );
         }
 
         this.splitTransactionIdx.set(
@@ -265,7 +270,14 @@ export class TransactionService {
     error: unknown
   ): TransactionError {
     const message = `Failed to ${action} ${identifier}`;
-    logger.trace(message, error);
+    logger.error(
+      {
+        action,
+        identifier,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      message
+    );
 
     if (error instanceof Error) {
       return new TransactionError(message, error);

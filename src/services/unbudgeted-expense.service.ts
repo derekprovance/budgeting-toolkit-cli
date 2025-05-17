@@ -51,13 +51,26 @@ export class UnbudgetedExpenseService {
         await this.transactionService.getTransactionsForMonth(month, year);
       const expenses = await this.filterExpenses(transactions);
 
+      logger.debug(
+        {
+          month,
+          year,
+          totalTransactions: transactions.length,
+          unbudgetedExpenses: expenses.length,
+        },
+        "Calculated unbudgeted expenses"
+      );
+
       return expenses;
     } catch (error) {
-      logger.trace(error, "Error calculating unbudgeted expenses", {
-        month,
-        year,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      logger.error(
+        {
+          month,
+          year,
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        "Failed to calculate unbudgeted expenses"
+      );
       if (error instanceof Error) {
         throw new Error(
           `Failed to calculate unbudgeted expenses for month ${month}: ${error.message}`
@@ -153,9 +166,13 @@ export class UnbudgetedExpenseService {
       isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
     };
 
-    logger.trace(
-      conditions,
-      `isRegularExpenseTransaction: ${transaction.description}`
+    logger.debug(
+      {
+        transactionId: transaction.transaction_journal_id,
+        description: transaction.description,
+        conditions,
+      },
+      "Evaluating regular expense transaction"
     );
 
     return (

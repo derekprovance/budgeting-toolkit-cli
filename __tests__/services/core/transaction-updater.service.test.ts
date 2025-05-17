@@ -208,5 +208,74 @@ describe("TransactionUpdaterService", () => {
 
       expect(result).toBeUndefined();
     });
+
+    it("should return transaction without updating when in dry run mode", async () => {
+      const serviceWithDryRun = new TransactionUpdaterService(
+        mockTransactionService,
+        mockValidator,
+        false,
+        true
+      );
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+
+      const result = await serviceWithDryRun.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBe(mockTransaction);
+      expect(UserInputService.askToUpdateTransaction).not.toHaveBeenCalled();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should skip validation in dry run mode if transaction data is invalid", async () => {
+      const serviceWithDryRun = new TransactionUpdaterService(
+        mockTransactionService,
+        mockValidator,
+        false,
+        true
+      );
+
+      mockValidator.validateTransactionData.mockReturnValue(false);
+
+      const result = await serviceWithDryRun.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should combine dry run with no confirmation", async () => {
+      const serviceWithBoth = new TransactionUpdaterService(
+        mockTransactionService,
+        mockValidator,
+        true,
+        true
+      );
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+      mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+
+      const result = await serviceWithBoth.updateTransaction(
+        mockTransaction as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBe(mockTransaction);
+      expect(UserInputService.askToUpdateTransaction).not.toHaveBeenCalled();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
   });
 });

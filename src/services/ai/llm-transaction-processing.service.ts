@@ -42,16 +42,11 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
       return {};
     }
 
-    logger.trace(
+    logger.debug(
       {
         transactionCount: transactions.length,
         categoryCount: categories?.length || 0,
         budgetCount: budgets?.length || 0,
-        transactions: transactions.map((t) => ({
-          id: t.transaction_journal_id,
-          description: t.description,
-          amount: t.amount,
-        })),
       },
       "Starting transaction processing"
     );
@@ -64,24 +59,10 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
       ? this.createTransactionBatches(transactions)
       : [];
 
-    logger.trace(
+    logger.debug(
       {
         categoryBatchCount: categoryBatches.length,
         budgetBatchCount: budgetBatches.length,
-        categoryBatches: categoryBatches.map((batch) => ({
-          indices: batch.indices,
-          transactions: batch.transactions.map((t) => ({
-            id: t.transaction_journal_id,
-            description: t.description,
-          })),
-        })),
-        budgetBatches: budgetBatches.map((batch) => ({
-          indices: batch.indices,
-          transactions: batch.transactions.map((t) => ({
-            id: t.transaction_journal_id,
-            description: t.description,
-          })),
-        })),
       },
       "Created transaction batches"
     );
@@ -95,17 +76,6 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         )
       : [];
 
-    logger.trace(
-      {
-        transactionResults: transactions.map((t, i) => ({
-          id: t.transaction_journal_id,
-          description: t.description,
-          assignedCategory: assignedCategories[i],
-        })),
-      },
-      "Category assignment complete"
-    );
-
     // Then process budgets using the assigned categories
     const assignedBudgets =
       budgets?.length && categories?.length
@@ -117,18 +87,6 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
           )
         : [];
 
-    logger.trace(
-      {
-        transactionResults: transactions.map((t, i) => ({
-          id: t.transaction_journal_id,
-          description: t.description,
-          assignedCategory: assignedCategories[i],
-          assignedBudget: assignedBudgets[i],
-        })),
-      },
-      "Budget assignment complete"
-    );
-
     const result = transactions.reduce((acc, t, index) => {
       acc[t.transaction_journal_id || ""] = {
         ...(assignedCategories[index] && {
@@ -139,16 +97,13 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
       return acc;
     }, {} as AIResponse);
 
-    logger.trace(
+    logger.debug(
       {
-        results: Object.entries(result).map(([id, value]) => ({
-          id,
-          ...value,
-          transaction: transactions.find((t) => t.transaction_journal_id === id)
-            ?.description,
-        })),
+        processedCount: Object.keys(result).length,
+        categoryCount: Object.values(result).filter(r => r.category).length,
+        budgetCount: Object.values(result).filter(r => r.budget).length,
       },
-      "Final transaction processing results"
+      "Transaction processing complete"
     );
 
     return result;
@@ -270,37 +225,45 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
     batches: TransactionBatch[]
   ): Promise<string[]> {
     try {
+      logger.debug(
+        {
+          categories,
+          transactionCount: transactions.length,
+          categoryCount: categories.length,
+          batchCount: batches.length,
+        },
+        "Starting category processing with error handling"
+      );
+
       const results = new Array(transactions.length).fill("");
 
       for (const batch of batches) {
-        logger.trace(
+        logger.debug(
           {
             batchSize: batch.transactions.length,
             batchIndices: batch.indices,
-            batchTransactions: batch.transactions.map((t) => ({
+            batchTransactions: batch.transactions.map(t => ({
               id: t.transaction_journal_id,
               description: t.description,
-            })),
+              amount: t.amount,
+              date: t.date
+            }))
           },
           "Processing category batch"
         );
 
-        const batchResults =
-          await this.llmCategoryService.categorizeTransactions(
-            categories,
-            batch.transactions
-          );
+        // Pass all available categories to each batch
+        const batchResults = await this.llmCategoryService.categorizeTransactions(
+          batch.transactions,
+          categories
+        );
 
-        logger.trace(
+        logger.debug(
           {
+            batchResults,
             batchIndices: batch.indices,
-            batchResults: batch.transactions.map((t, i) => ({
-              id: t.transaction_journal_id,
-              description: t.description,
-              assignedCategory: batchResults[i],
-            })),
           },
-          "Category batch results received"
+          "Received batch results"
         );
 
         // Map batch results back to original indices
@@ -309,20 +272,28 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         });
       }
 
-      logger.trace(
+      logger.debug(
         {
-          finalResults: transactions.map((t, i) => ({
-            id: t.transaction_journal_id,
-            description: t.description,
-            assignedCategory: results[i],
-          })),
+          totalProcessed: results.filter(r => r).length,
+          totalTransactions: transactions.length,
+          results,
         },
-        "All category batches processed"
+        "Category processing complete"
       );
 
       return results;
     } catch (error) {
-      logger.error({ error }, "Unable to assign categories");
+      logger.error(
+        { 
+          error: error instanceof Error ? error.message : String(error),
+          type: error instanceof Error ? error.constructor.name : typeof error,
+          stack: error instanceof Error ? error.stack : undefined,
+          categories,
+          transactionCount: transactions.length,
+          categoryCount: categories.length,
+        }, 
+        "Unable to assign categories"
+      );
       return new Array(transactions.length).fill("");
     }
   }
@@ -337,64 +308,32 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
       const results = new Array(transactions.length).fill("");
 
       for (const batch of batches || []) {
-        // Get categories for just this batch
-        const batchCategories = batch.indices.map(
-          (index) => assignedCategories[index] || ""
-        );
-
-        logger.trace(
+        logger.debug(
           {
             batchSize: batch.transactions.length,
             batchIndices: batch.indices,
-            batchTransactions: batch.transactions.map((t, i) => ({
-              id: t.transaction_journal_id,
-              description: t.description,
-              category: batchCategories[i],
-            })),
           },
           "Processing budget batch"
         );
 
-        const batchResults = await this.llmBudgetService.assignBudgets(
-          budgets,
+        const budgetResults = await this.llmBudgetService.assignBudgets(
           batch.transactions,
-          batchCategories
-        );
-
-        logger.trace(
-          {
-            batchIndices: batch.indices,
-            batchResults: batch.transactions.map((t, i) => ({
-              id: t.transaction_journal_id,
-              description: t.description,
-              category: batchCategories[i],
-              assignedBudget: batchResults[i],
-            })),
-          },
-          "Budget batch results received"
+          budgets
         );
 
         // Map batch results back to original indices
-        batchResults.forEach((result, batchIndex) => {
+        budgetResults.forEach((result, batchIndex) => {
           results[batch.indices[batchIndex]] = result;
         });
       }
 
-      logger.trace(
-        {
-          finalResults: transactions.map((t, i) => ({
-            id: t.transaction_journal_id,
-            description: t.description,
-            category: assignedCategories[i],
-            assignedBudget: results[i],
-          })),
-        },
-        "All budget batches processed"
-      );
-
       return results;
     } catch (error) {
-      logger.error({ error }, "Unable to assign budgets");
+      logger.error({
+        error,
+        transactionCount: transactions.length,
+        message: "Error processing budgets",
+      });
       return new Array(transactions.length).fill("");
     }
   }

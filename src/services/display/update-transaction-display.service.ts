@@ -8,34 +8,41 @@ export class UpdateTransactionDisplayService {
    */
   formatProcessingHeader(
     tag: string,
-    updateMode: UpdateTransactionMode
+    updateMode: UpdateTransactionMode,
+    dryRun?: boolean
   ): string {
+    const modeText = updateMode === UpdateTransactionMode.Both
+      ? "categories and budgets"
+      : updateMode === UpdateTransactionMode.Category
+      ? "categories"
+      : "budgets";
+    
+    const dryRunText = dryRun ? " (Dry Run)" : "";
+    
     return [
-      `\n${chalk.blueBright("🔄 Categorizing transactions using LLM...")}`,
-      `${chalk.gray("Tag:")} ${chalk.cyan(tag)}`,
-      `${chalk.gray("Mode:")} ${chalk.cyan(updateMode)}`,
-      chalk.gray("─".repeat(50)),
+      "\n",
+      chalk.blueBright(`Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`),
     ].join("\n");
   }
 
   /**
-   * Formats the error message for tag not found
+   * Formats the tag not found message
    */
   formatTagNotFound(tag: string): string {
-    return `\n${chalk.redBright("!!!")} Tag not found: ${chalk.gray(
-      tag
-    )} ${chalk.redBright("!!!")}`;
+    return [
+      "\n",
+      chalk.yellow(`❌ Tag "${tag}" not found`),
+    ].join("\n");
   }
 
   /**
-   * Formats the error message for empty tag
+   * Formats the empty tag message
    */
   formatEmptyTag(tag: string): string {
-    return `\n${chalk.redBright(
-      "!!!"
-    )} No transactions found for tag: ${chalk.gray(tag)} ${chalk.redBright(
-      "!!!"
-    )}`;
+    return [
+      "\n",
+      chalk.yellow(`ℹ️ No transactions found with tag "${tag}"`),
+    ].join("\n");
   }
 
   /**
@@ -44,9 +51,10 @@ export class UpdateTransactionDisplayService {
    */
   formatTransactionUpdates(
     results: UpdateTransactionStatusDto,
-    updateMode: UpdateTransactionMode
+    updateMode: UpdateTransactionMode,
+    dryRun?: boolean
   ): [string, number] {
-    const lines: string[] = [`\n${chalk.blueBright("Transaction Updates:")}`];
+    const lines: string[] = [`\n${chalk.blueBright(dryRun ? "Proposed Transaction Updates:" : "Transaction Updates:")}`];
     let updatedCount = 0;
 
     results.data?.forEach((result) => {
@@ -93,18 +101,22 @@ export class UpdateTransactionDisplayService {
    */
   formatSummary(
     results: UpdateTransactionStatusDto,
-    updatedCount: number
+    updatedCount: number,
+    dryRun?: boolean
   ): string {
-    return [
-      "\n",
-      chalk.gray("─".repeat(50)),
-      chalk.green("✅ Processing complete"),
-      `   ${chalk.gray("Total transactions:")} ${chalk.white(
-        results.totalTransactions
-      )}`,
-      `   ${chalk.gray("Updates made:")} ${chalk.white(updatedCount)}`,
-      "",
-    ].join("\n");
+    const lines: string[] = [];
+
+    if (results.totalTransactions === 0) {
+      lines.push(chalk.yellow("No transactions found"));
+    } else {
+      lines.push(
+        chalk.green(
+          `✅ ${dryRun ? "Proposed" : "Successfully"} updated ${updatedCount} of ${results.totalTransactions} transactions`
+        )
+      );
+    }
+
+    return lines.join("\n");
   }
 
   /**

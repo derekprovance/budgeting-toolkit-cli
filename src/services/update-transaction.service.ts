@@ -7,7 +7,6 @@ import { logger } from "../logger";
 import { CategoryService } from "./core/category.service";
 import { TransactionService } from "./core/transaction.service";
 import { BudgetService } from "./core/budget.service";
-import { TransactionPropertyService } from "./core/transaction-property.service";
 import {
   AIResponse,
   LLMTransactionProcessingService,
@@ -20,35 +19,32 @@ import { TransactionValidatorService } from "./core/transaction-validator.servic
 import { TransactionUpdaterService } from "./core/transaction-updater.service";
 
 export class UpdateTransactionService implements IUpdateTransactionService {
-  private readonly validator: TransactionValidatorService;
-  private readonly updater: TransactionUpdaterService;
-
   constructor(
     private readonly transactionService: TransactionService,
     private readonly categoryService: CategoryService,
     private readonly budgetService: BudgetService,
-    private readonly llmTransactionProcessingService: LLMTransactionProcessingService,
-    private readonly transactionPropertyService: TransactionPropertyService,
-    private readonly processTransactionsWithCategories = false,
-    private readonly noConfirmation = false
-  ) {
-    this.validator = new TransactionValidatorService(
-      transactionPropertyService
-    );
-    this.updater = new TransactionUpdaterService(
-      transactionService,
-      this.validator,
-      noConfirmation
-    );
-  }
+    private readonly llmService: LLMTransactionProcessingService,
+    private readonly validator: TransactionValidatorService,
+    private readonly processTransactionsWithCategories: boolean = false,
+    private readonly noConfirmation: boolean = false,
+    private readonly dryRun: boolean = false
+  ) {}
 
   async updateTransactionsByTag(
     tag: string,
-    updateMode: UpdateTransactionMode
+    updateMode: UpdateTransactionMode,
+    dryRun?: boolean
   ): Promise<UpdateTransactionStatusDto> {
     try {
       if (!(await this.transactionService.tagExists(tag))) {
-        logger.debug(`Tag ${tag} does not exist`);
+        logger.debug(
+          {
+            tag,
+            updateMode,
+            dryRun,
+          },
+          "Tag does not exist"
+        );
         return {
           status: UpdateTransactionStatus.NO_TAG,
           totalTransactions: 0,
@@ -67,7 +63,16 @@ export class UpdateTransactionService implements IUpdateTransactionService {
       );
 
       if (!transactions.length) {
-        logger.debug(`No transactions found for tag: ${tag}`);
+        logger.debug(
+          {
+            tag,
+            updateMode,
+            dryRun,
+            totalTransactions: unfilteredTransactions.length,
+            filteredTransactions: transactions.length,
+          },
+          "No valid transactions found for tag"
+        );
         return {
           status: UpdateTransactionStatus.EMPTY_TAG,
           totalTransactions: 0,
@@ -75,12 +80,22 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         };
       }
 
-      let categories;
+      logger.debug(
+        {
+          tag,
+          updateMode,
+          dryRun,
+          totalTransactions: transactions.length,
+        },
+        "Processing transactions"
+      );
+
+      let categories: Category[] | undefined;
       if (updateMode !== UpdateTransactionMode.Budget) {
         categories = await this.categoryService.getCategories();
       }
 
-      let budgets;
+      let budgets: BudgetRead[] | undefined;
       if (updateMode !== UpdateTransactionMode.Category) {
         budgets = await this.budgetService.getBudgets();
       }
@@ -96,12 +111,26 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         transactions,
         aiResults,
         categories,
-        budgets
+        budgets,
+        dryRun
       );
 
       const resultData = await this.transformToTransactionCategoryResult(
         updatedTransactions,
         aiResults
+      );
+
+      logger.debug(
+        {
+          tag,
+          updateMode,
+          dryRun,
+          totalTransactions: transactions.length,
+          updatedTransactions: updatedTransactions.length,
+          categories: categories?.length,
+          budgets: budgets?.length,
+        },
+        "Transaction update complete"
       );
 
       return {
@@ -110,9 +139,15 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         totalTransactions: transactions.length,
       };
     } catch (ex) {
-      if (ex instanceof Error) {
-        logger.error(`Unable to get transactions by tag: ${ex.message}`);
-      }
+      logger.error(
+        {
+          tag,
+          updateMode,
+          dryRun,
+          error: ex instanceof Error ? ex.message : "Unknown error",
+        },
+        "Failed to update transactions"
+      );
 
       return {
         status: UpdateTransactionStatus.PROCESSING_FAILED,
@@ -132,19 +167,37 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     const categoryNames = categories?.map((c) => c.name);
     const budgetNames = budgets?.map((b) => b.attributes.name);
 
+    logger.debug(
+      {
+        updateMode,
+        transactionCount: transactions.length,
+        categoryCount: categoryNames?.length,
+        budgetCount: budgetNames?.length,
+      },
+      "Getting AI results for transactions"
+    );
+
     const aiResults =
-      await this.llmTransactionProcessingService.processTransactions(
+      await this.llmService.processTransactions(
         transactions,
         updateMode !== UpdateTransactionMode.Budget ? categoryNames : undefined,
         updateMode !== UpdateTransactionMode.Category ? budgetNames : undefined
       );
 
     if (Object.keys(aiResults).length !== transactions.length) {
-      throw new Error(
+      const error = new Error(
         `LLM categorization result count (${
           Object.keys(aiResults).length
         }) doesn't match transaction count (${transactions.length})`
       );
+      logger.error(
+        {
+          expectedCount: transactions.length,
+          actualCount: Object.keys(aiResults).length,
+        },
+        "AI result count mismatch"
+      );
+      throw error;
     }
 
     return aiResults;
@@ -152,29 +205,88 @@ export class UpdateTransactionService implements IUpdateTransactionService {
 
   private async updateTransactionsWithAIResults(
     transactions: TransactionSplit[],
-    aiResults: AIResponse,
+    aiResults: Record<string, { category?: string; budget?: string }>,
     categories?: Category[],
-    budgets?: BudgetRead[]
+    budgets?: BudgetRead[],
+    dryRun?: boolean
   ): Promise<TransactionSplit[]> {
-    const updatedTransactions: TransactionSplit[] = [];
-
-    for (const transaction of transactions) {
-      const updatedTransaction = await this.updater.updateTransaction(
-        transaction,
-        aiResults,
-        categories,
-        budgets
-      );
-
-      if (updatedTransaction) {
-        updatedTransactions.push(updatedTransaction);
-      }
-    }
-
-    logger.debug(
-      `Processed ${transactions.length} transactions, updated ${updatedTransactions.length}`
+    logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
+    const results: TransactionSplit[] = [];
+    const updater = new TransactionUpdaterService(
+      this.transactionService,
+      this.validator,
+      this.noConfirmation,
+      this.dryRun
     );
-    return updatedTransactions;
+
+    try {
+      for (const transaction of transactions) {
+        const journalId = transaction.transaction_journal_id!;
+        if (!aiResults[journalId]) {
+          logger.debug(
+            "No AI results for transaction:",
+            transaction.description
+          );
+          continue;
+        }
+
+        const updatedTransaction = await updater.updateTransaction(
+          transaction,
+          aiResults,
+          categories || [],
+          budgets || []
+        );
+
+        if (updatedTransaction) {
+          results.push(updatedTransaction);
+        }
+      }
+
+      const totalTransactions = transactions.length;
+      const updatedCount = results.length;
+      const skippedCount = totalTransactions - updatedCount;
+
+      if (dryRun) {
+        logger.info(
+          {
+            totalTransactions,
+            proposedUpdates: updatedCount,
+            skipped: skippedCount,
+          },
+          "Dry run completed - showing proposed changes"
+        );
+        // Print a summary of proposed changes
+        logger.info("\nProposed Changes:");
+        results.forEach((transaction) => {
+          const journalId = transaction.transaction_journal_id!;
+          const aiResult = aiResults[journalId];
+          logger.info(
+            `Transaction: ${transaction.description}
+  Current Category: ${transaction.category_name || "None"}
+  Proposed Category: ${aiResult.category || "None"}
+  Current Budget: ${transaction.budget_name || "None"}
+  Proposed Budget: ${aiResult.budget || "None"}
+  Amount: ${transaction.amount}
+  Date: ${transaction.date}
+  --------------------`
+          );
+        });
+      } else {
+        logger.info(
+          {
+            totalTransactions,
+            updated: updatedCount,
+            skipped: skippedCount,
+          },
+          "Transaction update completed"
+        );
+      }
+      logger.debug({ updatedCount: results.length }, 'END updateTransactionsWithAIResults');
+      return results;
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : err }, 'ERROR in updateTransactionsWithAIResults');
+      throw err;
+    }
   }
 
   private async transformToTransactionCategoryResult(

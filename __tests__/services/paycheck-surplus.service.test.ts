@@ -133,7 +133,10 @@ describe("PaycheckSurplusService", () => {
 
       // Assert
       expect(result).toBe(3000.00);
-      expect(mockLogger.warn).toHaveBeenCalledWith("Expected monthly paycheck amount not configured");
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { expectedMonthlyPaycheck: undefined },
+        "Expected monthly paycheck amount not configured"
+      );
     });
 
     it("should handle invalid expected paycheck amount", async () => {
@@ -173,8 +176,8 @@ describe("PaycheckSurplusService", () => {
       // Assert
       expect(result).toBe(3000.00);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        "Invalid expected monthly paycheck amount",
-        { expectedMonthlyPaycheck: "invalid" }
+        { expectedMonthlyPaycheck: "invalid" },
+        "Invalid expected monthly paycheck amount"
       );
     });
 
@@ -208,9 +211,13 @@ describe("PaycheckSurplusService", () => {
       // Act & Assert
       await expect(service.calculatePaycheckSurplus(1, 2024)).rejects.toThrow("Failed to find paychecks for month 1");
       expect(logger.error).toHaveBeenCalledWith(
-        expect.any(Error),
-        "Error calculating paycheck surplus",
-        { month: 1, year: 2024 }
+        {
+          error: "API Error",
+          type: "Error",
+          month: 1,
+          year: 2024,
+        },
+        "Failed to find paychecks"
       );
     });
 

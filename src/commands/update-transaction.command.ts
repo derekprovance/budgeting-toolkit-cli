@@ -7,6 +7,7 @@ import { UpdateTransactionDisplayService } from "../services/display/update-tran
 interface UpdateTransactionsParams {
   tag: string;
   updateMode: UpdateTransactionMode;
+  dryRun?: boolean;
 }
 
 export class UpdateTransactionsCommand
@@ -20,14 +21,15 @@ export class UpdateTransactionsCommand
     this.displayService = new UpdateTransactionDisplayService();
   }
 
-  async execute({ tag, updateMode }: UpdateTransactionsParams): Promise<void> {
-    console.log(this.displayService.formatProcessingHeader(tag, updateMode));
+  async execute({ tag, updateMode, dryRun }: UpdateTransactionsParams): Promise<void> {
+    console.log(this.displayService.formatProcessingHeader(tag, updateMode, dryRun));
 
     try {
       const results =
         await this.updateTransactionService.updateTransactionsByTag(
           tag,
-          updateMode
+          updateMode,
+          dryRun
         );
 
       if (results.status === UpdateTransactionStatus.NO_TAG) {
@@ -41,9 +43,9 @@ export class UpdateTransactionsCommand
       }
 
       const [updatesText, updatedCount] =
-        this.displayService.formatTransactionUpdates(results, updateMode);
+        this.displayService.formatTransactionUpdates(results, updateMode, dryRun);
       console.log(updatesText);
-      console.log(this.displayService.formatSummary(results, updatedCount));
+      console.log(this.displayService.formatSummary(results, updatedCount, dryRun));
     } catch (error) {
       console.log(this.displayService.formatError(error));
       throw error;

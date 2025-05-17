@@ -1,5 +1,5 @@
 export class LLMResponseValidator {
-  private static readonly FUZZY_MATCH_THRESHOLD = 0.8;
+  private static readonly FUZZY_MATCH_THRESHOLD = 0.7;
 
   static validateCategoryResponse(
     response: string,
@@ -98,7 +98,7 @@ export class LLMResponseValidator {
   }
 
   private static normalizeString(str: string): string {
-    return str.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return str.toLowerCase().replace(/[^a-z0-9\s]/g, "");
   }
 
   private static calculateSimilarity(str1: string, str2: string): number {

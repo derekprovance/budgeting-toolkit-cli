@@ -2,6 +2,7 @@ import { BudgetStatusDto } from "../types/dto/budget-status.dto";
 import { BudgetService } from "./core/budget.service";
 import { BudgetStatusService as IBudgetStatusService } from "../types/interface/budget-status.service.interface";
 import { DateUtils } from "../utils/date.utils";
+import { logger } from "../logger";
 
 export class BudgetStatusService implements IBudgetStatusService {
   constructor(private budgetService: BudgetService) {}
@@ -14,6 +15,14 @@ export class BudgetStatusService implements IBudgetStatusService {
       DateUtils.validateMonthYear(month, year);
       const budgetStatuses: BudgetStatusDto[] = [];
 
+      logger.debug(
+        {
+          month,
+          year,
+        },
+        "Fetching budget status"
+      );
+
       const budgets = await this.budgetService.getBudgets();
       const insights = await this.budgetService.getBudgetExpenseInsights(
         month,
@@ -22,6 +31,15 @@ export class BudgetStatusService implements IBudgetStatusService {
       const budgetLimits = await this.budgetService.getBudgetLimits(
         month,
         year
+      );
+
+      logger.debug(
+        {
+          budgetCount: budgets.length,
+          insightCount: insights.length,
+          limitCount: budgetLimits.length,
+        },
+        "Retrieved budget data"
       );
 
       budgets.forEach((budget) => {
@@ -40,8 +58,25 @@ export class BudgetStatusService implements IBudgetStatusService {
         } as BudgetStatusDto);
       });
 
+      logger.debug(
+        {
+          month,
+          year,
+          budgetCount: budgetStatuses.length,
+        },
+        "Budget status calculation complete"
+      );
+
       return budgetStatuses;
     } catch (error) {
+      logger.error(
+        {
+          month,
+          year,
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        "Failed to get budget status"
+      );
       if (error instanceof Error) {
         throw new Error(
           `Failed to get budget status for month ${month}: ${error.message}`

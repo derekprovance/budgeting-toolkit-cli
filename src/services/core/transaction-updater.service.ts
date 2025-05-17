@@ -12,8 +12,13 @@ export class TransactionUpdaterService {
   constructor(
     private readonly transactionService: TransactionService,
     private readonly validator: TransactionValidatorService,
-    private readonly noConfirmation: boolean = false
-  ) {}
+    private readonly noConfirmation: boolean = false,
+    private readonly dryRun: boolean = false
+  ) {
+    // Debug log to see if the real constructor is called during tests
+    // eslint-disable-next-line no-console
+    console.log('REAL TransactionUpdaterService CONSTRUCTOR CALLED', { noConfirmation, dryRun });
+  }
 
   /**
    * Updates a transaction with new category and budget
@@ -39,20 +44,85 @@ export class TransactionUpdaterService {
       );
       const journalId = transaction.transaction_journal_id!;
 
-      let budget;
-      if (shouldUpdateBudget) {
-        budget = this.getValidBudget(budgets, aiResults[journalId].budget);
+      // --- Begin: Validate AI category and budget ---
+      const aiCategory = aiResults[journalId]?.category;
+      const aiBudget = aiResults[journalId]?.budget;
+
+      // If a category is proposed, it must be non-empty and valid
+      let category;
+      if (aiCategory && aiCategory !== "") {
+        category = this.getValidCategory(categories, aiCategory);
+        if (!category) {
+          logger.warn(
+            {
+              transactionId: journalId,
+              description: transaction.description,
+              attemptedCategory: aiCategory,
+              validCategories: categories?.map(c => c.name),
+            },
+            "Invalid or unrecognized category from AI, skipping transaction"
+          );
+          return undefined;
+        }
+      } else if (aiCategory === "") {
+        logger.warn(
+          {
+            transactionId: journalId,
+            description: transaction.description,
+            attemptedCategory: aiCategory,
+          },
+          "Empty category from AI, skipping transaction"
+        );
+        return undefined;
       }
 
-      const category = this.getValidCategory(
-        categories,
-        aiResults[journalId]?.category
-      );
+      // If a budget is proposed, it must be non-empty and valid
+      let budget;
+      if (shouldUpdateBudget && aiBudget && aiBudget !== "") {
+        budget = this.getValidBudget(budgets, aiBudget);
+        if (!budget) {
+          logger.warn(
+            {
+              transactionId: journalId,
+              description: transaction.description,
+              attemptedBudget: aiBudget,
+              validBudgets: budgets?.map(b => b.attributes.name),
+            },
+            "Invalid or unrecognized budget from AI, skipping transaction"
+          );
+          return undefined;
+        }
+      } else if (shouldUpdateBudget && aiBudget === "") {
+        logger.warn(
+          {
+            transactionId: journalId,
+            description: transaction.description,
+            attemptedBudget: aiBudget,
+          },
+          "Empty budget from AI, skipping transaction"
+        );
+        return undefined;
+      }
+      // --- End: Validate AI category and budget ---
 
       if (
         !this.validator.categoryOrBudgetChanged(transaction, category, budget)
       ) {
         return undefined;
+      }
+
+      // In dry run mode, we don't need user confirmation
+      if (this.dryRun) {
+        logger.debug(
+          {
+            transactionId: journalId,
+            description: transaction.description,
+            proposedCategory: category?.name,
+            proposedBudget: budget?.attributes.name,
+          },
+          "Dry run - showing proposed changes"
+        );
+        return transaction;
       }
 
       const approved =

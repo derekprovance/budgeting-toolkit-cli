@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { ContentBlock } from "@anthropic-ai/sdk/resources";
 import { logger } from "../logger";
 
 export interface ChatMessage {
@@ -33,21 +32,71 @@ interface ClaudeConfig {
   maxConcurrent?: number;
   retryDelayMs?: number;
   maxRetryDelayMs?: number;
+
+  // Function Calling Configuration
+  functions?: Array<{
+    name: string;
+    description: string;
+    parameters: {
+      type: string;
+      properties: Record<string, {
+        type: string;
+        description?: string;
+        enum?: string[];
+      }>;
+      required: string[];
+    };
+  }>;
+  function_call?: { name: string };
+}
+
+type RequiredClaudeConfig = Required<Omit<ClaudeConfig, 'functions' | 'function_call'>> & {
+  functions?: ClaudeConfig['functions'];
+  function_call?: ClaudeConfig['function_call'];
+};
+
+interface MessageCreateParams {
+  model: string;
+  messages: ChatMessage[];
+  max_tokens: number;
+  temperature: number;
+  top_p: number;
+  top_k: number;
+  stop_sequences: string[];
+  system?: string;
+  metadata?: Record<string, string>;
+  tools?: Array<{
+    name: string;
+    description?: string;
+    input_schema: {
+      type: 'object';
+      properties: Record<string, {
+        type: string;
+        description?: string;
+        enum?: string[];
+      }>;
+      required: string[];
+    };
+  }>;
+  tool_choice?: {
+    type: 'tool';
+    name: string;
+  };
 }
 
 export class ClaudeClient {
   private client: Anthropic;
-  private config: Required<ClaudeConfig>;
+  private config: RequiredClaudeConfig;
   private requestQueue: Promise<string>[] = [];
 
-  private static DEFAULT_CONFIG: Required<ClaudeConfig> = {
+  private static DEFAULT_CONFIG: RequiredClaudeConfig = {
     apiKey: process.env.ANTHROPIC_API_KEY || "",
     baseURL: "https://api.anthropic.com",
     timeout: 30000,
     maxRetries: 3,
     model: "claude-3-5-haiku-latest",
     maxTokens: 1024,
-    temperature: 1.0,
+    temperature: 0.2,
     topP: 1.0,
     topK: 5,
     stopSequences: [],
@@ -98,7 +147,9 @@ export class ClaudeClient {
     overrideConfig?: Partial<ClaudeConfig>
   ): Promise<string> {
     const config = { ...this.config, ...overrideConfig };
-    return this.processSingleChat(messages, config);
+    const response = await this.processSingleChat(messages, config);
+
+    return response;
   }
 
   updateConfig(newConfig: Partial<ClaudeConfig>): void {
@@ -119,7 +170,7 @@ export class ClaudeClient {
     }
   }
 
-  getConfig(): Omit<Required<ClaudeConfig>, "apiKey"> {
+  getConfig(): Omit<RequiredClaudeConfig, "apiKey"> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { apiKey, ...safeConfig } = this.config;
     return safeConfig;
@@ -127,7 +178,7 @@ export class ClaudeClient {
 
   private async processSingleChat(
     messages: ChatMessage[],
-    config: Required<ClaudeConfig>
+    config: RequiredClaudeConfig
   ): Promise<string> {
     let attempt = 0;
     let request: Promise<string>;
@@ -178,19 +229,40 @@ export class ClaudeClient {
 
   private async makeRequest(
     messages: ChatMessage[],
-    config: Required<ClaudeConfig>
+    config: RequiredClaudeConfig
   ): Promise<string> {
-    const response = await this.client.messages.create({
+    const requestParams: MessageCreateParams = {
       model: config.model,
       messages: messages,
-      max_tokens: config.maxTokens,
+      max_tokens: 150,
       temperature: config.temperature,
       top_p: config.topP,
       top_k: config.topK,
       stop_sequences: config.stopSequences,
       system: config.systemPrompt,
       metadata: config.metadata,
-    });
+    };
+
+    if (config.functions) {
+      requestParams.tools = config.functions.map(fn => ({
+        name: fn.name,
+        description: fn.description,
+        input_schema: {
+          type: 'object',
+          properties: fn.parameters.properties,
+          required: fn.parameters.required
+        }
+      }));
+    }
+
+    if (config.function_call) {
+      requestParams.tool_choice = {
+        type: 'tool',
+        name: config.function_call.name
+      };
+    }
+
+    const response = await this.client.messages.create(requestParams);
 
     const textContent = response.content
       .map((block) => this.getTextFromContentBlock(block))
@@ -204,9 +276,15 @@ export class ClaudeClient {
     return textContent;
   }
 
-  private getTextFromContentBlock(block: ContentBlock): string {
-    if (block.type === "text") {
-      return block.text;
+  private getTextFromContentBlock(block: unknown): string {
+    if (typeof block === 'object' && block !== null) {
+      const b = block as { type?: string; text?: string; input?: unknown };
+      if (b.type === "text" && typeof b.text === "string") {
+        return b.text;
+      }
+      if (b.type === "tool_use" && b.input) {
+        return JSON.stringify(b.input);
+      }
     }
     return "";
   }

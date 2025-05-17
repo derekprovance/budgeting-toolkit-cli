@@ -45,25 +45,38 @@ export class PaycheckSurplusService {
 
       return surplus;
     } catch (error) {
-      logger.error(error, "Error calculating paycheck surplus", {
-        month,
-        year,
-      });
+      logger.error(
+        {
+          month,
+          year,
+          error: error instanceof Error ? error.message : "Unknown error",
+          type: error instanceof Error ? error.constructor.name : typeof error,
+        },
+        "Failed to calculate paycheck surplus"
+      );
       throw error;
     }
   }
 
   private getExpectedPaycheckAmount(): number {
     if (!expectedMonthlyPaycheck) {
-      logger.warn("Expected monthly paycheck amount not configured");
+      logger.warn(
+        {
+          expectedMonthlyPaycheck,
+        },
+        "Expected monthly paycheck amount not configured"
+      );
       return 0;
     }
 
     const amount = parseFloat(expectedMonthlyPaycheck);
     if (isNaN(amount)) {
-      logger.error("Invalid expected monthly paycheck amount", {
-        expectedMonthlyPaycheck,
-      });
+      logger.error(
+        {
+          expectedMonthlyPaycheck,
+        },
+        "Invalid expected monthly paycheck amount"
+      );
       return 0;
     }
 
@@ -99,13 +112,27 @@ export class PaycheckSurplusService {
           return amountB - amountA;
         });
 
+      logger.debug(
+        {
+          month,
+          year,
+          totalTransactions: transactions.length,
+          paycheckCandidates: paycheckCandidates.length,
+        },
+        "Found paycheck candidates"
+      );
+
       return paycheckCandidates;
     } catch (error) {
-      logger.trace(error, "Error finding paychecks", {
-        month,
-        year,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      logger.error(
+        {
+          month,
+          year,
+          error: error instanceof Error ? error.message : "Unknown error",
+          type: error instanceof Error ? error.constructor.name : typeof error,
+        },
+        "Failed to find paychecks"
+      );
       if (error instanceof Error) {
         throw new Error(
           `Failed to find paychecks for month ${month}: ${error.message}`

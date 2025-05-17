@@ -163,12 +163,10 @@ describe("TransactionService", () => {
       await service.updateTransaction(mockTransaction, "New Category");
 
       expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          transaction: {
-            transactionJournalId: "1",
-            description: "Test Transaction",
-          },
-        }),
+        {
+          transactionId: "1",
+          description: "Test Transaction",
+        },
         "Unable to find Transaction ID for Split"
       );
     });

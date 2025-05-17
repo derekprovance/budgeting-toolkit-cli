@@ -109,6 +109,10 @@ export const createCli = (): Command => {
       "-y, --yes",
       "skip confirmation prompts and apply updates automatically (default: false)"
     )
+    .option(
+      "-d, --dryRun",
+      "show proposed changes without applying them (default: false)"
+    )
     .action(async (tag: string, opts: UpdateTransactionOptions) => {
       try {
         const claudeClient = LLMConfig.createClient();
@@ -127,15 +131,17 @@ export const createCli = (): Command => {
           services.categoryService,
           services.budgetService,
           llmTransactionProcessor,
-          services.transactionPropertyService,
+          services.transactionValidatorService,
           opts.includeClassified,
-          opts.yes
+          opts.yes,
+          opts.dryRun
         );
 
         const command = new UpdateTransactionsCommand(updateCategoryService);
         await command.execute({
           tag,
           updateMode: opts.mode,
+          dryRun: opts.dryRun
         });
       } catch (error) {
         logger.error("Error updating transactions:", error);

@@ -8,6 +8,7 @@ import { BudgetStatusService } from "../services/budget-status.service";
 import { ExcludedTransactionService } from "../services/excluded-transaction.service";
 import { TransactionPropertyService } from "../services/core/transaction-property.service";
 import { PaycheckSurplusService } from "../services/paycheck-surplus.service";
+import { TransactionValidatorService } from "../services/core/transaction-validator.service";
 
 export class ServiceFactory {
   static createServices(apiClient: FireflyApiClient) {
@@ -17,6 +18,9 @@ export class ServiceFactory {
     const excludedTransactionService = new ExcludedTransactionService();
     const transactionPropertyService = new TransactionPropertyService(
       excludedTransactionService
+    );
+    const transactionValidatorService = new TransactionValidatorService(
+      transactionPropertyService
     );
     const additionalIncomeService = new AdditionalIncomeService(
       transactionService,
@@ -42,6 +46,7 @@ export class ServiceFactory {
       transactionPropertyService,
       excludedTransactionService,
       paycheckSurplusService,
+      transactionValidatorService,
     };
   }
 }
