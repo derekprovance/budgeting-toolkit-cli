@@ -134,7 +134,6 @@ describe("UpdateTransactionService", () => {
           category_name: aiResult?.category || transaction.category_name,
           budget_name: aiResult?.budget || transaction.budget_name,
         };
-        console.log('MOCK updateTransaction returning:', JSON.stringify(result));
         return Promise.resolve(result);
       }),
     } as unknown as jest.Mocked<TransactionUpdaterService>;
@@ -225,21 +224,12 @@ describe("UpdateTransactionService", () => {
           { category: `New Category ${idx + 1}`, budget: `New Budget ${idx + 1}` },
         ])
       );
-      console.log('DEBUG filtered.length:', filtered.length);
-      console.log('DEBUG dynamicAIResults keys:', Object.keys(dynamicAIResults));
-      console.log('DEBUG dynamicAIResults:', JSON.stringify(dynamicAIResults, null, 2));
       mockLLMService.processTransactions.mockResolvedValue(dynamicAIResults);
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
       mockUpdater.updateTransaction.mockImplementation(async (transaction, aiResults) => {
         const journalId = transaction.transaction_journal_id!;
         const aiResult = aiResults[journalId];
-        const validateResult = mockValidator.validateTransactionData(transaction, aiResults);
-        // categoryOrBudgetChanged expects category and budget as objects with a name property (or undefined)
-        const categoryObj = aiResult?.category ? { name: aiResult.category } : undefined;
-        const budgetObj = aiResult?.budget ? { id: 'mock-id', attributes: { name: aiResult.budget } } : undefined;
-        const changedResult = mockValidator.categoryOrBudgetChanged(transaction, categoryObj, budgetObj);
-        console.log(`DEBUG updateTransaction for journalId=${journalId}: validateTransactionData=${validateResult}, categoryOrBudgetChanged=${changedResult}`);
         const result = {
           ...transaction,
           category_name: aiResult?.category || transaction.category_name,
@@ -252,9 +242,6 @@ describe("UpdateTransactionService", () => {
         "test",
         UpdateTransactionMode.Both
       );
-
-      // Log the full result object for diagnosis
-      console.log('FULL RESULT:', JSON.stringify(result, null, 2));
 
       expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
       expect(result.totalTransactions).toBe(mockTransactions.length);
