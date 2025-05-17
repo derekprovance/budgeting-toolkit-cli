@@ -115,6 +115,7 @@ export class FinalizeBudgetDisplayService {
     const totalIncome = this.calculateTotal(additionalIncome);
     const totalExpenses = this.calculateTotal(unbudgetedExpenses);
 
+    //TODO(DEREK) - We need to calculate disposable income
     const lines = [
       chalk.bold("\n=== Summary ===\n"),
       "Transaction Types:",
@@ -133,6 +134,7 @@ export class FinalizeBudgetDisplayService {
       `  Paycheck Surplus:      ${chalk.cyanBright(
         `${currencySymbol}${paycheckSurplus.toFixed(2)}`
       )}`,
+      `  Disposable Transfer:   ${chalk.cyanBright(`N/A`)}`,
     ];
 
     return lines.join("\n");
