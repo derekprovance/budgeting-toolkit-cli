@@ -560,8 +560,7 @@ describe("UpdateTransactionService", () => {
         mockTransaction,
         { "1": { category: "New Category", budget: "New Budget" } },
         [mockCategory],
-        [mockBudget],
-        dryRun
+        [mockBudget]
       );
     });
 
@@ -629,8 +628,7 @@ describe("UpdateTransactionService", () => {
         mockTransaction,
         { "1": { category: "New Category", budget: "New Budget" } },
         [mockCategory],
-        [mockBudget],
-        dryRun
+        [mockBudget]
       );
     });
   });

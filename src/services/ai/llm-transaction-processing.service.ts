@@ -78,7 +78,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
     // Then process budgets using the assigned categories
     const assignedBudgets =
-      budgets?.length && categories?.length
+      budgets?.length
         ? await this.processBudgetsWithErrorHandling(
             transactions,
             budgets,

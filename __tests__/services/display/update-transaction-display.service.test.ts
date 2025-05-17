@@ -45,6 +45,7 @@ jest.mock("chalk", () => createChalkMock());
 import { UpdateTransactionDisplayService } from "../../../src/services/display/update-transaction-display.service";
 import { UpdateTransactionMode } from "../../../src/types/enum/update-transaction-mode.enum";
 import { UpdateTransactionStatus } from "../../../src/types/enum/update-transaction-status.enum";
+import { UpdateTransactionStatusDto } from "../../../src/types/dto/update-transaction-status.dto";
 
 describe("UpdateTransactionDisplayService", () => {
   let service: UpdateTransactionDisplayService;
@@ -59,23 +60,21 @@ describe("UpdateTransactionDisplayService", () => {
         "test-tag",
         UpdateTransactionMode.Both
       );
-      expect(result).toContain("Categorizing transactions using LLM");
-      expect(result).toContain("Tag: test-tag");
-      expect(result).toContain("Mode: both");
+      expect(result).toContain("Processing transactions with tag \"test-tag\" for categories and budgets");
     });
   });
 
   describe("formatTagNotFound", () => {
     it("should format the tag not found message correctly", () => {
       const result = service.formatTagNotFound("test-tag");
-      expect(result).toContain("Tag not found: test-tag");
+      expect(result).toContain("❌ Tag \"test-tag\" not found");
     });
   });
 
   describe("formatEmptyTag", () => {
     it("should format the empty tag message correctly", () => {
       const result = service.formatEmptyTag("test-tag");
-      expect(result).toContain("No transactions found for tag: test-tag");
+      expect(result).toContain("ℹ️ No transactions found with tag \"test-tag\"");
     });
   });
 
@@ -142,16 +141,29 @@ describe("UpdateTransactionDisplayService", () => {
 
   describe("formatSummary", () => {
     it("should format the summary correctly", () => {
-      const results = {
+      const results: UpdateTransactionStatusDto = {
         status: UpdateTransactionStatus.HAS_RESULTS,
-        totalTransactions: 5,
-        data: [],
+        totalTransactions: 2,
+        data: [
+          {
+            name: "Test Transaction 1",
+            category: "New Category 1",
+            updatedCategory: "New Category 1",
+            budget: "New Budget 1",
+            updatedBudget: "New Budget 1"
+          },
+          {
+            name: "Test Transaction 2",
+            category: "New Category 2",
+            updatedCategory: "New Category 2",
+            budget: "New Budget 2",
+            updatedBudget: "New Budget 2"
+          }
+        ]
       };
 
       const result = service.formatSummary(results, 2);
-      expect(result).toContain("Processing complete");
-      expect(result).toContain("Total transactions: 5");
-      expect(result).toContain("Updates made: 2");
+      expect(result).toContain("Successfully updated 2 of 2 transactions");
     });
   });
 
