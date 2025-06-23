@@ -5,17 +5,12 @@ import { FinalizeBudgetCommand } from "./commands/finalize-budget.command";
 import { BudgetStatusCommand } from "./commands/budget-status.command";
 import { UpdateTransactionsCommand } from "./commands/update-transaction.command";
 import { ServiceFactory } from "./factories/service.factory";
-import { LLMConfig } from "./config/llm.config";
 import {
   BudgetDateOptions,
   UpdateTransactionOptions,
 } from "./types/interface/command-options.interface";
 import { UpdateTransactionMode } from "./types/enum/update-transaction-mode.enum";
 import { logger } from "./logger";
-import { LLMTransactionCategoryService } from "./services/ai/llm-transaction-category.service";
-import { LLMTransactionBudgetService } from "./services/ai/llm-transaction-budget.service";
-import { LLMTransactionProcessingService } from "./services/ai/llm-transaction-processing.service";
-import { UpdateTransactionService } from "./services/update-transaction.service";
 
 const getCurrentMonth = (): number => {
   return new Date().getMonth() + 1;
@@ -114,30 +109,20 @@ export const createCli = (): Command => {
       "show proposed changes without applying them (default: false)"
     )
     .action(async (tag: string, opts: UpdateTransactionOptions) => {
+      if (!tag || tag.trim() === "") {
+        logger.error("Tag parameter is required and cannot be empty");
+        process.exit(1);
+      }
+
       try {
-        const claudeClient = LLMConfig.createClient();
-        const llmServices = {
-          category: new LLMTransactionCategoryService(claudeClient),
-          budget: new LLMTransactionBudgetService(claudeClient),
-        };
-
-        const llmTransactionProcessor = new LLMTransactionProcessingService(
-          llmServices.category,
-          llmServices.budget
-        );
-
-        const updateCategoryService = new UpdateTransactionService(
-          services.transactionService,
-          services.categoryService,
-          services.budgetService,
-          llmTransactionProcessor,
-          services.transactionValidatorService,
+        const updateTransactionService = ServiceFactory.createUpdateTransactionService(
+          apiClient,
           opts.includeClassified,
           opts.yes,
           opts.dryRun
         );
 
-        const command = new UpdateTransactionsCommand(updateCategoryService);
+        const command = new UpdateTransactionsCommand(updateTransactionService);
         await command.execute({
           tag,
           updateMode: opts.mode,

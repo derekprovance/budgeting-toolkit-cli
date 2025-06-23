@@ -24,7 +24,10 @@ export const logLevel: string = process.env.LOG_LEVEL || "silent";
 export const claudeAPIKey = process.env.ANTHROPIC_API_KEY;
 export const llmModel = process.env.LLM_MODEL;
 
-export const expectedMonthlyPaycheck = getConfigValue<number>('expectedMonthlyPaycheck', 'EXPECTED_MONTHLY_PAYCHECK');
+export const expectedMonthlyPaycheck = getConfigValue<number>(
+  "expectedMonthlyPaycheck",
+  "EXPECTED_MONTHLY_PAYCHECK"
+);
 
 export enum Account {
   PRIMARY = "1",

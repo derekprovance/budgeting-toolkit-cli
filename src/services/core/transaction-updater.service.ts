@@ -14,11 +14,7 @@ export class TransactionUpdaterService {
     private readonly validator: TransactionValidatorService,
     private readonly noConfirmation: boolean = false,
     private readonly dryRun: boolean = false
-  ) {
-    // Debug log to see if the real constructor is called during tests
-    // eslint-disable-next-line no-console
-    console.log('REAL TransactionUpdaterService CONSTRUCTOR CALLED', { noConfirmation, dryRun });
-  }
+  ) {}
 
   /**
    * Updates a transaction with new category and budget
@@ -42,7 +38,17 @@ export class TransactionUpdaterService {
       const shouldUpdateBudget = await this.validator.shouldSetBudget(
         transaction
       );
-      const journalId = transaction.transaction_journal_id!;
+      const journalId = transaction.transaction_journal_id;
+      
+      if (!journalId) {
+        logger.warn(
+          {
+            description: transaction.description,
+          },
+          "Transaction missing journal ID, skipping"
+        );
+        return undefined;
+      }
 
       // --- Begin: Validate AI category and budget ---
       const aiCategory = aiResults[journalId]?.category;

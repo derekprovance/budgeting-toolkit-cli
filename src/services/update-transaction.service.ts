@@ -153,7 +153,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         status: UpdateTransactionStatus.PROCESSING_FAILED,
         data: [],
         totalTransactions: 0,
-        error: "Unable to get transactions by tag",
+        error: ex instanceof Error ? ex.message : "Unknown error occurred while processing transactions",
       };
     }
   }
@@ -216,12 +216,20 @@ export class UpdateTransactionService implements IUpdateTransactionService {
       this.transactionService,
       this.validator,
       this.noConfirmation,
-      this.dryRun
+      dryRun ?? this.dryRun
     );
 
     try {
       for (const transaction of transactions) {
-        const journalId = transaction.transaction_journal_id!;
+        const journalId = transaction.transaction_journal_id;
+        if (!journalId) {
+          logger.debug(
+            "Transaction missing journal ID:",
+            transaction.description
+          );
+          continue;
+        }
+        
         if (!aiResults[journalId]) {
           logger.debug(
             "No AI results for transaction:",
@@ -247,7 +255,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
       const skippedCount = totalTransactions - updatedCount;
 
       if (dryRun) {
-        logger.info(
+        logger.debug(
           {
             totalTransactions,
             proposedUpdates: updatedCount,
@@ -255,22 +263,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
           },
           "Dry run completed - showing proposed changes"
         );
-        // Print a summary of proposed changes
-        logger.info("\nProposed Changes:");
-        results.forEach((transaction) => {
-          const journalId = transaction.transaction_journal_id!;
-          const aiResult = aiResults[journalId];
-          logger.info(
-            `Transaction: ${transaction.description}
-  Current Category: ${transaction.category_name || "None"}
-  Proposed Category: ${aiResult.category || "None"}
-  Current Budget: ${transaction.budget_name || "None"}
-  Proposed Budget: ${aiResult.budget || "None"}
-  Amount: ${transaction.amount}
-  Date: ${transaction.date}
-  --------------------`
-          );
-        });
       } else {
         logger.info(
           {

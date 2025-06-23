@@ -112,6 +112,20 @@ describe("TransactionUpdaterService", () => {
       );
     });
 
+    it("should return undefined when transaction has no journal ID", async () => {
+      const transactionWithoutId = { ...mockTransaction, transaction_journal_id: undefined };
+
+      const result = await service.updateTransaction(
+        transactionWithoutId as TransactionSplit,
+        mockAIResults,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
     it("should not update budget when shouldSetBudget returns false", async () => {
       mockValidator.validateTransactionData.mockReturnValue(true);
       mockValidator.shouldSetBudget.mockResolvedValue(false);
@@ -275,6 +289,82 @@ describe("TransactionUpdaterService", () => {
 
       expect(result).toBe(mockTransaction);
       expect(UserInputService.askToUpdateTransaction).not.toHaveBeenCalled();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should return undefined when AI provides empty category", async () => {
+      const aiResultsWithEmptyCategory = {
+        "1": { category: "", budget: "New Budget" },
+      };
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        aiResultsWithEmptyCategory,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should return undefined when AI provides invalid category", async () => {
+      const aiResultsWithInvalidCategory = {
+        "1": { category: "Invalid Category", budget: "New Budget" },
+      };
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        aiResultsWithInvalidCategory,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should return undefined when AI provides empty budget", async () => {
+      const aiResultsWithEmptyBudget = {
+        "1": { category: "New Category", budget: "" },
+      };
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        aiResultsWithEmptyBudget,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("should return undefined when AI provides invalid budget", async () => {
+      const aiResultsWithInvalidBudget = {
+        "1": { category: "New Category", budget: "Invalid Budget" },
+      };
+
+      mockValidator.validateTransactionData.mockReturnValue(true);
+      mockValidator.shouldSetBudget.mockResolvedValue(true);
+
+      const result = await service.updateTransaction(
+        mockTransaction as TransactionSplit,
+        aiResultsWithInvalidBudget,
+        mockCategories as Category[],
+        mockBudgets as BudgetRead[]
+      );
+
+      expect(result).toBeUndefined();
       expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
     });
   });

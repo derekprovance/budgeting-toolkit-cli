@@ -265,7 +265,7 @@ describe("UpdateTransactionService", () => {
       expect(result.status).toBe(UpdateTransactionStatus.PROCESSING_FAILED);
       expect(result.totalTransactions).toBe(0);
       expect(result.data).toEqual([]);
-      expect(result.error).toBe("Unable to get transactions by tag");
+      expect(result.error).toBe("Processing failed");
     });
 
     it("should skip transactions that are transfers", async () => {
@@ -617,6 +617,36 @@ describe("UpdateTransactionService", () => {
         [mockCategory],
         [mockBudget]
       );
+    });
+
+    it("should skip transactions with missing journal IDs during processing", async () => {
+      const tag = "test-tag";
+      const updateMode = UpdateTransactionMode.Both;
+      
+      const transactionWithoutId = {
+        transaction_journal_id: undefined,
+        description: "Transaction without ID",
+        amount: "100.00",
+      };
+
+      mockTransactionService.tagExists.mockResolvedValue(true);
+      mockTransactionService.getTransactionsByTag.mockResolvedValue([transactionWithoutId] as any);
+      mockValidator.shouldProcessTransaction.mockReturnValue(true);
+      mockCategoryService.getCategories.mockResolvedValue([]);
+      mockBudgetService.getBudgets.mockResolvedValue([]);
+      
+      // Mock the LLM service to return exactly one result (to match transaction count)
+      // The key doesn't matter since the transaction has no journal ID
+      mockLLMService.processTransactions.mockResolvedValue({
+        "dummy": { category: "Test Category", budget: "Test Budget" }
+      });
+
+      const result = await service.updateTransactionsByTag(tag, updateMode);
+
+      expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+      expect(result.totalTransactions).toBe(1);
+      expect(result.data).toHaveLength(0); // No data because transaction was skipped due to missing ID
+      expect(mockUpdater.updateTransaction).not.toHaveBeenCalled();
     });
   });
 });
