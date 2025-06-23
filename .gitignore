@@ -11,3 +11,5 @@ certs/
 
 # Excluded Transactions in Budget Reporting
 excluded_transactions.csv
+
+budgeting-toolkit.config.yaml

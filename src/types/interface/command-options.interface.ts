@@ -12,3 +12,8 @@ export interface UpdateTransactionOptions {
   yes?: boolean;
   dryRun?: boolean;
 }
+
+export interface GlobalOptions {
+  verbose?: boolean;
+  quiet?: boolean;
+}

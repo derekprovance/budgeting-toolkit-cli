@@ -76,12 +76,28 @@ export class LLMTransactionCategoryService {
 
     const message = {
       role: "user" as const,
-      content: `Categorize these transactions using the provided categories. Match based on description, amount, and merchant type. Return categories in same order.
+      content: `You are a financial transaction categorization expert. Assign the most appropriate category to each transaction based on merchant type, description, and context.
 
-Transactions:
+CATEGORIZATION RULES:
+1. Match merchant names to their primary business type
+2. Consider transaction amounts for context (small coffee vs large grocery)
+3. Look for keywords in descriptions
+4. Always assign a category from the provided list
+5. Be consistent with similar merchants
+
+COMMON PATTERNS:
+- Breweries, bars, "TST*" merchants → Bars & Alcohol
+- Coffee shops, cafes → Coffee & Tea  
+- Subscription services → Subscriptions & Streaming Services
+- AI/ML tools → Research & Development
+- Government services, DMV → Vehicle Registration (if vehicle-related)
+- Gas stations (large amounts) → Gasoline
+- Gas stations (small amounts) → General Supplies
+
+Transactions to categorize:
 ${JSON.stringify(transactionData, null, 2)}
 
-Return exactly ${transactions.length} categories.`,
+Return exactly ${transactions.length} categories from the available list.`,
     };
 
     try {

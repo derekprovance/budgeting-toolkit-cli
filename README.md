@@ -40,39 +40,39 @@ A powerful command-line interface (CLI) for interacting with both the Firefly II
 
 ## Configuration
 
-### Environment Setup
+### Environment Setup (.env)
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root for **secrets and infrastructure settings**:
 
 ```bash
-# Firefly III Configuration
+# Firefly III API Configuration
 FIREFLY_API_URL=https://your-firefly-instance.com/api/v1
 FIREFLY_API_TOKEN=your_api_token_here
 
-# Client Certificate Configuration
+# Client Certificate Configuration (Optional)
 CLIENT_CERT_CA_PATH=../certs/ca.pem
 CLIENT_CERT_PATH=../certs/client.p12
 CLIENT_CERT_PASSWORD=your_certificate_password
 
-# Claude AI Configuration
+# AI Service Configuration
 ANTHROPIC_API_KEY=your_anthropic_key
-LLM_MODEL=claude-3-5-haiku-latest
 
 # Application Configuration
 LOG_LEVEL=info
 ```
 
-#### Required Variables
+#### Required Environment Variables
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `FIREFLY_API_URL` | Firefly III API endpoint URL | Yes | - |
 | `FIREFLY_API_TOKEN` | Personal access token | Yes | - |
 | `ANTHROPIC_API_KEY` | Claude AI API key | Yes* | - |
-| `LLM_MODEL` | Claude model version | No | claude-3-5-sonnet-latest |
 | `LOG_LEVEL` | Application logging level | No | info |
 
-*Required for AI features
+*Required for AI categorization features
+
+**Note:** LLM model and performance settings are configured in the YAML file for easier tuning.
 
 #### Certificate Variables (Optional)
 
@@ -203,38 +203,157 @@ The CLI includes several advanced features for production use:
 
 ## Usage
 
-### Basic Commands
+### Quick Start
 
-Run the CLI using:
+Run the CLI using either method:
 ```bash
+# Development mode (requires compilation)
 npm start -- [command] [options]
+
+# Production mode (compile first)
+npm run compile
+./budget.sh [command] [options]
 ```
 
-### Command Reference
+### Global Options
 
-#### Budget Finalization
-```
-Usage: finalize-budget [options]
-
-Runs calculations needed to finalize the budget
-
-Options:
-  -m, --month <month>  month to process (1-12, defaults to current month) (choices: "1", "2", "3", "4", "5", "6",
-                       "7", "8", "9", "10", "11", "12")
-  -h, --help           display help for command
+Available for all commands:
+```bash
+-v, --verbose    Enable detailed logging
+-q, --quiet      Suppress all output except errors
+-h, --help       Display help information
+--version        Show version number
 ```
 
-#### Transaction Updates
+### Commands
+
+#### 🔍 Budget Status
+
+View current budget status and spending analysis:
+
+```bash
+# Current month status
+budgeting-toolkit status
+
+# Specific month
+budgeting-toolkit status --month 8
+
+# Different year
+budgeting-toolkit status --month 12 --year 2024
+
+# Using alias
+budgeting-toolkit st
 ```
-Usage: update-transactions [options] <tag>
 
-Update transactions using an LLM
+**Options:**
+- `-m, --month <1-12>` - Target month (default: current month)
+- `-y, --year <year>` - Target year (default: current year)
 
-Options:
-  -m, --mode <mode>        mode to update transactions (choices: "category", "budget", "both", default: "category")
-  -i, --includeClassified  include transactions that already have categories assigned (default: false)
-  -y, --yes                skip confirmation prompts and apply updates automatically (default: false)
-  -h, --help               display help for command
+#### 📊 Budget Finalization
+
+Calculate budget finalization report with surplus/deficit analysis:
+
+```bash
+# Current month finalization
+budgeting-toolkit finalize
+
+# Specific month and year
+budgeting-toolkit finalize --month 6 --year 2024
+
+# Using alias
+budgeting-toolkit fin --month 3
+```
+
+**Options:**
+- `-m, --month <1-12>` - Target month (default: current month)
+- `-y, --year <year>` - Target year (default: current year)
+
+#### 🤖 AI Transaction Categorization
+
+Intelligent transaction categorization and budget assignment using Claude AI:
+
+```bash
+# Basic categorization (categories + budgets)
+budgeting-toolkit categorize Import-2025-06-23
+
+# Include already categorized transactions
+budgeting-toolkit categorize Import-2025-06-23 --include-classified
+
+# Preview changes without applying
+budgeting-toolkit categorize Import-2025-06-23 --dry-run
+
+# Auto-apply without confirmation
+budgeting-toolkit categorize Import-2025-06-23 --yes
+
+# Categories only
+budgeting-toolkit categorize Import-2025-06-23 --mode category
+
+# Budgets only
+budgeting-toolkit categorize Import-2025-06-23 --mode budget
+
+# Using alias with verbose logging
+budgeting-toolkit cat Import-2025-06-23 --verbose
+```
+
+**Options:**
+- `-m, --mode <type>` - What to update: `category`, `budget`, or `both` (default: both)
+- `-i, --include-classified` - Process transactions that already have categories/budgets
+- `-y, --yes` - Skip confirmation prompts and apply changes automatically
+- `-n, --dry-run` - Preview proposed changes without applying them
+
+**Prerequisites:**
+- Requires `ANTHROPIC_API_KEY` environment variable for AI categorization
+- Transactions must be tagged in Firefly III with the specified tag
+
+### Advanced Usage
+
+#### Verbose Logging
+```bash
+# See detailed processing information
+budgeting-toolkit categorize Import-2025-06-23 --verbose
+
+# Or set environment variable
+LOG_LEVEL=debug budgeting-toolkit categorize Import-2025-06-23
+```
+
+#### Batch Processing
+```bash
+# Process multiple months
+for month in {1..12}; do
+  budgeting-toolkit status --month $month --year 2024
+done
+```
+
+#### Configuration Testing
+```bash
+# Test AI categorization without changes
+budgeting-toolkit categorize Import-2025-06-23 --dry-run --verbose
+
+# Test with different modes
+budgeting-toolkit categorize Import-2025-06-23 --mode category --dry-run
+budgeting-toolkit categorize Import-2025-06-23 --mode budget --dry-run
+```
+
+### Common Workflows
+
+#### Monthly Budget Review
+```bash
+# 1. Check current status
+budgeting-toolkit status
+
+# 2. Categorize new transactions
+budgeting-toolkit categorize Import-$(date +%Y-%m-%d)
+
+# 3. Review finalization
+budgeting-toolkit finalize
+```
+
+#### Transaction Import & Processing
+```bash
+# 1. Import transactions to Firefly III (external process)
+# 2. Tag imported transactions with current date
+# 3. Categorize with AI
+budgeting-toolkit categorize Import-$(date +%Y-%m-%d) --yes
 ```
 
 ## Development
