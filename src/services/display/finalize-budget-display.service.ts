@@ -99,7 +99,7 @@ export class FinalizeBudgetDisplayService {
   }
 
   /**
-   * Formats the summary section
+   * Formats the summary section with enhanced visuals
    */
   formatSummary(
     counts: TransactionCounts,
@@ -115,26 +115,19 @@ export class FinalizeBudgetDisplayService {
     const totalIncome = this.calculateTotal(additionalIncome);
     const totalExpenses = this.calculateTotal(unbudgetedExpenses);
 
-    //TODO(DEREK) - We need to calculate disposable income
     const lines = [
-      chalk.bold("\n=== Summary ===\n"),
-      "Transaction Types:",
-      `  ${chalk.redBright("Bills:")}\t${counts.bills}`,
-      `  ${chalk.cyan("Transfers:")}\t${counts.transfers}`,
-      `  ${chalk.greenBright("Deposits:")}\t${counts.deposits}`,
-      `  ${chalk.gray("Other:")}\t${counts.other}`,
+      chalk.bold("\n=== Transaction Summary ==="),
       "",
-      "Final Totals:",
-      `  Additional Income:     ${chalk.cyanBright(
-        `${currencySymbol}${totalIncome.toFixed(2)}`
-      )}`,
-      `  Unbudgeted Expenses:   ${chalk.cyanBright(
-        `${currencySymbol}${Math.abs(totalExpenses).toFixed(2)}`
-      )}`,
-      `  Paycheck Surplus:      ${chalk.cyanBright(
-        `${currencySymbol}${paycheckSurplus.toFixed(2)}`
-      )}`,
-      `  Disposable Transfer:   ${chalk.cyanBright(`N/A`)}`,
+      "📋 Transaction Types:",
+      `  ${chalk.redBright("💳 Bills:")}\t\t${counts.bills}`,
+      `  ${chalk.cyan("↔️  Transfers:")}\t${counts.transfers}`,
+      `  ${chalk.greenBright("💰 Deposits:")}\t${counts.deposits}`,
+      `  ${chalk.gray("❓ Other:")}\t\t${counts.other}`,
+      "",
+      "💵 Financial Totals:",
+      `  Additional Income:     ${this.formatAmount(totalIncome, currencySymbol, 'positive')}`,
+      `  Unbudgeted Expenses:   ${this.formatAmount(totalExpenses, currencySymbol, 'negative')}`,
+      `  Paycheck Variance:     ${this.formatAmount(paycheckSurplus, currencySymbol, paycheckSurplus >= 0 ? 'positive' : 'negative')}`,
     ];
 
     return lines.join("\n");
@@ -171,6 +164,208 @@ export class FinalizeBudgetDisplayService {
       return chalk.greenBright("[DEPOSIT]");
     }
     return chalk.gray("[OTHER]");
+  }
+
+  /**
+   * Formats the calculation methodology section
+   */
+  formatCalculationMethodology(
+    expectedPaycheck: number,
+    actualPaycheck: number,
+    currencySymbol: string = "$"
+  ): string {
+    const lines = [
+      chalk.bold("\n=== Calculation Methodology ==="),
+      "",
+      chalk.dim("How these numbers are calculated:"),
+      "",
+      chalk.white("📊 Additional Income:"),
+      chalk.dim("  • Non-payroll deposits (reimbursements, investment sales, interest)"),
+      chalk.dim("  • Excludes regular paycheck transactions"),
+      "",
+      chalk.white("💸 Unbudgeted Expenses:"),
+      chalk.dim("  • Bills and expenses not covered by monthly budget"),
+      chalk.dim("  • Includes subscription services, insurance, one-time expenses"),
+      "",
+      chalk.white("💰 Paycheck Surplus/Deficit:"),
+      chalk.dim(`  • Expected monthly paycheck: ${currencySymbol}${expectedPaycheck.toFixed(2)}`),
+      chalk.dim(`  • Actual paycheck received: ${currencySymbol}${actualPaycheck.toFixed(2)}`),
+      chalk.dim(`  • Surplus/Deficit: ${currencySymbol}${(actualPaycheck - expectedPaycheck).toFixed(2)}`),
+    ];
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Formats the financial impact analysis section
+   */
+  formatFinancialImpact(
+    additionalIncome: TransactionSplit[],
+    unbudgetedExpenses: TransactionSplit[],
+    paycheckSurplus: number,
+    currencySymbol: string = "$"
+  ): string {
+    const totalIncome = this.calculateTotal(additionalIncome);
+    const totalExpenses = Math.abs(this.calculateTotal(unbudgetedExpenses));
+    const netImpact = totalIncome - totalExpenses + paycheckSurplus;
+    
+    const lines = [
+      chalk.bold("\n=== Financial Impact Analysis ==="),
+      "",
+      "📈 Net Position:",
+      `  Additional Income:     ${this.formatAmount(totalIncome, currencySymbol, 'positive')}`,
+      `  Unbudgeted Expenses:   ${this.formatAmount(-totalExpenses, currencySymbol, 'negative')}`,
+      `  Paycheck Variance:     ${this.formatAmount(paycheckSurplus, currencySymbol, paycheckSurplus >= 0 ? 'positive' : 'negative')}`,
+      chalk.dim("  " + "─".repeat(40)),
+      `  ${chalk.bold('Net Impact:')}           ${this.formatAmount(netImpact, currencySymbol, netImpact >= 0 ? 'positive' : 'negative')}`,
+      "",
+    ];
+
+    // Add ratio analysis if we have meaningful data
+    if (totalIncome > 0 && totalExpenses > 0) {
+      const expenseRatio = (totalExpenses / totalIncome) * 100;
+      lines.push(
+        "📊 Spending Analysis:",
+        `  Expense-to-Income Ratio: ${chalk.yellow(expenseRatio.toFixed(1) + '%')}`,
+        ""
+      );
+    }
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Formats the contextual insights section
+   */
+  formatContextualInsights(
+    additionalIncome: TransactionSplit[],
+    unbudgetedExpenses: TransactionSplit[],
+    paycheckSurplus: number,
+    monthlyBudget: number,
+    currencySymbol: string = "$"
+  ): string {
+    const totalExpenses = Math.abs(this.calculateTotal(unbudgetedExpenses));
+    const budgetOverrun = totalExpenses > 0 ? (totalExpenses / monthlyBudget) * 100 : 0;
+    
+    const lines = [
+      chalk.bold("\n=== Key Insights ==="),
+      ""
+    ];
+
+    // Budget variance insight
+    if (budgetOverrun > 10) {
+      lines.push(
+        `⚠️  ${chalk.yellow('Budget Overrun:')} Unbudgeted expenses are ${chalk.bold(budgetOverrun.toFixed(1) + '%')} of your monthly budget`,
+        `   Consider adjusting budget categories or reducing discretionary spending`,
+        ""
+      );
+    }
+
+    // Paycheck variance insight
+    if (Math.abs(paycheckSurplus) > 100) {
+      const paycheckVariance = paycheckSurplus >= 0 ? 'higher' : 'lower';
+      lines.push(
+        `💰 ${chalk.cyan('Paycheck Variance:')} Your paycheck was ${this.formatAmount(Math.abs(paycheckSurplus), currencySymbol)} ${paycheckVariance} than expected`,
+        ""
+      );
+    }
+
+    // Largest expense insight
+    if (unbudgetedExpenses.length > 0) {
+      const largestExpense = unbudgetedExpenses.reduce((max, expense) => 
+        Math.abs(parseFloat(expense.amount)) > Math.abs(parseFloat(max.amount)) ? expense : max
+      );
+      const largestAmount = Math.abs(parseFloat(largestExpense.amount));
+      
+      if (largestAmount > 1000) {
+        lines.push(
+          `🎯 ${chalk.red('Largest Expense:')} ${largestExpense.description} (${this.formatAmount(-largestAmount, currencySymbol, 'negative')})`,
+          ""
+        );
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Formats actionable recommendations
+   */
+  formatActionableRecommendations(
+    additionalIncome: TransactionSplit[],
+    unbudgetedExpenses: TransactionSplit[],
+    paycheckSurplus: number,
+    netImpact: number
+  ): string {
+    const lines = [
+      chalk.bold("\n=== Recommendations ==="),
+      ""
+    ];
+
+    // Positive net impact recommendations
+    if (netImpact > 500) {
+      lines.push(
+        `✅ ${chalk.green('Strong Position:')} Consider allocating surplus to:`,
+        `   • Emergency fund or high-yield savings`,
+        `   • Investment contributions`,
+        `   • Debt reduction`,
+        ""
+      );
+    }
+    // Negative net impact recommendations
+    else if (netImpact < -200) {
+      lines.push(
+        `🔴 ${chalk.red('Action Needed:')} Address spending gap by:`,
+        `   • Reviewing and reducing unbudgeted expenses`,
+        `   • Adjusting monthly budget categories`,
+        `   • Identifying recurring expenses to budget for`,
+        ""
+      );
+    }
+    // Neutral recommendations
+    else {
+      lines.push(
+        `📊 ${chalk.blue('Balanced Month:')} Maintain current approach:`,
+        `   • Monitor recurring unbudgeted expenses`,
+        `   • Consider adding buffer to monthly budget`,
+        ""
+      );
+    }
+
+    // Subscription management recommendation
+    const subscriptionExpenses = unbudgetedExpenses.filter(expense => 
+      expense.description.toLowerCase().includes('subscription') ||
+      expense.description.toLowerCase().includes('spotify') ||
+      expense.description.toLowerCase().includes('netflix') ||
+      expense.description.toLowerCase().includes('patreon')
+    );
+    
+    if (subscriptionExpenses.length > 2) {
+      lines.push(
+        `💡 ${chalk.yellow('Subscription Review:')} Found ${subscriptionExpenses.length} subscription charges`,
+        `   • Review active subscriptions for unused services`,
+        `   • Add regular subscriptions to monthly budget`,
+        ""
+      );
+    }
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Helper method to format amounts with appropriate colors
+   */
+  private formatAmount(amount: number, currencySymbol: string, type: 'positive' | 'negative' | 'neutral' = 'neutral'): string {
+    const formattedAmount = `${currencySymbol}${Math.abs(amount).toFixed(2)}`;
+    
+    switch (type) {
+      case 'positive':
+        return amount >= 0 ? chalk.green(formattedAmount) : chalk.red(`-${formattedAmount}`);
+      case 'negative':
+        return amount >= 0 ? chalk.red(formattedAmount) : chalk.green(`-${formattedAmount}`);
+      default:
+        return chalk.white(formattedAmount);
+    }
   }
 
   private calculateTotal(transactions: TransactionSplit[]): number {

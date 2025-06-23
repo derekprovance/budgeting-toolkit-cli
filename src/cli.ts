@@ -66,7 +66,7 @@ export const createCli = (): Command => {
 
   program
     .name("budgeting-toolkit")
-    .description("💰 Intelligent budgeting toolkit with AI-powered transaction categorization")
+    .description("Intelligent budgeting toolkit with AI-powered transaction categorization")
     .version(packageJson.version)
     .option("-v, --verbose", "enable verbose logging")
     .option("-q, --quiet", "suppress all output except errors")
@@ -82,7 +82,7 @@ export const createCli = (): Command => {
   program
     .command("finalize")
     .alias("fin")
-    .description("📊 Calculate budget finalization report with surplus/deficit analysis")
+    .description("Calculate budget finalization report with surplus/deficit analysis")
     .addOption(
       new Option(
         "-m, --month <month>",
@@ -101,7 +101,7 @@ export const createCli = (): Command => {
     )
     .addHelpText("after", `
 Examples:
-  $ budgeting-toolkit finalize                    # current month
+  $ budgeting-toolkit finalize                   # current month
   $ budgeting-toolkit finalize -m 6              # June, current year
   $ budgeting-toolkit finalize -m 12 -y 2024     # December 2024
   $ budgeting-toolkit fin -m 3                   # March (using alias)`)
@@ -125,7 +125,7 @@ Examples:
   program
     .command("status")
     .alias("st")
-    .description("📈 Display current budget status and spending analysis")
+    .description("Display current budget status and spending analysis")
     .addOption(
       new Option(
         "-m, --month <month>",
@@ -145,7 +145,7 @@ Examples:
     .addHelpText("after", `
 Examples:
   $ budgeting-toolkit status                      # current month status
-  $ budgeting-toolkit status -m 8                # August status
+  $ budgeting-toolkit status -m 8                 # August status
   $ budgeting-toolkit st                          # current month (using alias)`)
     .action(async (opts: BudgetDateOptions) => {
       try {
@@ -165,7 +165,7 @@ Examples:
   program
     .command("categorize <tag>")
     .alias("cat")
-    .description("🤖 AI-powered transaction categorization and budget assignment")
+    .description("AI-powered transaction categorization and budget assignment")
     .addOption(
       new Option("-m, --mode <mode>", "what to update")
         .choices(["category", "budget", "both"])
@@ -187,11 +187,11 @@ Examples:
 Note: Requires ANTHROPIC_API_KEY environment variable for AI categorization.`)
     .addHelpText("after", `
 Examples:
-  $ budgeting-toolkit categorize Import-2025-06-23           # categorize new transactions
-  $ budgeting-toolkit categorize Import-2025-06-23 -i       # include already categorized
-  $ budgeting-toolkit categorize Import-2025-06-23 -n       # preview changes only
+  $ budgeting-toolkit categorize Import-2025-06-23              # categorize new transactions
+  $ budgeting-toolkit categorize Import-2025-06-23 -i           # include already categorized
+  $ budgeting-toolkit categorize Import-2025-06-23 -n           # preview changes only
   $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only
-  $ budgeting-toolkit cat Import-2025-06-23 -y              # auto-apply changes`)
+  $ budgeting-toolkit cat Import-2025-06-23 -y                  # auto-apply changes`)
     .action(async (tag: string, opts: UpdateTransactionOptions) => {
       if (!tag || tag.trim() === "") {
         console.error("❌ Error: Tag parameter is required and cannot be empty");

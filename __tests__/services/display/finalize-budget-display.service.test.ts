@@ -11,6 +11,8 @@ jest.mock("chalk", () => {
   mockChalk.gray = mockChalk;
   mockChalk.cyanBright = mockChalk;
   mockChalk.red = mockChalk;
+  mockChalk.green = mockChalk;
+  mockChalk.blue = mockChalk;
   return mockChalk;
 });
 
@@ -214,14 +216,14 @@ describe("FinalizeBudgetDisplayService", () => {
       );
 
       // Assert
-      expect(result).toContain("=== Summary ===");
-      expect(result).toContain("Bills:\t2");
-      expect(result).toContain("Transfers:\t3");
-      expect(result).toContain("Deposits:\t4");
-      expect(result).toContain("Other:\t1");
+      expect(result).toContain("=== Transaction Summary ===");
+      expect(result).toContain("💳 Bills:\t\t2");
+      expect(result).toContain("↔️  Transfers:\t3");
+      expect(result).toContain("💰 Deposits:\t4");
+      expect(result).toContain("❓ Other:\t\t1");
       expect(result).toContain("Additional Income:     $100.00");
-      expect(result).toContain("Unbudgeted Expenses:   $50.00");
-      expect(result).toContain("Paycheck Surplus:      $500.00");
+      expect(result).toContain("Unbudgeted Expenses:   -$50.00");
+      expect(result).toContain("Paycheck Variance:     $500.00");
     });
   });
 });

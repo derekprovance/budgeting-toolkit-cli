@@ -38,6 +38,13 @@ interface YamlConfig {
 let cachedConfig: YamlConfig | null = null;
 
 /**
+ * Clears the cached configuration (for testing purposes)
+ */
+export function clearConfigCache(): void {
+  cachedConfig = null;
+}
+
+/**
  * Loads configuration from the budgeting-toolkit.config.yaml file
  */
 export function loadYamlConfig(): YamlConfig {
