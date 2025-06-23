@@ -1,0 +1,32 @@
+# Budgeting Toolkit Configuration
+
+validDestinationAccounts:
+  - "1"
+  - "11"
+  - "8"
+  - "14"
+
+validExpenseAccounts:
+  - "8"
+  - "11"
+  - "14"
+  - "1"
+
+excludedDescriptions:
+  - PAYROLL
+
+excludedTransactionsCsv: excluded_transactions.csv
+
+excludeDisposableIncome: false
+
+minTransactionAmount: 0
+
+moneyMarketAccount: "27"
+
+expectedMonthlyPaycheck: 10472.04
+
+monthlyBudget: 1840
+
+# Additional savings percentage (added to base 30%)
+additionalSavingsPercentage: 12.02
+

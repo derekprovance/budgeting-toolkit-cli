@@ -4,6 +4,7 @@ import { Account, Description } from "../config";
 import { TransactionPropertyService } from "./core/transaction-property.service";
 import { logger } from "../logger";
 import { DateUtils } from "../utils/date.utils";
+import { getConfigValue } from "../utils/config-loader";
 
 /**
  * Valid destination accounts for additional income.
@@ -67,11 +68,44 @@ export class AdditionalIncomeService {
     private readonly transactionPropertyService: TransactionPropertyService,
     config: Partial<AdditionalIncomeConfig> = {}
   ) {
+    const yamlConfig = this.loadConfigFromYaml();
+    
     this.config = {
       ...AdditionalIncomeService.DEFAULT_CONFIG,
+      ...yamlConfig,
       ...config,
     };
     this.validateConfig();
+  }
+
+  /**
+   * Loads configuration values from the YAML file
+   */
+  private loadConfigFromYaml(): Partial<AdditionalIncomeConfig> {
+    const validDestinationAccounts = getConfigValue<string[]>('validDestinationAccounts');
+    const excludedDescriptions = getConfigValue<string[]>('excludedDescriptions');
+    const excludeDisposableIncome = getConfigValue<boolean>('excludeDisposableIncome');
+    const minTransactionAmount = getConfigValue<number>('minTransactionAmount');
+
+    const yamlConfig: Partial<AdditionalIncomeConfig> = {};
+
+    if (validDestinationAccounts) {
+      yamlConfig.validDestinationAccounts = validDestinationAccounts as ValidDestinationAccount[];
+    }
+
+    if (excludedDescriptions) {
+      yamlConfig.excludedDescriptions = excludedDescriptions;
+    }
+
+    if (excludeDisposableIncome !== undefined) {
+      yamlConfig.excludeDisposableIncome = excludeDisposableIncome;
+    }
+
+    if (minTransactionAmount !== undefined) {
+      yamlConfig.minTransactionAmount = minTransactionAmount;
+    }
+
+    return yamlConfig;
   }
 
   /**

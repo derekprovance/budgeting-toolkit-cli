@@ -59,7 +59,7 @@ export class PaycheckSurplusService {
   }
 
   private getExpectedPaycheckAmount(): number {
-    if (!expectedMonthlyPaycheck) {
+    if (expectedMonthlyPaycheck === undefined || expectedMonthlyPaycheck === null) {
       logger.warn(
         {
           expectedMonthlyPaycheck,
@@ -69,7 +69,10 @@ export class PaycheckSurplusService {
       return 0;
     }
 
-    const amount = parseFloat(expectedMonthlyPaycheck);
+    const amount = typeof expectedMonthlyPaycheck === 'number' 
+      ? expectedMonthlyPaycheck 
+      : parseFloat(expectedMonthlyPaycheck);
+      
     if (isNaN(amount)) {
       logger.error(
         {
@@ -143,9 +146,11 @@ export class PaycheckSurplusService {
   }
 
   private isPaycheck(transaction: TransactionSplit): boolean {
-    return (
-      transaction.category_name === "Paycheck" &&
-      transaction.source_type === "Revenue account"
-    );
+    const hasPayrollDescription = transaction.description?.toLowerCase().includes('payroll') || false;
+    
+    const hasPaycheckCategory = transaction.category_name === "Paycheck" && 
+                               transaction.source_type === "Revenue account";
+    
+    return hasPayrollDescription || hasPaycheckCategory;
   }
 }

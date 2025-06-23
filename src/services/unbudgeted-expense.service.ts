@@ -4,6 +4,7 @@ import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionPropertyService } from "./core/transaction-property.service";
 import { logger } from "../logger";
 import { DateUtils } from "../utils/date.utils";
+import { getConfigValue } from "../utils/config-loader";
 
 /**
  * Service for calculating unbudgeted expenses.
@@ -27,10 +28,15 @@ import { DateUtils } from "../utils/date.utils";
  *    - Must meet all other criteria
  */
 export class UnbudgetedExpenseService {
+  private readonly validExpenseAccounts: string[];
+
   constructor(
     private readonly transactionService: TransactionService,
     private readonly transactionPropertyService: TransactionPropertyService
-  ) {}
+  ) {
+    // Load valid expense accounts from YAML config with fallback to defaults
+    this.validExpenseAccounts = getConfigValue<string[]>('validExpenseAccounts') ?? [];
+  }
 
   /**
    * Calculates unbudgeted expenses for a given month and year.
@@ -186,22 +192,13 @@ export class UnbudgetedExpenseService {
   /**
    * Checks if an account is a valid expense account.
    * 
-   * 1. Must be one of:
-   *    - PRIMARY
-   *    - CHASE_AMAZON
-   *    - CHASE_SAPPHIRE
-   *    - CITIBANK_DOUBLECASH
+   * Uses configuration from YAML file (validExpenseAccounts) with fallback to defaults.
    */
   private isExpenseAccount(accountId: string | null): boolean {
     if (!accountId) {
       return false;
     }
 
-    return [
-      Account.CHASE_AMAZON,
-      Account.CHASE_SAPPHIRE,
-      Account.CITIBANK_DOUBLECASH,
-      Account.PRIMARY,
-    ].includes(accountId as Account);
+    return this.validExpenseAccounts.includes(accountId);
   }
 }
