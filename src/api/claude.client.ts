@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../logger";
+import { loadYamlConfig } from "../utils/config-loader";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -84,10 +85,49 @@ interface MessageCreateParams {
   };
 }
 
+interface RateLimitState {
+  tokens: number;
+  lastRefill: number;
+}
+
+interface CircuitBreakerState {
+  failures: number;
+  lastFailureTime: number;
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+}
+
+interface PerformanceMetrics {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  totalTokensUsed: number;
+  totalCost: number;
+  averageResponseTime: number;
+  requestDurations: number[];
+}
+
 export class ClaudeClient {
   private client: Anthropic;
   private config: RequiredClaudeConfig;
   private requestQueue: Promise<string>[] = [];
+  private rateLimitState: RateLimitState = {
+    tokens: 50,
+    lastRefill: Date.now()
+  };
+  private circuitBreaker: CircuitBreakerState = {
+    failures: 0,
+    lastFailureTime: 0,
+    state: 'CLOSED'
+  };
+  private metrics: PerformanceMetrics = {
+    totalRequests: 0,
+    successfulRequests: 0,
+    failedRequests: 0,
+    totalTokensUsed: 0,
+    totalCost: 0,
+    averageResponseTime: 0,
+    requestDurations: []
+  };
 
   private static DEFAULT_CONFIG: RequiredClaudeConfig = {
     apiKey: process.env.ANTHROPIC_API_KEY || "",
@@ -103,7 +143,7 @@ export class ClaudeClient {
     systemPrompt: "",
     metadata: {},
     batchSize: 10,
-    maxConcurrent: 5,
+    maxConcurrent: 3,
     retryDelayMs: 1000,
     maxRetryDelayMs: 32000,
   };
@@ -116,7 +156,7 @@ export class ClaudeClient {
       maxRetries: this.config.maxRetries,
       timeout: this.config.timeout,
     });
-    logger.debug(`Initializing AI Client using ${this.config.model}`);
+    logger.debug(`Initializing AI Client with model: ${this.config.model}`);
   }
 
   async chatBatch(
@@ -180,11 +220,18 @@ export class ClaudeClient {
     messages: ChatMessage[],
     config: RequiredClaudeConfig
   ): Promise<string> {
+    await this.checkCircuitBreaker();
+    
+    const startTime = Date.now();
+    this.metrics.totalRequests++;
+    
     let attempt = 0;
     let request: Promise<string>;
 
     while (true) {
       try {
+        await this.waitForRateLimit();
+
         if (this.requestQueue.length >= config.maxConcurrent) {
           await Promise.race(this.requestQueue);
         }
@@ -193,11 +240,19 @@ export class ClaudeClient {
         this.requestQueue.push(request);
 
         const response = await request;
+        
+        const duration = Date.now() - startTime;
+        this.recordMetrics(duration, config.maxTokens, true);
+        this.onRequestSuccess();
+        
         return response;
       } catch (error) {
+        this.onRequestFailure();
         attempt++;
 
         if (attempt >= config.maxRetries) {
+          const duration = Date.now() - startTime;
+          this.recordMetrics(duration, 0, false);
           throw error;
         }
 
@@ -234,7 +289,7 @@ export class ClaudeClient {
     const requestParams: MessageCreateParams = {
       model: config.model,
       messages: messages,
-      max_tokens: 150,
+      max_tokens: config.maxTokens,
       temperature: config.temperature,
       top_p: config.topP,
       top_k: config.topK,
@@ -295,5 +350,128 @@ export class ClaudeClient {
       chunks.push(array.slice(i, i + size));
     }
     return chunks;
+  }
+
+  private async waitForRateLimit(): Promise<void> {
+    const yamlConfig = loadYamlConfig();
+    const now = Date.now();
+    const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
+    const REFILL_INTERVAL = yamlConfig.llm?.rateLimit?.refillInterval || 60000;
+    const MAX_TOKENS = yamlConfig.llm?.rateLimit?.maxTokensPerMinute || 50;
+    const REFILL_RATE = MAX_TOKENS;
+
+    if (timeSinceLastRefill >= REFILL_INTERVAL) {
+      this.rateLimitState.tokens = Math.min(
+        MAX_TOKENS,
+        this.rateLimitState.tokens + REFILL_RATE
+      );
+      this.rateLimitState.lastRefill = now;
+    }
+
+    if (this.rateLimitState.tokens <= 0) {
+      const waitTime = REFILL_INTERVAL - timeSinceLastRefill;
+      logger.debug(
+        { waitTime, tokens: this.rateLimitState.tokens },
+        "Rate limit reached, waiting for refill"
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+      return this.waitForRateLimit();
+    }
+
+    this.rateLimitState.tokens--;
+  }
+
+  private async checkCircuitBreaker(): Promise<void> {
+    const yamlConfig = loadYamlConfig();
+    const now = Date.now();
+    const FAILURE_THRESHOLD = yamlConfig.llm?.circuitBreaker?.failureThreshold || 5;
+    const RESET_TIMEOUT = yamlConfig.llm?.circuitBreaker?.resetTimeout || 60000;
+    const HALF_OPEN_TIMEOUT = yamlConfig.llm?.circuitBreaker?.halfOpenTimeout || 30000;
+
+    switch (this.circuitBreaker.state) {
+      case 'OPEN':
+        if (now - this.circuitBreaker.lastFailureTime > RESET_TIMEOUT) {
+          this.circuitBreaker.state = 'HALF_OPEN';
+          logger.info('Circuit breaker moved to HALF_OPEN state');
+        } else {
+          throw new Error('Circuit breaker is OPEN - API requests are blocked');
+        }
+        break;
+      
+      case 'HALF_OPEN':
+        if (now - this.circuitBreaker.lastFailureTime > HALF_OPEN_TIMEOUT) {
+          this.circuitBreaker.state = 'CLOSED';
+          this.circuitBreaker.failures = 0;
+          logger.info('Circuit breaker moved to CLOSED state');
+        }
+        break;
+      
+      case 'CLOSED':
+        if (this.circuitBreaker.failures >= FAILURE_THRESHOLD) {
+          this.circuitBreaker.state = 'OPEN';
+          this.circuitBreaker.lastFailureTime = now;
+          logger.warn('Circuit breaker moved to OPEN state due to failures');
+          throw new Error('Circuit breaker is OPEN - too many failures');
+        }
+        break;
+    }
+  }
+
+  private onRequestSuccess(): void {
+    if (this.circuitBreaker.state === 'HALF_OPEN') {
+      this.circuitBreaker.state = 'CLOSED';
+      this.circuitBreaker.failures = 0;
+      logger.info('Circuit breaker reset to CLOSED after successful request');
+    }
+  }
+
+  private onRequestFailure(): void {
+    this.circuitBreaker.failures++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+    logger.warn(
+      { failures: this.circuitBreaker.failures, state: this.circuitBreaker.state },
+      'Request failed, updating circuit breaker'
+    );
+  }
+
+  private recordMetrics(duration: number, tokensUsed: number, success: boolean): void {
+    this.metrics.requestDurations.push(duration);
+    
+    if (success) {
+      this.metrics.successfulRequests++;
+      this.metrics.totalTokensUsed += tokensUsed;
+      
+      const costPerToken = this.config.model.includes('haiku') ? 0.00025 / 1000 : 0.003 / 1000;
+      this.metrics.totalCost += tokensUsed * costPerToken;
+    } else {
+      this.metrics.failedRequests++;
+    }
+    
+    const recentDurations = this.metrics.requestDurations.slice(-100);
+    this.metrics.averageResponseTime = recentDurations.reduce((a, b) => a + b, 0) / recentDurations.length;
+    
+    if (this.metrics.totalRequests % 10 === 0) {
+      logger.debug(
+        {
+          totalRequests: this.metrics.totalRequests,
+          successRate: (this.metrics.successfulRequests / this.metrics.totalRequests * 100).toFixed(1) + '%',
+          avgResponseTime: Math.round(this.metrics.averageResponseTime) + 'ms',
+          totalCost: '$' + this.metrics.totalCost.toFixed(4),
+          tokensUsed: this.metrics.totalTokensUsed
+        },
+        'Claude API metrics update'
+      );
+    }
+  }
+
+  getMetrics(): Omit<PerformanceMetrics, 'requestDurations'> {
+    return {
+      totalRequests: this.metrics.totalRequests,
+      successfulRequests: this.metrics.successfulRequests,
+      failedRequests: this.metrics.failedRequests,
+      totalTokensUsed: this.metrics.totalTokensUsed,
+      totalCost: this.metrics.totalCost,
+      averageResponseTime: this.metrics.averageResponseTime
+    };
   }
 }

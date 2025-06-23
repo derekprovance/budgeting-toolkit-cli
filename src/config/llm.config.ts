@@ -1,5 +1,6 @@
 import { ClaudeClient } from "../api/claude.client";
 import { claudeAPIKey, llmModel } from "../config";
+import { getConfigValue, loadYamlConfig } from "../utils/config-loader";
 import chalk from "chalk";
 
 export class LLMConfig {
@@ -14,13 +15,20 @@ export class LLMConfig {
       );
     }
 
+    // Load configuration from YAML with fallbacks
+    const yamlConfig = loadYamlConfig();
+    const llmConfig = yamlConfig.llm;
+    
     return new ClaudeClient({
       apiKey: claudeAPIKey,
-      model: llmModel,
-      maxTokens: 20,
+      model: llmConfig?.model || llmModel,
+      maxTokens: llmConfig?.maxTokens || 1000,
       maxRetries: 3,
-      batchSize: 10,
-      maxConcurrent: 5,
+      batchSize: llmConfig?.batchSize || 10,
+      maxConcurrent: llmConfig?.maxConcurrent || 3,
+      temperature: llmConfig?.temperature || 0.2,
+      retryDelayMs: llmConfig?.retryDelayMs || 1000,
+      maxRetryDelayMs: llmConfig?.maxRetryDelayMs || 32000,
     });
   }
 }

@@ -30,13 +30,13 @@ describe('LLMTransactionBudgetService', () => {
   const budgets = ['Groceries', 'Dining Out'];
 
   it('assigns budgets for valid transactions', async () => {
-    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ budget: 'Groceries' }));
+    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ budgets: ['Groceries'] }));
     const result = await service.assignBudgets(tx, budgets);
     expect(result).toEqual(['Groceries']);
   });
 
   it('returns empty string for invalid budget', async () => {
-    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ budget: 'InvalidBudget' }));
+    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ budgets: ['InvalidBudget'] }));
     const result = await service.assignBudgets(tx, budgets);
     expect(result).toEqual(['']);
   });
@@ -48,7 +48,7 @@ describe('LLMTransactionBudgetService', () => {
 
   it('handles errors and retries, returns empty string on failure', async () => {
     mockClaudeClient.chat.mockRejectedValueOnce(new Error('Claude error'));
-    mockClaudeClient.chat.mockResolvedValueOnce(JSON.stringify({ budget: 'Groceries' }));
+    mockClaudeClient.chat.mockResolvedValueOnce(JSON.stringify({ budgets: ['Groceries'] }));
     const result = await service.assignBudgets(tx, budgets);
     expect(result).toEqual(['Groceries']);
   });

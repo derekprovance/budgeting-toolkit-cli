@@ -82,6 +82,76 @@ LOG_LEVEL=info
 | `CLIENT_CERT_PATH` | Client certificate path | .p12 |
 | `CLIENT_CERT_PASSWORD` | Certificate password | - |
 
+### YAML Configuration
+
+Create a `budgeting-toolkit.config.yaml` file for advanced configuration options:
+
+```yaml
+# Budget Configuration
+expectedMonthlyPaycheck: 5000.00
+validDestinationAccounts:
+  - "Checking Account"
+  - "Savings Account"
+validExpenseAccounts:
+  - "Credit Card"
+excludedDescriptions:
+  - "PAYROLL"
+  - "ATM FEE"
+excludeDisposableIncome: false
+minTransactionAmount: 1.00
+moneyMarketAccount: "Money Market"
+monthlyBudget: 4500.00
+additionalSavingsPercentage: 10
+
+# LLM Configuration
+llm:
+  maxTokens: 1000
+  batchSize: 10
+  maxConcurrent: 3
+  temperature: 0.2
+  model: "claude-3-5-haiku-latest"
+  retryDelayMs: 1000
+  maxRetryDelayMs: 32000
+  
+  # Rate Limiting
+  rateLimit:
+    maxTokensPerMinute: 50
+    refillInterval: 60000
+  
+  # Circuit Breaker
+  circuitBreaker:
+    failureThreshold: 5
+    resetTimeout: 60000
+    halfOpenTimeout: 30000
+```
+
+#### LLM Configuration Options
+
+| Option | Description | Default | Type |
+|--------|-------------|---------|------|
+| `maxTokens` | Maximum tokens per response | 1000 | number |
+| `batchSize` | Transactions per batch | 10 | number |
+| `maxConcurrent` | Concurrent API requests | 3 | number |
+| `temperature` | Response randomness (0-1) | 0.2 | number |
+| `model` | Claude model version | claude-3-5-haiku-latest | string |
+| `retryDelayMs` | Initial retry delay | 1000 | number |
+| `maxRetryDelayMs` | Maximum retry delay | 32000 | number |
+
+#### Rate Limiting Options
+
+| Option | Description | Default | Type |
+|--------|-------------|---------|------|
+| `maxTokensPerMinute` | Rate limit threshold | 50 | number |
+| `refillInterval` | Token refill interval (ms) | 60000 | number |
+
+#### Circuit Breaker Options
+
+| Option | Description | Default | Type |
+|--------|-------------|---------|------|
+| `failureThreshold` | Failures before opening | 5 | number |
+| `resetTimeout` | Reset timeout (ms) | 60000 | number |
+| `halfOpenTimeout` | Half-open timeout (ms) | 30000 | number |
+
 ### Transaction Exclusions
 
 Create `excluded_transactions.csv` to specify transactions to exclude from processing:
@@ -101,29 +171,35 @@ Description,Amount
 - Case-sensitive descriptions
 - Both fields must match when both provided
 
-### Claude AI Settings
+### Performance & Reliability Features
 
-Configure Claude behavior using the following options:
+The CLI includes several advanced features for production use:
 
-```typescript
-interface ClaudeConfig {
-  // API Configuration
-  apiKey?: string             // Anthropic API key
-  baseURL?: string           // API base URL
-  timeout?: number           // Request timeout (ms)
-  maxRetries?: number        // Retry attempts
+#### Batch Processing
+- **80-90% reduction** in API calls by processing multiple transactions per request
+- Configurable batch sizes (default: 10 transactions)
+- Automatic batching with order preservation
 
-  // Model Settings
-  model?: string             // Model version
-  maxTokens?: number         // Response token limit
-  temperature?: number       // Response randomness
-  
-  // Processing Settings
-  batchSize?: number         // Batch message count
-  maxConcurrent?: number     // Concurrent requests
-  retryDelayMs?: number      // Retry delay
-}
-```
+#### Rate Limiting
+- Token bucket algorithm for API rate limiting
+- Configurable requests per minute
+- Automatic backpressure handling
+
+#### Circuit Breaker
+- Automatic failure detection and recovery
+- Configurable failure thresholds
+- Half-open state for gradual recovery
+
+#### Performance Monitoring
+- Real-time metrics tracking
+- Cost estimation for API usage
+- Response time monitoring
+- Success/failure rate tracking
+
+#### Error Handling
+- Exponential backoff with jitter
+- Configurable retry policies
+- Graceful degradation on failures
 
 ## Usage
 

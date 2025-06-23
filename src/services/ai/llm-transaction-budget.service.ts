@@ -10,18 +10,21 @@ export class LLMTransactionBudgetService {
 
   private getBudgetFunction(validBudgets: string[]) {
     return {
-      name: "assign_budget",
-      description: "Assign the closest matching budget to a transaction from the provided list. Always select the most appropriate budget, even if the match is not perfect. Do not return an empty string.",
+      name: "assign_budgets",
+      description: "Assign the closest matching budget to each transaction from the provided list. Always select the most appropriate budget for each transaction, even if the match is not perfect. Return budgets in the same order as the input transactions.",
       parameters: {
         type: "object",
         properties: {
-          budget: {
-            type: "string",
-            enum: validBudgets,
-            description: "The closest matching budget to assign to the transaction. Must be exactly one of the provided budgets. Do not return an empty string."
+          budgets: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: validBudgets
+            },
+            description: "Array of budgets to assign to transactions. Must be exactly one budget per transaction in the same order as input transactions. Do not return empty strings."
           }
         },
-        required: ["budget"]
+        required: ["budgets"]
       }
     };
   }
@@ -43,111 +46,104 @@ export class LLMTransactionBudgetService {
       return new Array(transactions.length).fill("");
     }
 
-    const budgetFunction = this.getBudgetFunction(validBudgets);
+    const BATCH_SIZE = 10;
     const results: string[] = [];
-
-    for (const tx of transactions) {
-      try {
-        const message = {
-          role: "user" as const,
-          content: `You are a financial budget assignment expert. Your task is to assign the most appropriate budget to each transaction from the provided list of valid budgets. Always select the closest matching budget, even if the match is not perfect. Do not return an empty string.
-
-Consider these guidelines when assigning budgets:
-1. Transaction amount can help determine the budget (e.g., a $5 coffee is likely "Daily Expenses" while a $50 restaurant meal might be "Dining Out")
-2. Look for keywords in the description that match budget names
-3. Consider the merchant type and typical spending patterns
-4. If unsure, pick the most likely budget based on the transaction context
-
-Example budget assignments:
-- "STARBUCKS COFFEE $4.50" → "Daily Expenses"
-- "CHEESECAKE FACTORY $75.00" → "Dining Out"
-- "NETFLIX MONTHLY $15.99" → "Subscriptions"
-- "WALMART GROCERIES $120.00" → "Groceries"
-- "AMAZON PRIME $139.00" → "Subscriptions"
-
-Here is the transaction data to analyze:
-${JSON.stringify({
-  description: tx.description,
-  amount: tx.amount,
-  date: tx.date,
-  source_account: tx.source_name,
-  destination_account: tx.destination_name,
-  type: tx.type,
-  notes: tx.notes
-}, null, 2)}
-
-This data will be used to determine the appropriate budget. Consider the transaction description, amount, and type when making your decision.`,
-        };
-
-        const response = await this.retryWithBackoff(async () => {
-          logger.debug(
-            {
-              transaction: {
-                id: tx.transaction_journal_id,
-                description: tx.description,
-                amount: tx.amount,
-                date: tx.date
-              }
-            },
-            "Sending request to Claude"
-          );
-
-          const result = await this.claudeClient.chat(
-            [message],
-            {
-              functions: [budgetFunction],
-              function_call: { name: "assign_budget" }
-            }
-          );
-
-          if (!result) {
-            throw new Error("Invalid response from Claude");
-          }
-
-          try {
-            const parsedResult = JSON.parse(result);
-            const budget = parsedResult.budget;
-            
-            if (!validBudgets.includes(budget)) {
-              throw new Error("Invalid budget");
-            }
-
-            return budget;
-          } catch (error) {
-            logger.error({
-              transaction: {
-                id: tx.transaction_journal_id,
-                description: tx.description,
-                amount: tx.amount,
-                date: tx.date
-              },
-              attemptedBudget: result,
-              validBudgets,
-              error: error instanceof Error ? error.message : String(error)
-            }, "Budget validation failed");
-            return "";
-          }
-        });
-
-        results.push(response);
-      } catch (error) {
-        logger.error(
-          {
-            transaction: {
-              id: tx.transaction_journal_id,
-              description: tx.description,
-              amount: tx.amount,
-              date: tx.date
-            },
-            error: error instanceof Error ? error.message : String(error)
-          },
-          "Failed to assign budget"
-        );
-        results.push("");
-      }
+    
+    for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
+      const batch = transactions.slice(i, i + BATCH_SIZE);
+      const batchResults = await this.assignBudgetsBatch(batch, validBudgets);
+      results.push(...batchResults);
     }
 
     return results;
+  }
+
+  private async assignBudgetsBatch(
+    transactions: TransactionSplit[],
+    validBudgets: string[]
+  ): Promise<string[]> {
+    const budgetFunction = this.getBudgetFunction(validBudgets);
+    
+    const transactionData = transactions.map(tx => ({
+      description: tx.description,
+      amount: tx.amount,
+      date: tx.date,
+      source_account: tx.source_name,
+      destination_account: tx.destination_name,
+      type: tx.type,
+      notes: tx.notes
+    }));
+
+    const message = {
+      role: "user" as const,
+      content: `Assign budgets to these transactions using the provided budget list. Match based on description, amount, and merchant type. Return budgets in same order.
+
+Transactions:
+${JSON.stringify(transactionData, null, 2)}
+
+Return exactly ${transactions.length} budgets.`,
+    };
+
+    try {
+      const response = await this.retryWithBackoff(async () => {
+        logger.debug(
+          {
+            batchSize: transactions.length,
+            transactionIds: transactions.map(tx => tx.transaction_journal_id)
+          },
+          "Sending batch request to Claude"
+        );
+
+        const result = await this.claudeClient.chat(
+          [message],
+          {
+            functions: [budgetFunction],
+            function_call: { name: "assign_budgets" }
+          }
+        );
+
+        if (!result) {
+          throw new Error("Invalid response from Claude");
+        }
+
+        try {
+          const parsedResult = JSON.parse(result);
+          const resultBudgets = parsedResult.budgets;
+          
+          if (!Array.isArray(resultBudgets) || resultBudgets.length !== transactions.length) {
+            throw new Error(`Expected ${transactions.length} budgets, got ${resultBudgets?.length || 0}`);
+          }
+
+          for (const budget of resultBudgets) {
+            if (!validBudgets.includes(budget)) {
+              throw new Error(`Invalid budget: ${budget}`);
+            }
+          }
+
+          return resultBudgets;
+        } catch (error) {
+          logger.error({
+            batchSize: transactions.length,
+            attemptedBudgets: result,
+            validBudgets,
+            error: error instanceof Error ? error.message : String(error)
+          }, "Budget batch validation failed");
+          return new Array(transactions.length).fill("");
+        }
+      });
+
+      return response;
+    } catch (error) {
+      logger.error(
+        {
+          batchSize: transactions.length,
+          transactionIds: transactions.map(tx => tx.transaction_journal_id),
+          error: error instanceof Error ? error.message : String(error)
+        },
+        "Failed to assign budget batch"
+      );
+      return new Array(transactions.length).fill("");
+    }
   }
 
   private async retryWithBackoff<T>(

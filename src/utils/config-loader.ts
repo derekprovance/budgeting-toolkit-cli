@@ -13,6 +13,26 @@ interface YamlConfig {
   expectedMonthlyPaycheck?: number;
   monthlyBudget?: number;
   additionalSavingsPercentage?: number;
+  
+  // LLM Configuration
+  llm?: {
+    maxTokens?: number;
+    batchSize?: number;
+    maxConcurrent?: number;
+    temperature?: number;
+    model?: string;
+    retryDelayMs?: number;
+    maxRetryDelayMs?: number;
+    rateLimit?: {
+      maxTokensPerMinute?: number;
+      refillInterval?: number;
+    };
+    circuitBreaker?: {
+      failureThreshold?: number;
+      resetTimeout?: number;
+      halfOpenTimeout?: number;
+    };
+  };
 }
 
 let cachedConfig: YamlConfig | null = null;

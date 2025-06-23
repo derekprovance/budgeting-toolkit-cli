@@ -10,18 +10,21 @@ export class LLMTransactionCategoryService {
 
   private getCategoryFunction(validCategories: string[]) {
     return {
-      name: "assign_category",
-      description: "Assign the closest matching category to a transaction from the provided list. Always select the most appropriate category, even if the match is not perfect. Do not return an empty string.",
+      name: "assign_categories",
+      description: "Assign the closest matching category to each transaction from the provided list. Always select the most appropriate category for each transaction, even if the match is not perfect. Return categories in the same order as the input transactions.",
       parameters: {
         type: "object",
         properties: {
-          category: {
-            type: "string",
-            enum: validCategories,
-            description: "The closest matching category to assign to the transaction. Must be exactly one of the provided categories. Do not return an empty string."
+          categories: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: validCategories
+            },
+            description: "Array of categories to assign to transactions. Must be exactly one category per transaction in the same order as input transactions. Do not return empty strings."
           }
         },
-        required: ["category"]
+        required: ["categories"]
       }
     };
   }
@@ -43,111 +46,104 @@ export class LLMTransactionCategoryService {
       return new Array(transactions.length).fill("");
     }
 
-    const categoryFunction = this.getCategoryFunction(categories);
+    const BATCH_SIZE = 10;
     const results: string[] = [];
-
-    for (const tx of transactions) {
-      try {
-        const message = {
-          role: "user" as const,
-          content: `You are a financial transaction categorization expert. Your task is to assign the most appropriate category to each transaction from the provided list of valid categories. Always select the closest matching category, even if the match is not perfect. Do not return an empty string.
-
-Consider these guidelines when categorizing:
-1. Transaction amount can help determine the category (e.g., $3 at a gas station is likely a convenience store purchase, while $40 is likely fuel)
-2. Look for keywords in the description that match category names
-3. Consider the merchant type and typical spending patterns
-4. If unsure, pick the most likely category based on the transaction context
-
-Example categorizations:
-- "STARBUCKS COFFEE $4.50" → "Coffee & Tea"
-- "SHELL GAS STATION $3.25" → "General Supplies" (small amount suggests convenience store)
-- "SHELL GAS STATION $45.00" → "Gasoline" (larger amount suggests fuel)
-- "NETFLIX MONTHLY" → "Subscriptions & Streaming Services"
-- "AMZN Mktp" → "General Supplies" (Amazon marketplace)
-
-Here is the transaction data to analyze:
-${JSON.stringify({
-  description: tx.description,
-  amount: tx.amount,
-  date: tx.date,
-  source_account: tx.source_name,
-  destination_account: tx.destination_name,
-  type: tx.type,
-  notes: tx.notes
-}, null, 2)}
-
-This data will be used to determine the appropriate category. Consider the transaction description, amount, and type when making your decision.`,
-        };
-
-        const response = await this.retryWithBackoff(async () => {
-          logger.debug(
-            {
-              transaction: {
-                id: tx.transaction_journal_id,
-                description: tx.description,
-                amount: tx.amount,
-                date: tx.date
-              }
-            },
-            "Sending request to Claude"
-          );
-
-          const result = await this.claudeClient.chat(
-            [message], 
-            { 
-              functions: [categoryFunction],
-              function_call: { name: "assign_category" }
-            }
-          );
-
-          if (!result) {
-            throw new Error("Invalid response from Claude");
-          }
-
-          try {
-            const parsedResult = JSON.parse(result);
-            const category = parsedResult.category;
-            
-            if (!categories.includes(category)) {
-              throw new Error("Invalid category");
-            }
-
-            return category;
-          } catch (error) {
-            logger.error({
-              transaction: {
-                id: tx.transaction_journal_id,
-                description: tx.description,
-                amount: tx.amount,
-                date: tx.date
-              },
-              attemptedCategory: result,
-              validCategories: categories,
-              error: error instanceof Error ? error.message : String(error)
-            }, "Category validation failed");
-            return "";
-          }
-        });
-
-        results.push(response);
-      } catch (error) {
-        logger.error(
-          {
-            transaction: {
-              id: tx.transaction_journal_id,
-              description: tx.description,
-              amount: tx.amount,
-              date: tx.date
-            },
-            error: error instanceof Error ? error.message : String(error)
-          },
-          "Failed to categorize transaction"
-        );
-        results.push("");
-      }
+    
+    for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
+      const batch = transactions.slice(i, i + BATCH_SIZE);
+      const batchResults = await this.categorizeBatch(batch, categories);
+      results.push(...batchResults);
     }
 
     return results;
+  }
+
+  private async categorizeBatch(
+    transactions: TransactionSplit[],
+    categories: string[]
+  ): Promise<string[]> {
+    const categoryFunction = this.getCategoryFunction(categories);
+    
+    const transactionData = transactions.map(tx => ({
+      description: tx.description,
+      amount: tx.amount,
+      date: tx.date,
+      source_account: tx.source_name,
+      destination_account: tx.destination_name,
+      type: tx.type,
+      notes: tx.notes
+    }));
+
+    const message = {
+      role: "user" as const,
+      content: `Categorize these transactions using the provided categories. Match based on description, amount, and merchant type. Return categories in same order.
+
+Transactions:
+${JSON.stringify(transactionData, null, 2)}
+
+Return exactly ${transactions.length} categories.`,
+    };
+
+    try {
+      const response = await this.retryWithBackoff(async () => {
+        logger.debug(
+          {
+            batchSize: transactions.length,
+            transactionIds: transactions.map(tx => tx.transaction_journal_id)
+          },
+          "Sending batch request to Claude"
+        );
+
+        const result = await this.claudeClient.chat(
+          [message], 
+          { 
+            functions: [categoryFunction],
+            function_call: { name: "assign_categories" }
+          }
+        );
+
+        if (!result) {
+          throw new Error("Invalid response from Claude");
+        }
+
+        try {
+          const parsedResult = JSON.parse(result);
+          const resultCategories = parsedResult.categories;
+          
+          if (!Array.isArray(resultCategories) || resultCategories.length !== transactions.length) {
+            throw new Error(`Expected ${transactions.length} categories, got ${resultCategories?.length || 0}`);
+          }
+
+          for (const category of resultCategories) {
+            if (!categories.includes(category)) {
+              throw new Error(`Invalid category: ${category}`);
+            }
+          }
+
+          return resultCategories;
+        } catch (error) {
+          logger.error({
+            batchSize: transactions.length,
+            attemptedCategories: result,
+            validCategories: categories,
+            error: error instanceof Error ? error.message : String(error)
+          }, "Category batch validation failed");
+          return new Array(transactions.length).fill("");
+        }
+      });
+
+      return response;
+    } catch (error) {
+      logger.error(
+        {
+          batchSize: transactions.length,
+          transactionIds: transactions.map(tx => tx.transaction_journal_id),
+          error: error instanceof Error ? error.message : String(error)
+        },
+        "Failed to categorize transaction batch"
+      );
+      return new Array(transactions.length).fill("");
+    }
   }
 
   private async retryWithBackoff<T>(

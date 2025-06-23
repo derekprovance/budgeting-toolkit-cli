@@ -30,13 +30,13 @@ describe('LLMTransactionCategoryService', () => {
   const categories = ['Coffee & Tea', 'Dining Out'];
 
   it('assigns categories for valid transactions', async () => {
-    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ category: 'Coffee & Tea' }));
+    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ categories: ['Coffee & Tea'] }));
     const result = await service.categorizeTransactions(tx, categories);
     expect(result).toEqual(['Coffee & Tea']);
   });
 
   it('returns empty string for invalid category', async () => {
-    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ category: 'InvalidCategory' }));
+    mockClaudeClient.chat.mockResolvedValue(JSON.stringify({ categories: ['InvalidCategory'] }));
     const result = await service.categorizeTransactions(tx, categories);
     expect(result).toEqual(['']);
   });
@@ -48,7 +48,7 @@ describe('LLMTransactionCategoryService', () => {
 
   it('handles errors and retries, returns empty string on failure', async () => {
     mockClaudeClient.chat.mockRejectedValueOnce(new Error('Claude error'));
-    mockClaudeClient.chat.mockResolvedValueOnce(JSON.stringify({ category: 'Coffee & Tea' }));
+    mockClaudeClient.chat.mockResolvedValueOnce(JSON.stringify({ categories: ['Coffee & Tea'] }));
     const result = await service.categorizeTransactions(tx, categories);
     expect(result).toEqual(['Coffee & Tea']);
   });
