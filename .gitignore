@@ -13,3 +13,7 @@ certs/
 excluded_transactions.csv
 
 budgeting-toolkit.config.yaml
+
+#Mac Specific
+Icon?
+.DS_Store
