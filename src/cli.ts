@@ -62,20 +62,18 @@ export const createCli = (): Command => {
         services = ServiceFactory.createServices(apiClient);
     } catch (error) {
         console.error(
-            "❌ Failed to initialize API client:",
+            "Failed to initialize API client:",
             error instanceof Error ? error.message : String(error),
         );
         console.log(
-            "\n💡 Check your .env file and ensure FIREFLY_API_URL and FIREFLY_API_TOKEN are set.",
+            "\nCheck your .env file and ensure FIREFLY_API_URL and FIREFLY_API_TOKEN are set.",
         );
         process.exit(1);
     }
 
     program
         .name("budgeting-toolkit")
-        .description(
-            "Intelligent budgeting toolkit with AI-powered transaction categorization",
-        )
+        .description(packageJson.description)
         .version(packageJson.version)
         .option("-v, --verbose", "enable verbose logging")
         .option("-q, --quiet", "suppress all output except errors")

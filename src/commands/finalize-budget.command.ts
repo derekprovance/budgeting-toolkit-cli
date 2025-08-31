@@ -7,7 +7,6 @@ import { FinalizeBudgetDisplayService } from "../services/display/finalize-budge
 import { PaycheckSurplusService } from "../services/paycheck-surplus.service";
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import { TransactionCounts } from "../services/display/finalize-budget-display.service";
-import { getConfigValue } from "../utils/config-loader";
 import chalk from "chalk";
 
 /**
@@ -72,48 +71,6 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
                 ),
             );
 
-            // Get configuration values for enhanced analysis
-            const expectedPaycheck =
-                getConfigValue<number>("expectedMonthlyPaycheck") || 0;
-            const monthlyBudget = getConfigValue<number>("monthlyBudget") || 0;
-            const currencySymbol =
-                additionalIncomeResults[0]?.currency_symbol ||
-                unbudgetedExpenseResults[0]?.currency_symbol ||
-                "$";
-
-            // Calculate actual paycheck amount for methodology display
-            const actualPaycheck = expectedPaycheck + paycheckSurplus;
-
-            // Display calculation methodology
-            console.log(
-                this.displayService.formatCalculationMethodology(
-                    expectedPaycheck,
-                    actualPaycheck,
-                    currencySymbol,
-                ),
-            );
-
-            // Display financial impact analysis
-            console.log(
-                this.displayService.formatFinancialImpact(
-                    additionalIncomeResults,
-                    unbudgetedExpenseResults,
-                    paycheckSurplus,
-                    currencySymbol,
-                ),
-            );
-
-            // Display contextual insights
-            console.log(
-                this.displayService.formatContextualInsights(
-                    additionalIncomeResults,
-                    unbudgetedExpenseResults,
-                    paycheckSurplus,
-                    monthlyBudget,
-                    currencySymbol,
-                ),
-            );
-
             // Calculate and display enhanced summary
             const allTransactions = [
                 ...additionalIncomeResults,
@@ -132,7 +89,7 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
             const errorMessage =
                 error instanceof Error ? error.message : "Unknown error";
             console.error(
-                chalk.red("❌ Error finalizing budget:"),
+                chalk.red("Error finalizing budget:"),
                 chalk.red.bold(errorMessage),
             );
             throw error; // Re-throw to allow proper error handling up the chain

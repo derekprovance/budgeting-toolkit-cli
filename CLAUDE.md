@@ -17,11 +17,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:watch` - Run tests in watch mode
 - Jest config: Tests are in `__tests__/` directories, pattern `**/*.test.ts`
 
-### Linting
-
-- ESLint configuration in `eslint.config.mjs`
-- No specific lint command in package.json - use your editor's ESLint integration
-
 ## Configuration System
 
 This project uses a dual configuration system:
