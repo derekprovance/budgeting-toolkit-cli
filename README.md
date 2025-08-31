@@ -23,20 +23,22 @@ A powerful command-line interface (CLI) for interacting with both the Firefly II
 ### Installation
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/derekprovance/firefly-iii-cli.git
-   cd firefly-iii-cli
-   ```
+
+    ```bash
+    git clone https://github.com/derekprovance/firefly-iii-cli.git
+    cd firefly-iii-cli
+    ```
 
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+
+    ```bash
+    npm install
+    ```
 
 3. Configure your environment:
-   ```bash
-   cp .env.example .env
-   ```
+    ```bash
+    cp .env.example .env
+    ```
 
 ## Configuration
 
@@ -63,24 +65,24 @@ LOG_LEVEL=info
 
 #### Required Environment Variables
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `FIREFLY_API_URL` | Firefly III API endpoint URL | Yes | - |
-| `FIREFLY_API_TOKEN` | Personal access token | Yes | - |
-| `ANTHROPIC_API_KEY` | Claude AI API key | Yes* | - |
-| `LOG_LEVEL` | Application logging level | No | info |
+| Variable            | Description                  | Required | Default |
+| ------------------- | ---------------------------- | -------- | ------- |
+| `FIREFLY_API_URL`   | Firefly III API endpoint URL | Yes      | -       |
+| `FIREFLY_API_TOKEN` | Personal access token        | Yes      | -       |
+| `ANTHROPIC_API_KEY` | Claude AI API key            | Yes\*    | -       |
+| `LOG_LEVEL`         | Application logging level    | No       | info    |
 
-*Required for AI categorization features
+\*Required for AI categorization features
 
 **Note:** LLM model and performance settings are configured in the YAML file for easier tuning.
 
 #### Certificate Variables (Optional)
 
-| Variable | Description | File Type |
-|----------|-------------|-----------|
-| `CLIENT_CERT_CA_PATH` | CA certificate path | .pem |
-| `CLIENT_CERT_PATH` | Client certificate path | .p12 |
-| `CLIENT_CERT_PASSWORD` | Certificate password | - |
+| Variable               | Description             | File Type |
+| ---------------------- | ----------------------- | --------- |
+| `CLIENT_CERT_CA_PATH`  | CA certificate path     | .pem      |
+| `CLIENT_CERT_PATH`     | Client certificate path | .p12      |
+| `CLIENT_CERT_PASSWORD` | Certificate password    | -         |
 
 ### YAML Configuration
 
@@ -90,13 +92,13 @@ Create a `budgeting-toolkit.config.yaml` file for advanced configuration options
 # Budget Configuration
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
-  - "Checking Account"
-  - "Savings Account"
+    - "Checking Account"
+    - "Savings Account"
 validExpenseAccounts:
-  - "Credit Card"
+    - "Credit Card"
 excludedDescriptions:
-  - "PAYROLL"
-  - "ATM FEE"
+    - "PAYROLL"
+    - "ATM FEE"
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
 moneyMarketAccount: "Money Market"
@@ -105,52 +107,52 @@ additionalSavingsPercentage: 10
 
 # LLM Configuration
 llm:
-  maxTokens: 1000
-  batchSize: 10
-  maxConcurrent: 3
-  temperature: 0.2
-  model: "claude-3-5-haiku-latest"
-  retryDelayMs: 1000
-  maxRetryDelayMs: 32000
-  
-  # Rate Limiting
-  rateLimit:
-    maxTokensPerMinute: 50
-    refillInterval: 60000
-  
-  # Circuit Breaker
-  circuitBreaker:
-    failureThreshold: 5
-    resetTimeout: 60000
-    halfOpenTimeout: 30000
+    maxTokens: 1000
+    batchSize: 10
+    maxConcurrent: 3
+    temperature: 0.2
+    model: "claude-3-5-haiku-latest"
+    retryDelayMs: 1000
+    maxRetryDelayMs: 32000
+
+    # Rate Limiting
+    rateLimit:
+        maxTokensPerMinute: 50
+        refillInterval: 60000
+
+    # Circuit Breaker
+    circuitBreaker:
+        failureThreshold: 5
+        resetTimeout: 60000
+        halfOpenTimeout: 30000
 ```
 
 #### LLM Configuration Options
 
-| Option | Description | Default | Type |
-|--------|-------------|---------|------|
-| `maxTokens` | Maximum tokens per response | 1000 | number |
-| `batchSize` | Transactions per batch | 10 | number |
-| `maxConcurrent` | Concurrent API requests | 3 | number |
-| `temperature` | Response randomness (0-1) | 0.2 | number |
-| `model` | Claude model version | claude-3-5-haiku-latest | string |
-| `retryDelayMs` | Initial retry delay | 1000 | number |
-| `maxRetryDelayMs` | Maximum retry delay | 32000 | number |
+| Option            | Description                 | Default                 | Type   |
+| ----------------- | --------------------------- | ----------------------- | ------ |
+| `maxTokens`       | Maximum tokens per response | 1000                    | number |
+| `batchSize`       | Transactions per batch      | 10                      | number |
+| `maxConcurrent`   | Concurrent API requests     | 3                       | number |
+| `temperature`     | Response randomness (0-1)   | 0.2                     | number |
+| `model`           | Claude model version        | claude-3-5-haiku-latest | string |
+| `retryDelayMs`    | Initial retry delay         | 1000                    | number |
+| `maxRetryDelayMs` | Maximum retry delay         | 32000                   | number |
 
 #### Rate Limiting Options
 
-| Option | Description | Default | Type |
-|--------|-------------|---------|------|
-| `maxTokensPerMinute` | Rate limit threshold | 50 | number |
-| `refillInterval` | Token refill interval (ms) | 60000 | number |
+| Option               | Description                | Default | Type   |
+| -------------------- | -------------------------- | ------- | ------ |
+| `maxTokensPerMinute` | Rate limit threshold       | 50      | number |
+| `refillInterval`     | Token refill interval (ms) | 60000   | number |
 
 #### Circuit Breaker Options
 
-| Option | Description | Default | Type |
-|--------|-------------|---------|------|
-| `failureThreshold` | Failures before opening | 5 | number |
-| `resetTimeout` | Reset timeout (ms) | 60000 | number |
-| `halfOpenTimeout` | Half-open timeout (ms) | 30000 | number |
+| Option             | Description             | Default | Type   |
+| ------------------ | ----------------------- | ------- | ------ |
+| `failureThreshold` | Failures before opening | 5       | number |
+| `resetTimeout`     | Reset timeout (ms)      | 60000   | number |
+| `halfOpenTimeout`  | Half-open timeout (ms)  | 30000   | number |
 
 ### Transaction Exclusions
 
@@ -165,6 +167,7 @@ Description,Amount
 ```
 
 #### Format Rules
+
 - Two columns: Description (optional) and Amount (optional)
 - At least one field required per row
 - Amounts in decimal format (e.g., 125.50)
@@ -176,27 +179,32 @@ Description,Amount
 The CLI includes several advanced features for production use:
 
 #### Batch Processing
+
 - **80-90% reduction** in API calls by processing multiple transactions per request
 - Configurable batch sizes (default: 10 transactions)
 - Automatic batching with order preservation
 
 #### Rate Limiting
+
 - Token bucket algorithm for API rate limiting
 - Configurable requests per minute
 - Automatic backpressure handling
 
 #### Circuit Breaker
+
 - Automatic failure detection and recovery
 - Configurable failure thresholds
 - Half-open state for gradual recovery
 
 #### Performance Monitoring
+
 - Real-time metrics tracking
 - Cost estimation for API usage
 - Response time monitoring
 - Success/failure rate tracking
 
 #### Error Handling
+
 - Exponential backoff with jitter
 - Configurable retry policies
 - Graceful degradation on failures
@@ -206,6 +214,7 @@ The CLI includes several advanced features for production use:
 ### Quick Start
 
 Run the CLI using either method:
+
 ```bash
 # Development mode (requires compilation)
 npm start -- [command] [options]
@@ -218,6 +227,7 @@ npm run compile
 ### Global Options
 
 Available for all commands:
+
 ```bash
 -v, --verbose    Enable detailed logging
 -q, --quiet      Suppress all output except errors
@@ -246,6 +256,7 @@ budgeting-toolkit st
 ```
 
 **Options:**
+
 - `-m, --month <1-12>` - Target month (default: current month)
 - `-y, --year <year>` - Target year (default: current year)
 
@@ -265,6 +276,7 @@ budgeting-toolkit fin --month 3
 ```
 
 **Options:**
+
 - `-m, --month <1-12>` - Target month (default: current month)
 - `-y, --year <year>` - Target year (default: current year)
 
@@ -296,18 +308,21 @@ budgeting-toolkit cat Import-2025-06-23 --verbose
 ```
 
 **Options:**
+
 - `-m, --mode <type>` - What to update: `category`, `budget`, or `both` (default: both)
 - `-i, --include-classified` - Process transactions that already have categories/budgets
 - `-y, --yes` - Skip confirmation prompts and apply changes automatically
 - `-n, --dry-run` - Preview proposed changes without applying them
 
 **Prerequisites:**
+
 - Requires `ANTHROPIC_API_KEY` environment variable for AI categorization
 - Transactions must be tagged in Firefly III with the specified tag
 
 ### Advanced Usage
 
 #### Verbose Logging
+
 ```bash
 # See detailed processing information
 budgeting-toolkit categorize Import-2025-06-23 --verbose
@@ -317,6 +332,7 @@ LOG_LEVEL=debug budgeting-toolkit categorize Import-2025-06-23
 ```
 
 #### Batch Processing
+
 ```bash
 # Process multiple months
 for month in {1..12}; do
@@ -325,6 +341,7 @@ done
 ```
 
 #### Configuration Testing
+
 ```bash
 # Test AI categorization without changes
 budgeting-toolkit categorize Import-2025-06-23 --dry-run --verbose
@@ -337,6 +354,7 @@ budgeting-toolkit categorize Import-2025-06-23 --mode budget --dry-run
 ### Common Workflows
 
 #### Monthly Budget Review
+
 ```bash
 # 1. Check current status
 budgeting-toolkit status
@@ -349,6 +367,7 @@ budgeting-toolkit finalize
 ```
 
 #### Transaction Import & Processing
+
 ```bash
 # 1. Import transactions to Firefly III (external process)
 # 2. Tag imported transactions with current date
@@ -359,19 +378,21 @@ budgeting-toolkit categorize Import-$(date +%Y-%m-%d) --yes
 ## Development
 
 1. Run tests:
-   ```bash
-   npm test
-   ```
+
+    ```bash
+    npm test
+    ```
 
 2. Build:
-   ```bash
-   npm run compile
-   ```
+
+    ```bash
+    npm run compile
+    ```
 
 3. Development mode:
-   ```bash
-   npm run start
-   ```
+    ```bash
+    npm run start
+    ```
 
 ## Contributing
 
@@ -386,6 +407,7 @@ budgeting-toolkit categorize Import-$(date +%Y-%m-%d) --yes
 ### Troubleshooting
 
 Common issues:
+
 - PAT permission errors: Verify token permissions
 - Repository access: Check repository permissions
 - NPM configuration: Verify `.npmrc` settings

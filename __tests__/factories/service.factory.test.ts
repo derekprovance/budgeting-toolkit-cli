@@ -21,61 +21,62 @@ jest.mock("../../src/config/llm.config");
 
 // Mock the logger
 jest.mock("../../src/logger", () => ({
-  logger: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    trace: jest.fn(),
-  },
+    logger: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        trace: jest.fn(),
+    },
 }));
 
 describe("ServiceFactory", () => {
-  let mockApiClient: jest.Mocked<FireflyApiClient>;
+    let mockApiClient: jest.Mocked<FireflyApiClient>;
 
-  beforeEach(() => {
-    mockApiClient = {
-      // Mock only the properties we need for tests
-    } as unknown as jest.Mocked<FireflyApiClient>;
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  describe("createServices", () => {
-    it("should create all core services", () => {
-      const services = ServiceFactory.createServices(mockApiClient);
-
-      expect(services).toHaveProperty("transactionService");
-      expect(services).toHaveProperty("budgetService");
-      expect(services).toHaveProperty("categoryService");
-      expect(services).toHaveProperty("additionalIncomeService");
-      expect(services).toHaveProperty("unbudgetedExpenseService");
-      expect(services).toHaveProperty("budgetStatus");
-      expect(services).toHaveProperty("transactionPropertyService");
-      expect(services).toHaveProperty("excludedTransactionService");
-      expect(services).toHaveProperty("paycheckSurplusService");
-      expect(services).toHaveProperty("transactionValidatorService");
-    });
-  });
-
-  describe("createUpdateTransactionService", () => {
-    it("should create UpdateTransactionService with default parameters", () => {
-      const service = ServiceFactory.createUpdateTransactionService(mockApiClient);
-
-      expect(service).toBeInstanceOf(UpdateTransactionService);
+    beforeEach(() => {
+        mockApiClient = {
+            // Mock only the properties we need for tests
+        } as unknown as jest.Mocked<FireflyApiClient>;
     });
 
-    it("should create UpdateTransactionService with custom parameters", () => {
-      const service = ServiceFactory.createUpdateTransactionService(
-        mockApiClient,
-        true,  // includeClassified
-        true,  // noConfirmation
-        true   // dryRun
-      );
-
-      expect(service).toBeInstanceOf(UpdateTransactionService);
+    afterEach(() => {
+        jest.clearAllMocks();
     });
-  });
+
+    describe("createServices", () => {
+        it("should create all core services", () => {
+            const services = ServiceFactory.createServices(mockApiClient);
+
+            expect(services).toHaveProperty("transactionService");
+            expect(services).toHaveProperty("budgetService");
+            expect(services).toHaveProperty("categoryService");
+            expect(services).toHaveProperty("additionalIncomeService");
+            expect(services).toHaveProperty("unbudgetedExpenseService");
+            expect(services).toHaveProperty("budgetStatus");
+            expect(services).toHaveProperty("transactionPropertyService");
+            expect(services).toHaveProperty("excludedTransactionService");
+            expect(services).toHaveProperty("paycheckSurplusService");
+            expect(services).toHaveProperty("transactionValidatorService");
+        });
+    });
+
+    describe("createUpdateTransactionService", () => {
+        it("should create UpdateTransactionService with default parameters", () => {
+            const service =
+                ServiceFactory.createUpdateTransactionService(mockApiClient);
+
+            expect(service).toBeInstanceOf(UpdateTransactionService);
+        });
+
+        it("should create UpdateTransactionService with custom parameters", () => {
+            const service = ServiceFactory.createUpdateTransactionService(
+                mockApiClient,
+                true, // includeClassified
+                true, // noConfirmation
+                true, // dryRun
+            );
+
+            expect(service).toBeInstanceOf(UpdateTransactionService);
+        });
+    });
 });

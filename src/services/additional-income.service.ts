@@ -11,11 +11,11 @@ import { getConfigValue } from "../utils/config-loader";
  * These are the accounts where additional income can be deposited.
  */
 type ValidDestinationAccount = Extract<
-  Account,
-  | Account.PRIMARY
-  | Account.CHASE_SAPPHIRE
-  | Account.CHASE_AMAZON
-  | Account.CITIBANK_DOUBLECASH
+    Account,
+    | Account.PRIMARY
+    | Account.CHASE_SAPPHIRE
+    | Account.CHASE_AMAZON
+    | Account.CITIBANK_DOUBLECASH
 >;
 
 /**
@@ -27,10 +27,10 @@ type ValidDestinationAccount = Extract<
  * 4. minTransactionAmount: Minimum amount to consider as additional income
  */
 interface AdditionalIncomeConfig {
-  validDestinationAccounts: readonly ValidDestinationAccount[];
-  excludedDescriptions: readonly string[];
-  excludeDisposableIncome: boolean;
-  minTransactionAmount?: number;
+    validDestinationAccounts: readonly ValidDestinationAccount[];
+    excludedDescriptions: readonly string[];
+    excludeDisposableIncome: boolean;
+    minTransactionAmount?: number;
 }
 
 /**
@@ -49,234 +49,252 @@ interface AdditionalIncomeConfig {
  *    - Normalizes special characters and spaces
  */
 export class AdditionalIncomeService {
-  private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
-    validDestinationAccounts: [
-      Account.PRIMARY,
-      Account.CHASE_SAPPHIRE,
-      Account.CHASE_AMAZON,
-      Account.CITIBANK_DOUBLECASH,
-    ],
-    excludedDescriptions: [Description.PAYROLL],
-    excludeDisposableIncome: true,
-    minTransactionAmount: 0,
-  };
-
-  private readonly config: AdditionalIncomeConfig;
-
-  constructor(
-    private readonly transactionService: TransactionService,
-    private readonly transactionPropertyService: TransactionPropertyService,
-    config: Partial<AdditionalIncomeConfig> = {}
-  ) {
-    const yamlConfig = this.loadConfigFromYaml();
-    
-    this.config = {
-      ...AdditionalIncomeService.DEFAULT_CONFIG,
-      ...yamlConfig,
-      ...config,
+    private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
+        validDestinationAccounts: [
+            Account.PRIMARY,
+            Account.CHASE_SAPPHIRE,
+            Account.CHASE_AMAZON,
+            Account.CITIBANK_DOUBLECASH,
+        ],
+        excludedDescriptions: [Description.PAYROLL],
+        excludeDisposableIncome: true,
+        minTransactionAmount: 0,
     };
-    this.validateConfig();
-  }
 
-  /**
-   * Loads configuration values from the YAML file
-   */
-  private loadConfigFromYaml(): Partial<AdditionalIncomeConfig> {
-    const validDestinationAccounts = getConfigValue<string[]>('validDestinationAccounts');
-    const excludedDescriptions = getConfigValue<string[]>('excludedDescriptions');
-    const excludeDisposableIncome = getConfigValue<boolean>('excludeDisposableIncome');
-    const minTransactionAmount = getConfigValue<number>('minTransactionAmount');
+    private readonly config: AdditionalIncomeConfig;
 
-    const yamlConfig: Partial<AdditionalIncomeConfig> = {};
-
-    if (validDestinationAccounts) {
-      yamlConfig.validDestinationAccounts = validDestinationAccounts as ValidDestinationAccount[];
-    }
-
-    if (excludedDescriptions) {
-      yamlConfig.excludedDescriptions = excludedDescriptions;
-    }
-
-    if (excludeDisposableIncome !== undefined) {
-      yamlConfig.excludeDisposableIncome = excludeDisposableIncome;
-    }
-
-    if (minTransactionAmount !== undefined) {
-      yamlConfig.minTransactionAmount = minTransactionAmount;
-    }
-
-    return yamlConfig;
-  }
-
-  /**
-   * Calculates additional income for a given month and year.
-   *
-   * 1. Get all transactions for the month
-   * 2. Filter transactions based on criteria:
-   *    - Must be deposits
-   *    - Must go to valid accounts
-   *    - Must not be payroll
-   *    - Must meet minimum amount
-   *    - Must not be disposable income (if configured)
-   */
-  async calculateAdditionalIncome(
-    month: number,
-    year: number
-  ): Promise<TransactionSplit[]> {
-    try {
-      DateUtils.validateMonthYear(month, year);
-      const transactions =
-        await this.transactionService.getTransactionsForMonth(month, year);
-
-      if (!transactions?.length) {
-        logger.debug(`No transactions found for month ${month}, year ${year}`);
-        return [];
-      }
-
-      const additionalIncome = this.filterTransactions(transactions);
-
-      if (!additionalIncome.length) {
-        logger.debug(
-          `No additional income found for month ${month}, year ${year}`
-        );
-      }
-
-      return additionalIncome;
-    } catch (error) {
-      logger.trace(error, "Error calculating additional income", {
-        month,
-        year,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-      if (error instanceof Error) {
-        throw new Error(
-          `Failed to calculate additional income for month ${month}: ${error.message}`
-        );
-      }
-      throw new Error(
-        `Failed to calculate additional income for month ${month}`
-      );
-    }
-  }
-
-  /**
-   * Validates the configuration to ensure it's valid.
-   *
-   * 1. Must have at least one valid destination account
-   * 2. Minimum transaction amount cannot be negative
-   */
-  private validateConfig(): void {
-    if (!this.config.validDestinationAccounts.length) {
-      throw new Error(
-        "At least one valid destination account must be specified"
-      );
-    }
-
-    if (!this.config.excludedDescriptions.length) {
-      logger.warn(
-        "No excluded descriptions specified - all deposits will be considered additional income"
-      );
-    }
-
-    if (
-      this.config.minTransactionAmount !== undefined &&
-      this.config.minTransactionAmount < 0
+    constructor(
+        private readonly transactionService: TransactionService,
+        private readonly transactionPropertyService: TransactionPropertyService,
+        config: Partial<AdditionalIncomeConfig> = {},
     ) {
-      throw new Error("Minimum transaction amount cannot be negative");
-    }
-  }
+        const yamlConfig = this.loadConfigFromYaml();
 
-  /**
-   * Filters transactions to find additional income.
-   *
-   * 1. Must be a deposit
-   * 2. Must go to a valid destination account
-   * 3. Must not be payroll
-   * 4. Must meet minimum amount requirement
-   * 5. Must not be disposable income (if configured)
-   */
-  private filterTransactions(
-    transactions: TransactionSplit[]
-  ): TransactionSplit[] {
-    return transactions
-      .filter((t) => this.transactionPropertyService.isDeposit(t))
-      .filter(this.hasValidDestinationAccount)
-      .filter(this.isNotPayroll)
-      .filter(this.meetsMinimumAmount)
-      .filter(
-        (t) =>
-          !this.config.excludeDisposableIncome ||
-          !this.transactionPropertyService.isDisposableIncome(t)
-      );
-  }
-
-  /**
-   * Checks if a transaction goes to a valid destination account.
-   *
-   * 1. Must have a destination account
-   * 2. Destination account must be in the valid accounts list
-   */
-  private hasValidDestinationAccount = (
-    transaction: TransactionSplit
-  ): boolean =>
-    transaction.destination_id != null &&
-    this.config.validDestinationAccounts.includes(
-      transaction.destination_id as ValidDestinationAccount
-    );
-
-  /**
-   * Checks if a transaction is not payroll.
-   *
-   * 1. Normalizes the description
-   * 2. Checks if it matches any excluded descriptions
-   * 3. Returns true if it doesn't match any excluded descriptions
-   */
-  private isNotPayroll = (transaction: TransactionSplit): boolean => {
-    if (!transaction.description) {
-      logger.warn("Transaction found with no description", { transaction });
-      return true; // Consider non-described transactions as non-payroll
+        this.config = {
+            ...AdditionalIncomeService.DEFAULT_CONFIG,
+            ...yamlConfig,
+            ...config,
+        };
+        this.validateConfig();
     }
 
-    const normalizedDescription = this.normalizeString(transaction.description);
-    return !this.config.excludedDescriptions.some((desc) =>
-      normalizedDescription.includes(this.normalizeString(desc))
-    );
-  };
+    /**
+     * Loads configuration values from the YAML file
+     */
+    private loadConfigFromYaml(): Partial<AdditionalIncomeConfig> {
+        const validDestinationAccounts = getConfigValue<string[]>(
+            "validDestinationAccounts",
+        );
+        const excludedDescriptions = getConfigValue<string[]>(
+            "excludedDescriptions",
+        );
+        const excludeDisposableIncome = getConfigValue<boolean>(
+            "excludeDisposableIncome",
+        );
+        const minTransactionAmount = getConfigValue<number>(
+            "minTransactionAmount",
+        );
 
-  /**
-   * Checks if a transaction meets the minimum amount requirement.
-   *
-   * Core Logic:
-   * 1. If no minimum amount is set, all positive amounts are valid
-   * 2. Otherwise, amount must be greater than or equal to minimum
-   * 3. Zero and negative amounts are always excluded
-   */
-  private meetsMinimumAmount = (transaction: TransactionSplit): boolean => {
-    const amount = parseFloat(transaction.amount);
-    if (isNaN(amount) || amount <= 0) {
-      return false;
+        const yamlConfig: Partial<AdditionalIncomeConfig> = {};
+
+        if (validDestinationAccounts) {
+            yamlConfig.validDestinationAccounts =
+                validDestinationAccounts as ValidDestinationAccount[];
+        }
+
+        if (excludedDescriptions) {
+            yamlConfig.excludedDescriptions = excludedDescriptions;
+        }
+
+        if (excludeDisposableIncome !== undefined) {
+            yamlConfig.excludeDisposableIncome = excludeDisposableIncome;
+        }
+
+        if (minTransactionAmount !== undefined) {
+            yamlConfig.minTransactionAmount = minTransactionAmount;
+        }
+
+        return yamlConfig;
     }
 
-    if (!this.config.minTransactionAmount) {
-      return true;
+    /**
+     * Calculates additional income for a given month and year.
+     *
+     * 1. Get all transactions for the month
+     * 2. Filter transactions based on criteria:
+     *    - Must be deposits
+     *    - Must go to valid accounts
+     *    - Must not be payroll
+     *    - Must meet minimum amount
+     *    - Must not be disposable income (if configured)
+     */
+    async calculateAdditionalIncome(
+        month: number,
+        year: number,
+    ): Promise<TransactionSplit[]> {
+        try {
+            DateUtils.validateMonthYear(month, year);
+            const transactions =
+                await this.transactionService.getTransactionsForMonth(
+                    month,
+                    year,
+                );
+
+            if (!transactions?.length) {
+                logger.debug(
+                    `No transactions found for month ${month}, year ${year}`,
+                );
+                return [];
+            }
+
+            const additionalIncome = this.filterTransactions(transactions);
+
+            if (!additionalIncome.length) {
+                logger.debug(
+                    `No additional income found for month ${month}, year ${year}`,
+                );
+            }
+
+            return additionalIncome;
+        } catch (error) {
+            logger.trace(error, "Error calculating additional income", {
+                month,
+                year,
+                error: error instanceof Error ? error.message : "Unknown error",
+            });
+            if (error instanceof Error) {
+                throw new Error(
+                    `Failed to calculate additional income for month ${month}: ${error.message}`,
+                );
+            }
+            throw new Error(
+                `Failed to calculate additional income for month ${month}`,
+            );
+        }
     }
 
-    return amount >= this.config.minTransactionAmount;
-  };
+    /**
+     * Validates the configuration to ensure it's valid.
+     *
+     * 1. Must have at least one valid destination account
+     * 2. Minimum transaction amount cannot be negative
+     */
+    private validateConfig(): void {
+        if (!this.config.validDestinationAccounts.length) {
+            throw new Error(
+                "At least one valid destination account must be specified",
+            );
+        }
 
-  /**
-   * Normalizes a string for comparison.
-   *
-   * Core Logic:
-   * 1. Converts to lowercase
-   * 2. Trims whitespace
-   * 3. Normalizes spaces and special characters
-   */
-  private normalizeString(input: string): string {
-    return input
-      .toLowerCase()
-      .trim()
-      .replace(/[-_\s]+/g, " ") // Replace multiple spaces, hyphens, underscores with single space
-      .replace(/[^\w\s]/g, ""); // Remove all other special characters
-  }
+        if (!this.config.excludedDescriptions.length) {
+            logger.warn(
+                "No excluded descriptions specified - all deposits will be considered additional income",
+            );
+        }
+
+        if (
+            this.config.minTransactionAmount !== undefined &&
+            this.config.minTransactionAmount < 0
+        ) {
+            throw new Error("Minimum transaction amount cannot be negative");
+        }
+    }
+
+    /**
+     * Filters transactions to find additional income.
+     *
+     * 1. Must be a deposit
+     * 2. Must go to a valid destination account
+     * 3. Must not be payroll
+     * 4. Must meet minimum amount requirement
+     * 5. Must not be disposable income (if configured)
+     */
+    private filterTransactions(
+        transactions: TransactionSplit[],
+    ): TransactionSplit[] {
+        return transactions
+            .filter((t) => this.transactionPropertyService.isDeposit(t))
+            .filter(this.hasValidDestinationAccount)
+            .filter(this.isNotPayroll)
+            .filter(this.meetsMinimumAmount)
+            .filter(
+                (t) =>
+                    !this.config.excludeDisposableIncome ||
+                    !this.transactionPropertyService.isDisposableIncome(t),
+            );
+    }
+
+    /**
+     * Checks if a transaction goes to a valid destination account.
+     *
+     * 1. Must have a destination account
+     * 2. Destination account must be in the valid accounts list
+     */
+    private hasValidDestinationAccount = (
+        transaction: TransactionSplit,
+    ): boolean =>
+        transaction.destination_id != null &&
+        this.config.validDestinationAccounts.includes(
+            transaction.destination_id as ValidDestinationAccount,
+        );
+
+    /**
+     * Checks if a transaction is not payroll.
+     *
+     * 1. Normalizes the description
+     * 2. Checks if it matches any excluded descriptions
+     * 3. Returns true if it doesn't match any excluded descriptions
+     */
+    private isNotPayroll = (transaction: TransactionSplit): boolean => {
+        if (!transaction.description) {
+            logger.warn("Transaction found with no description", {
+                transaction,
+            });
+            return true; // Consider non-described transactions as non-payroll
+        }
+
+        const normalizedDescription = this.normalizeString(
+            transaction.description,
+        );
+        return !this.config.excludedDescriptions.some((desc) =>
+            normalizedDescription.includes(this.normalizeString(desc)),
+        );
+    };
+
+    /**
+     * Checks if a transaction meets the minimum amount requirement.
+     *
+     * Core Logic:
+     * 1. If no minimum amount is set, all positive amounts are valid
+     * 2. Otherwise, amount must be greater than or equal to minimum
+     * 3. Zero and negative amounts are always excluded
+     */
+    private meetsMinimumAmount = (transaction: TransactionSplit): boolean => {
+        const amount = parseFloat(transaction.amount);
+        if (isNaN(amount) || amount <= 0) {
+            return false;
+        }
+
+        if (!this.config.minTransactionAmount) {
+            return true;
+        }
+
+        return amount >= this.config.minTransactionAmount;
+    };
+
+    /**
+     * Normalizes a string for comparison.
+     *
+     * Core Logic:
+     * 1. Converts to lowercase
+     * 2. Trims whitespace
+     * 3. Normalizes spaces and special characters
+     */
+    private normalizeString(input: string): string {
+        return input
+            .toLowerCase()
+            .trim()
+            .replace(/[-_\s]+/g, " ") // Replace multiple spaces, hyphens, underscores with single space
+            .replace(/[^\w\s]/g, ""); // Remove all other special characters
+    }
 }

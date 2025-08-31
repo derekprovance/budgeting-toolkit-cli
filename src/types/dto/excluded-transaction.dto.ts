@@ -1,5 +1,5 @@
 export interface ExcludedTransactionDto {
-  description: string;
-  reason: string;
-  amount?: string;
+    description: string;
+    reason: string;
+    amount?: string;
 }

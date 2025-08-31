@@ -1,13 +1,13 @@
 {
-  "compilerOptions": {
-    "target": "ES2018",
-    "module": "commonjs",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "baseUrl": "."
-  },
-  "include": ["src/**/*"],
-  "exclude": ["**/*.test.ts", "__tests__/**/*"]
+    "compilerOptions": {
+        "target": "ES2018",
+        "module": "commonjs",
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "strict": true,
+        "esModuleInterop": true,
+        "baseUrl": "."
+    },
+    "include": ["src/**/*"],
+    "exclude": ["**/*.test.ts", "__tests__/**/*"]
 }

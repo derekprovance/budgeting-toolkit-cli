@@ -1,5 +1,5 @@
 export interface BudgetStatusDto {
-  name: string;
-  amount: number;
-  spent: number;
+    name: string;
+    amount: number;
+    spent: number;
 }

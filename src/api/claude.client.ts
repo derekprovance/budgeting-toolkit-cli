@@ -3,475 +3,518 @@ import { logger } from "../logger";
 import { loadYamlConfig } from "../utils/config-loader";
 
 export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
+    role: "user" | "assistant";
+    content: string;
 }
 
 interface ClaudeConfig {
-  // API and Client Configuration
-  apiKey?: string;
-  baseURL?: string;
-  timeout?: number;
-  maxRetries?: number;
+    // API and Client Configuration
+    apiKey?: string;
+    baseURL?: string;
+    timeout?: number;
+    maxRetries?: number;
 
-  // Model Configuration
-  model?: string;
+    // Model Configuration
+    model?: string;
 
-  // Message Parameters
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  topK?: number;
-  stopSequences?: string[];
+    // Message Parameters
+    maxTokens?: number;
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    stopSequences?: string[];
 
-  // System Configuration
-  systemPrompt?: string;
-  metadata?: Record<string, string>;
+    // System Configuration
+    systemPrompt?: string;
+    metadata?: Record<string, string>;
 
-  // Batch Processing Configuration
-  batchSize?: number;
-  maxConcurrent?: number;
-  retryDelayMs?: number;
-  maxRetryDelayMs?: number;
+    // Batch Processing Configuration
+    batchSize?: number;
+    maxConcurrent?: number;
+    retryDelayMs?: number;
+    maxRetryDelayMs?: number;
 
-  // Function Calling Configuration
-  functions?: Array<{
-    name: string;
-    description: string;
-    parameters: {
-      type: string;
-      properties: Record<string, {
-        type: string;
-        description?: string;
-        enum?: string[];
-      }>;
-      required: string[];
-    };
-  }>;
-  function_call?: { name: string };
+    // Function Calling Configuration
+    functions?: Array<{
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: Record<
+                string,
+                {
+                    type: string;
+                    description?: string;
+                    enum?: string[];
+                }
+            >;
+            required: string[];
+        };
+    }>;
+    function_call?: { name: string };
 }
 
-type RequiredClaudeConfig = Required<Omit<ClaudeConfig, 'functions' | 'function_call'>> & {
-  functions?: ClaudeConfig['functions'];
-  function_call?: ClaudeConfig['function_call'];
+type RequiredClaudeConfig = Required<
+    Omit<ClaudeConfig, "functions" | "function_call">
+> & {
+    functions?: ClaudeConfig["functions"];
+    function_call?: ClaudeConfig["function_call"];
 };
 
 interface MessageCreateParams {
-  model: string;
-  messages: ChatMessage[];
-  max_tokens: number;
-  temperature: number;
-  top_p: number;
-  top_k: number;
-  stop_sequences: string[];
-  system?: string;
-  metadata?: Record<string, string>;
-  tools?: Array<{
-    name: string;
-    description?: string;
-    input_schema: {
-      type: 'object';
-      properties: Record<string, {
-        type: string;
+    model: string;
+    messages: ChatMessage[];
+    max_tokens: number;
+    temperature: number;
+    top_p: number;
+    top_k: number;
+    stop_sequences: string[];
+    system?: string;
+    metadata?: Record<string, string>;
+    tools?: Array<{
+        name: string;
         description?: string;
-        enum?: string[];
-      }>;
-      required: string[];
+        input_schema: {
+            type: "object";
+            properties: Record<
+                string,
+                {
+                    type: string;
+                    description?: string;
+                    enum?: string[];
+                }
+            >;
+            required: string[];
+        };
+    }>;
+    tool_choice?: {
+        type: "tool";
+        name: string;
     };
-  }>;
-  tool_choice?: {
-    type: 'tool';
-    name: string;
-  };
 }
 
 interface RateLimitState {
-  tokens: number;
-  lastRefill: number;
+    tokens: number;
+    lastRefill: number;
 }
 
 interface CircuitBreakerState {
-  failures: number;
-  lastFailureTime: number;
-  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+    failures: number;
+    lastFailureTime: number;
+    state: "CLOSED" | "OPEN" | "HALF_OPEN";
 }
 
 interface PerformanceMetrics {
-  totalRequests: number;
-  successfulRequests: number;
-  failedRequests: number;
-  totalTokensUsed: number;
-  totalCost: number;
-  averageResponseTime: number;
-  requestDurations: number[];
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    totalTokensUsed: number;
+    totalCost: number;
+    averageResponseTime: number;
+    requestDurations: number[];
 }
 
 export class ClaudeClient {
-  private client: Anthropic;
-  private config: RequiredClaudeConfig;
-  private requestQueue: Promise<string>[] = [];
-  private rateLimitState: RateLimitState = {
-    tokens: 50,
-    lastRefill: Date.now()
-  };
-  private circuitBreaker: CircuitBreakerState = {
-    failures: 0,
-    lastFailureTime: 0,
-    state: 'CLOSED'
-  };
-  private metrics: PerformanceMetrics = {
-    totalRequests: 0,
-    successfulRequests: 0,
-    failedRequests: 0,
-    totalTokensUsed: 0,
-    totalCost: 0,
-    averageResponseTime: 0,
-    requestDurations: []
-  };
+    private client: Anthropic;
+    private config: RequiredClaudeConfig;
+    private requestQueue: Promise<string>[] = [];
+    private rateLimitState: RateLimitState = {
+        tokens: 50,
+        lastRefill: Date.now(),
+    };
+    private circuitBreaker: CircuitBreakerState = {
+        failures: 0,
+        lastFailureTime: 0,
+        state: "CLOSED",
+    };
+    private metrics: PerformanceMetrics = {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        totalTokensUsed: 0,
+        totalCost: 0,
+        averageResponseTime: 0,
+        requestDurations: [],
+    };
 
-  private static DEFAULT_CONFIG: RequiredClaudeConfig = {
-    apiKey: process.env.ANTHROPIC_API_KEY || "",
-    baseURL: "https://api.anthropic.com",
-    timeout: 30000,
-    maxRetries: 3,
-    model: "claude-3-5-haiku-latest",
-    maxTokens: 1024,
-    temperature: 0.2,
-    topP: 1.0,
-    topK: 5,
-    stopSequences: [],
-    systemPrompt: "",
-    metadata: {},
-    batchSize: 10,
-    maxConcurrent: 3,
-    retryDelayMs: 1000,
-    maxRetryDelayMs: 32000,
-  };
+    private static DEFAULT_CONFIG: RequiredClaudeConfig = {
+        apiKey: process.env.ANTHROPIC_API_KEY || "",
+        baseURL: "https://api.anthropic.com",
+        timeout: 30000,
+        maxRetries: 3,
+        model: "claude-3-5-haiku-latest",
+        maxTokens: 1024,
+        temperature: 0.2,
+        topP: 1.0,
+        topK: 5,
+        stopSequences: [],
+        systemPrompt: "",
+        metadata: {},
+        batchSize: 10,
+        maxConcurrent: 3,
+        retryDelayMs: 1000,
+        maxRetryDelayMs: 32000,
+    };
 
-  constructor(config: ClaudeConfig = {}) {
-    this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...config };
-    this.client = new Anthropic({
-      apiKey: this.config.apiKey,
-      baseURL: this.config.baseURL,
-      maxRetries: this.config.maxRetries,
-      timeout: this.config.timeout,
-    });
-    logger.debug(`Initializing AI Client with model: ${this.config.model}`);
-  }
-
-  async chatBatch(
-    messageBatches: ChatMessage[][],
-    overrideConfig?: Partial<ClaudeConfig>
-  ): Promise<string[]> {
-    const config = { ...this.config, ...overrideConfig };
-    const results: string[] = [];
-    const batches = this.chunkArray(messageBatches, config.batchSize);
-
-    for (const batch of batches) {
-      const batchPromises = batch.map((messages) =>
-        this.processSingleChat(messages, config)
-      );
-
-      while (batchPromises.length > 0) {
-        const chunk = batchPromises.splice(0, config.maxConcurrent);
-        const chunkResults = await Promise.all(chunk);
-        results.push(...chunkResults);
-      }
+    constructor(config: ClaudeConfig = {}) {
+        this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...config };
+        this.client = new Anthropic({
+            apiKey: this.config.apiKey,
+            baseURL: this.config.baseURL,
+            maxRetries: this.config.maxRetries,
+            timeout: this.config.timeout,
+        });
+        logger.debug(`Initializing AI Client with model: ${this.config.model}`);
     }
 
-    return results;
-  }
+    async chatBatch(
+        messageBatches: ChatMessage[][],
+        overrideConfig?: Partial<ClaudeConfig>,
+    ): Promise<string[]> {
+        const config = { ...this.config, ...overrideConfig };
+        const results: string[] = [];
+        const batches = this.chunkArray(messageBatches, config.batchSize);
 
-  async chat(
-    messages: ChatMessage[],
-    overrideConfig?: Partial<ClaudeConfig>
-  ): Promise<string> {
-    const config = { ...this.config, ...overrideConfig };
-    const response = await this.processSingleChat(messages, config);
+        for (const batch of batches) {
+            const batchPromises = batch.map((messages) =>
+                this.processSingleChat(messages, config),
+            );
 
-    return response;
-  }
-
-  updateConfig(newConfig: Partial<ClaudeConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-
-    if (
-      newConfig.apiKey ||
-      newConfig.baseURL ||
-      newConfig.timeout ||
-      newConfig.maxRetries
-    ) {
-      this.client = new Anthropic({
-        apiKey: this.config.apiKey,
-        baseURL: this.config.baseURL,
-        maxRetries: this.config.maxRetries,
-        timeout: this.config.timeout,
-      });
-    }
-  }
-
-  getConfig(): Omit<RequiredClaudeConfig, "apiKey"> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { apiKey, ...safeConfig } = this.config;
-    return safeConfig;
-  }
-
-  private async processSingleChat(
-    messages: ChatMessage[],
-    config: RequiredClaudeConfig
-  ): Promise<string> {
-    await this.checkCircuitBreaker();
-    
-    const startTime = Date.now();
-    this.metrics.totalRequests++;
-    
-    let attempt = 0;
-    let request: Promise<string>;
-
-    while (true) {
-      try {
-        await this.waitForRateLimit();
-
-        if (this.requestQueue.length >= config.maxConcurrent) {
-          await Promise.race(this.requestQueue);
+            while (batchPromises.length > 0) {
+                const chunk = batchPromises.splice(0, config.maxConcurrent);
+                const chunkResults = await Promise.all(chunk);
+                results.push(...chunkResults);
+            }
         }
 
-        request = this.makeRequest(messages, config);
-        this.requestQueue.push(request);
+        return results;
+    }
 
-        const response = await request;
-        
-        const duration = Date.now() - startTime;
-        this.recordMetrics(duration, config.maxTokens, true);
-        this.onRequestSuccess();
-        
+    async chat(
+        messages: ChatMessage[],
+        overrideConfig?: Partial<ClaudeConfig>,
+    ): Promise<string> {
+        const config = { ...this.config, ...overrideConfig };
+        const response = await this.processSingleChat(messages, config);
+
         return response;
-      } catch (error) {
-        this.onRequestFailure();
-        attempt++;
+    }
 
-        if (attempt >= config.maxRetries) {
-          const duration = Date.now() - startTime;
-          this.recordMetrics(duration, 0, false);
-          throw error;
+    updateConfig(newConfig: Partial<ClaudeConfig>): void {
+        this.config = { ...this.config, ...newConfig };
+
+        if (
+            newConfig.apiKey ||
+            newConfig.baseURL ||
+            newConfig.timeout ||
+            newConfig.maxRetries
+        ) {
+            this.client = new Anthropic({
+                apiKey: this.config.apiKey,
+                baseURL: this.config.baseURL,
+                maxRetries: this.config.maxRetries,
+                timeout: this.config.timeout,
+            });
+        }
+    }
+
+    getConfig(): Omit<RequiredClaudeConfig, "apiKey"> {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { apiKey, ...safeConfig } = this.config;
+        return safeConfig;
+    }
+
+    private async processSingleChat(
+        messages: ChatMessage[],
+        config: RequiredClaudeConfig,
+    ): Promise<string> {
+        await this.checkCircuitBreaker();
+
+        const startTime = Date.now();
+        this.metrics.totalRequests++;
+
+        let attempt = 0;
+        let request: Promise<string>;
+
+        while (true) {
+            try {
+                await this.waitForRateLimit();
+
+                if (this.requestQueue.length >= config.maxConcurrent) {
+                    await Promise.race(this.requestQueue);
+                }
+
+                request = this.makeRequest(messages, config);
+                this.requestQueue.push(request);
+
+                const response = await request;
+
+                const duration = Date.now() - startTime;
+                this.recordMetrics(duration, config.maxTokens, true);
+                this.onRequestSuccess();
+
+                return response;
+            } catch (error) {
+                this.onRequestFailure();
+                attempt++;
+
+                if (attempt >= config.maxRetries) {
+                    const duration = Date.now() - startTime;
+                    this.recordMetrics(duration, 0, false);
+                    throw error;
+                }
+
+                const delay = this.calculateBackoffDelay(
+                    attempt,
+                    config.retryDelayMs,
+                    config.maxRetryDelayMs,
+                );
+
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            } finally {
+                const index = this.requestQueue.findIndex((r) => r === request);
+                if (index !== -1) {
+                    this.requestQueue.splice(index, 1);
+                }
+            }
+        }
+    }
+
+    private calculateBackoffDelay(
+        attempt: number,
+        baseDelay: number,
+        maxDelay: number,
+    ): number {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * (baseDelay * 0.1);
+        return Math.min(delay + jitter, maxDelay);
+    }
+
+    private async makeRequest(
+        messages: ChatMessage[],
+        config: RequiredClaudeConfig,
+    ): Promise<string> {
+        const requestParams: MessageCreateParams = {
+            model: config.model,
+            messages: messages,
+            max_tokens: config.maxTokens,
+            temperature: config.temperature,
+            top_p: config.topP,
+            top_k: config.topK,
+            stop_sequences: config.stopSequences,
+            system: config.systemPrompt,
+            metadata: config.metadata,
+        };
+
+        if (config.functions) {
+            requestParams.tools = config.functions.map((fn) => ({
+                name: fn.name,
+                description: fn.description,
+                input_schema: {
+                    type: "object",
+                    properties: fn.parameters.properties,
+                    required: fn.parameters.required,
+                },
+            }));
         }
 
-        const delay = this.calculateBackoffDelay(
-          attempt,
-          config.retryDelayMs,
-          config.maxRetryDelayMs
+        if (config.function_call) {
+            requestParams.tool_choice = {
+                type: "tool",
+                name: config.function_call.name,
+            };
+        }
+
+        const response = await this.client.messages.create(requestParams);
+
+        const textContent = response.content
+            .map((block) => this.getTextFromContentBlock(block))
+            .filter((text) => text.length > 0)
+            .join("\n");
+
+        if (!textContent) {
+            throw new Error("No text content found in response");
+        }
+
+        return textContent;
+    }
+
+    private getTextFromContentBlock(block: unknown): string {
+        if (typeof block === "object" && block !== null) {
+            const b = block as {
+                type?: string;
+                text?: string;
+                input?: unknown;
+            };
+            if (b.type === "text" && typeof b.text === "string") {
+                return b.text;
+            }
+            if (b.type === "tool_use" && b.input) {
+                return JSON.stringify(b.input);
+            }
+        }
+        return "";
+    }
+
+    private chunkArray<T>(array: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < array.length; i += size) {
+            chunks.push(array.slice(i, i + size));
+        }
+        return chunks;
+    }
+
+    private async waitForRateLimit(): Promise<void> {
+        const yamlConfig = loadYamlConfig();
+        const now = Date.now();
+        const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
+        const REFILL_INTERVAL =
+            yamlConfig.llm?.rateLimit?.refillInterval || 60000;
+        const MAX_TOKENS = yamlConfig.llm?.rateLimit?.maxTokensPerMinute || 50;
+        const REFILL_RATE = MAX_TOKENS;
+
+        if (timeSinceLastRefill >= REFILL_INTERVAL) {
+            this.rateLimitState.tokens = Math.min(
+                MAX_TOKENS,
+                this.rateLimitState.tokens + REFILL_RATE,
+            );
+            this.rateLimitState.lastRefill = now;
+        }
+
+        if (this.rateLimitState.tokens <= 0) {
+            const waitTime = REFILL_INTERVAL - timeSinceLastRefill;
+            logger.debug(
+                { waitTime, tokens: this.rateLimitState.tokens },
+                "Rate limit reached, waiting for refill",
+            );
+            await new Promise((resolve) => setTimeout(resolve, waitTime));
+            return this.waitForRateLimit();
+        }
+
+        this.rateLimitState.tokens--;
+    }
+
+    private async checkCircuitBreaker(): Promise<void> {
+        const yamlConfig = loadYamlConfig();
+        const now = Date.now();
+        const FAILURE_THRESHOLD =
+            yamlConfig.llm?.circuitBreaker?.failureThreshold || 5;
+        const RESET_TIMEOUT =
+            yamlConfig.llm?.circuitBreaker?.resetTimeout || 60000;
+        const HALF_OPEN_TIMEOUT =
+            yamlConfig.llm?.circuitBreaker?.halfOpenTimeout || 30000;
+
+        switch (this.circuitBreaker.state) {
+            case "OPEN":
+                if (now - this.circuitBreaker.lastFailureTime > RESET_TIMEOUT) {
+                    this.circuitBreaker.state = "HALF_OPEN";
+                    logger.info("Circuit breaker moved to HALF_OPEN state");
+                } else {
+                    throw new Error(
+                        "Circuit breaker is OPEN - API requests are blocked",
+                    );
+                }
+                break;
+
+            case "HALF_OPEN":
+                if (
+                    now - this.circuitBreaker.lastFailureTime >
+                    HALF_OPEN_TIMEOUT
+                ) {
+                    this.circuitBreaker.state = "CLOSED";
+                    this.circuitBreaker.failures = 0;
+                    logger.info("Circuit breaker moved to CLOSED state");
+                }
+                break;
+
+            case "CLOSED":
+                if (this.circuitBreaker.failures >= FAILURE_THRESHOLD) {
+                    this.circuitBreaker.state = "OPEN";
+                    this.circuitBreaker.lastFailureTime = now;
+                    logger.warn(
+                        "Circuit breaker moved to OPEN state due to failures",
+                    );
+                    throw new Error(
+                        "Circuit breaker is OPEN - too many failures",
+                    );
+                }
+                break;
+        }
+    }
+
+    private onRequestSuccess(): void {
+        if (this.circuitBreaker.state === "HALF_OPEN") {
+            this.circuitBreaker.state = "CLOSED";
+            this.circuitBreaker.failures = 0;
+            logger.info(
+                "Circuit breaker reset to CLOSED after successful request",
+            );
+        }
+    }
+
+    private onRequestFailure(): void {
+        this.circuitBreaker.failures++;
+        this.circuitBreaker.lastFailureTime = Date.now();
+        logger.warn(
+            {
+                failures: this.circuitBreaker.failures,
+                state: this.circuitBreaker.state,
+            },
+            "Request failed, updating circuit breaker",
         );
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      } finally {
-        const index = this.requestQueue.findIndex((r) => r === request);
-        if (index !== -1) {
-          this.requestQueue.splice(index, 1);
-        }
-      }
-    }
-  }
-
-  private calculateBackoffDelay(
-    attempt: number,
-    baseDelay: number,
-    maxDelay: number
-  ): number {
-    const delay = baseDelay * Math.pow(2, attempt - 1);
-    const jitter = Math.random() * (baseDelay * 0.1);
-    return Math.min(delay + jitter, maxDelay);
-  }
-
-  private async makeRequest(
-    messages: ChatMessage[],
-    config: RequiredClaudeConfig
-  ): Promise<string> {
-    const requestParams: MessageCreateParams = {
-      model: config.model,
-      messages: messages,
-      max_tokens: config.maxTokens,
-      temperature: config.temperature,
-      top_p: config.topP,
-      top_k: config.topK,
-      stop_sequences: config.stopSequences,
-      system: config.systemPrompt,
-      metadata: config.metadata,
-    };
-
-    if (config.functions) {
-      requestParams.tools = config.functions.map(fn => ({
-        name: fn.name,
-        description: fn.description,
-        input_schema: {
-          type: 'object',
-          properties: fn.parameters.properties,
-          required: fn.parameters.required
-        }
-      }));
     }
 
-    if (config.function_call) {
-      requestParams.tool_choice = {
-        type: 'tool',
-        name: config.function_call.name
-      };
-    }
+    private recordMetrics(
+        duration: number,
+        tokensUsed: number,
+        success: boolean,
+    ): void {
+        this.metrics.requestDurations.push(duration);
 
-    const response = await this.client.messages.create(requestParams);
+        if (success) {
+            this.metrics.successfulRequests++;
+            this.metrics.totalTokensUsed += tokensUsed;
 
-    const textContent = response.content
-      .map((block) => this.getTextFromContentBlock(block))
-      .filter((text) => text.length > 0)
-      .join("\n");
-
-    if (!textContent) {
-      throw new Error("No text content found in response");
-    }
-
-    return textContent;
-  }
-
-  private getTextFromContentBlock(block: unknown): string {
-    if (typeof block === 'object' && block !== null) {
-      const b = block as { type?: string; text?: string; input?: unknown };
-      if (b.type === "text" && typeof b.text === "string") {
-        return b.text;
-      }
-      if (b.type === "tool_use" && b.input) {
-        return JSON.stringify(b.input);
-      }
-    }
-    return "";
-  }
-
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  }
-
-  private async waitForRateLimit(): Promise<void> {
-    const yamlConfig = loadYamlConfig();
-    const now = Date.now();
-    const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
-    const REFILL_INTERVAL = yamlConfig.llm?.rateLimit?.refillInterval || 60000;
-    const MAX_TOKENS = yamlConfig.llm?.rateLimit?.maxTokensPerMinute || 50;
-    const REFILL_RATE = MAX_TOKENS;
-
-    if (timeSinceLastRefill >= REFILL_INTERVAL) {
-      this.rateLimitState.tokens = Math.min(
-        MAX_TOKENS,
-        this.rateLimitState.tokens + REFILL_RATE
-      );
-      this.rateLimitState.lastRefill = now;
-    }
-
-    if (this.rateLimitState.tokens <= 0) {
-      const waitTime = REFILL_INTERVAL - timeSinceLastRefill;
-      logger.debug(
-        { waitTime, tokens: this.rateLimitState.tokens },
-        "Rate limit reached, waiting for refill"
-      );
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-      return this.waitForRateLimit();
-    }
-
-    this.rateLimitState.tokens--;
-  }
-
-  private async checkCircuitBreaker(): Promise<void> {
-    const yamlConfig = loadYamlConfig();
-    const now = Date.now();
-    const FAILURE_THRESHOLD = yamlConfig.llm?.circuitBreaker?.failureThreshold || 5;
-    const RESET_TIMEOUT = yamlConfig.llm?.circuitBreaker?.resetTimeout || 60000;
-    const HALF_OPEN_TIMEOUT = yamlConfig.llm?.circuitBreaker?.halfOpenTimeout || 30000;
-
-    switch (this.circuitBreaker.state) {
-      case 'OPEN':
-        if (now - this.circuitBreaker.lastFailureTime > RESET_TIMEOUT) {
-          this.circuitBreaker.state = 'HALF_OPEN';
-          logger.info('Circuit breaker moved to HALF_OPEN state');
+            const costPerToken = this.config.model.includes("haiku")
+                ? 0.00025 / 1000
+                : 0.003 / 1000;
+            this.metrics.totalCost += tokensUsed * costPerToken;
         } else {
-          throw new Error('Circuit breaker is OPEN - API requests are blocked');
+            this.metrics.failedRequests++;
         }
-        break;
-      
-      case 'HALF_OPEN':
-        if (now - this.circuitBreaker.lastFailureTime > HALF_OPEN_TIMEOUT) {
-          this.circuitBreaker.state = 'CLOSED';
-          this.circuitBreaker.failures = 0;
-          logger.info('Circuit breaker moved to CLOSED state');
+
+        const recentDurations = this.metrics.requestDurations.slice(-100);
+        this.metrics.averageResponseTime =
+            recentDurations.reduce((a, b) => a + b, 0) / recentDurations.length;
+
+        if (this.metrics.totalRequests % 10 === 0) {
+            logger.debug(
+                {
+                    totalRequests: this.metrics.totalRequests,
+                    successRate:
+                        (
+                            (this.metrics.successfulRequests /
+                                this.metrics.totalRequests) *
+                            100
+                        ).toFixed(1) + "%",
+                    avgResponseTime:
+                        Math.round(this.metrics.averageResponseTime) + "ms",
+                    totalCost: "$" + this.metrics.totalCost.toFixed(4),
+                    tokensUsed: this.metrics.totalTokensUsed,
+                },
+                "Claude API metrics update",
+            );
         }
-        break;
-      
-      case 'CLOSED':
-        if (this.circuitBreaker.failures >= FAILURE_THRESHOLD) {
-          this.circuitBreaker.state = 'OPEN';
-          this.circuitBreaker.lastFailureTime = now;
-          logger.warn('Circuit breaker moved to OPEN state due to failures');
-          throw new Error('Circuit breaker is OPEN - too many failures');
-        }
-        break;
     }
-  }
 
-  private onRequestSuccess(): void {
-    if (this.circuitBreaker.state === 'HALF_OPEN') {
-      this.circuitBreaker.state = 'CLOSED';
-      this.circuitBreaker.failures = 0;
-      logger.info('Circuit breaker reset to CLOSED after successful request');
+    getMetrics(): Omit<PerformanceMetrics, "requestDurations"> {
+        return {
+            totalRequests: this.metrics.totalRequests,
+            successfulRequests: this.metrics.successfulRequests,
+            failedRequests: this.metrics.failedRequests,
+            totalTokensUsed: this.metrics.totalTokensUsed,
+            totalCost: this.metrics.totalCost,
+            averageResponseTime: this.metrics.averageResponseTime,
+        };
     }
-  }
-
-  private onRequestFailure(): void {
-    this.circuitBreaker.failures++;
-    this.circuitBreaker.lastFailureTime = Date.now();
-    logger.warn(
-      { failures: this.circuitBreaker.failures, state: this.circuitBreaker.state },
-      'Request failed, updating circuit breaker'
-    );
-  }
-
-  private recordMetrics(duration: number, tokensUsed: number, success: boolean): void {
-    this.metrics.requestDurations.push(duration);
-    
-    if (success) {
-      this.metrics.successfulRequests++;
-      this.metrics.totalTokensUsed += tokensUsed;
-      
-      const costPerToken = this.config.model.includes('haiku') ? 0.00025 / 1000 : 0.003 / 1000;
-      this.metrics.totalCost += tokensUsed * costPerToken;
-    } else {
-      this.metrics.failedRequests++;
-    }
-    
-    const recentDurations = this.metrics.requestDurations.slice(-100);
-    this.metrics.averageResponseTime = recentDurations.reduce((a, b) => a + b, 0) / recentDurations.length;
-    
-    if (this.metrics.totalRequests % 10 === 0) {
-      logger.debug(
-        {
-          totalRequests: this.metrics.totalRequests,
-          successRate: (this.metrics.successfulRequests / this.metrics.totalRequests * 100).toFixed(1) + '%',
-          avgResponseTime: Math.round(this.metrics.averageResponseTime) + 'ms',
-          totalCost: '$' + this.metrics.totalCost.toFixed(4),
-          tokensUsed: this.metrics.totalTokensUsed
-        },
-        'Claude API metrics update'
-      );
-    }
-  }
-
-  getMetrics(): Omit<PerformanceMetrics, 'requestDurations'> {
-    return {
-      totalRequests: this.metrics.totalRequests,
-      successfulRequests: this.metrics.successfulRequests,
-      failedRequests: this.metrics.failedRequests,
-      totalTokensUsed: this.metrics.totalTokensUsed,
-      totalCost: this.metrics.totalCost,
-      averageResponseTime: this.metrics.averageResponseTime
-    };
-  }
 }

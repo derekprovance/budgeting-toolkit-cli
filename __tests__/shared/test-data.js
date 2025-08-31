@@ -1,6 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mockBudgets = exports.mockCategories = exports.mockTransactions = exports.createMockTransaction = void 0;
+exports.mockBudgets =
+    exports.mockCategories =
+    exports.mockTransactions =
+    exports.createMockTransaction =
+        void 0;
 const createMockTransaction = (overrides = {}) => ({
     transaction_journal_id: "1",
     description: "Walmart Supercenter",
