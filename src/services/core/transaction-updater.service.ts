@@ -12,6 +12,7 @@ export class TransactionUpdaterService {
     constructor(
         private readonly transactionService: TransactionService,
         private readonly validator: TransactionValidatorService,
+        private readonly userInputService: UserInputService,
         private readonly noConfirmation: boolean = false,
         private readonly dryRun: boolean = false,
     ) {}
@@ -138,10 +139,13 @@ export class TransactionUpdaterService {
 
             const approved =
                 this.noConfirmation ||
-                (await UserInputService.askToUpdateTransaction(transaction, {
-                    category: category?.name,
-                    budget: budget?.attributes.name,
-                }));
+                (await this.userInputService.askToUpdateTransaction(
+                    transaction,
+                    {
+                        category: category?.name,
+                        budget: budget?.attributes.name,
+                    },
+                ));
 
             if (!approved) {
                 logger.debug(
@@ -164,10 +168,13 @@ export class TransactionUpdaterService {
 
             return transaction;
         } catch (error) {
-            logger.error({
-                description: transaction.description,
-                error,
-            }, "Error processing transaction:");
+            logger.error(
+                {
+                    description: transaction.description,
+                    error,
+                },
+                "Error processing transaction:",
+            );
             return undefined;
         }
     }

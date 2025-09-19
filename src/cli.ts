@@ -59,7 +59,7 @@ export const createCli = (): Command => {
 
     try {
         apiClient = new FireflyApiClient(config);
-        services = ServiceFactory.createServices(apiClient);
+        services = ServiceFactory.createServices(apiClient, config);
     } catch (error) {
         console.error(
             "Failed to initialize API client:",
@@ -221,6 +221,7 @@ Examples:
                 const updateTransactionService =
                     ServiceFactory.createUpdateTransactionService(
                         apiClient,
+                        config,
                         opts.includeClassified,
                         opts.yes,
                         opts.dryRun,

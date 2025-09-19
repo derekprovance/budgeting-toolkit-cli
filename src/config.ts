@@ -3,7 +3,9 @@ import dotenv from "dotenv";
 import { ApiClientConfig } from "@derekprovance/firefly-iii-sdk";
 import { getConfigValue } from "./utils/config-loader";
 
-dotenv.config();
+dotenv.config({
+    quiet: true
+});
 
 export const config: ApiClientConfig = {
     baseUrl:
@@ -29,6 +31,7 @@ export const expectedMonthlyPaycheck = getConfigValue<number>(
     "EXPECTED_MONTHLY_PAYCHECK",
 );
 
+//TODO(DEREK) - this needs to be migrated to the yaml configuration
 export enum Account {
     PRIMARY = "1",
     DISPOSABLE = "13",
@@ -39,15 +42,18 @@ export enum Account {
     CITIBANK_DOUBLECASH = "14",
 }
 
+//TODO(DEREK) - this needs to be migrated to the yaml configuration
 export enum ExpenseAccount {
     NO_NAME = "5",
 }
 
+//TODO(DEREK) - this needs to be migrated to the yaml configuration
 export enum Tag {
     DISPOSABLE_INCOME = "Disposable Income",
     BILLS = "Bills",
 }
 
+//TODO(DEREK) - this needs to be migrated to the yaml configuration
 export enum Description {
     PAYROLL = "PAYROLL",
 }

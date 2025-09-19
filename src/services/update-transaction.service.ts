@@ -21,13 +21,12 @@ import { TransactionUpdaterService } from "./core/transaction-updater.service";
 export class UpdateTransactionService implements IUpdateTransactionService {
     constructor(
         private readonly transactionService: TransactionService,
+        private readonly transactionUpdaterService: TransactionUpdaterService,
         private readonly categoryService: CategoryService,
         private readonly budgetService: BudgetService,
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: TransactionValidatorService,
         private readonly processTransactionsWithCategories: boolean = false,
-        private readonly noConfirmation: boolean = false,
-        private readonly dryRun: boolean = false,
     ) {}
 
     async updateTransactionsByTag(
@@ -222,12 +221,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
             "START updateTransactionsWithAIResults",
         );
         const results: TransactionSplit[] = [];
-        const updater = new TransactionUpdaterService(
-            this.transactionService,
-            this.validator,
-            this.noConfirmation,
-            dryRun ?? this.dryRun,
-        );
 
         try {
             for (const transaction of transactions) {
@@ -248,7 +241,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                     continue;
                 }
 
-                const updatedTransaction = await updater.updateTransaction(
+                const updatedTransaction = await this.transactionUpdaterService.updateTransaction(
                     transaction,
                     aiResults,
                     categories || [],

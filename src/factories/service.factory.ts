@@ -1,4 +1,7 @@
-import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
+import {
+    ApiClientConfig,
+    FireflyApiClient,
+} from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "../services/core/transaction.service";
 import { BudgetService } from "../services/core/budget.service";
 import { CategoryService } from "../services/core/category.service";
@@ -14,12 +17,18 @@ import { LLMTransactionBudgetService } from "../services/ai/llm-transaction-budg
 import { LLMTransactionProcessingService } from "../services/ai/llm-transaction-processing.service";
 import { UpdateTransactionService } from "../services/update-transaction.service";
 import { LLMConfig } from "../config/llm.config";
+import { UserInputService } from "../services/user-input.service";
+import { TransactionUpdaterService } from "../services/core/transaction-updater.service";
 
 export class ServiceFactory {
-    static createServices(apiClient: FireflyApiClient) {
+    static createServices(
+        apiClient: FireflyApiClient,
+        apiClientConfig: ApiClientConfig,
+    ) {
         const transactionService = new TransactionService(apiClient);
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
+        const userInputService = new UserInputService(apiClientConfig);
         const excludedTransactionService = new ExcludedTransactionService();
         const transactionPropertyService = new TransactionPropertyService(
             excludedTransactionService,
@@ -45,6 +54,7 @@ export class ServiceFactory {
             transactionService,
             budgetService,
             categoryService,
+            userInputService,
             additionalIncomeService,
             unbudgetedExpenseService,
             budgetStatus,
@@ -57,11 +67,12 @@ export class ServiceFactory {
 
     static createUpdateTransactionService(
         apiClient: FireflyApiClient,
+        apiClientConfig: ApiClientConfig,
         includeClassified: boolean = false,
         noConfirmation: boolean = false,
         dryRun: boolean = false,
     ): UpdateTransactionService {
-        const services = this.createServices(apiClient);
+        const services = this.createServices(apiClient, apiClientConfig);
         const claudeClient = LLMConfig.createClient();
 
         const llmCategoryService = new LLMTransactionCategoryService(
@@ -73,15 +84,23 @@ export class ServiceFactory {
             llmBudgetService,
         );
 
+        //TODO(DEREK) - Is this actually good practice?
+        const transactionUpdaterService = new TransactionUpdaterService(
+            services.transactionService,
+            services.transactionValidatorService,
+            services.userInputService,
+            noConfirmation,
+            dryRun,
+        );
+
         return new UpdateTransactionService(
             services.transactionService,
+            transactionUpdaterService,
             services.categoryService,
             services.budgetService,
             llmProcessingService,
             services.transactionValidatorService,
             includeClassified,
-            noConfirmation,
-            dryRun,
         );
     }
 }
