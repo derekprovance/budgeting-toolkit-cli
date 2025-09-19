@@ -48,6 +48,7 @@ export class UpdateTransactionDisplayService {
      * Formats the transaction updates section
      * @returns A tuple containing the formatted string and the number of updates
      */
+    //TODO(DEREK) - need to change the "what is updated" to only contain what we updated
     formatTransactionUpdates(
         results: UpdateTransactionStatusDto,
         updateMode: UpdateTransactionMode,

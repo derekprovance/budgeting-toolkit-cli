@@ -142,11 +142,6 @@ export class UserInputService {
                 name: "Update all",
                 value: UpdateTransactionMode.Both,
             },
-            {
-                key: "x",
-                name: "Abort",
-                value: UpdateTransactionMode.Abort,
-            },
         ];
 
         if (options.budget) {
@@ -164,6 +159,14 @@ export class UserInputService {
                 value: UpdateTransactionMode.Category,
             });
         }
+
+        //TODO(DEREK) - Let's add an edit option that lets you select which and then set the value
+
+        choices.push({
+            key: "x",
+            name: "Abort",
+            value: UpdateTransactionMode.Abort,
+        });
 
         const answer = await expand({
             message,
