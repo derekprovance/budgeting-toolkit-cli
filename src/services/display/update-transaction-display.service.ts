@@ -21,7 +21,7 @@ export class UpdateTransactionDisplayService {
         const dryRunText = dryRun ? " (Dry Run)" : "";
 
         return [
-            chalk.cyanBright(
+            chalk.cyan(
                 `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`,
             ),
         ].join("\n");

@@ -67,7 +67,6 @@ export class ServiceFactory {
 
     static createUpdateTransactionService(
         apiClient: FireflyApiClient,
-        apiClientConfig: ApiClientConfig,
         includeClassified: boolean = false,
         noConfirmation: boolean = false,
         dryRun: boolean = false,

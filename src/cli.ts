@@ -221,7 +221,6 @@ Examples:
                 const updateTransactionService =
                     ServiceFactory.createUpdateTransactionService(
                         apiClient,
-                        config,
                         opts.includeClassified,
                         opts.yes,
                         opts.dryRun,

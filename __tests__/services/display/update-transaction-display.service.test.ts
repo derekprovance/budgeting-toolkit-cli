@@ -152,7 +152,6 @@ describe("UpdateTransactionDisplayService", () => {
                 totalTransactions: 2,
                 data: [
                     {
-                        id: "1",
                         name: "Test Transaction 1",
                         category: "New Category 1",
                         updatedCategory: "New Category 1",
@@ -160,7 +159,6 @@ describe("UpdateTransactionDisplayService", () => {
                         updatedBudget: "New Budget 1",
                     },
                     {
-                        id: "2",
                         name: "Test Transaction 2",
                         category: "New Category 2",
                         updatedCategory: "New Category 2",

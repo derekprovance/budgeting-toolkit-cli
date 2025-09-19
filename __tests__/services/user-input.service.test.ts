@@ -16,14 +16,20 @@ jest.mock("chalk", () => ({
     bold: (str: string) => str,
 }));
 
+//TODO(DEREK) - Need to add testing for transactionId and the new base url
 describe("UserInputService", () => {
+    let service: UserInputService;
     let consoleLogSpy: jest.SpyInstance;
     let promptMock: jest.Mock;
+
+    const mockBaseUrl = "http://derek.pro";
 
     beforeEach(() => {
         consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
         promptMock = inquirer.prompt as unknown as jest.Mock;
         promptMock.mockReset();
+
+        service = new UserInputService(mockBaseUrl);
     });
 
     afterEach(() => {
@@ -37,18 +43,22 @@ describe("UserInputService", () => {
             budget_name: "Old Budget",
         };
 
+        const mockTransactionId = "5";
+
         it("should throw error when transaction is null", async () => {
             await expect(
-                UserInputService.askToUpdateTransaction(
+                service.askToUpdateTransaction(
                     null as unknown as TransactionSplit,
+                    mockTransactionId,
                     {},
                 ),
             ).rejects.toThrow("Transaction cannot be null or undefined");
         });
 
         it("should return false when no changes are proposed", async () => {
-            const result = await UserInputService.askToUpdateTransaction(
+            const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
+                mockTransactionId,
                 {
                     category: mockTransaction.category_name ?? undefined,
                     budget: mockTransaction.budget_name ?? undefined,
@@ -64,8 +74,9 @@ describe("UserInputService", () => {
             const newCategory = "New Category";
             promptMock.mockResolvedValueOnce({ update: true });
 
-            const result = await UserInputService.askToUpdateTransaction(
+            const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
+                mockTransactionId,
                 { category: newCategory },
             );
 
@@ -84,8 +95,9 @@ describe("UserInputService", () => {
             const newBudget = "New Budget";
             promptMock.mockResolvedValueOnce({ update: false });
 
-            const result = await UserInputService.askToUpdateTransaction(
+            const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
+                mockTransactionId,
                 { budget: newBudget },
             );
 
@@ -105,8 +117,9 @@ describe("UserInputService", () => {
             const newBudget = "New Budget";
             promptMock.mockResolvedValueOnce({ update: true });
 
-            const result = await UserInputService.askToUpdateTransaction(
+            const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
+                mockTransactionId,
                 { category: newCategory, budget: newBudget },
             );
 
@@ -130,8 +143,9 @@ describe("UserInputService", () => {
             const newBudget = "New Budget";
             promptMock.mockResolvedValueOnce({ update: true });
 
-            const result = await UserInputService.askToUpdateTransaction(
+            const result = await service.askToUpdateTransaction(
                 mockTransactionWithoutValues as TransactionSplit,
+                mockTransactionId,
                 { category: newCategory, budget: newBudget },
             );
 
@@ -156,8 +170,9 @@ describe("UserInputService", () => {
 
             promptMock.mockResolvedValueOnce({ update: true });
 
-            const result = await UserInputService.askToUpdateTransaction(
+            const result = await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
+                mockTransactionId,
                 { category: "New Category", budget: "New Budget" },
             );
 
