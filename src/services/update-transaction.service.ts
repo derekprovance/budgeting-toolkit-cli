@@ -301,7 +301,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
             const aiResult = journalId ? aiResults[journalId] : undefined;
 
             return {
-                id: journalId || "",
                 name: transaction.description || "",
                 category: transaction.category_name || undefined,
                 updatedCategory: aiResult?.category,

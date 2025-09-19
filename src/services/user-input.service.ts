@@ -87,6 +87,8 @@ export class UserInputService {
     /**
      * Formats the transaction description, truncating if necessary
      */
+    //TODO(DEREK) - Looks like we're using the wrong id. Journal id is a sub transaction id, and. the actual id is higher
+    //TODO(DEREK) - Looks like the base url has /api/v1 in it, which is problematic
     private formatDescription(
         description: string,
         transactionId: string | undefined,
@@ -139,7 +141,7 @@ export class UserInputService {
     /*
      * Returns the link to show a transaction to the user
      */
-    private async getTransactionLink(transactionId: string | undefined) {
+    private getTransactionLink(transactionId: string | undefined) {
         return `${this.config.baseUrl}/transactions/show/${transactionId}`;
     }
 }

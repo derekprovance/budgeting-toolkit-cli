@@ -8,7 +8,6 @@ export interface UpdateTransactionStatusDto {
 }
 
 export interface UpdateTransactionResult {
-    id: string;
     name: string;
     category?: string | null;
     updatedCategory?: string;
