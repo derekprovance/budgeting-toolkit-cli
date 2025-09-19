@@ -12,7 +12,7 @@ import {
     LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
+import { UpdateTransactionResult, UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 import { IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
 import { TransactionValidatorService } from "./core/transaction-validator.service";
@@ -301,19 +301,14 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         transactions: TransactionSplit[],
         aiResults: AIResponse,
     ): Promise<
-        Array<{
-            name: string;
-            category?: string;
-            updatedCategory?: string;
-            budget?: string;
-            updatedBudget?: string;
-        }>
+        Array<UpdateTransactionResult>
     > {
         return transactions.map((transaction) => {
             const journalId = transaction.transaction_journal_id;
             const aiResult = journalId ? aiResults[journalId] : undefined;
 
             return {
+                id: journalId || "",
                 name: transaction.description || "",
                 category: transaction.category_name || undefined,
                 updatedCategory: aiResult?.category,

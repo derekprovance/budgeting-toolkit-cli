@@ -43,7 +43,6 @@ export class UserInputService {
 
     /**
      * Gets a list of changes to be made to the transaction
-     * @private
      */
     private static getChangeList(
         transaction: TransactionSplit,
@@ -69,7 +68,6 @@ export class UserInputService {
 
     /**
      * Formats a single change for display
-     * @private
      */
     private static formatChange(
         field: string,
@@ -83,7 +81,6 @@ export class UserInputService {
 
     /**
      * Formats the transaction description, truncating if necessary
-     * @private
      */
     private static formatDescription(description: string): string {
         return description.length > this.MAX_DESCRIPTION_LENGTH
@@ -93,7 +90,6 @@ export class UserInputService {
 
     /**
      * Formats the complete update message
-     * @private
      */
     private static formatUpdateMessage(
         transaction: TransactionSplit,
@@ -111,7 +107,6 @@ export class UserInputService {
 
     /**
      * Prompts the user for confirmation
-     * @private
      */
     private static async promptUser(message: string): Promise<boolean> {
         console.log("\n");

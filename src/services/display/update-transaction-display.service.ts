@@ -113,7 +113,7 @@ export class UpdateTransactionDisplayService {
         } else {
             lines.push(
                 chalk.green(
-                    `✅ ${dryRun ? "Proposed" : "Successfully"} updated ${updatedCount} of ${results.totalTransactions} transactions`,
+                    `${dryRun ? "Proposed" : "Successfully"} updated ${updatedCount} of ${results.totalTransactions} transactions`,
                 ),
             );
         }
