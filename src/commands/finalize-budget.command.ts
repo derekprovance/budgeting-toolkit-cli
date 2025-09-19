@@ -12,6 +12,9 @@ import chalk from "chalk";
 /**
  * Command for finalizing budget and displaying the finalization report
  */
+
+//TODO(DEREK) - calculate the amount of budget left for transfer into and out of disposable
+//TODO(DEREK) - Find a way to list all transactions without a budget that are not a bill or disposable income
 export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
     private readonly displayService: FinalizeBudgetDisplayService;
 
