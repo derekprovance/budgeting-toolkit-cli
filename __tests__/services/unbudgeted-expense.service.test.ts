@@ -12,7 +12,15 @@ import { ExcludedTransactionService } from "../../src/services/excluded-transact
 jest.mock("../../src/services/core/transaction.service");
 jest.mock("../../src/services/core/transaction-property.service");
 jest.mock("../../src/services/excluded-transaction.service");
-jest.mock("../../src/logger");
+jest.mock("../../src/logger", () => ({
+    logger: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        trace: jest.fn(),
+    },
+}));
 
 describe("UnbudgetedExpenseService", () => {
     let service: UnbudgetedExpenseService;
