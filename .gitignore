@@ -17,3 +17,4 @@ budgeting-toolkit.config.yaml
 #Mac Specific
 Icon?
 .DS_Store
+.claude

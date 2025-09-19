@@ -31,6 +31,7 @@ export class UserInputService {
      */
     async askToUpdateTransaction(
         transaction: TransactionSplit,
+        transactionId: string | undefined,
         options: TransactionUpdateOptions,
     ): Promise<boolean> {
         if (!transaction) {
@@ -42,7 +43,11 @@ export class UserInputService {
             return false;
         }
 
-        const message = this.formatUpdateMessage(transaction, changes);
+        const message = this.formatUpdateMessage(
+            transaction,
+            transactionId,
+            changes,
+        );
         return this.promptUser(message);
     }
 
@@ -87,7 +92,6 @@ export class UserInputService {
     /**
      * Formats the transaction description, truncating if necessary
      */
-    //TODO(DEREK) - Looks like we're using the wrong id. Journal id is a sub transaction id, and. the actual id is higher
     //TODO(DEREK) - Looks like the base url has /api/v1 in it, which is problematic
     private formatDescription(
         description: string,
@@ -98,7 +102,9 @@ export class UserInputService {
                 ? `${description.substring(0, this.DESCRIPTION_TRUNCATE_LENGTH)}...`
                 : description;
 
-        return `\x1B]8;;${this.getTransactionLink(transactionId)}\x1B\\${truncatedDescription}\x1B]8;;\x1B\\`;
+        return transactionId
+            ? `\x1B]8;;${this.getTransactionLink(transactionId)}\x1B\\${truncatedDescription}\x1B]8;;\x1B\\`
+            : truncatedDescription;
     }
 
     /**
@@ -106,14 +112,12 @@ export class UserInputService {
      */
     private formatUpdateMessage(
         transaction: TransactionSplit,
+        transactionId: string | undefined,
         changes: string[],
     ): string {
         return [
             `${chalk.bold("Transaction:")} "${chalk.yellow(
-                this.formatDescription(
-                    transaction.description,
-                    transaction.transaction_journal_id,
-                ),
+                this.formatDescription(transaction.description, transactionId),
             )}"`,
             `${chalk.bold("Proposed changes:")}`,
             ...changes.map((change) => chalk.gray(`  • ${change}`)),

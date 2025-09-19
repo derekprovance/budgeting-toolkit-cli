@@ -123,7 +123,6 @@ export class TransactionUpdaterService {
                 return undefined;
             }
 
-            // In dry run mode, we don't need user confirmation
             if (this.dryRun) {
                 logger.debug(
                     {
@@ -137,10 +136,13 @@ export class TransactionUpdaterService {
                 return transaction;
             }
 
+            const transactionRead =
+                this.transactionService.getTransactionReadBySplit(transaction);
             const approved =
                 this.noConfirmation ||
                 (await this.userInputService.askToUpdateTransaction(
                     transaction,
+                    transactionRead?.id,
                     {
                         category: category?.name,
                         budget: budget?.attributes.name,
