@@ -157,11 +157,12 @@ export class AdditionalIncomeService {
 
             return additionalIncome;
         } catch (error) {
-            logger.trace(error, "Error calculating additional income", {
+            logger.trace({
+                error,
                 month,
                 year,
-                error: error instanceof Error ? error.message : "Unknown error",
-            });
+                errorMessage: error instanceof Error ? error.message : "Unknown error",
+            }, "Error calculating additional income");
             if (error instanceof Error) {
                 throw new Error(
                     `Failed to calculate additional income for month ${month}: ${error.message}`,
@@ -247,9 +248,7 @@ export class AdditionalIncomeService {
      */
     private isNotPayroll = (transaction: TransactionSplit): boolean => {
         if (!transaction.description) {
-            logger.warn("Transaction found with no description", {
-                transaction,
-            });
+            logger.warn({ transaction }, "Transaction found with no description");
             return true; // Consider non-described transactions as non-payroll
         }
 

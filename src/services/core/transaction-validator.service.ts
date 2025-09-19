@@ -73,12 +73,12 @@ export class TransactionValidatorService {
         const journalId = transaction.transaction_journal_id;
 
         if (!journalId) {
-            logger.warn("Missing journal ID:", transaction.description);
+            logger.warn({ description: transaction.description }, "Missing journal ID:");
             return false;
         }
 
         if (!aiResults[journalId]) {
-            logger.warn("No AI results found:", transaction.description);
+            logger.warn({ description: transaction.description }, "No AI results found:");
             return false;
         }
 

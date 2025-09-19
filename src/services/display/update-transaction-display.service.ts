@@ -41,7 +41,7 @@ export class UpdateTransactionDisplayService {
     formatEmptyTag(tag: string): string {
         return [
             "\n",
-            chalk.yellow(`ℹ️ No transactions found with tag "${tag}"`),
+            chalk.yellow(`No transactions found with tag "${tag}"`),
         ].join("\n");
     }
 

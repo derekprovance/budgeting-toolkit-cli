@@ -234,16 +234,16 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 const journalId = transaction.transaction_journal_id;
                 if (!journalId) {
                     logger.debug(
+                        { description: transaction.description },
                         "Transaction missing journal ID:",
-                        transaction.description,
                     );
                     continue;
                 }
 
                 if (!aiResults[journalId]) {
                     logger.debug(
+                        { description: transaction.description },
                         "No AI results for transaction:",
-                        transaction.description,
                     );
                     continue;
                 }

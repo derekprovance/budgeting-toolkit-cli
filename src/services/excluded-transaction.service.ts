@@ -49,7 +49,7 @@ export class ExcludedTransactionService {
                 }
             }
         } catch (error) {
-            logger.error("Error parsing excluded transactions file:", error);
+            logger.error({ error }, "Error parsing excluded transactions file:");
             throw new Error("Failed to parse excluded transactions file");
         }
 

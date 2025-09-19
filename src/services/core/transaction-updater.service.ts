@@ -145,8 +145,8 @@ export class TransactionUpdaterService {
 
             if (!approved) {
                 logger.debug(
+                    { description: transaction.description },
                     "User skipped transaction update:",
-                    transaction.description,
                 );
                 return undefined;
             }
@@ -158,16 +158,16 @@ export class TransactionUpdaterService {
             );
 
             logger.debug(
+                { description: transaction.description },
                 "Successfully updated transaction:",
-                transaction.description,
             );
 
             return transaction;
         } catch (error) {
-            logger.error("Error processing transaction:", {
+            logger.error({
                 description: transaction.description,
                 error,
-            });
+            }, "Error processing transaction:");
             return undefined;
         }
     }
