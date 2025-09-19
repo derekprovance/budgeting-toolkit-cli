@@ -7,13 +7,28 @@ import { TransactionService } from "./transaction.service";
 import { TransactionValidatorService } from "./transaction-validator.service";
 import { UserInputService } from "../user-input.service";
 import { logger } from "../../logger";
+import { UpdateTransactionMode } from "../../types/enum/update-transaction-mode.enum";
 
 export class TransactionUpdaterService {
+    private readonly updateParameterMap = {
+        [UpdateTransactionMode.Both]: (
+            category?: Category,
+            budget?: BudgetRead,
+        ) => [category?.name, budget?.id] as const,
+        [UpdateTransactionMode.Budget]: (
+            _category?: Category,
+            budget?: BudgetRead,
+        ) => [undefined, budget?.id] as const,
+        [UpdateTransactionMode.Category]: (
+            category?: Category,
+            _budget?: BudgetRead,
+        ) => [category?.name, undefined] as const,
+    } as const;
+
     constructor(
         private readonly transactionService: TransactionService,
         private readonly validator: TransactionValidatorService,
         private readonly userInputService: UserInputService,
-        private readonly noConfirmation: boolean = false,
         private readonly dryRun: boolean = false,
     ) {}
 
@@ -138,29 +153,33 @@ export class TransactionUpdaterService {
 
             const transactionRead =
                 this.transactionService.getTransactionReadBySplit(transaction);
-            const approved =
-                this.noConfirmation ||
-                (await this.userInputService.askToUpdateTransaction(
-                    transaction,
-                    transactionRead?.id,
-                    {
-                        category: category?.name,
-                        budget: budget?.attributes.name,
-                    },
-                ));
+            const action = await this.userInputService.askToUpdateTransaction(
+                transaction,
+                transactionRead?.id,
+                {
+                    category: category?.name,
+                    budget: budget?.attributes.name,
+                },
+            );
 
-            if (!approved) {
+            if (action === UpdateTransactionMode.Abort) {
                 logger.debug(
                     { description: transaction.description },
-                    "User skipped transaction update:",
+                    "User skipped transaction update",
                 );
                 return undefined;
             }
 
+            //TODO(DEREK) - it looks like both were updated regardless. Next steps would be to dig into why
+            const [categoryName, budgetId] = this.updateParameterMap[action](
+                category,
+                budget,
+            );
+
             await this.transactionService.updateTransaction(
                 transaction,
-                category?.name,
-                budget?.id,
+                categoryName,
+                budgetId,
             );
 
             logger.debug(

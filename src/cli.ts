@@ -181,10 +181,6 @@ Examples:
             "process transactions that already have categories/budgets assigned",
         )
         .option(
-            "-y, --yes",
-            "skip confirmation prompts and apply changes automatically",
-        )
-        .option(
             "-n, --dry-run",
             "preview proposed changes without applying them",
         )
@@ -200,8 +196,7 @@ Examples:
   $ budgeting-toolkit categorize Import-2025-06-23              # categorize new transactions
   $ budgeting-toolkit categorize Import-2025-06-23 -i           # include already categorized
   $ budgeting-toolkit categorize Import-2025-06-23 -n           # preview changes only
-  $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only
-  $ budgeting-toolkit cat Import-2025-06-23 -y                  # auto-apply changes`,
+  $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only`,
         )
         .action(async (tag: string, opts: UpdateTransactionOptions) => {
             if (!tag || tag.trim() === "") {
@@ -222,7 +217,6 @@ Examples:
                     ServiceFactory.createUpdateTransactionService(
                         apiClient,
                         opts.includeClassified,
-                        opts.yes,
                         opts.dryRun,
                     );
 

@@ -1,7 +1,4 @@
-import {
-    ApiClientConfig,
-    FireflyApiClient,
-} from "@derekprovance/firefly-iii-sdk";
+import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "../services/core/transaction.service";
 import { BudgetService } from "../services/core/budget.service";
 import { CategoryService } from "../services/core/category.service";
@@ -22,9 +19,7 @@ import { TransactionUpdaterService } from "../services/core/transaction-updater.
 import { baseUrl } from "../config";
 
 export class ServiceFactory {
-    static createServices(
-        apiClient: FireflyApiClient,
-    ) {
+    static createServices(apiClient: FireflyApiClient) {
         const transactionService = new TransactionService(apiClient);
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
@@ -68,7 +63,6 @@ export class ServiceFactory {
     static createUpdateTransactionService(
         apiClient: FireflyApiClient,
         includeClassified: boolean = false,
-        noConfirmation: boolean = false,
         dryRun: boolean = false,
     ): UpdateTransactionService {
         const services = this.createServices(apiClient);
@@ -88,7 +82,6 @@ export class ServiceFactory {
             services.transactionService,
             services.transactionValidatorService,
             services.userInputService,
-            noConfirmation,
             dryRun,
         );
 

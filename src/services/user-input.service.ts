@@ -1,6 +1,7 @@
 import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import chalk from "chalk";
-import inquirer from "inquirer";
+import { expand } from "@inquirer/prompts";
+import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
 
 /**
  * Interface for transaction update options
@@ -30,14 +31,14 @@ export class UserInputService {
         transaction: TransactionSplit,
         transactionId: string | undefined,
         options: TransactionUpdateOptions,
-    ): Promise<boolean> {
+    ): Promise<UpdateTransactionMode> {
         if (!transaction) {
             throw new Error("Transaction cannot be null or undefined");
         }
 
         const changes = this.getChangeList(transaction, options);
         if (changes.length === 0) {
-            return false;
+            return UpdateTransactionMode.Abort;
         }
 
         const message = this.formatUpdateMessage(
@@ -124,18 +125,35 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    //TODO(DEREK) - Let's update this to ask to change the category, description, update both, quit. In other words, use the question
-    private async promptUser(message: string): Promise<boolean> {
-        console.log("\n");
-        const answer = await inquirer.prompt([
-            {
-                type: "confirm",
-                name: "update",
-                message,
-                default: true,
-            },
-        ]);
-        return answer.update;
+    private async promptUser(message: string): Promise<UpdateTransactionMode> {
+        const answer = await expand({
+            message,
+            default: "a",
+            choices: [
+                {
+                    key: "a",
+                    name: "Update all",
+                    value: UpdateTransactionMode.Both,
+                },
+                {
+                    key: "c",
+                    name: "Update only the category",
+                    value: UpdateTransactionMode.Category,
+                },
+                {
+                    key: "b",
+                    name: "Update only the budget",
+                    value: UpdateTransactionMode.Budget,
+                },
+                {
+                    key: "x",
+                    name: "Abort",
+                    value: UpdateTransactionMode.Abort,
+                },
+            ],
+        });
+
+        return answer;
     }
 
     /*
