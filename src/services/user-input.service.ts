@@ -46,7 +46,8 @@ export class UserInputService {
             transactionId,
             changes,
         );
-        return this.promptUser(message);
+
+        return this.promptUser(message, options);
     }
 
     /**
@@ -125,32 +126,49 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    private async promptUser(message: string): Promise<UpdateTransactionMode> {
+    private async promptUser(
+        message: string,
+        options: TransactionUpdateOptions,
+    ): Promise<UpdateTransactionMode> {
+        type InquirerKey = "a" | "b" | "c" | "x";
+
+        let choices: Array<{
+            key: InquirerKey;
+            name: string;
+            value: UpdateTransactionMode;
+        }> = [
+            {
+                key: "a",
+                name: "Update all",
+                value: UpdateTransactionMode.Both,
+            },
+            {
+                key: "x",
+                name: "Abort",
+                value: UpdateTransactionMode.Abort,
+            },
+        ];
+
+        if (options.budget) {
+            choices.push({
+                key: "b",
+                name: "Update only the budget",
+                value: UpdateTransactionMode.Budget,
+            });
+        }
+
+        if (options.category) {
+            choices.push({
+                key: "c",
+                name: "Update only the category",
+                value: UpdateTransactionMode.Category,
+            });
+        }
+
         const answer = await expand({
             message,
             default: "a",
-            choices: [
-                {
-                    key: "a",
-                    name: "Update all",
-                    value: UpdateTransactionMode.Both,
-                },
-                {
-                    key: "c",
-                    name: "Update only the category",
-                    value: UpdateTransactionMode.Category,
-                },
-                {
-                    key: "b",
-                    name: "Update only the budget",
-                    value: UpdateTransactionMode.Budget,
-                },
-                {
-                    key: "x",
-                    name: "Abort",
-                    value: UpdateTransactionMode.Abort,
-                },
-            ],
+            choices,
         });
 
         return answer;

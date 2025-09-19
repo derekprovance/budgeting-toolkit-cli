@@ -170,7 +170,9 @@ export class TransactionUpdaterService {
                 return undefined;
             }
 
-            //TODO(DEREK) - it looks like both were updated regardless. Next steps would be to dig into why
+            //TODO(DEREK) - need to change the "what is updated" to only contain what we updated
+            //TODO(DEREK) - I'd love the option to update the budget via dropdown
+            //TODO(DEREK) - Category search for application
             const [categoryName, budgetId] = this.updateParameterMap[action](
                 category,
                 budget,

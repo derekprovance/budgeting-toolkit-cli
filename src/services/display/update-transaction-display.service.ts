@@ -22,7 +22,7 @@ export class UpdateTransactionDisplayService {
 
         return [
             chalk.cyan(
-                `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`,
+                `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:\n`,
             ),
         ].join("\n");
     }
@@ -53,9 +53,7 @@ export class UpdateTransactionDisplayService {
         updateMode: UpdateTransactionMode,
         dryRun?: boolean,
     ): [string, number] {
-        const lines: string[] = [
-            `\n${chalk.blueBright(dryRun ? "Proposed Transaction Updates:" : "Transaction Updates:")}`,
-        ];
+        const lines: string[] = [];
         let updatedCount = 0;
 
         results.data?.forEach((result) => {

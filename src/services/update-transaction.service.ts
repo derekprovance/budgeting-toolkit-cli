@@ -12,7 +12,10 @@ import {
     LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { UpdateTransactionResult, UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
+import {
+    UpdateTransactionResult,
+    UpdateTransactionStatusDto,
+} from "../types/dto/update-transaction-status.dto";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 import { IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
 import { TransactionValidatorService } from "./core/transaction-validator.service";
@@ -241,12 +244,13 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                     continue;
                 }
 
-                const updatedTransaction = await this.transactionUpdaterService.updateTransaction(
-                    transaction,
-                    aiResults,
-                    categories || [],
-                    budgets || [],
-                );
+                const updatedTransaction =
+                    await this.transactionUpdaterService.updateTransaction(
+                        transaction,
+                        aiResults,
+                        categories || [],
+                        budgets || [],
+                    );
 
                 if (updatedTransaction) {
                     results.push(updatedTransaction);
@@ -257,29 +261,15 @@ export class UpdateTransactionService implements IUpdateTransactionService {
             const updatedCount = results.length;
             const skippedCount = totalTransactions - updatedCount;
 
-            if (dryRun) {
-                logger.debug(
-                    {
-                        totalTransactions,
-                        proposedUpdates: updatedCount,
-                        skipped: skippedCount,
-                    },
-                    "Dry run completed - showing proposed changes",
-                );
-            } else {
-                logger.info(
-                    {
-                        totalTransactions,
-                        updated: updatedCount,
-                        skipped: skippedCount,
-                    },
-                    "Transaction update completed",
-                );
-            }
             logger.debug(
-                { updatedCount: results.length },
-                "END updateTransactionsWithAIResults",
+                {
+                    totalTransactions,
+                    updated: updatedCount,
+                    skipped: skippedCount,
+                },
+                `${dryRun ?? "[DRYRUN] "} Transaction update completed`,
             );
+
             return results;
         } catch (err) {
             logger.error(
@@ -293,9 +283,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     private async transformToTransactionCategoryResult(
         transactions: TransactionSplit[],
         aiResults: AIResponse,
-    ): Promise<
-        Array<UpdateTransactionResult>
-    > {
+    ): Promise<Array<UpdateTransactionResult>> {
         return transactions.map((transaction) => {
             const journalId = transaction.transaction_journal_id;
             const aiResult = journalId ? aiResults[journalId] : undefined;
