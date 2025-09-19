@@ -26,6 +26,7 @@ describe("TransactionUpdaterService", () => {
     let service: TransactionUpdaterService;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockValidator: jest.Mocked<TransactionValidatorService>;
+    let mockUserInputService: jest.Mocked<UserInputService>;
 
     const mockTransaction: Partial<TransactionSplit> = {
         transaction_journal_id: "1",
@@ -49,6 +50,7 @@ describe("TransactionUpdaterService", () => {
     beforeEach(() => {
         mockTransactionService = {
             updateTransaction: jest.fn(),
+            getTransactionReadBySplit: jest.fn(),
         } as unknown as jest.Mocked<TransactionService>;
 
         mockValidator = {
@@ -57,14 +59,14 @@ describe("TransactionUpdaterService", () => {
             categoryOrBudgetChanged: jest.fn(),
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
-        jest.spyOn(
-            UserInputService,
-            "askToUpdateTransaction",
-        ).mockImplementation(async () => true);
+        mockUserInputService = {
+            askToUpdateTransaction: jest.fn().mockResolvedValue(true),
+        } as unknown as jest.Mocked<UserInputService>;
 
         service = new TransactionUpdaterService(
             mockTransactionService,
             mockValidator,
+            mockUserInputService,
             false,
         );
     });
@@ -176,10 +178,7 @@ describe("TransactionUpdaterService", () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            jest.spyOn(
-                UserInputService,
-                "askToUpdateTransaction",
-            ).mockImplementation(async () => false);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(false);
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -198,6 +197,7 @@ describe("TransactionUpdaterService", () => {
             const serviceWithNoConfirmation = new TransactionUpdaterService(
                 mockTransactionService,
                 mockValidator,
+                mockUserInputService,
                 true,
             );
 
@@ -217,7 +217,7 @@ describe("TransactionUpdaterService", () => {
 
             expect(result).toBe(mockTransaction);
             expect(
-                UserInputService.askToUpdateTransaction,
+                mockUserInputService.askToUpdateTransaction,
             ).not.toHaveBeenCalled();
             expect(mockTransactionService.updateTransaction).toHaveBeenCalled();
         });
@@ -244,6 +244,7 @@ describe("TransactionUpdaterService", () => {
             const serviceWithDryRun = new TransactionUpdaterService(
                 mockTransactionService,
                 mockValidator,
+                mockUserInputService,
                 false,
                 true,
             );
@@ -261,7 +262,7 @@ describe("TransactionUpdaterService", () => {
 
             expect(result).toBe(mockTransaction);
             expect(
-                UserInputService.askToUpdateTransaction,
+                mockUserInputService.askToUpdateTransaction,
             ).not.toHaveBeenCalled();
             expect(
                 mockTransactionService.updateTransaction,
@@ -272,6 +273,7 @@ describe("TransactionUpdaterService", () => {
             const serviceWithDryRun = new TransactionUpdaterService(
                 mockTransactionService,
                 mockValidator,
+                mockUserInputService,
                 false,
                 true,
             );
@@ -295,6 +297,7 @@ describe("TransactionUpdaterService", () => {
             const serviceWithBoth = new TransactionUpdaterService(
                 mockTransactionService,
                 mockValidator,
+                mockUserInputService,
                 true,
                 true,
             );
@@ -312,7 +315,7 @@ describe("TransactionUpdaterService", () => {
 
             expect(result).toBe(mockTransaction);
             expect(
-                UserInputService.askToUpdateTransaction,
+                mockUserInputService.askToUpdateTransaction,
             ).not.toHaveBeenCalled();
             expect(
                 mockTransactionService.updateTransaction,

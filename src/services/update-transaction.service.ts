@@ -12,7 +12,7 @@ import {
     LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
+import { UpdateTransactionResult, UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 import { IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
 import { TransactionValidatorService } from "./core/transaction-validator.service";
@@ -21,13 +21,12 @@ import { TransactionUpdaterService } from "./core/transaction-updater.service";
 export class UpdateTransactionService implements IUpdateTransactionService {
     constructor(
         private readonly transactionService: TransactionService,
+        private readonly transactionUpdaterService: TransactionUpdaterService,
         private readonly categoryService: CategoryService,
         private readonly budgetService: BudgetService,
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: TransactionValidatorService,
         private readonly processTransactionsWithCategories: boolean = false,
-        private readonly noConfirmation: boolean = false,
-        private readonly dryRun: boolean = false,
     ) {}
 
     async updateTransactionsByTag(
@@ -222,33 +221,27 @@ export class UpdateTransactionService implements IUpdateTransactionService {
             "START updateTransactionsWithAIResults",
         );
         const results: TransactionSplit[] = [];
-        const updater = new TransactionUpdaterService(
-            this.transactionService,
-            this.validator,
-            this.noConfirmation,
-            dryRun ?? this.dryRun,
-        );
 
         try {
             for (const transaction of transactions) {
                 const journalId = transaction.transaction_journal_id;
                 if (!journalId) {
                     logger.debug(
+                        { description: transaction.description },
                         "Transaction missing journal ID:",
-                        transaction.description,
                     );
                     continue;
                 }
 
                 if (!aiResults[journalId]) {
                     logger.debug(
+                        { description: transaction.description },
                         "No AI results for transaction:",
-                        transaction.description,
                     );
                     continue;
                 }
 
-                const updatedTransaction = await updater.updateTransaction(
+                const updatedTransaction = await this.transactionUpdaterService.updateTransaction(
                     transaction,
                     aiResults,
                     categories || [],
@@ -301,13 +294,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         transactions: TransactionSplit[],
         aiResults: AIResponse,
     ): Promise<
-        Array<{
-            name: string;
-            category?: string;
-            updatedCategory?: string;
-            budget?: string;
-            updatedBudget?: string;
-        }>
+        Array<UpdateTransactionResult>
     > {
         return transactions.map((transaction) => {
             const journalId = transaction.transaction_journal_id;

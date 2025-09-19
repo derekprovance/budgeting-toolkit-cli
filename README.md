@@ -48,7 +48,7 @@ Create a `.env` file in the project root for **secrets and infrastructure settin
 
 ```bash
 # Firefly III API Configuration
-FIREFLY_API_URL=https://your-firefly-instance.com/api/v1
+FIREFLY_API_URL=https://your-firefly-instance.com
 FIREFLY_API_TOKEN=your_api_token_here
 
 # Client Certificate Configuration (Optional)

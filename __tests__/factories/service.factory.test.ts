@@ -1,4 +1,4 @@
-import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
+import { FireflyApiClient, ApiClientConfig } from "@derekprovance/firefly-iii-sdk";
 import { ServiceFactory } from "../../src/factories/service.factory";
 import { UpdateTransactionService } from "../../src/services/update-transaction.service";
 

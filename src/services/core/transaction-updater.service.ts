@@ -12,6 +12,7 @@ export class TransactionUpdaterService {
     constructor(
         private readonly transactionService: TransactionService,
         private readonly validator: TransactionValidatorService,
+        private readonly userInputService: UserInputService,
         private readonly noConfirmation: boolean = false,
         private readonly dryRun: boolean = false,
     ) {}
@@ -122,7 +123,6 @@ export class TransactionUpdaterService {
                 return undefined;
             }
 
-            // In dry run mode, we don't need user confirmation
             if (this.dryRun) {
                 logger.debug(
                     {
@@ -136,17 +136,23 @@ export class TransactionUpdaterService {
                 return transaction;
             }
 
+            const transactionRead =
+                this.transactionService.getTransactionReadBySplit(transaction);
             const approved =
                 this.noConfirmation ||
-                (await UserInputService.askToUpdateTransaction(transaction, {
-                    category: category?.name,
-                    budget: budget?.attributes.name,
-                }));
+                (await this.userInputService.askToUpdateTransaction(
+                    transaction,
+                    transactionRead?.id,
+                    {
+                        category: category?.name,
+                        budget: budget?.attributes.name,
+                    },
+                ));
 
             if (!approved) {
                 logger.debug(
+                    { description: transaction.description },
                     "User skipped transaction update:",
-                    transaction.description,
                 );
                 return undefined;
             }
@@ -158,16 +164,19 @@ export class TransactionUpdaterService {
             );
 
             logger.debug(
+                { description: transaction.description },
                 "Successfully updated transaction:",
-                transaction.description,
             );
 
             return transaction;
         } catch (error) {
-            logger.error("Error processing transaction:", {
-                description: transaction.description,
-                error,
-            });
+            logger.error(
+                {
+                    description: transaction.description,
+                    error,
+                },
+                "Error processing transaction:",
+            );
             return undefined;
         }
     }

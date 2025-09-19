@@ -46,7 +46,7 @@ const validateYear = (value: string): number => {
 };
 
 const handleError = (error: unknown, operation: string): never => {
-    logger.error(`Error ${operation}:`, error);
+    logger.error({ error }, `Error ${operation}:`);
     process.exit(1);
 };
 

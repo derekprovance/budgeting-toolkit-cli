@@ -14,8 +14,10 @@ interface TransactionUpdateOptions {
  * Service for handling user input interactions
  */
 export class UserInputService {
-    private static readonly MAX_DESCRIPTION_LENGTH = 50;
-    private static readonly DESCRIPTION_TRUNCATE_LENGTH = 47;
+    private readonly MAX_DESCRIPTION_LENGTH = 50;
+    private readonly DESCRIPTION_TRUNCATE_LENGTH = 47;
+
+    constructor(private baseUrl: string) {}
 
     /**
      * Asks the user whether to update a transaction with new category and/or budget
@@ -24,8 +26,9 @@ export class UserInputService {
      * @returns Promise<boolean> Whether the user approved the changes
      * @throws Error if the transaction is invalid
      */
-    static async askToUpdateTransaction(
+    async askToUpdateTransaction(
         transaction: TransactionSplit,
+        transactionId: string | undefined,
         options: TransactionUpdateOptions,
     ): Promise<boolean> {
         if (!transaction) {
@@ -37,15 +40,18 @@ export class UserInputService {
             return false;
         }
 
-        const message = this.formatUpdateMessage(transaction, changes);
+        const message = this.formatUpdateMessage(
+            transaction,
+            transactionId,
+            changes,
+        );
         return this.promptUser(message);
     }
 
     /**
      * Gets a list of changes to be made to the transaction
-     * @private
      */
-    private static getChangeList(
+    private getChangeList(
         transaction: TransactionSplit,
         options: TransactionUpdateOptions,
     ): string[] {
@@ -69,9 +75,8 @@ export class UserInputService {
 
     /**
      * Formats a single change for display
-     * @private
      */
-    private static formatChange(
+    private formatChange(
         field: string,
         oldValue: string | undefined,
         newValue: string,
@@ -83,25 +88,32 @@ export class UserInputService {
 
     /**
      * Formats the transaction description, truncating if necessary
-     * @private
      */
-    private static formatDescription(description: string): string {
-        return description.length > this.MAX_DESCRIPTION_LENGTH
-            ? `${description.substring(0, this.DESCRIPTION_TRUNCATE_LENGTH)}...`
-            : description;
+    private formatDescription(
+        description: string,
+        transactionId: string | undefined,
+    ): string {
+        let truncatedDescription =
+            description.length > this.MAX_DESCRIPTION_LENGTH
+                ? `${description.substring(0, this.DESCRIPTION_TRUNCATE_LENGTH)}...`
+                : description;
+
+        return transactionId
+            ? `\x1B]8;;${this.getTransactionLink(transactionId)}\x1B\\${truncatedDescription}\x1B]8;;\x1B\\`
+            : truncatedDescription;
     }
 
     /**
      * Formats the complete update message
-     * @private
      */
-    private static formatUpdateMessage(
+    private formatUpdateMessage(
         transaction: TransactionSplit,
+        transactionId: string | undefined,
         changes: string[],
     ): string {
         return [
             `${chalk.bold("Transaction:")} "${chalk.yellow(
-                this.formatDescription(transaction.description),
+                this.formatDescription(transaction.description, transactionId),
             )}"`,
             `${chalk.bold("Proposed changes:")}`,
             ...changes.map((change) => chalk.gray(`  • ${change}`)),
@@ -111,9 +123,9 @@ export class UserInputService {
 
     /**
      * Prompts the user for confirmation
-     * @private
      */
-    private static async promptUser(message: string): Promise<boolean> {
+    //TODO(DEREK) - Let's update this to ask to change the category, description, update both, quit. In other words, use the question
+    private async promptUser(message: string): Promise<boolean> {
         console.log("\n");
         const answer = await inquirer.prompt([
             {
@@ -124,5 +136,12 @@ export class UserInputService {
             },
         ]);
         return answer.update;
+    }
+
+    /*
+     * Returns the link to show a transaction to the user
+     */
+    private getTransactionLink(transactionId: string | undefined) {
+        return `${this.baseUrl}/transactions/show/${transactionId}`;
     }
 }

@@ -77,7 +77,7 @@ describe("UpdateTransactionDisplayService", () => {
         it("should format the empty tag message correctly", () => {
             const result = service.formatEmptyTag("test-tag");
             expect(result).toContain(
-                'ℹ️ No transactions found with tag "test-tag"',
+                'No transactions found with tag "test-tag"',
             );
         });
     });
@@ -104,6 +104,7 @@ describe("UpdateTransactionDisplayService", () => {
                 totalTransactions: 1,
                 data: [
                     {
+                        id: "1",
                         name: "Test Transaction",
                         category: "Old Category",
                         updatedCategory: "New Category",
@@ -126,6 +127,7 @@ describe("UpdateTransactionDisplayService", () => {
                 totalTransactions: 1,
                 data: [
                     {
+                        id: "1",
                         name: "Test Transaction",
                         budget: "Old Budget",
                         updatedBudget: "New Budget",

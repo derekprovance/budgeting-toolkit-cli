@@ -230,7 +230,6 @@ describe("PaycheckSurplusService", () => {
             // Assert
             expect(result).toBe(-2000.0);
             expect(logger.warn).toHaveBeenCalledWith(
-                "Invalid paycheck amount found",
                 {
                     paycheck: {
                         amount: "invalid",
@@ -238,6 +237,7 @@ describe("PaycheckSurplusService", () => {
                         source_type: "Revenue account",
                     },
                 },
+                "Invalid paycheck amount found",
             );
         });
 

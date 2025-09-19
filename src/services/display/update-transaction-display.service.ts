@@ -21,8 +21,7 @@ export class UpdateTransactionDisplayService {
         const dryRunText = dryRun ? " (Dry Run)" : "";
 
         return [
-            "\n",
-            chalk.blueBright(
+            chalk.cyan(
                 `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`,
             ),
         ].join("\n");
@@ -41,7 +40,7 @@ export class UpdateTransactionDisplayService {
     formatEmptyTag(tag: string): string {
         return [
             "\n",
-            chalk.yellow(`ℹ️ No transactions found with tag "${tag}"`),
+            chalk.yellow(`No transactions found with tag "${tag}"`),
         ].join("\n");
     }
 
@@ -113,7 +112,7 @@ export class UpdateTransactionDisplayService {
         } else {
             lines.push(
                 chalk.green(
-                    `✅ ${dryRun ? "Proposed" : "Successfully"} updated ${updatedCount} of ${results.totalTransactions} transactions`,
+                    `${dryRun ? "Proposed" : "Successfully"} updated ${updatedCount} of ${results.totalTransactions} transactions`,
                 ),
             );
         }

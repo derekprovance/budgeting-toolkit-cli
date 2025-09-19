@@ -124,11 +124,13 @@ describe("UpdateTransactionsCommand", () => {
                 totalTransactions: 2,
                 data: [
                     {
+                        id: "trans-1",
                         name: "Transaction 1",
                         category: "Old Category",
                         updatedCategory: "New Category",
                     },
                     {
+                        id: "trans-2",
                         name: "Transaction 2",
                         budget: "Old Budget",
                         updatedBudget: "New Budget",
@@ -170,11 +172,13 @@ describe("UpdateTransactionsCommand", () => {
                 totalTransactions: 2,
                 data: [
                     {
+                        id: "trans-1",
                         name: "Transaction 1",
                         category: "Old Category",
                         updatedCategory: "New Category",
                     },
                     {
+                        id: "trans-2",
                         name: "Transaction 2",
                         budget: "Old Budget",
                         updatedBudget: "New Budget",

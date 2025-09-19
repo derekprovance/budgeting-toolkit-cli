@@ -105,7 +105,7 @@ export class PaycheckSurplusService {
         return paychecks.reduce((sum, paycheck) => {
             const amount = parseFloat(paycheck.amount);
             if (isNaN(amount)) {
-                logger.warn("Invalid paycheck amount found", { paycheck });
+                logger.warn({ paycheck }, "Invalid paycheck amount found");
                 return sum;
             }
             return sum + amount;

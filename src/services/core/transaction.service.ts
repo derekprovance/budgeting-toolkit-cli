@@ -178,6 +178,16 @@ export class TransactionService {
         }
     }
 
+    getTransactionReadBySplit(
+        splitTransaction: TransactionSplit,
+    ): TransactionRead | null {
+        const result = this.splitTransactionIdx.get(
+            this.generateSplitTransactionKey(splitTransaction),
+        );
+
+        return result ? result : null;
+    }
+
     /**
      * Clears the transaction cache
      */
@@ -223,16 +233,6 @@ export class TransactionService {
                 );
             });
         });
-    }
-
-    private getTransactionReadBySplit(
-        splitTransaction: TransactionSplit,
-    ): TransactionRead | null {
-        const result = this.splitTransactionIdx.get(
-            this.generateSplitTransactionKey(splitTransaction),
-        );
-
-        return result ? result : null;
     }
 
     private async fetchTransactionsByTag(
