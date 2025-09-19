@@ -59,8 +59,7 @@ export function loadYamlConfig(): YamlConfig {
 
     try {
         if (!fs.existsSync(configPath)) {
-            console.warn(`Configuration file not found at ${configPath}`);
-            return {};
+            throw new Error(`Configuration file not found at ${configPath}`);
         }
 
         const fileContents = fs.readFileSync(configPath, "utf8");
@@ -69,8 +68,7 @@ export function loadYamlConfig(): YamlConfig {
         cachedConfig = config || {};
         return cachedConfig;
     } catch (error) {
-        console.error("Failed to load YAML configuration:", error);
-        return {};
+        throw new Error(`Failed to load YAML configuration: ${error}`);
     }
 }
 
