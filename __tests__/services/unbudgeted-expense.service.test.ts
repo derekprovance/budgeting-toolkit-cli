@@ -7,11 +7,15 @@ import { TransactionService } from "../../src/services/core/transaction.service"
 import { TransactionPropertyService } from "../../src/services/core/transaction-property.service";
 import { Account } from "../../src/config";
 import { ExcludedTransactionService } from "../../src/services/excluded-transaction.service";
+import { getConfigValue } from "../../src/utils/config-loader";
 
 // Mock dependencies
 jest.mock("../../src/services/core/transaction.service");
 jest.mock("../../src/services/core/transaction-property.service");
 jest.mock("../../src/services/excluded-transaction.service");
+jest.mock("../../src/utils/config-loader", () => ({
+    getConfigValue: jest.fn(),
+}));
 jest.mock("../../src/logger", () => ({
     logger: {
         debug: jest.fn(),
@@ -26,8 +30,22 @@ describe("UnbudgetedExpenseService", () => {
     let service: UnbudgetedExpenseService;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockGetConfigValue: jest.MockedFunction<typeof getConfigValue>;
 
     beforeEach(() => {
+        mockGetConfigValue = getConfigValue as jest.MockedFunction<typeof getConfigValue>;
+        // Set up valid expense accounts for tests
+        mockGetConfigValue.mockImplementation((key: string) => {
+            if (key === "validExpenseAccounts") {
+                return [
+                    Account.CHASE_AMAZON,
+                    Account.CHASE_SAPPHIRE,
+                    Account.CITIBANK_DOUBLECASH,
+                    Account.PRIMARY,
+                ];
+            }
+            return undefined;
+        });
         const mockApiClient = {} as FireflyApiClient;
         const mockExcludedTransactionService =
             new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
