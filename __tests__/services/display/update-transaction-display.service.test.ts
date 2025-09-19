@@ -94,7 +94,7 @@ describe("UpdateTransactionDisplayService", () => {
                 results,
                 UpdateTransactionMode.Both,
             );
-            expect(text).toContain("Transaction Updates");
+            expect(text).toBe("");
             expect(count).toBe(0);
         });
 

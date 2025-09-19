@@ -62,26 +62,15 @@ describe("config-loader", () => {
             expect(result).toEqual(mockConfig);
         });
 
-        it("should return empty object if config file does not exist", () => {
-            const consoleSpy = jest
-                .spyOn(console, "warn")
-                .mockImplementation(() => {});
+        it("should throw error if config file does not exist", () => {
             mockFs.existsSync.mockReturnValue(false);
 
-            const result = loadYamlConfig();
-
-            expect(result).toEqual({});
-            expect(consoleSpy).toHaveBeenCalledWith(
-                expect.stringContaining("Configuration file not found at"),
+            expect(() => loadYamlConfig()).toThrow(
+                "Failed to load YAML configuration"
             );
-
-            consoleSpy.mockRestore();
         });
 
-        it("should return empty object if YAML loading fails", () => {
-            const consoleSpy = jest
-                .spyOn(console, "error")
-                .mockImplementation(() => {});
+        it("should throw error if YAML loading fails", () => {
             const error = new Error("YAML parse error");
 
             mockFs.existsSync.mockReturnValue(true);
@@ -90,15 +79,9 @@ describe("config-loader", () => {
                 throw error;
             });
 
-            const result = loadYamlConfig();
-
-            expect(result).toEqual({});
-            expect(consoleSpy).toHaveBeenCalledWith(
-                "Failed to load YAML configuration:",
-                error,
+            expect(() => loadYamlConfig()).toThrow(
+                "Failed to load YAML configuration"
             );
-
-            consoleSpy.mockRestore();
         });
 
         it("should return empty object if yaml.load returns null", () => {

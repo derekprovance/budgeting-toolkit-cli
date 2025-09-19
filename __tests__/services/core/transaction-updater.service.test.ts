@@ -2,6 +2,7 @@ import { TransactionUpdaterService } from "../../../src/services/core/transactio
 import { TransactionService } from "../../../src/services/core/transaction.service";
 import { TransactionValidatorService } from "../../../src/services/core/transaction-validator.service";
 import { UserInputService } from "../../../src/services/user-input.service";
+import { UpdateTransactionMode } from "../../../src/types/enum/update-transaction-mode.enum";
 import {
     TransactionSplit,
     Category,
@@ -100,6 +101,9 @@ describe("TransactionUpdaterService", () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Both,
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(
                 undefined,
             );
@@ -140,6 +144,9 @@ describe("TransactionUpdaterService", () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(false);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Both,
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(
                 undefined,
             );
@@ -178,7 +185,9 @@ describe("TransactionUpdaterService", () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(false);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Abort,
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -193,8 +202,8 @@ describe("TransactionUpdaterService", () => {
             ).not.toHaveBeenCalled();
         });
 
-        it("should skip user confirmation when noConfirmation is true", async () => {
-            const serviceWithNoConfirmation = new TransactionUpdaterService(
+        it("should skip user confirmation when in dry run mode", async () => {
+            const serviceWithDryRun = new TransactionUpdaterService(
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
@@ -204,11 +213,8 @@ describe("TransactionUpdaterService", () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockTransactionService.updateTransaction.mockResolvedValue(
-                undefined,
-            );
 
-            const result = await serviceWithNoConfirmation.updateTransaction(
+            const result = await serviceWithDryRun.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
                 mockCategories as Category[],
@@ -219,7 +225,7 @@ describe("TransactionUpdaterService", () => {
             expect(
                 mockUserInputService.askToUpdateTransaction,
             ).not.toHaveBeenCalled();
-            expect(mockTransactionService.updateTransaction).toHaveBeenCalled();
+            expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
 
         it("should handle errors during update", async () => {
@@ -245,7 +251,6 @@ describe("TransactionUpdaterService", () => {
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
-                false,
                 true,
             );
 
@@ -274,7 +279,6 @@ describe("TransactionUpdaterService", () => {
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
-                false,
                 true,
             );
 
@@ -298,7 +302,6 @@ describe("TransactionUpdaterService", () => {
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
-                true,
                 true,
             );
 

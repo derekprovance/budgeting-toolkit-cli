@@ -72,7 +72,6 @@ describe("ServiceFactory", () => {
             const service = ServiceFactory.createUpdateTransactionService(
                 mockApiClient,
                 true, // includeClassified
-                true, // noConfirmation
                 true, // dryRun
             );
 
