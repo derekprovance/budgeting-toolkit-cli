@@ -4,13 +4,15 @@ import { ApiClientConfig } from "@derekprovance/firefly-iii-sdk";
 import { getConfigValue } from "./utils/config-loader";
 
 dotenv.config({
-    quiet: true
+    quiet: true,
 });
+
+export const baseUrl: string = process.env.FIREFLY_API_URL || "";
 
 export const config: ApiClientConfig = {
     baseUrl:
-        process.env.FIREFLY_API_URL ||
-        "https://your-firefly-instance.com/api/v1",
+        (process.env.FIREFLY_API_URL?.trim() ||
+            "https://your-firefly-instance.com") + "/api/v1/",
     apiToken: process.env.FIREFLY_API_TOKEN || "",
     caCertPath: process.env.CLIENT_CERT_CA_PATH
         ? path.resolve(__dirname, process.env.CLIENT_CERT_CA_PATH)

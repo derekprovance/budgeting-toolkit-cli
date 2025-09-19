@@ -1,7 +1,4 @@
-import {
-    ApiClientConfig,
-    TransactionSplit,
-} from "@derekprovance/firefly-iii-sdk";
+import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
 import chalk from "chalk";
 import inquirer from "inquirer";
 
@@ -20,7 +17,7 @@ export class UserInputService {
     private readonly MAX_DESCRIPTION_LENGTH = 50;
     private readonly DESCRIPTION_TRUNCATE_LENGTH = 47;
 
-    constructor(private config: ApiClientConfig) {}
+    constructor(private baseUrl: string) {}
 
     /**
      * Asks the user whether to update a transaction with new category and/or budget
@@ -92,7 +89,6 @@ export class UserInputService {
     /**
      * Formats the transaction description, truncating if necessary
      */
-    //TODO(DEREK) - Looks like the base url has /api/v1 in it, which is problematic
     private formatDescription(
         description: string,
         transactionId: string | undefined,
@@ -146,6 +142,6 @@ export class UserInputService {
      * Returns the link to show a transaction to the user
      */
     private getTransactionLink(transactionId: string | undefined) {
-        return `${this.config.baseUrl}/transactions/show/${transactionId}`;
+        return `${this.baseUrl}/transactions/show/${transactionId}`;
     }
 }

@@ -19,16 +19,16 @@ import { UpdateTransactionService } from "../services/update-transaction.service
 import { LLMConfig } from "../config/llm.config";
 import { UserInputService } from "../services/user-input.service";
 import { TransactionUpdaterService } from "../services/core/transaction-updater.service";
+import { baseUrl } from "../config";
 
 export class ServiceFactory {
     static createServices(
         apiClient: FireflyApiClient,
-        apiClientConfig: ApiClientConfig,
     ) {
         const transactionService = new TransactionService(apiClient);
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
-        const userInputService = new UserInputService(apiClientConfig);
+        const userInputService = new UserInputService(baseUrl);
         const excludedTransactionService = new ExcludedTransactionService();
         const transactionPropertyService = new TransactionPropertyService(
             excludedTransactionService,
@@ -72,7 +72,7 @@ export class ServiceFactory {
         noConfirmation: boolean = false,
         dryRun: boolean = false,
     ): UpdateTransactionService {
-        const services = this.createServices(apiClient, apiClientConfig);
+        const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
         const llmCategoryService = new LLMTransactionCategoryService(
