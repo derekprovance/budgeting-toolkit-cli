@@ -69,6 +69,8 @@ describe("TransactionUpdaterService", () => {
             mockValidator,
             mockUserInputService,
             false,
+            mockCategories as Category[],
+            mockBudgets as BudgetRead[],
         );
     });
 
@@ -83,8 +85,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -111,8 +111,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBe(mockTransaction);
@@ -130,8 +128,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 transactionWithoutId as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -154,8 +150,6 @@ describe("TransactionUpdaterService", () => {
             await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(
@@ -171,8 +165,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -192,11 +184,9 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
-            expect(result).toBeUndefined();
+            expect(result).toEqual(mockTransaction);
             expect(
                 mockTransactionService.updateTransaction,
             ).not.toHaveBeenCalled();
@@ -208,6 +198,8 @@ describe("TransactionUpdaterService", () => {
                 mockValidator,
                 mockUserInputService,
                 true,
+                mockCategories as Category[],
+                mockBudgets as BudgetRead[],
             );
 
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -217,8 +209,6 @@ describe("TransactionUpdaterService", () => {
             const result = await serviceWithDryRun.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBe(mockTransaction);
@@ -239,8 +229,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -252,6 +240,8 @@ describe("TransactionUpdaterService", () => {
                 mockValidator,
                 mockUserInputService,
                 true,
+                mockCategories as Category[],
+                mockBudgets as BudgetRead[],
             );
 
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -261,8 +251,6 @@ describe("TransactionUpdaterService", () => {
             const result = await serviceWithDryRun.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBe(mockTransaction);
@@ -280,6 +268,8 @@ describe("TransactionUpdaterService", () => {
                 mockValidator,
                 mockUserInputService,
                 true,
+                mockCategories as Category[],
+                mockBudgets as BudgetRead[],
             );
 
             mockValidator.validateTransactionData.mockReturnValue(false);
@@ -287,8 +277,6 @@ describe("TransactionUpdaterService", () => {
             const result = await serviceWithDryRun.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -303,6 +291,8 @@ describe("TransactionUpdaterService", () => {
                 mockValidator,
                 mockUserInputService,
                 true,
+                mockCategories as Category[],
+                mockBudgets as BudgetRead[],
             );
 
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -312,8 +302,6 @@ describe("TransactionUpdaterService", () => {
             const result = await serviceWithBoth.updateTransaction(
                 mockTransaction as TransactionSplit,
                 mockAIResults,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBe(mockTransaction);
@@ -336,8 +324,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 aiResultsWithEmptyCategory,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -357,8 +343,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 aiResultsWithInvalidCategory,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -378,8 +362,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 aiResultsWithEmptyBudget,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();
@@ -399,8 +381,6 @@ describe("TransactionUpdaterService", () => {
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
                 aiResultsWithInvalidBudget,
-                mockCategories as Category[],
-                mockBudgets as BudgetRead[],
             );
 
             expect(result).toBeUndefined();

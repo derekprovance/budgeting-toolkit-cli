@@ -47,21 +47,6 @@ export class UpdateTransactionsCommand
                 console.log(this.displayService.formatEmptyTag(tag));
                 return;
             }
-
-            const [updatesText, updatedCount] =
-                this.displayService.formatTransactionUpdates(
-                    results,
-                    updateMode,
-                    dryRun,
-                );
-            console.log(updatesText);
-            console.log(
-                this.displayService.formatSummary(
-                    results,
-                    updatedCount,
-                    dryRun,
-                ),
-            );
         } catch (error) {
             console.log(this.displayService.formatError(error));
             throw error;

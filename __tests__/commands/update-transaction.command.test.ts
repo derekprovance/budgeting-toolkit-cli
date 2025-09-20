@@ -23,10 +23,6 @@ describe("UpdateTransactionsCommand", () => {
                 .mockReturnValue("Processing header"),
             formatTagNotFound: jest.fn().mockReturnValue("Tag not found"),
             formatEmptyTag: jest.fn().mockReturnValue("Empty tag"),
-            formatTransactionUpdates: jest
-                .fn()
-                .mockReturnValue(["Updates text", 2]),
-            formatSummary: jest.fn().mockReturnValue("Summary"),
             formatError: jest.fn().mockReturnValue("Error"),
         } as unknown as jest.Mocked<UpdateTransactionDisplayService>;
 
@@ -42,14 +38,6 @@ describe("UpdateTransactionsCommand", () => {
             UpdateTransactionDisplayService.prototype,
             "formatEmptyTag",
         ).mockImplementation(mockDisplayService.formatEmptyTag);
-        jest.spyOn(
-            UpdateTransactionDisplayService.prototype,
-            "formatTransactionUpdates",
-        ).mockImplementation(mockDisplayService.formatTransactionUpdates);
-        jest.spyOn(
-            UpdateTransactionDisplayService.prototype,
-            "formatSummary",
-        ).mockImplementation(mockDisplayService.formatSummary);
         jest.spyOn(
             UpdateTransactionDisplayService.prototype,
             "formatError",
@@ -71,8 +59,6 @@ describe("UpdateTransactionsCommand", () => {
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue({
                 status: UpdateTransactionStatus.NO_TAG,
-                totalTransactions: 0,
-                data: [],
             });
 
             await command.execute(params);
@@ -96,8 +82,6 @@ describe("UpdateTransactionsCommand", () => {
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue({
                 status: UpdateTransactionStatus.EMPTY_TAG,
-                totalTransactions: 0,
-                data: [],
             });
 
             await command.execute(params);
@@ -121,21 +105,6 @@ describe("UpdateTransactionsCommand", () => {
 
             const results = {
                 status: UpdateTransactionStatus.HAS_RESULTS,
-                totalTransactions: 2,
-                data: [
-                    {
-                        id: "trans-1",
-                        name: "Transaction 1",
-                        category: "Old Category",
-                        updatedCategory: "New Category",
-                    },
-                    {
-                        id: "trans-2",
-                        name: "Transaction 2",
-                        budget: "Old Budget",
-                        updatedBudget: "New Budget",
-                    },
-                ],
             };
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue(
@@ -150,14 +119,7 @@ describe("UpdateTransactionsCommand", () => {
             expect(
                 mockDisplayService.formatProcessingHeader,
             ).toHaveBeenCalledWith(params.tag, params.updateMode, undefined);
-            expect(
-                mockDisplayService.formatTransactionUpdates,
-            ).toHaveBeenCalledWith(results, params.updateMode, undefined);
-            expect(mockDisplayService.formatSummary).toHaveBeenCalledWith(
-                results,
-                2,
-                undefined,
-            );
+            // Command now returns after successful updates without displaying them
         });
 
         it("should handle dry run mode", async () => {
@@ -169,21 +131,6 @@ describe("UpdateTransactionsCommand", () => {
 
             const results = {
                 status: UpdateTransactionStatus.HAS_RESULTS,
-                totalTransactions: 2,
-                data: [
-                    {
-                        id: "trans-1",
-                        name: "Transaction 1",
-                        category: "Old Category",
-                        updatedCategory: "New Category",
-                    },
-                    {
-                        id: "trans-2",
-                        name: "Transaction 2",
-                        budget: "Old Budget",
-                        updatedBudget: "New Budget",
-                    },
-                ],
             };
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue(
@@ -198,14 +145,7 @@ describe("UpdateTransactionsCommand", () => {
             expect(
                 mockDisplayService.formatProcessingHeader,
             ).toHaveBeenCalledWith(params.tag, params.updateMode, true);
-            expect(
-                mockDisplayService.formatTransactionUpdates,
-            ).toHaveBeenCalledWith(results, params.updateMode, true);
-            expect(mockDisplayService.formatSummary).toHaveBeenCalledWith(
-                results,
-                2,
-                true,
-            );
+            // Command now returns after successful updates without displaying them
         });
 
         it("should handle errors", async () => {

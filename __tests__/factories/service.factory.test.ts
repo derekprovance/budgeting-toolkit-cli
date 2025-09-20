@@ -18,6 +18,8 @@ jest.mock("../../src/services/ai/llm-transaction-budget.service");
 jest.mock("../../src/services/ai/llm-transaction-processing.service");
 jest.mock("../../src/services/update-transaction.service");
 jest.mock("../../src/config/llm.config");
+jest.mock("../../src/services/user-input.service");
+jest.mock("../../src/services/core/transaction-updater.service");
 
 // Mock the logger
 jest.mock("../../src/logger", () => ({
@@ -29,6 +31,13 @@ jest.mock("../../src/logger", () => ({
         trace: jest.fn(),
     },
 }));
+
+// Mock budget and category services to return empty arrays
+import { BudgetService } from "../../src/services/core/budget.service";
+import { CategoryService } from "../../src/services/core/category.service";
+
+(BudgetService as jest.MockedClass<typeof BudgetService>).prototype.getBudgets = jest.fn().mockResolvedValue([]);
+(CategoryService as jest.MockedClass<typeof CategoryService>).prototype.getCategories = jest.fn().mockResolvedValue([]);
 
 describe("ServiceFactory", () => {
     let mockApiClient: jest.Mocked<FireflyApiClient>;
@@ -61,15 +70,14 @@ describe("ServiceFactory", () => {
     });
 
     describe("createUpdateTransactionService", () => {
-        it("should create UpdateTransactionService with default parameters", () => {
-            const service =
-                ServiceFactory.createUpdateTransactionService(mockApiClient);
+        it("should create UpdateTransactionService with default parameters", async () => {
+            const service = await ServiceFactory.createUpdateTransactionService(mockApiClient);
 
             expect(service).toBeInstanceOf(UpdateTransactionService);
         });
 
-        it("should create UpdateTransactionService with custom parameters", () => {
-            const service = ServiceFactory.createUpdateTransactionService(
+        it("should create UpdateTransactionService with custom parameters", async () => {
+            const service = await ServiceFactory.createUpdateTransactionService(
                 mockApiClient,
                 true, // includeClassified
                 true, // dryRun

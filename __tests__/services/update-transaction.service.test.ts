@@ -1,4 +1,3 @@
-// Move all jest.mock(...) calls to the top, before any imports
 jest.mock("../../src/logger", () => ({
     logger: {
         debug: (...args: unknown[]) => console.log("[logger.debug]", ...args),
@@ -171,8 +170,6 @@ describe("UpdateTransactionService", () => {
             mockValidator
         );
 
-        // Assert that the service is using the correct mock instance
-        // (This will throw if not, helping us diagnose the issue)
         expect(
             (service as unknown as { transactionService: TransactionService })
                 .transactionService,
@@ -195,8 +192,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.NO_TAG);
-            expect(result.totalTransactions).toBe(0);
-            expect(result.data).toEqual([]);
         });
 
         it("should return EMPTY_TAG status when no transactions found", async () => {
@@ -209,8 +204,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
-            expect(result.totalTransactions).toBe(0);
-            expect(result.data).toEqual([]);
         });
 
         it("should process transactions and return HAS_RESULTS status", async () => {
@@ -250,8 +243,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(result.totalTransactions).toBe(mockTransactions.length);
-            expect(result.data).toHaveLength(mockTransactions.length);
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledTimes(
                 mockTransactions.length,
             );
@@ -271,8 +262,7 @@ describe("UpdateTransactionService", () => {
             expect(result.status).toBe(
                 UpdateTransactionStatus.PROCESSING_FAILED,
             );
-            expect(result.totalTransactions).toBe(0);
-            expect(result.data).toEqual([]);
+            // No need to check totalTransactions or data - they don't exist in the DTO
             expect(result.error).toBe("Processing failed");
         });
 
@@ -296,8 +286,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
-            expect(result.totalTransactions).toBe(0);
-            expect(result.data).toHaveLength(0);
             expect(mockTransactionUpdaterService.updateTransaction).not.toHaveBeenCalled();
         });
 
@@ -327,8 +315,6 @@ describe("UpdateTransactionService", () => {
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.any(Object),
-                expect.any(Array),
-                [],
             );
         });
 
@@ -358,8 +344,6 @@ describe("UpdateTransactionService", () => {
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.any(Object),
-                [],
-                expect.any(Array),
             );
         });
 
@@ -395,8 +379,7 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(result.totalTransactions).toBe(mockTransactions.length);
-            expect(result.data).toHaveLength(mockTransactions.length);
+            // No need to check totalTransactions or data - they don't exist in the DTO
             expect(
                 mockTransactionService.updateTransaction,
             ).not.toHaveBeenCalled();
@@ -432,25 +415,6 @@ describe("UpdateTransactionService", () => {
                 "test",
                 UpdateTransactionMode.Both,
             );
-
-            expect(result.data).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        name: "Test Transaction 1",
-                        category: "New Category 1",
-                        updatedCategory: "New Category 1",
-                        budget: "New Budget 1",
-                        updatedBudget: "New Budget 1",
-                    }),
-                    expect.objectContaining({
-                        name: "Test Transaction 2",
-                        category: "New Category 2",
-                        updatedCategory: "New Category 2",
-                        budget: "New Budget 2",
-                        updatedBudget: "New Budget 2",
-                    }),
-                ]),
-            );
         });
 
         it("should combine dry run with no confirmation", async () => {
@@ -485,8 +449,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(result.totalTransactions).toBe(mockTransactions.length);
-            expect(result.data).toHaveLength(mockTransactions.length);
             expect(
                 mockTransactionService.updateTransaction,
             ).not.toHaveBeenCalled();
@@ -546,8 +508,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(result.totalTransactions).toBe(1);
-            expect(result.data).toHaveLength(1);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
             expect(
                 mockTransactionService.getTransactionsByTag,
@@ -566,8 +526,6 @@ describe("UpdateTransactionService", () => {
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 { "1": { category: "New Category", budget: "New Budget" } },
-                [mockCategory],
-                [mockBudget],
             );
         });
 
@@ -625,8 +583,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(result.totalTransactions).toBe(1);
-            expect(result.data).toHaveLength(1);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
             expect(
                 mockTransactionService.getTransactionsByTag,
@@ -645,8 +601,6 @@ describe("UpdateTransactionService", () => {
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 { "1": { category: "New Category", budget: "New Budget" } },
-                [mockCategory],
-                [mockBudget],
             );
         });
 
@@ -668,8 +622,6 @@ describe("UpdateTransactionService", () => {
             mockCategoryService.getCategories.mockResolvedValue([]);
             mockBudgetService.getBudgets.mockResolvedValue([]);
 
-            // Mock the LLM service to return exactly one result (to match transaction count)
-            // The key doesn't matter since the transaction has no journal ID
             mockLLMService.processTransactions.mockResolvedValue({
                 dummy: { category: "Test Category", budget: "Test Budget" },
             });
@@ -680,8 +632,6 @@ describe("UpdateTransactionService", () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(result.totalTransactions).toBe(1);
-            expect(result.data).toHaveLength(0); // No data because transaction was skipped due to missing ID
             expect(mockTransactionUpdaterService.updateTransaction).not.toHaveBeenCalled();
         });
     });

@@ -12,10 +12,7 @@ import {
     LLMTransactionProcessingService,
 } from "./ai/llm-transaction-processing.service";
 import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import {
-    UpdateTransactionResult,
-    UpdateTransactionStatusDto,
-} from "../types/dto/update-transaction-status.dto";
+import { UpdateTransactionStatusDto } from "../types/dto/update-transaction-status.dto";
 import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
 import { IUpdateTransactionService } from "../types/interface/update-transaction.service.interface";
 import { TransactionValidatorService } from "./core/transaction-validator.service";
@@ -49,8 +46,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 );
                 return {
                     status: UpdateTransactionStatus.NO_TAG,
-                    totalTransactions: 0,
-                    data: [],
                 };
             }
 
@@ -77,8 +72,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 );
                 return {
                     status: UpdateTransactionStatus.EMPTY_TAG,
-                    totalTransactions: 0,
-                    data: [],
                 };
             }
 
@@ -116,11 +109,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                     dryRun,
                 );
 
-            const resultData = await this.transformToTransactionCategoryResult(
-                updatedTransactions,
-                aiResults,
-            );
-
             logger.debug(
                 {
                     tag,
@@ -136,8 +124,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
 
             return {
                 status: UpdateTransactionStatus.HAS_RESULTS,
-                data: resultData,
-                totalTransactions: transactions.length,
             };
         } catch (ex) {
             logger.error(
@@ -152,8 +138,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
 
             return {
                 status: UpdateTransactionStatus.PROCESSING_FAILED,
-                data: [],
-                totalTransactions: 0,
                 error:
                     ex instanceof Error
                         ? ex.message
@@ -272,23 +256,5 @@ export class UpdateTransactionService implements IUpdateTransactionService {
             );
             throw err;
         }
-    }
-
-    private async transformToTransactionCategoryResult(
-        transactions: TransactionSplit[],
-        aiResults: AIResponse,
-    ): Promise<Array<UpdateTransactionResult>> {
-        return transactions.map((transaction) => {
-            const journalId = transaction.transaction_journal_id;
-            const aiResult = journalId ? aiResults[journalId] : undefined;
-
-            return {
-                name: transaction.description || "",
-                category: transaction.category_name || undefined,
-                updatedCategory: aiResult?.category,
-                budget: transaction.budget_name || undefined,
-                updatedBudget: aiResult?.budget,
-            };
-        });
     }
 }
