@@ -46,11 +46,10 @@ export class TransactionUpdaterService {
         aiResults: Record<string, { category?: string; budget?: string }>
     ): Promise<TransactionRead | undefined> {
         if (!this.validator.validateTransactionData(transaction, aiResults)) {
-            return undefined;
+            return;
         }
 
         try {
-            const shouldUpdateBudget = await this.validator.shouldSetBudget(transaction);
             const journalId = transaction.transaction_journal_id;
 
             if (!journalId) {
@@ -60,72 +59,14 @@ export class TransactionUpdaterService {
                     },
                     'Transaction missing journal ID, skipping'
                 );
-                return undefined;
+                return;
             }
 
-            // --- Begin: Validate AI category and budget ---
-            const aiCategory = aiResults[journalId]?.category;
-            const aiBudget = aiResults[journalId]?.budget;
-
-            // If a category is proposed, it must be non-empty and valid
-            let category;
-            if (aiCategory && aiCategory !== '') {
-                category = this.getValidCategory(aiCategory);
-                if (!category) {
-                    logger.warn(
-                        {
-                            transactionId: journalId,
-                            description: transaction.description,
-                            attemptedCategory: aiCategory,
-                            validCategories: this.categories?.map(c => c.name),
-                        },
-                        'Invalid or unrecognized category from AI, skipping transaction'
-                    );
-                    return undefined;
-                }
-            } else if (aiCategory === '') {
-                logger.warn(
-                    {
-                        transactionId: journalId,
-                        description: transaction.description,
-                        attemptedCategory: aiCategory,
-                    },
-                    'Empty category from AI, skipping transaction'
-                );
-                return undefined;
-            }
-
-            // If a budget is proposed, it must be non-empty and valid
-            let budget;
-            if (shouldUpdateBudget && aiBudget && aiBudget !== '') {
-                budget = this.getValidBudget(aiBudget);
-                if (!budget) {
-                    logger.warn(
-                        {
-                            transactionId: journalId,
-                            description: transaction.description,
-                            attemptedBudget: aiBudget,
-                            validBudgets: this.budgets?.map(b => b.attributes.name),
-                        },
-                        'Invalid or unrecognized budget from AI, skipping transaction'
-                    );
-                    return undefined;
-                }
-            } else if (shouldUpdateBudget && aiBudget === '') {
-                logger.warn(
-                    {
-                        transactionId: journalId,
-                        description: transaction.description,
-                        attemptedBudget: aiBudget,
-                    },
-                    'Empty budget from AI, skipping transaction'
-                );
-                return undefined;
-            }
-            // --- End: Validate AI category and budget ---
+            const category = this.validateAICategory(aiResults[journalId]?.category, transaction);
+            const budget = await this.validateAIBudget(aiResults[journalId]?.budget, transaction);
 
             if (!this.validator.categoryOrBudgetChanged(transaction, category, budget)) {
-                return undefined;
+                return;
             }
 
             const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
@@ -163,8 +104,78 @@ export class TransactionUpdaterService {
                 },
                 'Error processing transaction:'
             );
-            return undefined;
+            return;
         }
+    }
+
+    private validateAICategory(
+        aiCategory: string | undefined,
+        transaction: TransactionSplit
+    ): Category | undefined {
+        let category;
+        if (aiCategory && aiCategory !== '') {
+            category = this.getValidCategory(aiCategory);
+            if (!category) {
+                logger.warn(
+                    {
+                        transactionId: transaction.transaction_journal_id,
+                        description: transaction.description,
+                        attemptedCategory: aiCategory,
+                        validCategories: this.categories?.map(c => c.name),
+                    },
+                    'Invalid or unrecognized category from AI, skipping transaction'
+                );
+                return;
+            }
+        } else if (aiCategory === '') {
+            logger.warn(
+                {
+                    transactionId: transaction.transaction_journal_id,
+                    description: transaction.description,
+                    attemptedCategory: aiCategory,
+                },
+                'Empty category from AI, skipping transaction'
+            );
+            return;
+        }
+
+        return category;
+    }
+
+    private async validateAIBudget(
+        aiBudget: string | undefined,
+        transaction: TransactionSplit
+    ): Promise<BudgetRead | undefined> {
+        const shouldUpdateBudget = await this.validator.shouldSetBudget(transaction);
+
+        let budget;
+        if (shouldUpdateBudget && aiBudget && aiBudget !== '') {
+            budget = this.getValidBudget(aiBudget);
+            if (!budget) {
+                logger.warn(
+                    {
+                        transactionId: transaction.transaction_journal_id,
+                        description: transaction.description,
+                        attemptedBudget: aiBudget,
+                        validBudgets: this.budgets?.map(b => b.attributes.name),
+                    },
+                    'Invalid or unrecognized budget from AI, skipping transaction'
+                );
+                return;
+            }
+        } else if (shouldUpdateBudget && aiBudget === '') {
+            logger.warn(
+                {
+                    transactionId: transaction.transaction_journal_id,
+                    description: transaction.description,
+                    attemptedBudget: aiBudget,
+                },
+                'Empty budget from AI, skipping transaction'
+            );
+            return;
+        }
+
+        return budget;
     }
 
     private async handleUpdateWorkflow(
@@ -189,7 +200,7 @@ export class TransactionUpdaterService {
                     { description: transaction.description },
                     'User skipped transaction update'
                 );
-                return undefined;
+                return;
             }
 
             if (action === UpdateTransactionMode.Edit) {
@@ -230,7 +241,7 @@ export class TransactionUpdaterService {
      */
     private getValidBudget(value: string | undefined): BudgetRead | undefined {
         if (!value) {
-            return undefined;
+            return;
         }
 
         return this.budgets?.find(b => b.attributes.name === value);
@@ -244,7 +255,7 @@ export class TransactionUpdaterService {
      */
     private getValidCategory(value: string | undefined): Category | undefined {
         if (!value) {
-            return undefined;
+            return;
         }
 
         return this.categories?.find(c => c?.name === value);
