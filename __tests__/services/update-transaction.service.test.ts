@@ -186,6 +186,7 @@ describe('UpdateTransactionService', () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.NO_TAG);
+            expect(result.transactionsUpdated).toBe(0);
         });
 
         it('should return EMPTY_TAG status when no transactions found', async () => {
@@ -198,6 +199,7 @@ describe('UpdateTransactionService', () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
+            expect(result.transactionsUpdated).toBe(0);
         });
 
         it('should process transactions and return HAS_RESULTS status', async () => {
@@ -282,7 +284,7 @@ describe('UpdateTransactionService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
-                mockTransactions[0] as TransactionSplit
+                mockTransactions[0] as any
             );
 
             const result = await service.updateTransactionsByTag(
@@ -309,7 +311,7 @@ describe('UpdateTransactionService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
-                mockTransactions[0] as TransactionSplit
+                mockTransactions[0] as any
             );
 
             const result = await service.updateTransactionsByTag(
@@ -460,7 +462,9 @@ describe('UpdateTransactionService', () => {
             mockLLMService.processTransactions.mockResolvedValue({
                 '1': { category: 'New Category', budget: 'New Budget' },
             });
-            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(mockTransaction);
+            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
@@ -529,7 +533,9 @@ describe('UpdateTransactionService', () => {
             mockLLMService.processTransactions.mockResolvedValue({
                 '1': { category: 'New Category', budget: 'New Budget' },
             });
-            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(mockTransaction);
+            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 

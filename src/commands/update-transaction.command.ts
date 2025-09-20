@@ -17,7 +17,7 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
         this.displayService = new UpdateTransactionDisplayService();
     }
 
-    async execute({ tag, updateMode, dryRun }: UpdateTransactionsParams): Promise<void> {
+    async execute({ tag, updateMode, dryRun = false }: UpdateTransactionsParams): Promise<void> {
         console.log(this.displayService.formatProcessingHeader(tag, updateMode, dryRun));
 
         try {
@@ -36,6 +36,9 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
                 console.log(this.displayService.formatEmptyTag(tag));
                 return;
             }
+
+            const prefix = dryRun ? '[DRYRUN] ' : '';
+            console.log(`\n${prefix}Updated ${results.transactionsUpdated} Transaction(s)!`);
         } catch (error) {
             console.log(this.displayService.formatError(error));
             throw error;

@@ -17,6 +17,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:watch` - Run tests in watch mode
 - Jest config: Tests are in `__tests__/` directories, pattern `**/*.test.ts`
 
+### Code Quality
+
+- `npm run linter` - Run ESLint and Prettier (lint + format)
+- ESLint config: `eslint.config.mts` with TypeScript, Node.js globals, and Prettier integration
+- Prettier integration for consistent code formatting
+
 ## Configuration System
 
 This project uses a dual configuration system:
@@ -72,6 +78,7 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 - `CategoryService` - Category API operations
 - `TransactionPropertyService` - Transaction classification logic (deposit, bill, transfer, etc.)
 - `TransactionValidatorService` - Transaction validation
+- `TransactionUpdaterService` - Handles transaction updates with user workflow
 
 **Business Logic Services** (`src/services/`):
 
@@ -80,6 +87,7 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 - `PaycheckSurplusService` - Calculates paycheck surplus/deficit
 - `ExcludedTransactionService` - Manages transaction exclusions via CSV
 - `UpdateTransactionService` - Orchestrates AI-powered transaction updates
+- `UserInputService` - Handles user interactions, prompts, and multiple-choice inputs
 
 **AI Services** (`src/services/ai/`):
 
@@ -115,6 +123,16 @@ Claude AI integration through `@anthropic-ai/sdk`:
 - Validation of AI responses before applying changes
 - Dry-run mode for testing AI suggestions
 
+### User Interface and Workflow
+
+Enhanced user experience with `@inquirer/prompts`:
+
+- Multiple-choice prompts for transaction updates (approve all, budget only, category only, edit, abort)
+- Interactive editing workflow with category and budget selection dropdowns
+- Do-while loop implementation for iterative user input
+- Hyperlink support for transaction references in terminal output
+- Colored output with `chalk` for better readability
+
 ## Key Files and Patterns
 
 ### Configuration Loading
@@ -127,6 +145,7 @@ Claude AI integration through `@anthropic-ai/sdk`:
 
 - `src/factories/service.factory.ts` - Central service factory
 - All services should be instantiated here for consistent DI
+- Recent additions: `UserInputService` and `TransactionUpdaterService` integration
 
 ### Error Handling
 
@@ -143,6 +162,15 @@ Services like `AdditionalIncomeService` use a filtering pattern:
 3. Return filtered results
 
 Follow this pattern for new transaction analysis services.
+
+### User Interaction Patterns
+
+The `UserInputService` provides standardized user interaction patterns:
+
+1. **Transaction Update Workflow**: Uses `expand` prompts for multiple options
+2. **Edit Mode**: Uses `checkbox` for selecting what to edit, `select` dropdowns for choices
+3. **Do-While Loops**: Implemented for iterative user input until satisfaction
+4. **Validation**: Input validation with graceful error handling and retry logic
 
 ### Testing
 

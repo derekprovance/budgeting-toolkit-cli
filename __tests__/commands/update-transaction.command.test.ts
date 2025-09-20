@@ -55,6 +55,7 @@ describe('UpdateTransactionsCommand', () => {
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue({
                 status: UpdateTransactionStatus.NO_TAG,
+                transactionsUpdated: 0,
             });
 
             await command.execute(params);
@@ -62,12 +63,12 @@ describe('UpdateTransactionsCommand', () => {
             expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
             expect(mockDisplayService.formatTagNotFound).toHaveBeenCalledWith(params.tag);
         });
@@ -80,6 +81,7 @@ describe('UpdateTransactionsCommand', () => {
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue({
                 status: UpdateTransactionStatus.EMPTY_TAG,
+                transactionsUpdated: 0,
             });
 
             await command.execute(params);
@@ -87,12 +89,12 @@ describe('UpdateTransactionsCommand', () => {
             expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
             expect(mockDisplayService.formatEmptyTag).toHaveBeenCalledWith(params.tag);
         });
@@ -105,23 +107,29 @@ describe('UpdateTransactionsCommand', () => {
 
             const results = {
                 status: UpdateTransactionStatus.HAS_RESULTS,
+                transactionsUpdated: 5,
             };
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue(results);
+
+            // Mock console.log to verify output
+            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
             await command.execute(params);
 
             expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
-            // Command now returns after successful updates without displaying them
+            expect(consoleSpy).toHaveBeenCalledWith('\nUpdated 5 Transaction(s)!');
+
+            consoleSpy.mockRestore();
         });
 
         it('should handle dry run mode', async () => {
@@ -133,9 +141,13 @@ describe('UpdateTransactionsCommand', () => {
 
             const results = {
                 status: UpdateTransactionStatus.HAS_RESULTS,
+                transactionsUpdated: 3,
             };
 
             mockUpdateService.updateTransactionsByTag.mockResolvedValue(results);
+
+            // Mock console.log to verify output
+            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
             await command.execute(params);
 
@@ -149,7 +161,9 @@ describe('UpdateTransactionsCommand', () => {
                 params.updateMode,
                 true
             );
-            // Command now returns after successful updates without displaying them
+            expect(consoleSpy).toHaveBeenCalledWith('\n[DRYRUN] Updated 3 Transaction(s)!');
+
+            consoleSpy.mockRestore();
         });
 
         it('should handle errors', async () => {
@@ -165,7 +179,7 @@ describe('UpdateTransactionsCommand', () => {
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
-                undefined
+                false
             );
             expect(mockDisplayService.formatError).toHaveBeenCalledWith(error);
         });

@@ -85,7 +85,11 @@ export class TransactionService {
         return response?.data !== undefined;
     }
 
-    async updateTransaction(transaction: TransactionSplit, category?: string, budgetId?: string) {
+    async updateTransaction(
+        transaction: TransactionSplit,
+        category?: string,
+        budgetId?: string
+    ): Promise<TransactionRead | undefined> {
         if (!transaction?.transaction_journal_id) {
             throw new TransactionError(
                 `Invalid transaction: missing transaction_journal_id for ${transaction.description}`
@@ -133,7 +137,7 @@ export class TransactionService {
                 ],
             };
 
-            await this.apiClient.put<TransactionArray>(
+            const updatedTransaction = await this.apiClient.put<TransactionRead>(
                 `/transactions/${transactionRead.id}`,
                 updatePayload
             );
@@ -144,6 +148,8 @@ export class TransactionService {
                 },
                 `Transaction updated successfully`
             );
+
+            return updatedTransaction;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
@@ -158,12 +164,12 @@ export class TransactionService {
         }
     }
 
-    getTransactionReadBySplit(splitTransaction: TransactionSplit): TransactionRead | null {
+    getTransactionReadBySplit(splitTransaction: TransactionSplit): TransactionRead | undefined {
         const result = this.splitTransactionIdx.get(
             this.generateSplitTransactionKey(splitTransaction)
         );
 
-        return result ? result : null;
+        return result;
     }
 
     /**

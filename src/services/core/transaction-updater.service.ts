@@ -44,7 +44,7 @@ export class TransactionUpdaterService {
     async updateTransaction(
         transaction: TransactionSplit,
         aiResults: Record<string, { category?: string; budget?: string }>
-    ): Promise<TransactionSplit | undefined> {
+    ): Promise<TransactionRead | undefined> {
         if (!this.validator.validateTransactionData(transaction, aiResults)) {
             return undefined;
         }
@@ -128,6 +128,7 @@ export class TransactionUpdaterService {
                 return undefined;
             }
 
+            const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
             if (this.dryRun) {
                 logger.debug(
                     {
@@ -138,19 +139,22 @@ export class TransactionUpdaterService {
                     },
                     'Dry run - showing proposed changes'
                 );
-                return transaction;
+                return transactionRead;
             }
 
-            const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
-
-            await this.handleUpdateWorkflow(transaction, transactionRead, category, budget);
+            const updatedTransaction = await this.handleUpdateWorkflow(
+                transaction,
+                transactionRead,
+                category,
+                budget
+            );
 
             logger.debug(
                 { description: transaction.description },
                 'Successfully updated transaction:'
             );
 
-            return transaction;
+            return updatedTransaction;
         } catch (error) {
             logger.error(
                 {
@@ -165,10 +169,10 @@ export class TransactionUpdaterService {
 
     private async handleUpdateWorkflow(
         transaction: TransactionSplit,
-        transactionRead: TransactionRead | null,
+        transactionRead: TransactionRead | undefined,
         category: Category | undefined,
         budget: BudgetRead | undefined
-    ) {
+    ): Promise<TransactionRead | undefined> {
         let action;
         do {
             action = await this.userInputService.askToUpdateTransaction(
@@ -195,7 +199,7 @@ export class TransactionUpdaterService {
 
         const [categoryName, budgetId] = this.updateParameterMap[action](category, budget);
 
-        await this.transactionService.updateTransaction(transaction, categoryName, budgetId);
+        return await this.transactionService.updateTransaction(transaction, categoryName, budgetId);
     }
 
     private async processEditCommand(

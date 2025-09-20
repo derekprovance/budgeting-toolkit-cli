@@ -3,6 +3,7 @@ import { TransactionService } from '../../../src/services/core/transaction.servi
 import { TransactionValidatorService } from '../../../src/services/core/transaction-validator.service';
 import { UserInputService } from '../../../src/services/user-input.service';
 import { UpdateTransactionMode } from '../../../src/types/enum/update-transaction-mode.enum';
+import { EditTransactionAttribute } from '../../../src/types/enum/edit-transaction-attribute.enum';
 import { TransactionSplit, Category, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 
 // Mock the logger to prevent console output during tests
@@ -57,7 +58,10 @@ describe('TransactionUpdaterService', () => {
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
         mockUserInputService = {
-            askToUpdateTransaction: jest.fn().mockResolvedValue(true),
+            askToUpdateTransaction: jest.fn().mockResolvedValue(UpdateTransactionMode.Both),
+            shouldEditCategoryBudget: jest.fn(),
+            getNewCategory: jest.fn(),
+            getNewBudget: jest.fn(),
         } as unknown as jest.Mocked<UserInputService>;
 
         service = new TransactionUpdaterService(
@@ -98,7 +102,10 @@ describe('TransactionUpdaterService', () => {
             mockUserInputService.askToUpdateTransaction.mockResolvedValue(
                 UpdateTransactionMode.Both
             );
-            mockTransactionService.updateTransaction.mockResolvedValue(undefined);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -173,7 +180,7 @@ describe('TransactionUpdaterService', () => {
                 mockAIResults
             );
 
-            expect(result).toEqual(mockTransaction);
+            expect(result).toBeUndefined();
             expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
 
@@ -190,6 +197,9 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await serviceWithDryRun.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -228,6 +238,9 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await serviceWithDryRun.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -273,6 +286,9 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await serviceWithBoth.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -350,6 +366,135 @@ describe('TransactionUpdaterService', () => {
 
             expect(result).toBeUndefined();
             expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+        });
+
+        it('should handle edit mode workflow', async () => {
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Category,
+                EditTransactionAttribute.Budget,
+            ]);
+            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as Category);
+            mockUserInputService.getNewBudget.mockResolvedValue(mockBudgets[0] as BudgetRead);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            expect(result).toBe(mockTransaction);
+            expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(2);
+            expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalled();
+            expect(mockUserInputService.getNewCategory).toHaveBeenCalledWith(mockCategories);
+            expect(mockUserInputService.getNewBudget).toHaveBeenCalledWith(mockBudgets);
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                mockTransaction,
+                'New Category',
+                '2'
+            );
+        });
+
+        it('should handle edit mode with only category change', async () => {
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Category);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Category,
+            ]);
+            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as Category);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            expect(result).toBe(mockTransaction);
+            expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(2);
+            expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalled();
+            expect(mockUserInputService.getNewCategory).toHaveBeenCalledWith(mockCategories);
+            expect(mockUserInputService.getNewBudget).not.toHaveBeenCalled();
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                mockTransaction,
+                'New Category',
+                undefined
+            );
+        });
+
+        it('should handle edit mode with only budget change', async () => {
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Budget);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Budget,
+            ]);
+            mockUserInputService.getNewBudget.mockResolvedValue(mockBudgets[0] as BudgetRead);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            expect(result).toBe(mockTransaction);
+            expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(2);
+            expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalled();
+            expect(mockUserInputService.getNewCategory).not.toHaveBeenCalled();
+            expect(mockUserInputService.getNewBudget).toHaveBeenCalledWith(mockBudgets);
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                mockTransaction,
+                undefined,
+                '2'
+            );
+        });
+
+        it('should handle multiple edit cycles', async () => {
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Category,
+            ]);
+            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as Category);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            expect(result).toBe(mockTransaction);
+            expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(3);
+            expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalledTimes(2);
+            expect(mockUserInputService.getNewCategory).toHaveBeenCalledTimes(2);
         });
     });
 });

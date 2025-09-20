@@ -1,4 +1,9 @@
-import { BudgetRead, Category, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import {
+    BudgetRead,
+    Category,
+    TransactionRead,
+    TransactionSplit,
+} from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger';
 import { CategoryService } from './core/category.service';
 import { TransactionService } from './core/transaction.service';
@@ -42,6 +47,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 );
                 return {
                     status: UpdateTransactionStatus.NO_TAG,
+                    transactionsUpdated: 0,
                 };
             }
 
@@ -64,6 +70,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 );
                 return {
                     status: UpdateTransactionStatus.EMPTY_TAG,
+                    transactionsUpdated: 0,
                 };
             }
 
@@ -115,6 +122,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
 
             return {
                 status: UpdateTransactionStatus.HAS_RESULTS,
+                transactionsUpdated: updatedTransactions.length,
             };
         } catch (ex) {
             logger.error(
@@ -129,6 +137,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
 
             return {
                 status: UpdateTransactionStatus.PROCESSING_FAILED,
+                transactionsUpdated: 0,
                 error:
                     ex instanceof Error
                         ? ex.message
@@ -185,9 +194,9 @@ export class UpdateTransactionService implements IUpdateTransactionService {
         transactions: TransactionSplit[],
         aiResults: Record<string, { category?: string; budget?: string }>,
         dryRun?: boolean
-    ): Promise<TransactionSplit[]> {
+    ): Promise<TransactionRead[]> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
-        const results: TransactionSplit[] = [];
+        const results: TransactionRead[] = [];
 
         try {
             for (const transaction of transactions) {
