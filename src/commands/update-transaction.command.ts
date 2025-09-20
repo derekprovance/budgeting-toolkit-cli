@@ -1,8 +1,8 @@
-import { UpdateTransactionService } from "../services/update-transaction.service";
-import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatus } from "../types/enum/update-transaction-status.enum";
-import { Command } from "../types/interface/command.interface";
-import { UpdateTransactionDisplayService } from "../services/display/update-transaction-display.service";
+import { UpdateTransactionService } from '../services/update-transaction.service';
+import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
+import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum';
+import { Command } from '../types/interface/command.interface';
+import { UpdateTransactionDisplayService } from '../services/display/update-transaction-display.service';
 
 interface UpdateTransactionsParams {
     tag: string;
@@ -10,33 +10,22 @@ interface UpdateTransactionsParams {
     dryRun?: boolean;
 }
 
-export class UpdateTransactionsCommand
-    implements Command<void, UpdateTransactionsParams>
-{
+export class UpdateTransactionsCommand implements Command<void, UpdateTransactionsParams> {
     private readonly displayService: UpdateTransactionDisplayService;
 
-    constructor(
-        private readonly updateTransactionService: UpdateTransactionService,
-    ) {
+    constructor(private readonly updateTransactionService: UpdateTransactionService) {
         this.displayService = new UpdateTransactionDisplayService();
     }
 
-    async execute({
-        tag,
-        updateMode,
-        dryRun,
-    }: UpdateTransactionsParams): Promise<void> {
-        console.log(
-            this.displayService.formatProcessingHeader(tag, updateMode, dryRun),
-        );
+    async execute({ tag, updateMode, dryRun }: UpdateTransactionsParams): Promise<void> {
+        console.log(this.displayService.formatProcessingHeader(tag, updateMode, dryRun));
 
         try {
-            const results =
-                await this.updateTransactionService.updateTransactionsByTag(
-                    tag,
-                    updateMode,
-                    dryRun,
-                );
+            const results = await this.updateTransactionService.updateTransactionsByTag(
+                tag,
+                updateMode,
+                dryRun
+            );
 
             if (results.status === UpdateTransactionStatus.NO_TAG) {
                 console.log(this.displayService.formatTagNotFound(tag));

@@ -5,17 +5,17 @@ import {
     TransactionArray,
     TransactionRead,
     TransactionSplit,
-} from "@derekprovance/firefly-iii-sdk";
-import { logger } from "../../logger";
-import { DateRangeService } from "../../types/interface/date-range.service.interface";
+} from '@derekprovance/firefly-iii-sdk';
+import { logger } from '../../logger';
+import { DateRangeService } from '../../types/interface/date-range.service.interface';
 
 class TransactionError extends Error {
     constructor(
         message: string,
-        public readonly originalError?: Error,
+        public readonly originalError?: Error
     ) {
         super(message);
-        this.name = "TransactionError";
+        this.name = 'TransactionError';
     }
 }
 
@@ -27,7 +27,7 @@ export class TransactionService {
 
     constructor(
         private readonly apiClient: FireflyApiClient,
-        cacheImplementation: TransactionCache = new Map(),
+        cacheImplementation: TransactionCache = new Map()
     ) {
         this.cache = cacheImplementation;
         this.splitTransactionIdx = new Map();
@@ -36,30 +36,21 @@ export class TransactionService {
     /**
      * Retrieves transactions for a specific month, using cache when available
      */
-    async getTransactionsForMonth(
-        month: number,
-        year: number,
-    ): Promise<TransactionSplit[]> {
+    async getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]> {
         try {
             const cacheKey = `month-${month}-year-${year}`;
             const transactions = await this.getFromCacheOrFetch(cacheKey, () =>
-                this.fetchTransactionsFromAPIByMonth(month, year),
+                this.fetchTransactionsFromAPIByMonth(month, year)
             );
 
             return this.flattenTransactions(transactions);
         } catch (error) {
-            throw this.handleError(
-                "fetch transactions for month",
-                month,
-                error,
-            );
+            throw this.handleError('fetch transactions for month', month, error);
         }
     }
 
     async getMostRecentTransactionDate(): Promise<Date | null> {
-        const response = await this.apiClient.get<TransactionArray>(
-            `/transactions?limit=1`,
-        );
+        const response = await this.apiClient.get<TransactionArray>(`/transactions?limit=1`);
         if (!response) {
             throw new FireflyApiError(`Failed to fetch transactions`);
         }
@@ -74,42 +65,36 @@ export class TransactionService {
      */
     async getTransactionsByTag(tag: string): Promise<TransactionSplit[]> {
         if (!tag) {
-            throw new TransactionError("Tag parameter is required");
+            throw new TransactionError('Tag parameter is required');
         }
 
         try {
             const cacheKey = `tag-${tag}`;
             const transactions = await this.getFromCacheOrFetch(cacheKey, () =>
-                this.fetchTransactionsByTag(tag),
+                this.fetchTransactionsByTag(tag)
             );
 
             return this.flattenTransactions(transactions);
         } catch (error) {
-            throw this.handleError("fetch transactions by tag", tag, error);
+            throw this.handleError('fetch transactions by tag', tag, error);
         }
     }
 
     async tagExists(tag: string): Promise<boolean> {
-        const response = await this.apiClient.get<TagSingle>(
-            `/tags/${encodeURIComponent(tag)}`,
-        );
+        const response = await this.apiClient.get<TagSingle>(`/tags/${encodeURIComponent(tag)}`);
         return response?.data !== undefined;
     }
 
-    async updateTransaction(
-        transaction: TransactionSplit,
-        category?: string,
-        budgetId?: string,
-    ) {
+    async updateTransaction(transaction: TransactionSplit, category?: string, budgetId?: string) {
         if (!transaction?.transaction_journal_id) {
             throw new TransactionError(
-                `Invalid transaction: missing transaction_journal_id for ${transaction.description}`,
+                `Invalid transaction: missing transaction_journal_id for ${transaction.description}`
             );
         }
 
-        if (!["deposit", "withdrawal"].includes(transaction.type)) {
+        if (!['deposit', 'withdrawal'].includes(transaction.type)) {
             throw new TransactionError(
-                `Unsupported transaction type ${transaction.type} for transaction_journal_id ${transaction.transaction_journal_id}`,
+                `Unsupported transaction type ${transaction.type} for transaction_journal_id ${transaction.transaction_journal_id}`
             );
         }
 
@@ -120,19 +105,18 @@ export class TransactionService {
                 category,
                 budgetId,
             },
-            `Updating transaction: ${transaction.description}`,
+            `Updating transaction: ${transaction.description}`
         );
 
         try {
-            const transactionRead =
-                await this.getTransactionReadBySplit(transaction);
+            const transactionRead = await this.getTransactionReadBySplit(transaction);
             if (!transactionRead?.id) {
                 logger.error(
                     {
                         transactionId: transaction.transaction_journal_id,
                         description: transaction.description,
                     },
-                    "Unable to find Transaction ID for Split",
+                    'Unable to find Transaction ID for Split'
                 );
                 return;
             }
@@ -142,8 +126,7 @@ export class TransactionService {
                 fire_webhooks: true,
                 transactions: [
                     {
-                        transaction_journal_id:
-                            transaction.transaction_journal_id,
+                        transaction_journal_id: transaction.transaction_journal_id,
                         ...(category && { category_name: category }),
                         ...(budgetId && { budget_id: budgetId }),
                     },
@@ -152,20 +135,17 @@ export class TransactionService {
 
             await this.apiClient.put<TransactionArray>(
                 `/transactions/${transactionRead.id}`,
-                updatePayload,
+                updatePayload
             );
             logger.debug(
                 {
                     transactionId: transaction.transaction_journal_id,
                     updatedFields: Object.keys(updatePayload.transactions[0]),
                 },
-                `Transaction updated successfully`,
+                `Transaction updated successfully`
             );
         } catch (error) {
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : "Unknown error occurred";
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
             logger.error(
                 {
@@ -173,16 +153,14 @@ export class TransactionService {
                     transactionId: transaction.transaction_journal_id,
                     description: transaction.description,
                 },
-                "Transaction update failed",
+                'Transaction update failed'
             );
         }
     }
 
-    getTransactionReadBySplit(
-        splitTransaction: TransactionSplit,
-    ): TransactionRead | null {
+    getTransactionReadBySplit(splitTransaction: TransactionSplit): TransactionRead | null {
         const result = this.splitTransactionIdx.get(
-            this.generateSplitTransactionKey(splitTransaction),
+            this.generateSplitTransactionKey(splitTransaction)
         );
 
         return result ? result : null;
@@ -198,7 +176,7 @@ export class TransactionService {
 
     private async getFromCacheOrFetch(
         key: string,
-        fetchFn: () => Promise<TransactionRead[]>,
+        fetchFn: () => Promise<TransactionRead[]>
     ): Promise<TransactionRead[]> {
         const cached = this.cache.get(key);
         if (cached) {
@@ -212,9 +190,9 @@ export class TransactionService {
     }
 
     private storeTransactionSplitInIndex(transactions: TransactionRead[]) {
-        transactions.forEach((tx) => {
+        transactions.forEach(tx => {
             const splitTransactions = tx.attributes.transactions;
-            splitTransactions.forEach((txSp) => {
+            splitTransactions.forEach(txSp => {
                 const indexKey = this.generateSplitTransactionKey(txSp);
 
                 if (this.splitTransactionIdx.has(indexKey)) {
@@ -223,54 +201,41 @@ export class TransactionService {
                             transactionId: txSp.transaction_journal_id,
                             description: txSp.description,
                         },
-                        "Duplicate transaction found in index",
+                        'Duplicate transaction found in index'
                     );
                 }
 
-                this.splitTransactionIdx.set(
-                    this.generateSplitTransactionKey(txSp),
-                    tx,
-                );
+                this.splitTransactionIdx.set(this.generateSplitTransactionKey(txSp), tx);
             });
         });
     }
 
-    private async fetchTransactionsByTag(
-        tag: string,
-    ): Promise<TransactionRead[]> {
+    private async fetchTransactionsByTag(tag: string): Promise<TransactionRead[]> {
         const response = await this.apiClient.get<TransactionArray>(
-            `/tags/${encodeURIComponent(tag)}/transactions`,
+            `/tags/${encodeURIComponent(tag)}/transactions`
         );
         if (!response) {
-            throw new FireflyApiError(
-                `Failed to fetch transactions for tag: ${tag}`,
-            );
+            throw new FireflyApiError(`Failed to fetch transactions for tag: ${tag}`);
         }
         return response.data;
     }
 
     private async fetchTransactionsFromAPIByMonth(
         month: number,
-        year: number,
+        year: number
     ): Promise<TransactionRead[]> {
         const range = DateRangeService.getDateRange(month, year);
         const response = await this.apiClient.get<TransactionArray>(
-            `/transactions?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`,
+            `/transactions?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
         );
         if (!response) {
-            throw new FireflyApiError(
-                `Failed to fetch transactions for month: ${month}`,
-            );
+            throw new FireflyApiError(`Failed to fetch transactions for month: ${month}`);
         }
         return response.data;
     }
 
-    private flattenTransactions(
-        transactions: TransactionRead[],
-    ): TransactionSplit[] {
-        return transactions.flatMap(
-            (transaction) => transaction.attributes?.transactions ?? [],
-        );
+    private flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
+        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
     }
 
     private generateSplitTransactionKey(tx: TransactionSplit): string {
@@ -280,16 +245,16 @@ export class TransactionService {
     private handleError(
         action: string,
         identifier: string | number,
-        error: unknown,
+        error: unknown
     ): TransactionError {
         const message = `Failed to ${action} ${identifier}`;
         logger.error(
             {
                 action,
                 identifier,
-                error: error instanceof Error ? error.message : "Unknown error",
+                error: error instanceof Error ? error.message : 'Unknown error',
             },
-            message,
+            message
         );
 
         if (error instanceof Error) {

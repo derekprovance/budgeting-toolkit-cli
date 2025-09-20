@@ -1,12 +1,8 @@
-import {
-    BudgetRead,
-    Category,
-    TransactionSplit,
-} from "@derekprovance/firefly-iii-sdk";
-import chalk from "chalk";
-import { expand, checkbox, select } from "@inquirer/prompts";
-import { UpdateTransactionMode } from "../types/enum/update-transaction-mode.enum";
-import { EditTransactionAttribute } from "../types/enum/edit-transaction-attribute.enum";
+import { BudgetRead, Category, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import chalk from 'chalk';
+import { expand, checkbox, select } from '@inquirer/prompts';
+import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
+import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum';
 
 /**
  * Interface for transaction update options
@@ -35,10 +31,10 @@ export class UserInputService {
     async askToUpdateTransaction(
         transaction: TransactionSplit,
         transactionId: string | undefined,
-        options: TransactionUpdateOptions,
+        options: TransactionUpdateOptions
     ): Promise<UpdateTransactionMode> {
         if (!transaction) {
-            throw new Error("Transaction cannot be null or undefined");
+            throw new Error('Transaction cannot be null or undefined');
         }
 
         const changes = this.getChangeList(transaction, options);
@@ -46,28 +42,24 @@ export class UserInputService {
             return UpdateTransactionMode.Abort;
         }
 
-        const message = this.formatUpdateMessage(
-            transaction,
-            transactionId,
-            changes,
-        );
+        const message = this.formatUpdateMessage(transaction, transactionId, changes);
 
         return this.promptUser(message, options);
     }
 
     async shouldEditCategoryBudget(): Promise<string[]> {
         const answer = await checkbox({
-            message: "What do you want to edit?",
+            message: 'What do you want to edit?',
             choices: [
                 {
-                    name: "Modify Category",
+                    name: 'Modify Category',
                     value: EditTransactionAttribute.Category,
-                    description: "Change the category suggested by AI",
+                    description: 'Change the category suggested by AI',
                 },
                 {
-                    name: "Modify Budget",
+                    name: 'Modify Budget',
                     value: EditTransactionAttribute.Budget,
-                    description: "Change the budget suggested by AI",
+                    description: 'Change the budget suggested by AI',
                 },
             ],
         });
@@ -75,15 +67,13 @@ export class UserInputService {
         return answer;
     }
 
-    async getNewCategory(
-        categories: Category[],
-    ): Promise<Category | undefined> {
+    async getNewCategory(categories: Category[]): Promise<Category | undefined> {
         const answer = await this.createSelectDropdown(
-            categories.map((category) => category.name),
-            "Select a new Category",
+            categories.map(category => category.name),
+            'Select a new Category'
         );
 
-        return categories.find((category) => {
+        return categories.find(category => {
             if (category.name === answer) {
                 return category;
             }
@@ -92,11 +82,11 @@ export class UserInputService {
 
     async getNewBudget(budgets: BudgetRead[]): Promise<BudgetRead | undefined> {
         const answer = await this.createSelectDropdown(
-            budgets.map((budget) => budget.attributes.name),
-            "Select a new Budget",
+            budgets.map(budget => budget.attributes.name),
+            'Select a new Budget'
         );
 
-        return budgets.find((budget) => {
+        return budgets.find(budget => {
             if (budget.attributes.name === answer) {
                 return budget;
             }
@@ -105,11 +95,11 @@ export class UserInputService {
 
     private async createSelectDropdown(
         values: string[],
-        message: string,
+        message: string
     ): Promise<string | undefined> {
         const choices = [];
 
-        for (let value of values) {
+        for (const value of values) {
             choices.push({
                 name: value,
                 value: value,
@@ -127,7 +117,7 @@ export class UserInputService {
      */
     private getChangeList(
         transaction: TransactionSplit,
-        options: TransactionUpdateOptions,
+        options: TransactionUpdateOptions
     ): string[] {
         return [
             options.category &&
@@ -135,14 +125,14 @@ export class UserInputService {
                 this.formatChange(
                     EditTransactionAttribute.Category,
                     transaction.category_name ?? undefined,
-                    options.category,
+                    options.category
                 ),
             options.budget &&
                 options.budget !== transaction.budget_name &&
                 this.formatChange(
                     EditTransactionAttribute.Budget,
                     transaction.budget_name ?? undefined,
-                    options.budget,
+                    options.budget
                 ),
         ].filter(Boolean) as string[];
     }
@@ -150,24 +140,15 @@ export class UserInputService {
     /**
      * Formats a single change for display
      */
-    private formatChange(
-        field: string,
-        oldValue: string | undefined,
-        newValue: string,
-    ): string {
-        return `${field}: ${chalk.redBright(oldValue || "None")} → ${chalk.cyan(
-            newValue,
-        )}`;
+    private formatChange(field: string, oldValue: string | undefined, newValue: string): string {
+        return `${field}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}`;
     }
 
     /**
      * Formats the transaction description, truncating if necessary
      */
-    private formatDescription(
-        description: string,
-        transactionId: string | undefined,
-    ): string {
-        let truncatedDescription =
+    private formatDescription(description: string, transactionId: string | undefined): string {
+        const truncatedDescription =
             description.length > this.MAX_DESCRIPTION_LENGTH
                 ? `${description.substring(0, this.DESCRIPTION_TRUNCATE_LENGTH)}...`
                 : description;
@@ -183,16 +164,16 @@ export class UserInputService {
     private formatUpdateMessage(
         transaction: TransactionSplit,
         transactionId: string | undefined,
-        changes: string[],
+        changes: string[]
     ): string {
         return [
-            `${chalk.bold("\nTransaction:")} "${chalk.yellow(
-                this.formatDescription(transaction.description, transactionId),
+            `${chalk.bold('\nTransaction:')} "${chalk.yellow(
+                this.formatDescription(transaction.description, transactionId)
             )}"`,
-            `${chalk.bold("Proposed changes:")}`,
-            ...changes.map((change) => chalk.gray(`  • ${change}`)),
-            `\n${chalk.bold("Apply these changes?")}`,
-        ].join("\n");
+            `${chalk.bold('Proposed changes:')}`,
+            ...changes.map(change => chalk.gray(`  • ${change}`)),
+            `\n${chalk.bold('Apply these changes?')}`,
+        ].join('\n');
     }
 
     /**
@@ -200,53 +181,53 @@ export class UserInputService {
      */
     private async promptUser(
         message: string,
-        options: TransactionUpdateOptions,
+        options: TransactionUpdateOptions
     ): Promise<UpdateTransactionMode> {
-        type InquirerKey = "a" | "b" | "c" | "e" | "x";
+        type InquirerKey = 'a' | 'b' | 'c' | 'e' | 'x';
 
-        let choices: Array<{
+        const choices: Array<{
             key: InquirerKey;
             name: string;
             value: UpdateTransactionMode;
         }> = [
             {
-                key: "a",
-                name: "Update all",
+                key: 'a',
+                name: 'Update all',
                 value: UpdateTransactionMode.Both,
             },
         ];
 
         if (options.budget) {
             choices.push({
-                key: "b",
-                name: "Update only the budget",
+                key: 'b',
+                name: 'Update only the budget',
                 value: UpdateTransactionMode.Budget,
             });
         }
 
         if (options.category) {
             choices.push({
-                key: "c",
-                name: "Update only the category",
+                key: 'c',
+                name: 'Update only the category',
                 value: UpdateTransactionMode.Category,
             });
         }
 
         choices.push({
-            key: "e",
-            name: "Edit",
+            key: 'e',
+            name: 'Edit',
             value: UpdateTransactionMode.Edit,
         });
 
         choices.push({
-            key: "x",
-            name: "Abort",
+            key: 'x',
+            name: 'Abort',
             value: UpdateTransactionMode.Abort,
         });
 
         const answer = await expand({
             message,
-            default: "a",
+            default: 'a',
             choices,
         });
 

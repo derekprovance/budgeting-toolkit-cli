@@ -1,37 +1,37 @@
-jest.mock("../../src/logger", () => ({
+jest.mock('../../src/logger', () => ({
     logger: {
-        debug: (...args: unknown[]) => console.log("[logger.debug]", ...args),
-        info: (...args: unknown[]) => console.log("[logger.info]", ...args),
-        warn: (...args: unknown[]) => console.log("[logger.warn]", ...args),
-        error: (...args: unknown[]) => console.log("[logger.error]", ...args),
-        trace: (...args: unknown[]) => console.log("[logger.trace]", ...args),
+        debug: (...args: unknown[]) => console.log('[logger.debug]', ...args),
+        info: (...args: unknown[]) => console.log('[logger.info]', ...args),
+        warn: (...args: unknown[]) => console.log('[logger.warn]', ...args),
+        error: (...args: unknown[]) => console.log('[logger.error]', ...args),
+        trace: (...args: unknown[]) => console.log('[logger.trace]', ...args),
     },
 }));
 
-jest.mock("../../src/services/core/transaction.service");
-jest.mock("../../src/services/core/category.service");
-jest.mock("../../src/services/core/budget.service");
-jest.mock("../../src/services/ai/llm-transaction-processing.service");
-jest.mock("../../src/services/core/transaction-property.service");
-jest.mock("../../src/services/core/transaction-validator.service");
-jest.mock("../../src/services/core/transaction-updater.service");
+jest.mock('../../src/services/core/transaction.service');
+jest.mock('../../src/services/core/category.service');
+jest.mock('../../src/services/core/budget.service');
+jest.mock('../../src/services/ai/llm-transaction-processing.service');
+jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-validator.service');
+jest.mock('../../src/services/core/transaction-updater.service');
 
-import { UpdateTransactionService } from "../../src/services/update-transaction.service";
-import { TransactionService } from "../../src/services/core/transaction.service";
-import { CategoryService } from "../../src/services/core/category.service";
-import { BudgetService } from "../../src/services/core/budget.service";
-import { LLMTransactionProcessingService } from "../../src/services/ai/llm-transaction-processing.service";
-import { TransactionPropertyService } from "../../src/services/core/transaction-property.service";
-import { TransactionValidatorService } from "../../src/services/core/transaction-validator.service";
-import { TransactionUpdaterService } from "../../src/services/core/transaction-updater.service";
-import { UpdateTransactionMode } from "../../src/types/enum/update-transaction-mode.enum";
-import { UpdateTransactionStatus } from "../../src/types/enum/update-transaction-status.enum";
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { Category } from "@derekprovance/firefly-iii-sdk";
-import { BudgetRead } from "@derekprovance/firefly-iii-sdk";
-import { createMockTransaction } from "../shared/test-data";
+import { UpdateTransactionService } from '../../src/services/update-transaction.service';
+import { TransactionService } from '../../src/services/core/transaction.service';
+import { CategoryService } from '../../src/services/core/category.service';
+import { BudgetService } from '../../src/services/core/budget.service';
+import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service';
+import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
+import { TransactionUpdaterService } from '../../src/services/core/transaction-updater.service';
+import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
+import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { Category } from '@derekprovance/firefly-iii-sdk';
+import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
+import { createMockTransaction } from '../shared/test-data';
 
-describe("UpdateTransactionService", () => {
+describe('UpdateTransactionService', () => {
     let service: UpdateTransactionService;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockTransactionUpdaterService: jest.Mocked<TransactionUpdaterService>;
@@ -44,13 +44,13 @@ describe("UpdateTransactionService", () => {
     let mockAIResults: { [key: string]: { category: string; budget: string } };
 
     const mockCategories: Partial<Category>[] = [
-        { name: "New Category 1" },
-        { name: "New Category 2" },
+        { name: 'New Category 1' },
+        { name: 'New Category 2' },
     ];
 
     const mockBudgets: Partial<BudgetRead>[] = [
-        { id: "1", type: "budget", attributes: { name: "New Budget 1" } },
-        { id: "2", type: "budget", attributes: { name: "New Budget 2" } },
+        { id: '1', type: 'budget', attributes: { name: 'New Budget 1' } },
+        { id: '2', type: 'budget', attributes: { name: 'New Budget 2' } },
     ];
 
     beforeEach(() => {
@@ -58,28 +58,28 @@ describe("UpdateTransactionService", () => {
 
         mockTransactions = [
             {
-                transaction_journal_id: "1",
-                description: "Test Transaction 1",
-                amount: "100.00",
-                category_name: "Old Category",
-                budget_id: "1",
-                budget_name: "Old Budget",
-                type: "withdrawal",
-                date: "2024-03-01",
-                source_id: "1",
-                destination_id: "2",
+                transaction_journal_id: '1',
+                description: 'Test Transaction 1',
+                amount: '100.00',
+                category_name: 'Old Category',
+                budget_id: '1',
+                budget_name: 'Old Budget',
+                type: 'withdrawal',
+                date: '2024-03-01',
+                source_id: '1',
+                destination_id: '2',
             },
             {
-                transaction_journal_id: "2",
-                description: "Test Transaction 2",
-                amount: "200.00",
-                category_name: "Old Category",
-                budget_id: "2",
-                budget_name: "Old Budget",
-                type: "withdrawal",
-                date: "2024-03-01",
-                source_id: "1",
-                destination_id: "2",
+                transaction_journal_id: '2',
+                description: 'Test Transaction 2',
+                amount: '200.00',
+                category_name: 'Old Category',
+                budget_id: '2',
+                budget_name: 'Old Budget',
+                type: 'withdrawal',
+                date: '2024-03-01',
+                source_id: '1',
+                destination_id: '2',
             },
         ];
 
@@ -87,8 +87,8 @@ describe("UpdateTransactionService", () => {
         // console.log('beforeEach mockTransactions:', mockTransactions.length, JSON.stringify(mockTransactions));
 
         mockAIResults = {
-            "1": { category: "New Category 1", budget: "New Budget 1" },
-            "2": { category: "New Category 2", budget: "New Budget 2" },
+            '1': { category: 'New Category 1', budget: 'New Budget 1' },
+            '2': { category: 'New Category 2', budget: 'New Budget 2' },
         };
 
         mockTransactionService = {
@@ -100,21 +100,17 @@ describe("UpdateTransactionService", () => {
         } as unknown as jest.Mocked<TransactionService>;
 
         mockTransactionUpdaterService = {
-            updateTransaction: jest
-                .fn()
-                .mockImplementation(async (transaction, aiResults) => {
-                    // Return the transaction with updated category and budget
-                    const journalId = transaction.transaction_journal_id!;
-                    const aiResult = aiResults[journalId];
-                    const result = {
-                        ...transaction,
-                        category_name:
-                            aiResult?.category || transaction.category_name,
-                        budget_name:
-                            aiResult?.budget || transaction.budget_name,
-                    };
-                    return Promise.resolve(result);
-                }),
+            updateTransaction: jest.fn().mockImplementation(async (transaction, aiResults) => {
+                // Return the transaction with updated category and budget
+                const journalId = transaction.transaction_journal_id!;
+                const aiResult = aiResults[journalId];
+                const result = {
+                    ...transaction,
+                    category_name: aiResult?.category || transaction.category_name,
+                    budget_name: aiResult?.budget || transaction.budget_name,
+                };
+                return Promise.resolve(result);
+            }),
         } as unknown as jest.Mocked<TransactionUpdaterService>;
 
         mockCategoryService = {
@@ -146,19 +142,18 @@ describe("UpdateTransactionService", () => {
         // Mock the services directly
         jest.spyOn(
             TransactionValidatorService.prototype,
-            "shouldProcessTransaction",
+            'shouldProcessTransaction'
         ).mockImplementation(mockValidator.shouldProcessTransaction);
+        jest.spyOn(TransactionValidatorService.prototype, 'shouldSetBudget').mockImplementation(
+            mockValidator.shouldSetBudget
+        );
         jest.spyOn(
             TransactionValidatorService.prototype,
-            "shouldSetBudget",
-        ).mockImplementation(mockValidator.shouldSetBudget);
-        jest.spyOn(
-            TransactionValidatorService.prototype,
-            "validateTransactionData",
+            'validateTransactionData'
         ).mockImplementation(mockValidator.validateTransactionData);
         jest.spyOn(
             TransactionValidatorService.prototype,
-            "categoryOrBudgetChanged",
+            'categoryOrBudgetChanged'
         ).mockImplementation(mockValidator.categoryOrBudgetChanged);
 
         service = new UpdateTransactionService(
@@ -171,8 +166,7 @@ describe("UpdateTransactionService", () => {
         );
 
         expect(
-            (service as unknown as { transactionService: TransactionService })
-                .transactionService,
+            (service as unknown as { transactionService: TransactionService }).transactionService
         ).toBe(mockTransactionService);
 
         mockValidator.shouldProcessTransaction.mockReturnValue(true);
@@ -182,45 +176,41 @@ describe("UpdateTransactionService", () => {
         jest.clearAllMocks();
     });
 
-    describe("updateTransactionsByTag", () => {
-        it("should return NO_TAG status when tag does not exist", async () => {
+    describe('updateTransactionsByTag', () => {
+        it('should return NO_TAG status when tag does not exist', async () => {
             mockTransactionService.tagExists.mockResolvedValue(false);
 
             const result = await service.updateTransactionsByTag(
-                "nonexistent",
-                UpdateTransactionMode.Both,
+                'nonexistent',
+                UpdateTransactionMode.Both
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.NO_TAG);
         });
 
-        it("should return EMPTY_TAG status when no transactions found", async () => {
+        it('should return EMPTY_TAG status when no transactions found', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue([]);
 
             const result = await service.updateTransactionsByTag(
-                "empty",
-                UpdateTransactionMode.Both,
+                'empty',
+                UpdateTransactionMode.Both
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
         });
 
-        it("should process transactions and return HAS_RESULTS status", async () => {
+        it('should process transactions and return HAS_RESULTS status', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(
-                mockCategories as Category[],
-            );
-            mockBudgetService.getBudgets.mockResolvedValue(
-                mockBudgets as BudgetRead[],
-            );
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             // Dynamically generate mockAIResults to match filtered transactions
-            const filtered = (mockTransactions as TransactionSplit[]).filter(
-                (t) => mockValidator.shouldProcessTransaction(t, false),
+            const filtered = (mockTransactions as TransactionSplit[]).filter(t =>
+                mockValidator.shouldProcessTransaction(t, false)
             );
             const dynamicAIResults = Object.fromEntries(
                 filtered.map((t, idx) => [
@@ -229,135 +219,119 @@ describe("UpdateTransactionService", () => {
                         category: `New Category ${idx + 1}`,
                         budget: `New Budget ${idx + 1}`,
                     },
-                ]),
+                ])
             );
-            mockLLMService.processTransactions.mockResolvedValue(
-                dynamicAIResults,
-            );
+            mockLLMService.processTransactions.mockResolvedValue(dynamicAIResults);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
             const result = await service.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Both,
+                'test',
+                UpdateTransactionMode.Both
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledTimes(
-                mockTransactions.length,
+                mockTransactions.length
             );
         });
 
-        it("should handle processing failures and return PROCESSING_FAILED status", async () => {
+        it('should handle processing failures and return PROCESSING_FAILED status', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockRejectedValue(
-                new Error("Processing failed"),
+                new Error('Processing failed')
             );
 
             const result = await service.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Both,
+                'test',
+                UpdateTransactionMode.Both
             );
 
-            expect(result.status).toBe(
-                UpdateTransactionStatus.PROCESSING_FAILED,
-            );
+            expect(result.status).toBe(UpdateTransactionStatus.PROCESSING_FAILED);
             // No need to check totalTransactions or data - they don't exist in the DTO
-            expect(result.error).toBe("Processing failed");
+            expect(result.error).toBe('Processing failed');
         });
 
-        it("should skip transactions that are transfers", async () => {
+        it('should skip transactions that are transfers', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(
-                mockCategories as Category[],
-            );
-            mockBudgetService.getBudgets.mockResolvedValue(
-                mockBudgets as BudgetRead[],
-            );
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(false);
 
             const result = await service.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Both,
+                'test',
+                UpdateTransactionMode.Both
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
             expect(mockTransactionUpdaterService.updateTransaction).not.toHaveBeenCalled();
         });
 
-        it("should handle category-only update mode", async () => {
+        it('should handle category-only update mode', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(
-                mockCategories as Category[],
-            );
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
-                mockTransactions[0] as TransactionSplit,
+                mockTransactions[0] as TransactionSplit
             );
 
             const result = await service.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Category,
+                'test',
+                UpdateTransactionMode.Category
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
-                expect.any(Object),
+                expect.any(Object)
             );
         });
 
-        it("should handle budget-only update mode", async () => {
+        it('should handle budget-only update mode', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockBudgetService.getBudgets.mockResolvedValue(
-                mockBudgets as BudgetRead[],
-            );
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
-                mockTransactions[0] as TransactionSplit,
+                mockTransactions[0] as TransactionSplit
             );
 
             const result = await service.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Budget,
+                'test',
+                UpdateTransactionMode.Budget
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockCategoryService.getCategories).not.toHaveBeenCalled();
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
-                expect.any(Object),
+                expect.any(Object)
             );
         });
 
-        it("should handle dry run mode correctly", async () => {
+        it('should handle dry run mode correctly', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(
-                mockCategories as Category[],
-            );
-            mockBudgetService.getBudgets.mockResolvedValue(
-                mockBudgets as BudgetRead[],
-            );
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -370,32 +344,26 @@ describe("UpdateTransactionService", () => {
                 mockBudgetService,
                 mockLLMService,
                 mockValidator,
-                false,
+                false
             );
 
             const result = await serviceWithDryRun.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Both,
+                'test',
+                UpdateTransactionMode.Both
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             // No need to check totalTransactions or data - they don't exist in the DTO
-            expect(
-                mockTransactionService.updateTransaction,
-            ).not.toHaveBeenCalled();
+            expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
 
-        it("should show proposed changes in dry run mode", async () => {
+        it('should show proposed changes in dry run mode', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(
-                mockCategories as Category[],
-            );
-            mockBudgetService.getBudgets.mockResolvedValue(
-                mockBudgets as BudgetRead[],
-            );
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -408,26 +376,23 @@ describe("UpdateTransactionService", () => {
                 mockBudgetService,
                 mockLLMService,
                 mockValidator,
-                false,
+                false
             );
 
             const result = await serviceWithDryRun.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Both,
+                'test',
+                UpdateTransactionMode.Both
             );
+            expect(result).toBeTruthy();
         });
 
-        it("should combine dry run with no confirmation", async () => {
+        it('should combine dry run with no confirmation', async () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
-                mockTransactions as TransactionSplit[],
+                mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(
-                mockCategories as Category[],
-            );
-            mockBudgetService.getBudgets.mockResolvedValue(
-                mockBudgets as BudgetRead[],
-            );
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -440,46 +405,44 @@ describe("UpdateTransactionService", () => {
                 mockBudgetService,
                 mockLLMService,
                 mockValidator,
-                false,
+                false
             );
 
             const result = await serviceWithBoth.updateTransactionsByTag(
-                "test",
-                UpdateTransactionMode.Both,
+                'test',
+                UpdateTransactionMode.Both
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(
-                mockTransactionService.updateTransaction,
-            ).not.toHaveBeenCalled();
+            expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
 
-        it("should handle successful updates", async () => {
-            const tag = "test-tag";
+        it('should handle successful updates', async () => {
+            const tag = 'test-tag';
             const updateMode = UpdateTransactionMode.Both;
             const dryRun = false;
 
             const mockTransaction = createMockTransaction({
-                transaction_journal_id: "1",
-                description: "Test Transaction",
-                amount: "100.00",
+                transaction_journal_id: '1',
+                description: 'Test Transaction',
+                amount: '100.00',
             });
 
             const mockCategory: Category = {
-                name: "Test Category",
-                created_at: "2024-01-01T00:00:00Z",
-                updated_at: "2024-01-01T00:00:00Z",
+                name: 'Test Category',
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
             };
 
             const mockBudget: BudgetRead = {
-                id: "1",
-                type: "budget",
+                id: '1',
+                type: 'budget',
                 attributes: {
-                    name: "Test Budget",
+                    name: 'Test Budget',
                     active: true,
                     order: 0,
-                    created_at: "2024-01-01T00:00:00Z",
-                    updated_at: "2024-01-01T00:00:00Z",
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
                     spent: [],
                     auto_budget_type: null,
                     auto_budget_currency_id: null,
@@ -490,71 +453,65 @@ describe("UpdateTransactionService", () => {
             };
 
             mockTransactionService.tagExists.mockResolvedValue(true);
-            mockTransactionService.getTransactionsByTag.mockResolvedValue([
-                mockTransaction,
-            ]);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([mockTransaction]);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockCategoryService.getCategories.mockResolvedValue([mockCategory]);
             mockBudgetService.getBudgets.mockResolvedValue([mockBudget]);
             mockLLMService.processTransactions.mockResolvedValue({
-                "1": { category: "New Category", budget: "New Budget" },
+                '1': { category: 'New Category', budget: 'New Budget' },
             });
             mockTransactionUpdaterService.updateTransaction.mockResolvedValue(mockTransaction);
 
-            const result = await service.updateTransactionsByTag(
-                tag,
-                updateMode,
-                dryRun,
-            );
+            const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
-            expect(
-                mockTransactionService.getTransactionsByTag,
-            ).toHaveBeenCalledWith(tag);
+            expect(mockTransactionService.getTransactionsByTag).toHaveBeenCalledWith(tag);
             expect(mockValidator.shouldProcessTransaction).toHaveBeenCalledWith(
                 mockTransaction,
-                false,
+                false
             );
             expect(mockCategoryService.getCategories).toHaveBeenCalled();
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
                 [mockCategory.name],
-                [mockBudget.attributes.name],
+                [mockBudget.attributes.name]
             );
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
-                { "1": { category: "New Category", budget: "New Budget" } },
+                {
+                    '1': { category: 'New Category', budget: 'New Budget' },
+                }
             );
         });
 
-        it("should handle dry run mode", async () => {
-            const tag = "test-tag";
+        it('should handle dry run mode', async () => {
+            const tag = 'test-tag';
             const updateMode = UpdateTransactionMode.Both;
             const dryRun = true;
 
             const mockTransaction = createMockTransaction({
-                transaction_journal_id: "1",
-                description: "Test Transaction",
-                amount: "100.00",
+                transaction_journal_id: '1',
+                description: 'Test Transaction',
+                amount: '100.00',
             });
 
             const mockCategory: Category = {
-                name: "Test Category",
-                created_at: "2024-01-01T00:00:00Z",
-                updated_at: "2024-01-01T00:00:00Z",
+                name: 'Test Category',
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
             };
 
             const mockBudget: BudgetRead = {
-                id: "1",
-                type: "budget",
+                id: '1',
+                type: 'budget',
                 attributes: {
-                    name: "Test Budget",
+                    name: 'Test Budget',
                     active: true,
                     order: 0,
-                    created_at: "2024-01-01T00:00:00Z",
-                    updated_at: "2024-01-01T00:00:00Z",
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
                     spent: [],
                     auto_budget_type: null,
                     auto_budget_currency_id: null,
@@ -565,53 +522,47 @@ describe("UpdateTransactionService", () => {
             };
 
             mockTransactionService.tagExists.mockResolvedValue(true);
-            mockTransactionService.getTransactionsByTag.mockResolvedValue([
-                mockTransaction,
-            ]);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([mockTransaction]);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockCategoryService.getCategories.mockResolvedValue([mockCategory]);
             mockBudgetService.getBudgets.mockResolvedValue([mockBudget]);
             mockLLMService.processTransactions.mockResolvedValue({
-                "1": { category: "New Category", budget: "New Budget" },
+                '1': { category: 'New Category', budget: 'New Budget' },
             });
             mockTransactionUpdaterService.updateTransaction.mockResolvedValue(mockTransaction);
 
-            const result = await service.updateTransactionsByTag(
-                tag,
-                updateMode,
-                dryRun,
-            );
+            const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
-            expect(
-                mockTransactionService.getTransactionsByTag,
-            ).toHaveBeenCalledWith(tag);
+            expect(mockTransactionService.getTransactionsByTag).toHaveBeenCalledWith(tag);
             expect(mockValidator.shouldProcessTransaction).toHaveBeenCalledWith(
                 mockTransaction,
-                false,
+                false
             );
             expect(mockCategoryService.getCategories).toHaveBeenCalled();
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
                 [mockCategory.name],
-                [mockBudget.attributes.name],
+                [mockBudget.attributes.name]
             );
             expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
-                { "1": { category: "New Category", budget: "New Budget" } },
+                {
+                    '1': { category: 'New Category', budget: 'New Budget' },
+                }
             );
         });
 
-        it("should skip transactions with missing journal IDs during processing", async () => {
-            const tag = "test-tag";
+        it('should skip transactions with missing journal IDs during processing', async () => {
+            const tag = 'test-tag';
             const updateMode = UpdateTransactionMode.Both;
 
             const transactionWithoutId = {
                 transaction_journal_id: undefined,
-                description: "Transaction without ID",
-                amount: "100.00",
+                description: 'Transaction without ID',
+                amount: '100.00',
             };
 
             mockTransactionService.tagExists.mockResolvedValue(true);
@@ -623,13 +574,10 @@ describe("UpdateTransactionService", () => {
             mockBudgetService.getBudgets.mockResolvedValue([]);
 
             mockLLMService.processTransactions.mockResolvedValue({
-                dummy: { category: "Test Category", budget: "Test Budget" },
+                dummy: { category: 'Test Category', budget: 'Test Budget' },
             });
 
-            const result = await service.updateTransactionsByTag(
-                tag,
-                updateMode,
-            );
+            const result = await service.updateTransactionsByTag(tag, updateMode);
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockTransactionUpdaterService.updateTransaction).not.toHaveBeenCalled();

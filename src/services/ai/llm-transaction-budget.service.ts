@@ -1,6 +1,6 @@
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { ClaudeClient } from "../../api/claude.client";
-import { logger } from "../../logger";
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { ClaudeClient } from '../../api/claude.client';
+import { logger } from '../../logger';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -10,42 +10,42 @@ export class LLMTransactionBudgetService {
 
     private getBudgetFunction(validBudgets: string[]) {
         return {
-            name: "assign_budgets",
+            name: 'assign_budgets',
             description:
-                "Assign the closest matching budget to each transaction from the provided list. Always select the most appropriate budget for each transaction, even if the match is not perfect. Return budgets in the same order as the input transactions.",
+                'Assign the closest matching budget to each transaction from the provided list. Always select the most appropriate budget for each transaction, even if the match is not perfect. Return budgets in the same order as the input transactions.',
             parameters: {
-                type: "object",
+                type: 'object',
                 properties: {
                     budgets: {
-                        type: "array",
+                        type: 'array',
                         items: {
-                            type: "string",
+                            type: 'string',
                             enum: validBudgets,
                         },
                         description:
-                            "Array of budgets to assign to transactions. Must be exactly one budget per transaction in the same order as input transactions. Do not return empty strings.",
+                            'Array of budgets to assign to transactions. Must be exactly one budget per transaction in the same order as input transactions. Do not return empty strings.',
                     },
                 },
-                required: ["budgets"],
+                required: ['budgets'],
             },
         };
     }
 
     async assignBudgets(
         transactions: TransactionSplit[],
-        validBudgets: string[],
+        validBudgets: string[]
     ): Promise<string[]> {
         logger.debug(
             {
                 transactionCount: transactions.length,
                 budgetCount: validBudgets.length,
             },
-            "Starting budget assignment",
+            'Starting budget assignment'
         );
 
         if (!validBudgets.length) {
-            logger.debug("No budgets provided, returning empty strings");
-            return new Array(transactions.length).fill("");
+            logger.debug('No budgets provided, returning empty strings');
+            return new Array(transactions.length).fill('');
         }
 
         const BATCH_SIZE = 10;
@@ -53,10 +53,7 @@ export class LLMTransactionBudgetService {
 
         for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
             const batch = transactions.slice(i, i + BATCH_SIZE);
-            const batchResults = await this.assignBudgetsBatch(
-                batch,
-                validBudgets,
-            );
+            const batchResults = await this.assignBudgetsBatch(batch, validBudgets);
             results.push(...batchResults);
         }
 
@@ -65,11 +62,11 @@ export class LLMTransactionBudgetService {
 
     private async assignBudgetsBatch(
         transactions: TransactionSplit[],
-        validBudgets: string[],
+        validBudgets: string[]
     ): Promise<string[]> {
         const budgetFunction = this.getBudgetFunction(validBudgets);
 
-        const transactionData = transactions.map((tx) => ({
+        const transactionData = transactions.map(tx => ({
             description: tx.description,
             amount: tx.amount,
             date: tx.date,
@@ -80,7 +77,7 @@ export class LLMTransactionBudgetService {
         }));
 
         const message = {
-            role: "user" as const,
+            role: 'user' as const,
             content: `You are a financial categorization expert. Assign the most appropriate budget category to each transaction based on the merchant, description, and spending context.
 
 BUDGET CATEGORIES AND THEIR PURPOSE:
@@ -131,20 +128,18 @@ Return exactly ${transactions.length} budget categories from the available list.
                 logger.debug(
                     {
                         batchSize: transactions.length,
-                        transactionIds: transactions.map(
-                            (tx) => tx.transaction_journal_id,
-                        ),
+                        transactionIds: transactions.map(tx => tx.transaction_journal_id),
                     },
-                    "Sending batch request to Claude",
+                    'Sending batch request to Claude'
                 );
 
                 const result = await this.claudeClient.chat([message], {
                     functions: [budgetFunction],
-                    function_call: { name: "assign_budgets" },
+                    function_call: { name: 'assign_budgets' },
                 });
 
                 if (!result) {
-                    throw new Error("Invalid response from Claude");
+                    throw new Error('Invalid response from Claude');
                 }
 
                 try {
@@ -156,7 +151,7 @@ Return exactly ${transactions.length} budget categories from the available list.
                         resultBudgets.length !== transactions.length
                     ) {
                         throw new Error(
-                            `Expected ${transactions.length} budgets, got ${resultBudgets?.length || 0}`,
+                            `Expected ${transactions.length} budgets, got ${resultBudgets?.length || 0}`
                         );
                     }
 
@@ -173,14 +168,11 @@ Return exactly ${transactions.length} budget categories from the available list.
                             batchSize: transactions.length,
                             attemptedBudgets: result,
                             validBudgets,
-                            error:
-                                error instanceof Error
-                                    ? error.message
-                                    : String(error),
+                            error: error instanceof Error ? error.message : String(error),
                         },
-                        "Budget batch validation failed",
+                        'Budget batch validation failed'
                     );
-                    return new Array(transactions.length).fill("");
+                    return new Array(transactions.length).fill('');
                 }
             });
 
@@ -189,22 +181,19 @@ Return exactly ${transactions.length} budget categories from the available list.
             logger.error(
                 {
                     batchSize: transactions.length,
-                    transactionIds: transactions.map(
-                        (tx) => tx.transaction_journal_id,
-                    ),
-                    error:
-                        error instanceof Error ? error.message : String(error),
+                    transactionIds: transactions.map(tx => tx.transaction_journal_id),
+                    error: error instanceof Error ? error.message : String(error),
                 },
-                "Failed to assign budget batch",
+                'Failed to assign budget batch'
             );
-            return new Array(transactions.length).fill("");
+            return new Array(transactions.length).fill('');
         }
     }
 
     private async retryWithBackoff<T>(
         operation: () => Promise<T>,
         retries = MAX_RETRIES,
-        delay = RETRY_DELAY_MS,
+        delay = RETRY_DELAY_MS
     ): Promise<T> {
         try {
             return await operation();
@@ -215,15 +204,14 @@ Return exactly ${transactions.length} budget categories from the available list.
 
             logger.warn(
                 {
-                    error:
-                        error instanceof Error ? error.message : String(error),
+                    error: error instanceof Error ? error.message : String(error),
                     retriesLeft: retries,
                     delay,
                 },
-                "Retrying operation after error",
+                'Retrying operation after error'
             );
 
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            await new Promise(resolve => setTimeout(resolve, delay));
             return this.retryWithBackoff(operation, retries - 1, delay * 2);
         }
     }
@@ -234,59 +222,45 @@ Return exactly ${transactions.length} budget categories from the available list.
             const name = budgetName.toLowerCase();
 
             // Pattern matching for common budget types
-            if (name.includes("grocer") || name.includes("food")) {
-                return "Food shopping, supermarkets, grocery stores";
+            if (name.includes('grocer') || name.includes('food')) {
+                return 'Food shopping, supermarkets, grocery stores';
             }
             if (
-                name.includes("going out") ||
-                name.includes("dining") ||
-                name.includes("restaurant")
+                name.includes('going out') ||
+                name.includes('dining') ||
+                name.includes('restaurant')
             ) {
-                return "Restaurants, bars, cafes, dining out, social activities";
+                return 'Restaurants, bars, cafes, dining out, social activities';
             }
             if (
-                name.includes("entertainment") ||
-                name.includes("recreation") ||
-                name.includes("fun")
+                name.includes('entertainment') ||
+                name.includes('recreation') ||
+                name.includes('fun')
             ) {
-                return "Movies, streaming services, games, sports, hobbies, recreational activities";
+                return 'Movies, streaming services, games, sports, hobbies, recreational activities';
             }
             if (
-                name.includes("transport") ||
-                name.includes("car") ||
-                name.includes("gas") ||
-                name.includes("vehicle")
+                name.includes('transport') ||
+                name.includes('car') ||
+                name.includes('gas') ||
+                name.includes('vehicle')
             ) {
-                return "Gas, car maintenance, DMV services, rideshare, parking, public transit";
+                return 'Gas, car maintenance, DMV services, rideshare, parking, public transit';
             }
-            if (
-                name.includes("medical") ||
-                name.includes("health") ||
-                name.includes("doctor")
-            ) {
-                return "Healthcare expenses, pharmacy, medical bills, insurance copays";
+            if (name.includes('medical') || name.includes('health') || name.includes('doctor')) {
+                return 'Healthcare expenses, pharmacy, medical bills, insurance copays';
             }
-            if (
-                name.includes("donation") ||
-                name.includes("charit") ||
-                name.includes("giving")
-            ) {
-                return "Charitable giving, donations, non-profit contributions";
+            if (name.includes('donation') || name.includes('charit') || name.includes('giving')) {
+                return 'Charitable giving, donations, non-profit contributions';
             }
-            if (
-                name.includes("misc") ||
-                name.includes("other") ||
-                name.includes("general")
-            ) {
-                return "General expenses, business tools, professional subscriptions, unclear transactions";
+            if (name.includes('misc') || name.includes('other') || name.includes('general')) {
+                return 'General expenses, business tools, professional subscriptions, unclear transactions';
             }
 
             // Default description for unrecognized budget names
             return `Expenses related to ${budgetName.toLowerCase()} category`;
         };
 
-        return validBudgets
-            .map((budget) => `- ${budget}: ${generateDescription(budget)}`)
-            .join("\n");
+        return validBudgets.map(budget => `- ${budget}: ${generateDescription(budget)}`).join('\n');
     }
 }

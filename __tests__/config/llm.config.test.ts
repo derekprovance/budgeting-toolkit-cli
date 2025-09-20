@@ -1,11 +1,11 @@
-import { LLMConfig } from "../../src/config/llm.config";
-import { ClaudeClient } from "../../src/api/claude.client";
-import { loadYamlConfig } from "../../src/utils/config-loader";
+import { LLMConfig } from '../../src/config/llm.config';
+import { ClaudeClient } from '../../src/api/claude.client';
+import { loadYamlConfig } from '../../src/utils/config-loader';
 
 // Mock dependencies
-jest.mock("../../src/api/claude.client");
-jest.mock("../../src/utils/config-loader");
-jest.mock("../../src/logger", () => ({
+jest.mock('../../src/api/claude.client');
+jest.mock('../../src/utils/config-loader');
+jest.mock('../../src/logger', () => ({
     logger: {
         debug: jest.fn(),
         info: jest.fn(),
@@ -14,29 +14,27 @@ jest.mock("../../src/logger", () => ({
     },
 }));
 
-const mockLoadYamlConfig = loadYamlConfig as jest.MockedFunction<
-    typeof loadYamlConfig
->;
+const mockLoadYamlConfig = loadYamlConfig as jest.MockedFunction<typeof loadYamlConfig>;
 
 // Mock the config module inline
 const mockClaudeAPIKey = jest.fn();
-jest.mock("../../src/config", () => ({
+jest.mock('../../src/config', () => ({
     get claudeAPIKey() {
         return mockClaudeAPIKey();
     },
 }));
 
-describe("LLMConfig", () => {
+describe('LLMConfig', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    describe("createClient", () => {
-        it("should create ClaudeClient with API key and default LLM config", () => {
-            mockClaudeAPIKey.mockReturnValue("test-api-key");
+    describe('createClient', () => {
+        it('should create ClaudeClient with API key and default LLM config', () => {
+            mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: "claude-3-5-sonnet-latest",
+                    model: 'claude-3-5-sonnet-latest',
                     maxTokens: 4000,
                     batchSize: 10,
                     maxConcurrent: 3,
@@ -49,8 +47,8 @@ describe("LLMConfig", () => {
             LLMConfig.createClient();
 
             expect(ClaudeClient).toHaveBeenCalledWith({
-                apiKey: "test-api-key",
-                model: "claude-3-5-sonnet-latest",
+                apiKey: 'test-api-key',
+                model: 'claude-3-5-sonnet-latest',
                 maxTokens: 4000,
                 maxRetries: 3,
                 batchSize: 10,
@@ -61,8 +59,8 @@ describe("LLMConfig", () => {
             });
         });
 
-        it("should use default values when LLM config values are not provided", () => {
-            mockClaudeAPIKey.mockReturnValue("test-api-key");
+        it('should use default values when LLM config values are not provided', () => {
+            mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {}, // Empty LLM config
             });
@@ -70,8 +68,8 @@ describe("LLMConfig", () => {
             LLMConfig.createClient();
 
             expect(ClaudeClient).toHaveBeenCalledWith({
-                apiKey: "test-api-key",
-                model: "claude-3-5-haiku-latest",
+                apiKey: 'test-api-key',
+                model: 'claude-3-5-haiku-latest',
                 maxTokens: 2000,
                 maxRetries: 3,
                 batchSize: 5,
@@ -82,57 +80,49 @@ describe("LLMConfig", () => {
             });
         });
 
-        it("should throw error when Claude API key is missing", () => {
-            mockClaudeAPIKey.mockReturnValue("");
+        it('should throw error when Claude API key is missing', () => {
+            mockClaudeAPIKey.mockReturnValue('');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: "claude-3-5-sonnet-latest",
+                    model: 'claude-3-5-sonnet-latest',
                 },
             });
 
-            expect(() => LLMConfig.createClient()).toThrow(
-                /Claude API Key is required/,
-            );
+            expect(() => LLMConfig.createClient()).toThrow(/Claude API Key is required/);
         });
 
-        it("should throw error when Claude API key is undefined", () => {
+        it('should throw error when Claude API key is undefined', () => {
             mockClaudeAPIKey.mockReturnValue(undefined);
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: "claude-3-5-sonnet-latest",
+                    model: 'claude-3-5-sonnet-latest',
                 },
             });
 
-            expect(() => LLMConfig.createClient()).toThrow(
-                /Claude API Key is required/,
-            );
+            expect(() => LLMConfig.createClient()).toThrow(/Claude API Key is required/);
         });
 
-        it("should throw error when LLM config is missing from YAML", () => {
-            mockClaudeAPIKey.mockReturnValue("test-api-key");
+        it('should throw error when LLM config is missing from YAML', () => {
+            mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({}); // No LLM config
 
-            expect(() => LLMConfig.createClient()).toThrow(
-                /LLM configuration missing/,
-            );
+            expect(() => LLMConfig.createClient()).toThrow(/LLM configuration missing/);
         });
 
-        it("should throw error when LLM config is undefined", () => {
-            mockClaudeAPIKey.mockReturnValue("test-api-key");
+        it('should throw error when LLM config is undefined', () => {
+            mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: undefined,
             });
 
-            expect(() => LLMConfig.createClient()).toThrow(
-                /LLM configuration missing/,
-            );
+            expect(() => LLMConfig.createClient()).toThrow(/LLM configuration missing/);
         });
 
-        it("should handle partial LLM config with some values missing", () => {
-            mockClaudeAPIKey.mockReturnValue("test-api-key");
+        it('should handle partial LLM config with some values missing', () => {
+            mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: "custom-model",
+                    model: 'custom-model',
                     maxTokens: 3000,
                     // Missing other values - should use defaults
                 },
@@ -141,8 +131,8 @@ describe("LLMConfig", () => {
             LLMConfig.createClient();
 
             expect(ClaudeClient).toHaveBeenCalledWith({
-                apiKey: "test-api-key",
-                model: "custom-model",
+                apiKey: 'test-api-key',
+                model: 'custom-model',
                 maxTokens: 3000,
                 maxRetries: 3,
                 batchSize: 5, // default
@@ -153,16 +143,16 @@ describe("LLMConfig", () => {
             });
         });
 
-        it("should return ClaudeClient instance when called successfully", () => {
+        it('should return ClaudeClient instance when called successfully', () => {
             const mockClaudeClient = {} as ClaudeClient;
-            (
-                ClaudeClient as jest.MockedClass<typeof ClaudeClient>
-            ).mockImplementation(() => mockClaudeClient);
+            (ClaudeClient as jest.MockedClass<typeof ClaudeClient>).mockImplementation(
+                () => mockClaudeClient
+            );
 
-            mockClaudeAPIKey.mockReturnValue("test-api-key");
+            mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: "claude-3-5-sonnet-latest",
+                    model: 'claude-3-5-sonnet-latest',
                 },
             });
 

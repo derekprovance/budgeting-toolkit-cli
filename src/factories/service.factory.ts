@@ -1,26 +1,22 @@
-import {
-    BudgetRead,
-    Category,
-    FireflyApiClient,
-} from "@derekprovance/firefly-iii-sdk";
-import { TransactionService } from "../services/core/transaction.service";
-import { BudgetService } from "../services/core/budget.service";
-import { CategoryService } from "../services/core/category.service";
-import { AdditionalIncomeService } from "../services/additional-income.service";
-import { UnbudgetedExpenseService } from "../services/unbudgeted-expense.service";
-import { BudgetStatusService } from "../services/budget-status.service";
-import { ExcludedTransactionService } from "../services/excluded-transaction.service";
-import { TransactionPropertyService } from "../services/core/transaction-property.service";
-import { PaycheckSurplusService } from "../services/paycheck-surplus.service";
-import { TransactionValidatorService } from "../services/core/transaction-validator.service";
-import { LLMTransactionCategoryService } from "../services/ai/llm-transaction-category.service";
-import { LLMTransactionBudgetService } from "../services/ai/llm-transaction-budget.service";
-import { LLMTransactionProcessingService } from "../services/ai/llm-transaction-processing.service";
-import { UpdateTransactionService } from "../services/update-transaction.service";
-import { LLMConfig } from "../config/llm.config";
-import { UserInputService } from "../services/user-input.service";
-import { TransactionUpdaterService } from "../services/core/transaction-updater.service";
-import { baseUrl } from "../config";
+import { BudgetRead, Category, FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { TransactionService } from '../services/core/transaction.service';
+import { BudgetService } from '../services/core/budget.service';
+import { CategoryService } from '../services/core/category.service';
+import { AdditionalIncomeService } from '../services/additional-income.service';
+import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service';
+import { BudgetStatusService } from '../services/budget-status.service';
+import { ExcludedTransactionService } from '../services/excluded-transaction.service';
+import { TransactionPropertyService } from '../services/core/transaction-property.service';
+import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
+import { TransactionValidatorService } from '../services/core/transaction-validator.service';
+import { LLMTransactionCategoryService } from '../services/ai/llm-transaction-category.service';
+import { LLMTransactionBudgetService } from '../services/ai/llm-transaction-budget.service';
+import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service';
+import { UpdateTransactionService } from '../services/update-transaction.service';
+import { LLMConfig } from '../config/llm.config';
+import { UserInputService } from '../services/user-input.service';
+import { TransactionUpdaterService } from '../services/core/transaction-updater.service';
+import { baseUrl } from '../config';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyApiClient) {
@@ -30,23 +26,23 @@ export class ServiceFactory {
         const userInputService = new UserInputService(baseUrl);
         const excludedTransactionService = new ExcludedTransactionService();
         const transactionPropertyService = new TransactionPropertyService(
-            excludedTransactionService,
+            excludedTransactionService
         );
         const transactionValidatorService = new TransactionValidatorService(
-            transactionPropertyService,
+            transactionPropertyService
         );
         const additionalIncomeService = new AdditionalIncomeService(
             transactionService,
-            transactionPropertyService,
+            transactionPropertyService
         );
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
-            transactionPropertyService,
+            transactionPropertyService
         );
         const budgetStatus = new BudgetStatusService(budgetService);
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
-            transactionPropertyService,
+            transactionPropertyService
         );
 
         return {
@@ -67,23 +63,20 @@ export class ServiceFactory {
     static async createUpdateTransactionService(
         apiClient: FireflyApiClient,
         includeClassified: boolean = false,
-        dryRun: boolean = false,
+        dryRun: boolean = false
     ): Promise<UpdateTransactionService> {
         const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
-        const llmCategoryService = new LLMTransactionCategoryService(
-            claudeClient,
-        );
+        const llmCategoryService = new LLMTransactionCategoryService(claudeClient);
         const llmBudgetService = new LLMTransactionBudgetService(claudeClient);
         const llmProcessingService = new LLMTransactionProcessingService(
             llmCategoryService,
-            llmBudgetService,
+            llmBudgetService
         );
 
         const budgets: BudgetRead[] = await services.budgetService.getBudgets();
-        const categories: Category[] =
-            await services.categoryService.getCategories();
+        const categories: Category[] = await services.categoryService.getCategories();
 
         const transactionUpdaterService = new TransactionUpdaterService(
             services.transactionService,
@@ -91,7 +84,7 @@ export class ServiceFactory {
             services.userInputService,
             dryRun,
             categories,
-            budgets,
+            budgets
         );
 
         return new UpdateTransactionService(
@@ -101,7 +94,7 @@ export class ServiceFactory {
             services.budgetService,
             llmProcessingService,
             services.transactionValidatorService,
-            includeClassified,
+            includeClassified
         );
     }
 }

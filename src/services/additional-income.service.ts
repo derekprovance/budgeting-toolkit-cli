@@ -1,10 +1,10 @@
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { TransactionService } from "./core/transaction.service";
-import { Account, Description } from "../config";
-import { TransactionPropertyService } from "./core/transaction-property.service";
-import { logger } from "../logger";
-import { DateUtils } from "../utils/date.utils";
-import { getConfigValue } from "../utils/config-loader";
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionService } from './core/transaction.service';
+import { Account, Description } from '../config';
+import { TransactionPropertyService } from './core/transaction-property.service';
+import { logger } from '../logger';
+import { DateUtils } from '../utils/date.utils';
+import { getConfigValue } from '../utils/config-loader';
 
 /**
  * Valid destination accounts for additional income.
@@ -12,10 +12,7 @@ import { getConfigValue } from "../utils/config-loader";
  */
 type ValidDestinationAccount = Extract<
     Account,
-    | Account.PRIMARY
-    | Account.CHASE_SAPPHIRE
-    | Account.CHASE_AMAZON
-    | Account.CITIBANK_DOUBLECASH
+    Account.PRIMARY | Account.CHASE_SAPPHIRE | Account.CHASE_AMAZON | Account.CITIBANK_DOUBLECASH
 >;
 
 /**
@@ -66,7 +63,7 @@ export class AdditionalIncomeService {
     constructor(
         private readonly transactionService: TransactionService,
         private readonly transactionPropertyService: TransactionPropertyService,
-        config: Partial<AdditionalIncomeConfig> = {},
+        config: Partial<AdditionalIncomeConfig> = {}
     ) {
         const yamlConfig = this.loadConfigFromYaml();
 
@@ -82,18 +79,10 @@ export class AdditionalIncomeService {
      * Loads configuration values from the YAML file
      */
     private loadConfigFromYaml(): Partial<AdditionalIncomeConfig> {
-        const validDestinationAccounts = getConfigValue<string[]>(
-            "validDestinationAccounts",
-        );
-        const excludedDescriptions = getConfigValue<string[]>(
-            "excludedDescriptions",
-        );
-        const excludeDisposableIncome = getConfigValue<boolean>(
-            "excludeDisposableIncome",
-        );
-        const minTransactionAmount = getConfigValue<number>(
-            "minTransactionAmount",
-        );
+        const validDestinationAccounts = getConfigValue<string[]>('validDestinationAccounts');
+        const excludedDescriptions = getConfigValue<string[]>('excludedDescriptions');
+        const excludeDisposableIncome = getConfigValue<boolean>('excludeDisposableIncome');
+        const minTransactionAmount = getConfigValue<number>('minTransactionAmount');
 
         const yamlConfig: Partial<AdditionalIncomeConfig> = {};
 
@@ -128,49 +117,39 @@ export class AdditionalIncomeService {
      *    - Must meet minimum amount
      *    - Must not be disposable income (if configured)
      */
-    async calculateAdditionalIncome(
-        month: number,
-        year: number,
-    ): Promise<TransactionSplit[]> {
+    async calculateAdditionalIncome(month: number, year: number): Promise<TransactionSplit[]> {
         try {
             DateUtils.validateMonthYear(month, year);
-            const transactions =
-                await this.transactionService.getTransactionsForMonth(
-                    month,
-                    year,
-                );
+            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
             if (!transactions?.length) {
-                logger.debug(
-                    `No transactions found for month ${month}, year ${year}`,
-                );
+                logger.debug(`No transactions found for month ${month}, year ${year}`);
                 return [];
             }
 
             const additionalIncome = this.filterTransactions(transactions);
 
             if (!additionalIncome.length) {
-                logger.debug(
-                    `No additional income found for month ${month}, year ${year}`,
-                );
+                logger.debug(`No additional income found for month ${month}, year ${year}`);
             }
 
             return additionalIncome;
         } catch (error) {
-            logger.trace({
-                error,
-                month,
-                year,
-                errorMessage: error instanceof Error ? error.message : "Unknown error",
-            }, "Error calculating additional income");
+            logger.trace(
+                {
+                    error,
+                    month,
+                    year,
+                    errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                },
+                'Error calculating additional income'
+            );
             if (error instanceof Error) {
                 throw new Error(
-                    `Failed to calculate additional income for month ${month}: ${error.message}`,
+                    `Failed to calculate additional income for month ${month}: ${error.message}`
                 );
             }
-            throw new Error(
-                `Failed to calculate additional income for month ${month}`,
-            );
+            throw new Error(`Failed to calculate additional income for month ${month}`);
         }
     }
 
@@ -182,14 +161,12 @@ export class AdditionalIncomeService {
      */
     private validateConfig(): void {
         if (!this.config.validDestinationAccounts.length) {
-            throw new Error(
-                "At least one valid destination account must be specified",
-            );
+            throw new Error('At least one valid destination account must be specified');
         }
 
         if (!this.config.excludedDescriptions.length) {
             logger.warn(
-                "No excluded descriptions specified - all deposits will be considered additional income",
+                'No excluded descriptions specified - all deposits will be considered additional income'
             );
         }
 
@@ -197,7 +174,7 @@ export class AdditionalIncomeService {
             this.config.minTransactionAmount !== undefined &&
             this.config.minTransactionAmount < 0
         ) {
-            throw new Error("Minimum transaction amount cannot be negative");
+            throw new Error('Minimum transaction amount cannot be negative');
         }
     }
 
@@ -210,18 +187,16 @@ export class AdditionalIncomeService {
      * 4. Must meet minimum amount requirement
      * 5. Must not be disposable income (if configured)
      */
-    private filterTransactions(
-        transactions: TransactionSplit[],
-    ): TransactionSplit[] {
+    private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
         return transactions
-            .filter((t) => this.transactionPropertyService.isDeposit(t))
+            .filter(t => this.transactionPropertyService.isDeposit(t))
             .filter(this.hasValidDestinationAccount)
             .filter(this.isNotPayroll)
             .filter(this.meetsMinimumAmount)
             .filter(
-                (t) =>
+                t =>
                     !this.config.excludeDisposableIncome ||
-                    !this.transactionPropertyService.isDisposableIncome(t),
+                    !this.transactionPropertyService.isDisposableIncome(t)
             );
     }
 
@@ -231,12 +206,10 @@ export class AdditionalIncomeService {
      * 1. Must have a destination account
      * 2. Destination account must be in the valid accounts list
      */
-    private hasValidDestinationAccount = (
-        transaction: TransactionSplit,
-    ): boolean =>
+    private hasValidDestinationAccount = (transaction: TransactionSplit): boolean =>
         transaction.destination_id != null &&
         this.config.validDestinationAccounts.includes(
-            transaction.destination_id as ValidDestinationAccount,
+            transaction.destination_id as ValidDestinationAccount
         );
 
     /**
@@ -248,15 +221,13 @@ export class AdditionalIncomeService {
      */
     private isNotPayroll = (transaction: TransactionSplit): boolean => {
         if (!transaction.description) {
-            logger.warn({ transaction }, "Transaction found with no description");
+            logger.warn({ transaction }, 'Transaction found with no description');
             return true; // Consider non-described transactions as non-payroll
         }
 
-        const normalizedDescription = this.normalizeString(
-            transaction.description,
-        );
-        return !this.config.excludedDescriptions.some((desc) =>
-            normalizedDescription.includes(this.normalizeString(desc)),
+        const normalizedDescription = this.normalizeString(transaction.description);
+        return !this.config.excludedDescriptions.some(desc =>
+            normalizedDescription.includes(this.normalizeString(desc))
         );
     };
 
@@ -293,7 +264,7 @@ export class AdditionalIncomeService {
         return input
             .toLowerCase()
             .trim()
-            .replace(/[-_\s]+/g, " ") // Replace multiple spaces, hyphens, underscores with single space
-            .replace(/[^\w\s]/g, ""); // Remove all other special characters
+            .replace(/[-_\s]+/g, ' ') // Replace multiple spaces, hyphens, underscores with single space
+            .replace(/[^\w\s]/g, ''); // Remove all other special characters
     }
 }

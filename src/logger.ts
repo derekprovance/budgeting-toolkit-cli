@@ -1,15 +1,15 @@
-import { logLevel } from "./config";
+import { logLevel } from './config';
 
-import pino from "pino";
+import pino from 'pino';
 
 export const logger = pino({
     level: logLevel,
     formatters: {
-        level: (label) => {
+        level: label => {
             return { level: label };
         },
     },
     timestamp: false,
-    messageKey: "message",
+    messageKey: 'message',
     base: null,
 });

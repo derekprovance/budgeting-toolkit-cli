@@ -1,4 +1,4 @@
 export enum EditTransactionAttribute {
-    Category = "Category",
-    Budget = "Budget",
+    Category = 'Category',
+    Budget = 'Budget',
 }

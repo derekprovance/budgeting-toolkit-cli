@@ -1,6 +1,6 @@
-import * as fs from "fs";
-import * as path from "path";
-import * as yaml from "js-yaml";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as yaml from 'js-yaml';
 
 interface YamlConfig {
     validDestinationAccounts?: string[];
@@ -52,17 +52,14 @@ export function loadYamlConfig(): YamlConfig {
         return cachedConfig;
     }
 
-    const configPath = path.join(
-        process.cwd(),
-        "budgeting-toolkit.config.yaml",
-    );
+    const configPath = path.join(process.cwd(), 'budgeting-toolkit.config.yaml');
 
     try {
         if (!fs.existsSync(configPath)) {
             throw new Error(`Configuration file not found at ${configPath}`);
         }
 
-        const fileContents = fs.readFileSync(configPath, "utf8");
+        const fileContents = fs.readFileSync(configPath, 'utf8');
         const config = yaml.load(fileContents) as YamlConfig;
 
         cachedConfig = config || {};
@@ -78,7 +75,7 @@ export function loadYamlConfig(): YamlConfig {
 export function getConfigValue<T>(
     yamlKey: keyof YamlConfig,
     envKey?: string,
-    defaultValue?: T,
+    defaultValue?: T
 ): T | undefined {
     const yamlConfig = loadYamlConfig();
 
@@ -92,7 +89,7 @@ export function getConfigValue<T>(
         const envValue = process.env[envKey];
 
         // Try to parse as number if the YAML value would be a number
-        if (typeof defaultValue === "number" && envValue) {
+        if (typeof defaultValue === 'number' && envValue) {
             const parsed = parseFloat(envValue);
             if (!isNaN(parsed)) {
                 return parsed as T;

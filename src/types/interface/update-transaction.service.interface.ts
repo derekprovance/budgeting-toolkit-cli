@@ -1,5 +1,5 @@
-import { UpdateTransactionMode } from "../enum/update-transaction-mode.enum";
-import { UpdateTransactionStatusDto } from "../dto/update-transaction-status.dto";
+import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum';
+import { UpdateTransactionStatusDto } from '../dto/update-transaction-status.dto';
 
 export interface IUpdateTransactionService {
     /**
@@ -12,6 +12,6 @@ export interface IUpdateTransactionService {
     updateTransactionsByTag(
         tag: string,
         updateMode: UpdateTransactionMode,
-        dryRun?: boolean,
+        dryRun?: boolean
     ): Promise<UpdateTransactionStatusDto>;
 }

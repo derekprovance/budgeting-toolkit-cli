@@ -1,13 +1,13 @@
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { LLMTransactionCategoryService } from "./llm-transaction-category.service";
-import { LLMTransactionBudgetService } from "./llm-transaction-budget.service";
-import { logger } from "../../logger";
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { LLMTransactionCategoryService } from './llm-transaction-category.service';
+import { LLMTransactionBudgetService } from './llm-transaction-budget.service';
+import { logger } from '../../logger';
 
 interface ITransactionProcessor {
     processTransactions(
         transactions: TransactionSplit[],
         categories: string[],
-        budgets?: string[],
+        budgets?: string[]
     ): Promise<AIResponse>;
 }
 
@@ -30,13 +30,13 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
     constructor(
         private llmCategoryService: LLMTransactionCategoryService,
-        private llmBudgetService: LLMTransactionBudgetService,
+        private llmBudgetService: LLMTransactionBudgetService
     ) {}
 
     async processTransactions(
         transactions: TransactionSplit[],
         categories?: string[],
-        budgets?: string[],
+        budgets?: string[]
     ): Promise<AIResponse> {
         if (!transactions.length) {
             return {};
@@ -48,23 +48,21 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
                 categoryCount: categories?.length || 0,
                 budgetCount: budgets?.length || 0,
             },
-            "Starting transaction processing",
+            'Starting transaction processing'
         );
 
         // Create batches of similar transactions
         const categoryBatches = categories?.length
             ? this.createTransactionBatches(transactions)
             : [];
-        const budgetBatches = budgets?.length
-            ? this.createTransactionBatches(transactions)
-            : [];
+        const budgetBatches = budgets?.length ? this.createTransactionBatches(transactions) : [];
 
         logger.debug(
             {
                 categoryBatchCount: categoryBatches.length,
                 budgetBatchCount: budgetBatches.length,
             },
-            "Created transaction batches",
+            'Created transaction batches'
         );
 
         // Process categories first
@@ -72,7 +70,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
             ? await this.processCategoriesWithErrorHandling(
                   transactions,
                   categories,
-                  categoryBatches,
+                  categoryBatches
               )
             : [];
 
@@ -82,12 +80,12 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
                   transactions,
                   budgets,
                   assignedCategories,
-                  budgetBatches,
+                  budgetBatches
               )
             : [];
 
         const result = transactions.reduce((acc, t, index) => {
-            acc[t.transaction_journal_id || ""] = {
+            acc[t.transaction_journal_id || ''] = {
                 ...(assignedCategories[index] && {
                     category: assignedCategories[index],
                 }),
@@ -101,20 +99,16 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         logger.debug(
             {
                 processedCount: Object.keys(result).length,
-                categoryCount: Object.values(result).filter((r) => r.category)
-                    .length,
-                budgetCount: Object.values(result).filter((r) => r.budget)
-                    .length,
+                categoryCount: Object.values(result).filter(r => r.category).length,
+                budgetCount: Object.values(result).filter(r => r.budget).length,
             },
-            "Transaction processing complete",
+            'Transaction processing complete'
         );
 
         return result;
     }
 
-    private createTransactionBatches(
-        transactions: TransactionSplit[],
-    ): TransactionBatch[] {
+    private createTransactionBatches(transactions: TransactionSplit[]): TransactionBatch[] {
         const batches: TransactionBatch[] = [];
         const processedIndices = new Set<number>();
 
@@ -134,7 +128,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
                 const similarity = this.calculateTransactionSimilarity(
                     transactions[i],
-                    transactions[j],
+                    transactions[j]
                 );
 
                 if (similarity >= this.SIMILARITY_THRESHOLD) {
@@ -150,28 +144,21 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         return batches;
     }
 
-    private calculateTransactionSimilarity(
-        tx1: TransactionSplit,
-        tx2: TransactionSplit,
-    ): number {
+    private calculateTransactionSimilarity(tx1: TransactionSplit, tx2: TransactionSplit): number {
         if (!tx1.description || !tx2.description) return 0.0;
 
         const desc1 = tx1.description.toLowerCase();
         const desc2 = tx2.description.toLowerCase();
 
         // Check for payment platforms
-        const paymentPlatforms = ["venmo", "paypal", "cash app", "zelle"];
-        const isPlatform1 = paymentPlatforms.some((p) => desc1.includes(p));
-        const isPlatform2 = paymentPlatforms.some((p) => desc2.includes(p));
+        const paymentPlatforms = ['venmo', 'paypal', 'cash app', 'zelle'];
+        const isPlatform1 = paymentPlatforms.some(p => desc1.includes(p));
+        const isPlatform2 = paymentPlatforms.some(p => desc2.includes(p));
 
         // If both are payment platform transactions
         if (isPlatform1 && isPlatform2) {
             // If they're from the same platform
-            if (
-                paymentPlatforms.some(
-                    (p) => desc1.includes(p) && desc2.includes(p),
-                )
-            ) {
+            if (paymentPlatforms.some(p => desc1.includes(p) && desc2.includes(p))) {
                 // Extract recipient names
                 const recipient1 = desc1
                     .split(/(?:to|from)\s+/)[1]
@@ -191,9 +178,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
                 const amount1 = Math.abs(parseFloat(tx1.amount));
                 const amount2 = Math.abs(parseFloat(tx2.amount));
                 if (!isNaN(amount1) && !isNaN(amount2)) {
-                    const amountDiff =
-                        Math.abs(amount1 - amount2) /
-                        Math.max(amount1, amount2);
+                    const amountDiff = Math.abs(amount1 - amount2) / Math.max(amount1, amount2);
                     if (amountDiff <= 0.2) return 0.6;
                 }
             }
@@ -208,8 +193,8 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         }
 
         // For non-platform transactions, use original logic
-        const merchant1 = desc1.split(" ")[0];
-        const merchant2 = desc2.split(" ")[0];
+        const merchant1 = desc1.split(' ')[0];
+        const merchant2 = desc2.split(' ')[0];
 
         // Check if same merchant
         if (merchant1 === merchant2) return 1.0;
@@ -219,8 +204,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         const amount2 = Math.abs(parseFloat(tx2.amount));
         if (isNaN(amount1) || isNaN(amount2)) return 0.0;
 
-        const amountDiff =
-            Math.abs(amount1 - amount2) / Math.max(amount1, amount2);
+        const amountDiff = Math.abs(amount1 - amount2) / Math.max(amount1, amount2);
         if (amountDiff <= 0.2) return 0.8;
 
         return 0.0;
@@ -229,7 +213,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
     private async processCategoriesWithErrorHandling(
         transactions: TransactionSplit[],
         categories: string[],
-        batches: TransactionBatch[],
+        batches: TransactionBatch[]
     ): Promise<string[]> {
         try {
             logger.debug(
@@ -239,39 +223,38 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
                     categoryCount: categories.length,
                     batchCount: batches.length,
                 },
-                "Starting category processing with error handling",
+                'Starting category processing with error handling'
             );
 
-            const results = new Array(transactions.length).fill("");
+            const results = new Array(transactions.length).fill('');
 
             for (const batch of batches) {
                 logger.debug(
                     {
                         batchSize: batch.transactions.length,
                         batchIndices: batch.indices,
-                        batchTransactions: batch.transactions.map((t) => ({
+                        batchTransactions: batch.transactions.map(t => ({
                             id: t.transaction_journal_id,
                             description: t.description,
                             amount: t.amount,
                             date: t.date,
                         })),
                     },
-                    "Processing category batch",
+                    'Processing category batch'
                 );
 
                 // Pass all available categories to each batch
-                const batchResults =
-                    await this.llmCategoryService.categorizeTransactions(
-                        batch.transactions,
-                        categories,
-                    );
+                const batchResults = await this.llmCategoryService.categorizeTransactions(
+                    batch.transactions,
+                    categories
+                );
 
                 logger.debug(
                     {
                         batchResults,
                         batchIndices: batch.indices,
                     },
-                    "Received batch results",
+                    'Received batch results'
                 );
 
                 // Map batch results back to original indices
@@ -282,31 +265,27 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
             logger.debug(
                 {
-                    totalProcessed: results.filter((r) => r).length,
+                    totalProcessed: results.filter(r => r).length,
                     totalTransactions: transactions.length,
                     results,
                 },
-                "Category processing complete",
+                'Category processing complete'
             );
 
             return results;
         } catch (error) {
             logger.error(
                 {
-                    error:
-                        error instanceof Error ? error.message : String(error),
-                    type:
-                        error instanceof Error
-                            ? error.constructor.name
-                            : typeof error,
+                    error: error instanceof Error ? error.message : String(error),
+                    type: error instanceof Error ? error.constructor.name : typeof error,
                     stack: error instanceof Error ? error.stack : undefined,
                     categories,
                     transactionCount: transactions.length,
                     categoryCount: categories.length,
                 },
-                "Unable to assign categories",
+                'Unable to assign categories'
             );
-            return new Array(transactions.length).fill("");
+            return new Array(transactions.length).fill('');
         }
     }
 
@@ -314,10 +293,10 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         transactions: TransactionSplit[],
         budgets: string[],
         assignedCategories: string[],
-        batches?: TransactionBatch[],
+        batches?: TransactionBatch[]
     ): Promise<string[]> {
         try {
-            const results = new Array(transactions.length).fill("");
+            const results = new Array(transactions.length).fill('');
 
             for (const batch of batches || []) {
                 logger.debug(
@@ -325,12 +304,12 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
                         batchSize: batch.transactions.length,
                         batchIndices: batch.indices,
                     },
-                    "Processing budget batch",
+                    'Processing budget batch'
                 );
 
                 const budgetResults = await this.llmBudgetService.assignBudgets(
                     batch.transactions,
-                    budgets,
+                    budgets
                 );
 
                 // Map batch results back to original indices
@@ -344,9 +323,9 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
             logger.error({
                 error,
                 transactionCount: transactions.length,
-                message: "Error processing budgets",
+                message: 'Error processing budgets',
             });
-            return new Array(transactions.length).fill("");
+            return new Array(transactions.length).fill('');
         }
     }
 }

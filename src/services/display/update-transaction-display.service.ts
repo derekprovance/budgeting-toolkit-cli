@@ -1,6 +1,5 @@
-import chalk from "chalk";
-import { UpdateTransactionStatusDto } from "../../types/dto/update-transaction-status.dto";
-import { UpdateTransactionMode } from "../../types/enum/update-transaction-mode.enum";
+import chalk from 'chalk';
+import { UpdateTransactionMode } from '../../types/enum/update-transaction-mode.enum';
 
 export class UpdateTransactionDisplayService {
     /**
@@ -9,39 +8,34 @@ export class UpdateTransactionDisplayService {
     formatProcessingHeader(
         tag: string,
         updateMode: UpdateTransactionMode,
-        dryRun?: boolean,
+        dryRun?: boolean
     ): string {
         const modeText =
             updateMode === UpdateTransactionMode.Both
-                ? "categories and budgets"
+                ? 'categories and budgets'
                 : updateMode === UpdateTransactionMode.Category
-                  ? "categories"
-                  : "budgets";
+                  ? 'categories'
+                  : 'budgets';
 
-        const dryRunText = dryRun ? " (Dry Run)" : "";
+        const dryRunText = dryRun ? ' (Dry Run)' : '';
 
         return [
-            chalk.cyan(
-                `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`,
-            ),
-        ].join("\n");
+            chalk.cyan(`Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`),
+        ].join('\n');
     }
 
     /**
      * Formats the tag not found message
      */
     formatTagNotFound(tag: string): string {
-        return ["\n", chalk.yellow(`❌ Tag "${tag}" not found`)].join("\n");
+        return ['\n', chalk.yellow(`❌ Tag "${tag}" not found`)].join('\n');
     }
 
     /**
      * Formats the empty tag message
      */
     formatEmptyTag(tag: string): string {
-        return [
-            "\n",
-            chalk.yellow(`No transactions found with tag "${tag}"`),
-        ].join("\n");
+        return ['\n', chalk.yellow(`No transactions found with tag "${tag}"`)].join('\n');
     }
 
     /**
@@ -49,12 +43,9 @@ export class UpdateTransactionDisplayService {
      */
     formatError(error: unknown): string {
         return [
-            "\n",
-            chalk.red("❌ Error processing transactions:"),
-            chalk.red(
-                "   " +
-                    (error instanceof Error ? error.message : String(error)),
-            ),
-        ].join("\n");
+            '\n',
+            chalk.red('❌ Error processing transactions:'),
+            chalk.red('   ' + (error instanceof Error ? error.message : String(error))),
+        ].join('\n');
     }
 }

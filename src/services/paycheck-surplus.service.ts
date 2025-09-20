@@ -1,9 +1,9 @@
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { TransactionService } from "./core/transaction.service";
-import { TransactionPropertyService } from "./core/transaction-property.service";
-import { logger } from "../logger";
-import { DateUtils } from "../utils/date.utils";
-import { expectedMonthlyPaycheck } from "../config";
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionService } from './core/transaction.service';
+import { TransactionPropertyService } from './core/transaction-property.service';
+import { logger } from '../logger';
+import { DateUtils } from '../utils/date.utils';
+import { expectedMonthlyPaycheck } from '../config';
 
 /**
  * Service for calculating paycheck surplus (difference between actual and expected paychecks).
@@ -11,7 +11,7 @@ import { expectedMonthlyPaycheck } from "../config";
 export class PaycheckSurplusService {
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly transactionPropertyService: TransactionPropertyService,
+        private readonly transactionPropertyService: TransactionPropertyService
     ) {}
 
     /**
@@ -22,15 +22,11 @@ export class PaycheckSurplusService {
      * @returns The difference between actual and expected paycheck amounts
      * @throws Error if month/year is invalid or if paycheck amounts cannot be calculated
      */
-    async calculatePaycheckSurplus(
-        month: number,
-        year: number,
-    ): Promise<number> {
+    async calculatePaycheckSurplus(month: number, year: number): Promise<number> {
         try {
             const paycheckCandidates = await this.findPaychecks(month, year);
             const expectedPaycheckAmount = this.getExpectedPaycheckAmount();
-            const totalPaycheckAmount =
-                this.calculateTotalPaycheckAmount(paycheckCandidates);
+            const totalPaycheckAmount = this.calculateTotalPaycheckAmount(paycheckCandidates);
 
             const surplus = totalPaycheckAmount - expectedPaycheckAmount;
 
@@ -43,7 +39,7 @@ export class PaycheckSurplusService {
                     surplus,
                     paycheckCount: paycheckCandidates.length,
                 },
-                "Calculated paycheck surplus",
+                'Calculated paycheck surplus'
             );
 
             return surplus;
@@ -52,37 +48,28 @@ export class PaycheckSurplusService {
                 {
                     month,
                     year,
-                    error:
-                        error instanceof Error
-                            ? error.message
-                            : "Unknown error",
-                    type:
-                        error instanceof Error
-                            ? error.constructor.name
-                            : typeof error,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    type: error instanceof Error ? error.constructor.name : typeof error,
                 },
-                "Failed to calculate paycheck surplus",
+                'Failed to calculate paycheck surplus'
             );
             throw error;
         }
     }
 
     private getExpectedPaycheckAmount(): number {
-        if (
-            expectedMonthlyPaycheck === undefined ||
-            expectedMonthlyPaycheck === null
-        ) {
+        if (expectedMonthlyPaycheck === undefined || expectedMonthlyPaycheck === null) {
             logger.warn(
                 {
                     expectedMonthlyPaycheck,
                 },
-                "Expected monthly paycheck amount not configured",
+                'Expected monthly paycheck amount not configured'
             );
             return 0;
         }
 
         const amount =
-            typeof expectedMonthlyPaycheck === "number"
+            typeof expectedMonthlyPaycheck === 'number'
                 ? expectedMonthlyPaycheck
                 : parseFloat(expectedMonthlyPaycheck);
 
@@ -91,7 +78,7 @@ export class PaycheckSurplusService {
                 {
                     expectedMonthlyPaycheck,
                 },
-                "Invalid expected monthly paycheck amount",
+                'Invalid expected monthly paycheck amount'
             );
             return 0;
         }
@@ -99,34 +86,25 @@ export class PaycheckSurplusService {
         return amount;
     }
 
-    private calculateTotalPaycheckAmount(
-        paychecks: TransactionSplit[],
-    ): number {
+    private calculateTotalPaycheckAmount(paychecks: TransactionSplit[]): number {
         return paychecks.reduce((sum, paycheck) => {
             const amount = parseFloat(paycheck.amount);
             if (isNaN(amount)) {
-                logger.warn({ paycheck }, "Invalid paycheck amount found");
+                logger.warn({ paycheck }, 'Invalid paycheck amount found');
                 return sum;
             }
             return sum + amount;
         }, 0);
     }
 
-    private async findPaychecks(
-        month: number,
-        year: number,
-    ): Promise<TransactionSplit[]> {
+    private async findPaychecks(month: number, year: number): Promise<TransactionSplit[]> {
         try {
             DateUtils.validateMonthYear(month, year);
-            const transactions =
-                await this.transactionService.getTransactionsForMonth(
-                    month,
-                    year,
-                );
+            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
             const paycheckCandidates = transactions
-                .filter((t) => this.transactionPropertyService.isDeposit(t))
-                .filter((t) => this.isPaycheck(t))
+                .filter(t => this.transactionPropertyService.isDeposit(t))
+                .filter(t => this.isPaycheck(t))
                 .sort((a, b) => {
                     const amountA = parseFloat(a.amount);
                     const amountB = parseFloat(b.amount);
@@ -140,7 +118,7 @@ export class PaycheckSurplusService {
                     totalTransactions: transactions.length,
                     paycheckCandidates: paycheckCandidates.length,
                 },
-                "Found paycheck candidates",
+                'Found paycheck candidates'
             );
 
             return paycheckCandidates;
@@ -149,21 +127,13 @@ export class PaycheckSurplusService {
                 {
                     month,
                     year,
-                    error:
-                        error instanceof Error
-                            ? error.message
-                            : "Unknown error",
-                    type:
-                        error instanceof Error
-                            ? error.constructor.name
-                            : typeof error,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    type: error instanceof Error ? error.constructor.name : typeof error,
                 },
-                "Failed to find paychecks",
+                'Failed to find paychecks'
             );
             if (error instanceof Error) {
-                throw new Error(
-                    `Failed to find paychecks for month ${month}: ${error.message}`,
-                );
+                throw new Error(`Failed to find paychecks for month ${month}: ${error.message}`);
             }
             throw new Error(`Failed to find paychecks for month ${month}`);
         }
@@ -171,11 +141,11 @@ export class PaycheckSurplusService {
 
     private isPaycheck(transaction: TransactionSplit): boolean {
         const hasPayrollDescription =
-            transaction.description?.toLowerCase().includes("payroll") || false;
+            transaction.description?.toLowerCase().includes('payroll') || false;
 
         const hasPaycheckCategory =
-            transaction.category_name === "Paycheck" &&
-            transaction.source_type === "Revenue account";
+            transaction.category_name === 'Paycheck' &&
+            transaction.source_type === 'Revenue account';
 
         return hasPayrollDescription || hasPaycheckCategory;
     }

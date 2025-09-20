@@ -1,4 +1,4 @@
-import { DateRangeDto } from "../dto/date-range.dto";
+import { DateRangeDto } from '../dto/date-range.dto';
 
 export interface IDateRangeService {
     getDateRange(month: number, year: number): DateRangeDto;

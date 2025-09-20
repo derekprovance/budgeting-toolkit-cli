@@ -92,16 +92,16 @@ Create a `budgeting-toolkit.config.yaml` file for advanced configuration options
 # Budget Configuration
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
-    - "Checking Account"
-    - "Savings Account"
+    - 'Checking Account'
+    - 'Savings Account'
 validExpenseAccounts:
-    - "Credit Card"
+    - 'Credit Card'
 excludedDescriptions:
-    - "PAYROLL"
-    - "ATM FEE"
+    - 'PAYROLL'
+    - 'ATM FEE'
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
-moneyMarketAccount: "Money Market"
+moneyMarketAccount: 'Money Market'
 monthlyBudget: 4500.00
 additionalSavingsPercentage: 10
 
@@ -111,7 +111,7 @@ llm:
     batchSize: 10
     maxConcurrent: 3
     temperature: 0.2
-    model: "claude-3-5-haiku-latest"
+    model: 'claude-3-5-haiku-latest'
     retryDelayMs: 1000
     maxRetryDelayMs: 32000
 

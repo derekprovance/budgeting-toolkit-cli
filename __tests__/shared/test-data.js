@@ -1,19 +1,19 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.mockBudgets =
     exports.mockCategories =
     exports.mockTransactions =
     exports.createMockTransaction =
         void 0;
 const createMockTransaction = (overrides = {}) => ({
-    transaction_journal_id: "1",
-    description: "Walmart Supercenter",
-    amount: "150.00",
-    type: "withdrawal",
+    transaction_journal_id: '1',
+    description: 'Walmart Supercenter',
+    amount: '150.00',
+    type: 'withdrawal',
     date: new Date().toISOString(),
-    source_id: "source1",
-    destination_id: "dest1",
-    currency_code: "USD",
+    source_id: 'source1',
+    destination_id: 'dest1',
+    currency_code: 'USD',
     foreign_amount: null,
     foreign_currency_code: null,
     budget_id: null,
@@ -49,30 +49,30 @@ const createMockTransaction = (overrides = {}) => ({
 exports.createMockTransaction = createMockTransaction;
 exports.mockTransactions = {
     walmart: (0, exports.createMockTransaction)({
-        transaction_journal_id: "1",
-        description: "Walmart Supercenter",
-        amount: "150.00",
+        transaction_journal_id: '1',
+        description: 'Walmart Supercenter',
+        amount: '150.00',
     }),
     pharmacy: (0, exports.createMockTransaction)({
-        transaction_journal_id: "2",
-        description: "Walmart Pharmacy",
-        amount: "25.00",
+        transaction_journal_id: '2',
+        description: 'Walmart Pharmacy',
+        amount: '25.00',
     }),
     amazon: (0, exports.createMockTransaction)({
-        transaction_journal_id: "3",
-        description: "Amazon Fresh",
-        amount: "75.00",
+        transaction_journal_id: '3',
+        description: 'Amazon Fresh',
+        amount: '75.00',
     }),
 };
 exports.mockCategories = {
-    groceries: "Groceries",
-    healthcare: "Healthcare",
-    shopping: "Shopping",
-    other: "Other",
+    groceries: 'Groceries',
+    healthcare: 'Healthcare',
+    shopping: 'Shopping',
+    other: 'Other',
 };
 exports.mockBudgets = {
-    food: "Food",
-    medical: "Medical",
-    shopping: "Shopping",
-    other: "Other",
+    food: 'Food',
+    medical: 'Medical',
+    shopping: 'Shopping',
+    other: 'Other',
 };

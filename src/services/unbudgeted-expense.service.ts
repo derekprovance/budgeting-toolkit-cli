@@ -1,10 +1,10 @@
-import { TransactionService } from "./core/transaction.service";
-import { Account } from "../config";
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { TransactionPropertyService } from "./core/transaction-property.service";
-import { logger } from "../logger";
-import { DateUtils } from "../utils/date.utils";
-import { getConfigValue } from "../utils/config-loader";
+import { TransactionService } from './core/transaction.service';
+import { Account } from '../config';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionPropertyService } from './core/transaction-property.service';
+import { logger } from '../logger';
+import { DateUtils } from '../utils/date.utils';
+import { getConfigValue } from '../utils/config-loader';
 
 /**
  * Service for calculating unbudgeted expenses.
@@ -32,11 +32,10 @@ export class UnbudgetedExpenseService {
 
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly transactionPropertyService: TransactionPropertyService,
+        private readonly transactionPropertyService: TransactionPropertyService
     ) {
         // Load valid expense accounts from YAML config with fallback to defaults
-        this.validExpenseAccounts =
-            getConfigValue<string[]>("validExpenseAccounts") ?? [];
+        this.validExpenseAccounts = getConfigValue<string[]>('validExpenseAccounts') ?? [];
     }
 
     /**
@@ -48,17 +47,10 @@ export class UnbudgetedExpenseService {
      *    - Regular expenses must meet all criteria
      *    - Transfers must meet special criteria
      */
-    async calculateUnbudgetedExpenses(
-        month: number,
-        year: number,
-    ): Promise<TransactionSplit[]> {
+    async calculateUnbudgetedExpenses(month: number, year: number): Promise<TransactionSplit[]> {
         try {
             DateUtils.validateMonthYear(month, year);
-            const transactions =
-                await this.transactionService.getTransactionsForMonth(
-                    month,
-                    year,
-                );
+            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
             const expenses = await this.filterExpenses(transactions);
 
             logger.debug(
@@ -68,7 +60,7 @@ export class UnbudgetedExpenseService {
                     totalTransactions: transactions.length,
                     unbudgetedExpenses: expenses.length,
                 },
-                "Calculated unbudgeted expenses",
+                'Calculated unbudgeted expenses'
             );
 
             return expenses;
@@ -77,21 +69,16 @@ export class UnbudgetedExpenseService {
                 {
                     month,
                     year,
-                    error:
-                        error instanceof Error
-                            ? error.message
-                            : "Unknown error",
+                    error: error instanceof Error ? error.message : 'Unknown error',
                 },
-                "Failed to calculate unbudgeted expenses",
+                'Failed to calculate unbudgeted expenses'
             );
             if (error instanceof Error) {
                 throw new Error(
-                    `Failed to calculate unbudgeted expenses for month ${month}: ${error.message}`,
+                    `Failed to calculate unbudgeted expenses for month ${month}: ${error.message}`
                 );
             }
-            throw new Error(
-                `Failed to calculate unbudgeted expenses for month ${month}`,
-            );
+            throw new Error(`Failed to calculate unbudgeted expenses for month ${month}`);
         }
     }
 
@@ -105,18 +92,15 @@ export class UnbudgetedExpenseService {
      */
     private async filterExpenses(transactions: TransactionSplit[]) {
         const results = await Promise.all(
-            transactions.map(async (transaction) => {
-                const isTransfer =
-                    this.transactionPropertyService.isTransfer(transaction);
-                const shouldCountExpense =
-                    await this.shouldCountExpense(transaction);
+            transactions.map(async transaction => {
+                const isTransfer = this.transactionPropertyService.isTransfer(transaction);
+                const shouldCountExpense = await this.shouldCountExpense(transaction);
 
                 return (
                     (!isTransfer && shouldCountExpense) ||
-                    (shouldCountExpense &&
-                        this.shouldCountTransfer(transaction))
+                    (shouldCountExpense && this.shouldCountTransfer(transaction))
                 );
-            }),
+            })
         );
 
         return transactions.filter((_, index) => results[index]);
@@ -135,9 +119,7 @@ export class UnbudgetedExpenseService {
 
         return (
             transaction.source_id === Account.PRIMARY &&
-            [Account.MONEY_MARKET].includes(
-                transaction.destination_id as Account,
-            )
+            [Account.MONEY_MARKET].includes(transaction.destination_id as Account)
         );
     }
 
@@ -147,9 +129,7 @@ export class UnbudgetedExpenseService {
      * 1. If it's a bill, always count it
      * 2. Otherwise, check regular expense criteria
      */
-    private async shouldCountExpense(
-        transaction: TransactionSplit,
-    ): Promise<boolean> {
+    private async shouldCountExpense(transaction: TransactionSplit): Promise<boolean> {
         if (this.transactionPropertyService.isBill(transaction)) {
             return true;
         }
@@ -164,21 +144,16 @@ export class UnbudgetedExpenseService {
      * 3. Must not be in excluded transactions list
      * 4. Must be from a valid expense account
      */
-    private async isRegularExpenseTransaction(
-        transaction: TransactionSplit,
-    ): Promise<boolean> {
-        const isExcludedTransaction =
-            await this.transactionPropertyService.isExcludedTransaction(
-                transaction.description,
-                transaction.amount,
-            );
+    private async isRegularExpenseTransaction(transaction: TransactionSplit): Promise<boolean> {
+        const isExcludedTransaction = await this.transactionPropertyService.isExcludedTransaction(
+            transaction.description,
+            transaction.amount
+        );
 
         const conditions = {
             hasNoBudget: !transaction.budget_id,
             isNotDisposableSupplemented:
-                !this.transactionPropertyService.isSupplementedByDisposable(
-                    transaction.tags,
-                ),
+                !this.transactionPropertyService.isSupplementedByDisposable(transaction.tags),
             isNotExcludedTransaction: !isExcludedTransaction,
             isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
         };
@@ -189,7 +164,7 @@ export class UnbudgetedExpenseService {
                 description: transaction.description,
                 conditions,
             },
-            "Evaluating regular expense transaction",
+            'Evaluating regular expense transaction'
         );
 
         return (

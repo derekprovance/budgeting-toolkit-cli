@@ -1,18 +1,15 @@
-import {
-    TransactionSplit,
-    FireflyApiClient,
-} from "@derekprovance/firefly-iii-sdk";
-import { AdditionalIncomeService } from "../../src/services/additional-income.service";
-import { TransactionService } from "../../src/services/core/transaction.service";
-import { TransactionPropertyService } from "../../src/services/core/transaction-property.service";
-import { Account } from "../../src/config";
-import { ExcludedTransactionService } from "../../src/services/excluded-transaction.service";
+import { TransactionSplit, FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { AdditionalIncomeService } from '../../src/services/additional-income.service';
+import { TransactionService } from '../../src/services/core/transaction.service';
+import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { Account } from '../../src/config';
+import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
 
 // Mock dependencies
-jest.mock("../../src/services/core/transaction.service");
-jest.mock("../../src/services/core/transaction-property.service");
-jest.mock("../../src/services/excluded-transaction.service");
-jest.mock("../../src/logger", () => ({
+jest.mock('../../src/services/core/transaction.service');
+jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/excluded-transaction.service');
+jest.mock('../../src/logger', () => ({
     logger: {
         debug: jest.fn(),
         info: jest.fn(),
@@ -22,7 +19,7 @@ jest.mock("../../src/logger", () => ({
     },
 }));
 
-describe("AdditionalIncomeService", () => {
+describe('AdditionalIncomeService', () => {
     let service: AdditionalIncomeService;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
@@ -34,235 +31,200 @@ describe("AdditionalIncomeService", () => {
         mockExcludedTransactionService =
             new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
         mockTransactionService = new TransactionService(
-            mockApiClient,
+            mockApiClient
         ) as jest.Mocked<TransactionService>;
         mockTransactionPropertyService = new TransactionPropertyService(
-            mockExcludedTransactionService,
+            mockExcludedTransactionService
         ) as jest.Mocked<TransactionPropertyService>;
         service = new AdditionalIncomeService(
             mockTransactionService,
-            mockTransactionPropertyService,
+            mockTransactionPropertyService
         );
     });
 
-    describe("configuration", () => {
-        it("should throw error for empty valid destination accounts", () => {
+    describe('configuration', () => {
+        it('should throw error for empty valid destination accounts', () => {
             expect(
                 () =>
                     new AdditionalIncomeService(
                         mockTransactionService,
                         mockTransactionPropertyService,
-                        { validDestinationAccounts: [] },
-                    ),
-            ).toThrow(
-                "At least one valid destination account must be specified",
-            );
+                        { validDestinationAccounts: [] }
+                    )
+            ).toThrow('At least one valid destination account must be specified');
         });
 
-        it("should throw error for negative minimum transaction amount", () => {
+        it('should throw error for negative minimum transaction amount', () => {
             expect(
                 () =>
                     new AdditionalIncomeService(
                         mockTransactionService,
                         mockTransactionPropertyService,
-                        { minTransactionAmount: -1 },
-                    ),
-            ).toThrow("Minimum transaction amount cannot be negative");
+                        { minTransactionAmount: -1 }
+                    )
+            ).toThrow('Minimum transaction amount cannot be negative');
         });
 
-        it("should accept custom configuration", async () => {
+        it('should accept custom configuration', async () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
                 mockTransactionPropertyService,
                 {
                     validDestinationAccounts: [Account.PRIMARY],
-                    excludedDescriptions: ["PAYROLL"],
+                    excludedDescriptions: ['PAYROLL'],
                     minTransactionAmount: 100,
                     excludeDisposableIncome: false,
-                },
+                }
             );
 
             const mockTransactions = [
                 createMockTransaction({
-                    description: "PAYROLL",
-                    amount: "50.00",
+                    description: 'PAYROLL',
+                    amount: '50.00',
                 }),
                 createMockTransaction({
-                    description: "Valid Income",
-                    amount: "150.00",
+                    description: 'Valid Income',
+                    amount: '150.00',
                 }),
             ];
 
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                mockTransactions,
-            );
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-            mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                true,
-            );
+            mockTransactionPropertyService.isDisposableIncome.mockReturnValue(true);
 
-            const result = await customService.calculateAdditionalIncome(
-                4,
-                2024,
-            );
+            const result = await customService.calculateAdditionalIncome(4, 2024);
 
             expect(result).toHaveLength(1);
-            expect(result[0].description).toBe("Valid Income");
+            expect(result[0].description).toBe('Valid Income');
         });
     });
 
-    describe("input validation", () => {
-        it("should throw error for invalid month", async () => {
-            await expect(
-                service.calculateAdditionalIncome(13, 2024),
-            ).rejects.toThrow("Month must be an integer between 1 and 12");
+    describe('input validation', () => {
+        it('should throw error for invalid month', async () => {
+            await expect(service.calculateAdditionalIncome(13, 2024)).rejects.toThrow(
+                'Month must be an integer between 1 and 12'
+            );
         });
 
-        it("should throw error for invalid year", async () => {
-            await expect(
-                service.calculateAdditionalIncome(1, 1899),
-            ).rejects.toThrow("Year must be a valid 4-digit year");
+        it('should throw error for invalid year', async () => {
+            await expect(service.calculateAdditionalIncome(1, 1899)).rejects.toThrow(
+                'Year must be a valid 4-digit year'
+            );
         });
 
-        it("should throw error for non-integer month", async () => {
-            await expect(
-                service.calculateAdditionalIncome(1.5, 2024),
-            ).rejects.toThrow("Month must be an integer between 1 and 12");
+        it('should throw error for non-integer month', async () => {
+            await expect(service.calculateAdditionalIncome(1.5, 2024)).rejects.toThrow(
+                'Month must be an integer between 1 and 12'
+            );
         });
     });
 
-    describe("calculateAdditionalIncome", () => {
-        it("should handle empty transaction list", async () => {
+    describe('calculateAdditionalIncome', () => {
+        it('should handle empty transaction list', async () => {
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+            const result = await service.calculateAdditionalIncome(4, 2024);
+            expect(result).toEqual([]);
+        });
+
+        it('should handle null transaction list', async () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                [],
+                [] as TransactionSplit[]
             );
             const result = await service.calculateAdditionalIncome(4, 2024);
             expect(result).toEqual([]);
         });
 
-        it("should handle null transaction list", async () => {
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                [] as TransactionSplit[],
-            );
-            const result = await service.calculateAdditionalIncome(4, 2024);
-            expect(result).toEqual([]);
-        });
-
-        describe("transaction filtering", () => {
-            it("should filter by minimum amount when configured", async () => {
+        describe('transaction filtering', () => {
+            it('should filter by minimum amount when configured', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionPropertyService,
-                    { minTransactionAmount: 100 },
+                    { minTransactionAmount: 100 }
                 );
 
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Small Amount",
-                        amount: "50.00",
+                        description: 'Small Amount',
+                        amount: '50.00',
                     }),
                     createMockTransaction({
-                        description: "Large Amount",
-                        amount: "150.00",
+                        description: 'Large Amount',
+                        amount: '150.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
-                const result =
-                    await serviceWithMinAmount.calculateAdditionalIncome(
-                        4,
-                        2024,
-                    );
+                const result = await serviceWithMinAmount.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(1);
-                expect(result[0].description).toBe("Large Amount");
+                expect(result[0].description).toBe('Large Amount');
             });
 
-            it("should handle invalid amount formats", async () => {
+            it('should handle invalid amount formats', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionPropertyService,
-                    { minTransactionAmount: 100 },
+                    { minTransactionAmount: 100 }
                 );
 
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Invalid Amount",
-                        amount: "invalid",
+                        description: 'Invalid Amount',
+                        amount: 'invalid',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
-                const result =
-                    await serviceWithMinAmount.calculateAdditionalIncome(
-                        4,
-                        2024,
-                    );
+                const result = await serviceWithMinAmount.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(0);
             });
         });
 
-        describe("payroll filtering", () => {
-            it("should exclude payroll transactions", async () => {
+        describe('payroll filtering', () => {
+            it('should exclude payroll transactions', async () => {
                 const mockTransactions: TransactionSplit[] = [
                     createMockTransaction({
-                        description: "PAYROLL",
-                        amount: "1000.00",
+                        description: 'PAYROLL',
+                        amount: '1000.00',
                     }),
                     createMockTransaction({
-                        description: "Freelance Work",
-                        amount: "500.00",
+                        description: 'Freelance Work',
+                        amount: '500.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(1);
-                expect(result[0].description).toBe("Freelance Work");
+                expect(result[0].description).toBe('Freelance Work');
             });
 
-            it("should handle transactions with no description", async () => {
+            it('should handle transactions with no description', async () => {
                 const mockTransactions: TransactionSplit[] = [
                     createMockTransaction({
-                        description: "",
-                        amount: "1000.00",
+                        description: '',
+                        amount: '1000.00',
                     }),
                     createMockTransaction({
                         description: undefined,
-                        amount: "500.00",
+                        amount: '500.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -270,107 +232,87 @@ describe("AdditionalIncomeService", () => {
             });
         });
 
-        describe("error handling", () => {
-            it("should handle errors gracefully with proper context", async () => {
-                const originalError = new Error("API Error");
-                mockTransactionService.getTransactionsForMonth.mockRejectedValue(
-                    originalError,
-                );
+        describe('error handling', () => {
+            it('should handle errors gracefully with proper context', async () => {
+                const originalError = new Error('API Error');
+                mockTransactionService.getTransactionsForMonth.mockRejectedValue(originalError);
 
-                await expect(
-                    service.calculateAdditionalIncome(4, 2024),
-                ).rejects.toThrow(
-                    "Failed to calculate additional income for month 4: API Error",
+                await expect(service.calculateAdditionalIncome(4, 2024)).rejects.toThrow(
+                    'Failed to calculate additional income for month 4: API Error'
                 );
             });
 
-            it("should handle unknown errors gracefully", async () => {
-                mockTransactionService.getTransactionsForMonth.mockRejectedValue(
-                    "Unknown error",
-                );
+            it('should handle unknown errors gracefully', async () => {
+                mockTransactionService.getTransactionsForMonth.mockRejectedValue('Unknown error');
 
-                await expect(
-                    service.calculateAdditionalIncome(4, 2024),
-                ).rejects.toThrow(
-                    "Failed to calculate additional income for month 4",
+                await expect(service.calculateAdditionalIncome(4, 2024)).rejects.toThrow(
+                    'Failed to calculate additional income for month 4'
                 );
             });
         });
 
-        describe("description matching", () => {
-            it("should handle case-insensitive description matching", async () => {
+        describe('description matching', () => {
+            it('should handle case-insensitive description matching', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "payroll",
-                        amount: "1000.00",
+                        description: 'payroll',
+                        amount: '1000.00',
                     }),
                     createMockTransaction({
-                        description: "PAYROLL",
-                        amount: "1000.00",
+                        description: 'PAYROLL',
+                        amount: '1000.00',
                     }),
                     createMockTransaction({
-                        description: "Payroll",
-                        amount: "1000.00",
+                        description: 'Payroll',
+                        amount: '1000.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(0);
             });
 
-            it("should handle partial description matches", async () => {
+            it('should handle partial description matches', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Monthly Payroll Bonus",
-                        amount: "1000.00",
+                        description: 'Monthly Payroll Bonus',
+                        amount: '1000.00',
                     }),
                     createMockTransaction({
-                        description: "Payroll Advance",
-                        amount: "1000.00",
+                        description: 'Payroll Advance',
+                        amount: '1000.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(0);
             });
 
-            it("should handle special characters in descriptions", async () => {
+            it('should handle special characters in descriptions', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Payroll!@#$%^&*()",
-                        amount: "1000.00",
+                        description: 'Payroll!@#$%^&*()',
+                        amount: '1000.00',
                     }),
                     createMockTransaction({
-                        description: "PAYROLL-123",
-                        amount: "1000.00",
+                        description: 'PAYROLL-123',
+                        amount: '1000.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -378,96 +320,80 @@ describe("AdditionalIncomeService", () => {
             });
         });
 
-        describe("amount validation", () => {
-            it("should handle zero amounts", async () => {
+        describe('amount validation', () => {
+            it('should handle zero amounts', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Zero Amount",
-                        amount: "0.00",
+                        description: 'Zero Amount',
+                        amount: '0.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(0);
             });
 
-            it("should handle negative amounts", async () => {
+            it('should handle negative amounts', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Negative Amount",
-                        amount: "-100.00",
+                        description: 'Negative Amount',
+                        amount: '-100.00',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(0);
             });
 
-            it("should handle very large amounts", async () => {
+            it('should handle very large amounts', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Large Amount",
-                        amount: "999999999.99",
+                        description: 'Large Amount',
+                        amount: '999999999.99',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(1);
-                expect(result[0].description).toBe("Large Amount");
+                expect(result[0].description).toBe('Large Amount');
             });
 
-            it("should handle decimal precision", async () => {
+            it('should handle decimal precision', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Precise Amount",
-                        amount: "100.123456789",
+                        description: 'Precise Amount',
+                        amount: '100.123456789',
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(1);
-                expect(result[0].description).toBe("Precise Amount");
+                expect(result[0].description).toBe('Precise Amount');
             });
         });
 
-        describe("account validation", () => {
-            it("should handle all valid destination accounts", async () => {
+        describe('account validation', () => {
+            it('should handle all valid destination accounts', async () => {
                 const validAccounts = [
                     Account.PRIMARY,
                     Account.CHASE_SAPPHIRE,
@@ -475,72 +401,55 @@ describe("AdditionalIncomeService", () => {
                     Account.CITIBANK_DOUBLECASH,
                 ];
 
-                const mockTransactions = validAccounts.map((account) =>
+                const mockTransactions = validAccounts.map(account =>
                     createMockTransaction({
                         description: `Transaction to ${account}`,
                         destination_id: account,
-                    }),
+                    })
                 );
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(validAccounts.length);
                 result.forEach((transaction, index) => {
-                    expect(transaction.destination_id).toBe(
-                        validAccounts[index],
-                    );
+                    expect(transaction.destination_id).toBe(validAccounts[index]);
                 });
             });
 
-            it("should exclude transactions to invalid destination accounts", async () => {
-                const invalidAccounts = [
-                    Account.MONEY_MARKET,
-                    "INVALID_ACCOUNT",
-                ];
+            it('should exclude transactions to invalid destination accounts', async () => {
+                const invalidAccounts = [Account.MONEY_MARKET, 'INVALID_ACCOUNT'];
 
-                const mockTransactions = invalidAccounts.map((account) =>
+                const mockTransactions = invalidAccounts.map(account =>
                     createMockTransaction({
                         description: `Transaction to ${account}`,
                         destination_id: account,
-                    }),
+                    })
                 );
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result).toHaveLength(0);
             });
 
-            it("should handle transactions with null destination accounts", async () => {
+            it('should handle transactions with null destination accounts', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: "Null Destination Account",
+                        description: 'Null Destination Account',
                         destination_id: null,
                     }),
                 ];
 
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                    mockTransactions,
-                );
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(
-                    false,
-                );
+                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -551,15 +460,13 @@ describe("AdditionalIncomeService", () => {
 });
 
 // Helper function to create mock transactions
-function createMockTransaction(
-    overrides: Partial<TransactionSplit>,
-): TransactionSplit {
+function createMockTransaction(overrides: Partial<TransactionSplit>): TransactionSplit {
     return {
-        id: "1",
-        type: "deposit",
-        date: "2024-04-01",
-        amount: "100.00",
-        description: "Test Transaction",
+        id: '1',
+        type: 'deposit',
+        date: '2024-04-01',
+        amount: '100.00',
+        description: 'Test Transaction',
         source_id: null,
         destination_id: Account.PRIMARY,
         ...overrides,

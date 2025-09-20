@@ -1,14 +1,12 @@
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { ExpenseAccount, Tag } from "../../config";
-import { ExcludedTransactionService } from "../excluded-transaction.service";
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { ExpenseAccount, Tag } from '../../config';
+import { ExcludedTransactionService } from '../excluded-transaction.service';
 
 export class TransactionPropertyService {
-    constructor(
-        private readonly excludedTransactionService: ExcludedTransactionService,
-    ) {}
+    constructor(private readonly excludedTransactionService: ExcludedTransactionService) {}
 
     isTransfer(transaction: TransactionSplit): boolean {
-        return transaction.type === "transfer";
+        return transaction.type === 'transfer';
     }
 
     isBill(transaction: TransactionSplit): boolean {
@@ -31,38 +29,29 @@ export class TransactionPropertyService {
         return tags?.includes(Tag.DISPOSABLE_INCOME) ?? false;
     }
 
-    async isExcludedTransaction(
-        description: string,
-        amount: string,
-    ): Promise<boolean> {
-        return this.excludedTransactionService.isExcludedTransaction(
-            description,
-            amount,
-        );
+    async isExcludedTransaction(description: string, amount: string): Promise<boolean> {
+        return this.excludedTransactionService.isExcludedTransaction(description, amount);
     }
 
     isDeposit(transaction: TransactionSplit): boolean {
-        return transaction.type === "deposit";
+        return transaction.type === 'deposit';
     }
 
     hasACategory(transaction: TransactionSplit): boolean {
-        return !(
-            transaction.category_id === undefined ||
-            transaction.category_id === null
-        );
+        return !(transaction.category_id === undefined || transaction.category_id === null);
     }
 
     private convertCurrencyToFloat(amount: string): string {
         if (!amount) {
-            throw new Error("Amount cannot be empty");
+            throw new Error('Amount cannot be empty');
         }
 
-        const isNegative = amount.includes("(") && amount.includes(")");
+        const isNegative = amount.includes('(') && amount.includes(')');
 
         const cleanAmount = amount
-            .replace(/[()]/g, "")
-            .replace(/[$€£¥]/g, "")
-            .replace(/,/g, "")
+            .replace(/[()]/g, '')
+            .replace(/[$€£¥]/g, '')
+            .replace(/,/g, '')
             .trim();
 
         if (!/^-?\d*\.?\d+$/.test(cleanAmount)) {

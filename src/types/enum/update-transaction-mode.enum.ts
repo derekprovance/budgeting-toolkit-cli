@@ -1,7 +1,7 @@
 export enum UpdateTransactionMode {
-    Category = "category",
-    Budget = "budget",
-    Both = "both",
-    Abort = "abort",
-    Edit = "edit",
+    Category = 'category',
+    Budget = 'budget',
+    Both = 'both',
+    Abort = 'abort',
+    Edit = 'edit',
 }

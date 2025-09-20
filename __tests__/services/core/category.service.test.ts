@@ -1,13 +1,9 @@
-import { CategoryService } from "../../../src/services/core/category.service";
-import {
-    FireflyApiClient,
-    CategoryArray,
-    CategoryRead,
-} from "@derekprovance/firefly-iii-sdk";
+import { CategoryService } from '../../../src/services/core/category.service';
+import { FireflyApiClient, CategoryArray, CategoryRead } from '@derekprovance/firefly-iii-sdk';
 
-jest.mock("@derekprovance/firefly-iii-sdk");
+jest.mock('@derekprovance/firefly-iii-sdk');
 
-describe("CategoryService", () => {
+describe('CategoryService', () => {
     let service: CategoryService;
     let mockApiClient: jest.Mocked<FireflyApiClient>;
 
@@ -18,16 +14,16 @@ describe("CategoryService", () => {
         service = new CategoryService(mockApiClient);
     });
 
-    describe("getCategories", () => {
-        it("should return categories from the API", async () => {
+    describe('getCategories', () => {
+        it('should return categories from the API', async () => {
             const mockCategories: CategoryRead[] = [
                 {
-                    id: "1",
-                    attributes: { name: "Category 1" },
+                    id: '1',
+                    attributes: { name: 'Category 1' },
                 },
                 {
-                    id: "2",
-                    attributes: { name: "Category 2" },
+                    id: '2',
+                    attributes: { name: 'Category 2' },
                 },
             ] as CategoryRead[];
 
@@ -37,17 +33,14 @@ describe("CategoryService", () => {
 
             const result = await service.getCategories();
 
-            expect(result).toEqual([
-                { name: "Category 1" },
-                { name: "Category 2" },
-            ]);
-            expect(mockApiClient.get).toHaveBeenCalledWith("/categories");
+            expect(result).toEqual([{ name: 'Category 1' }, { name: 'Category 2' }]);
+            expect(mockApiClient.get).toHaveBeenCalledWith('/categories');
         });
 
-        it("should throw error when API call fails", async () => {
-            mockApiClient.get.mockRejectedValueOnce(new Error("API Error"));
+        it('should throw error when API call fails', async () => {
+            mockApiClient.get.mockRejectedValueOnce(new Error('API Error'));
 
-            await expect(service.getCategories()).rejects.toThrow("API Error");
+            await expect(service.getCategories()).rejects.toThrow('API Error');
         });
     });
 });

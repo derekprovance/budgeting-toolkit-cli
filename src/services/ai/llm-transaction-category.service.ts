@@ -1,6 +1,6 @@
-import { TransactionSplit } from "@derekprovance/firefly-iii-sdk";
-import { ClaudeClient } from "../../api/claude.client";
-import { logger } from "../../logger";
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { ClaudeClient } from '../../api/claude.client';
+import { logger } from '../../logger';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -10,42 +10,42 @@ export class LLMTransactionCategoryService {
 
     private getCategoryFunction(validCategories: string[]) {
         return {
-            name: "assign_categories",
+            name: 'assign_categories',
             description:
-                "Assign the closest matching category to each transaction from the provided list. Always select the most appropriate category for each transaction, even if the match is not perfect. Return categories in the same order as the input transactions.",
+                'Assign the closest matching category to each transaction from the provided list. Always select the most appropriate category for each transaction, even if the match is not perfect. Return categories in the same order as the input transactions.',
             parameters: {
-                type: "object",
+                type: 'object',
                 properties: {
                     categories: {
-                        type: "array",
+                        type: 'array',
                         items: {
-                            type: "string",
+                            type: 'string',
                             enum: validCategories,
                         },
                         description:
-                            "Array of categories to assign to transactions. Must be exactly one category per transaction in the same order as input transactions. Do not return empty strings.",
+                            'Array of categories to assign to transactions. Must be exactly one category per transaction in the same order as input transactions. Do not return empty strings.',
                     },
                 },
-                required: ["categories"],
+                required: ['categories'],
             },
         };
     }
 
     async categorizeTransactions(
         transactions: TransactionSplit[],
-        categories: string[],
+        categories: string[]
     ): Promise<string[]> {
         logger.debug(
             {
                 transactionCount: transactions.length,
                 categoryCount: categories.length,
             },
-            "Starting transaction categorization",
+            'Starting transaction categorization'
         );
 
         if (!categories.length) {
-            logger.debug("No categories provided, returning empty strings");
-            return new Array(transactions.length).fill("");
+            logger.debug('No categories provided, returning empty strings');
+            return new Array(transactions.length).fill('');
         }
 
         const BATCH_SIZE = 10;
@@ -62,11 +62,11 @@ export class LLMTransactionCategoryService {
 
     private async categorizeBatch(
         transactions: TransactionSplit[],
-        categories: string[],
+        categories: string[]
     ): Promise<string[]> {
         const categoryFunction = this.getCategoryFunction(categories);
 
-        const transactionData = transactions.map((tx) => ({
+        const transactionData = transactions.map(tx => ({
             description: tx.description,
             amount: tx.amount,
             date: tx.date,
@@ -77,7 +77,7 @@ export class LLMTransactionCategoryService {
         }));
 
         const message = {
-            role: "user" as const,
+            role: 'user' as const,
             content: `You are a financial transaction categorization expert. Assign the most appropriate category to each transaction based on merchant type, description, and context.
 
 CATEGORIZATION RULES:
@@ -107,20 +107,18 @@ Return exactly ${transactions.length} categories from the available list.`,
                 logger.debug(
                     {
                         batchSize: transactions.length,
-                        transactionIds: transactions.map(
-                            (tx) => tx.transaction_journal_id,
-                        ),
+                        transactionIds: transactions.map(tx => tx.transaction_journal_id),
                     },
-                    "Sending batch request to Claude",
+                    'Sending batch request to Claude'
                 );
 
                 const result = await this.claudeClient.chat([message], {
                     functions: [categoryFunction],
-                    function_call: { name: "assign_categories" },
+                    function_call: { name: 'assign_categories' },
                 });
 
                 if (!result) {
-                    throw new Error("Invalid response from Claude");
+                    throw new Error('Invalid response from Claude');
                 }
 
                 try {
@@ -132,7 +130,7 @@ Return exactly ${transactions.length} categories from the available list.`,
                         resultCategories.length !== transactions.length
                     ) {
                         throw new Error(
-                            `Expected ${transactions.length} categories, got ${resultCategories?.length || 0}`,
+                            `Expected ${transactions.length} categories, got ${resultCategories?.length || 0}`
                         );
                     }
 
@@ -149,14 +147,11 @@ Return exactly ${transactions.length} categories from the available list.`,
                             batchSize: transactions.length,
                             attemptedCategories: result,
                             validCategories: categories,
-                            error:
-                                error instanceof Error
-                                    ? error.message
-                                    : String(error),
+                            error: error instanceof Error ? error.message : String(error),
                         },
-                        "Category batch validation failed",
+                        'Category batch validation failed'
                     );
-                    return new Array(transactions.length).fill("");
+                    return new Array(transactions.length).fill('');
                 }
             });
 
@@ -165,22 +160,19 @@ Return exactly ${transactions.length} categories from the available list.`,
             logger.error(
                 {
                     batchSize: transactions.length,
-                    transactionIds: transactions.map(
-                        (tx) => tx.transaction_journal_id,
-                    ),
-                    error:
-                        error instanceof Error ? error.message : String(error),
+                    transactionIds: transactions.map(tx => tx.transaction_journal_id),
+                    error: error instanceof Error ? error.message : String(error),
                 },
-                "Failed to categorize transaction batch",
+                'Failed to categorize transaction batch'
             );
-            return new Array(transactions.length).fill("");
+            return new Array(transactions.length).fill('');
         }
     }
 
     private async retryWithBackoff<T>(
         operation: () => Promise<T>,
         retries = MAX_RETRIES,
-        delay = RETRY_DELAY_MS,
+        delay = RETRY_DELAY_MS
     ): Promise<T> {
         try {
             return await operation();
@@ -191,15 +183,14 @@ Return exactly ${transactions.length} categories from the available list.`,
 
             logger.warn(
                 {
-                    error:
-                        error instanceof Error ? error.message : String(error),
+                    error: error instanceof Error ? error.message : String(error),
                     retriesLeft: retries,
                     delay,
                 },
-                "Retrying operation after error",
+                'Retrying operation after error'
             );
 
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            await new Promise(resolve => setTimeout(resolve, delay));
             return this.retryWithBackoff(operation, retries - 1, delay * 2);
         }
     }

@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { logger } from "../logger";
-import { loadYamlConfig } from "../utils/config-loader";
+import Anthropic from '@anthropic-ai/sdk';
+import { logger } from '../logger';
+import { loadYamlConfig } from '../utils/config-loader';
 
 export interface ChatMessage {
-    role: "user" | "assistant";
+    role: 'user' | 'assistant';
     content: string;
 }
 
@@ -54,11 +54,9 @@ interface ClaudeConfig {
     function_call?: { name: string };
 }
 
-type RequiredClaudeConfig = Required<
-    Omit<ClaudeConfig, "functions" | "function_call">
-> & {
-    functions?: ClaudeConfig["functions"];
-    function_call?: ClaudeConfig["function_call"];
+type RequiredClaudeConfig = Required<Omit<ClaudeConfig, 'functions' | 'function_call'>> & {
+    functions?: ClaudeConfig['functions'];
+    function_call?: ClaudeConfig['function_call'];
 };
 
 interface MessageCreateParams {
@@ -75,7 +73,7 @@ interface MessageCreateParams {
         name: string;
         description?: string;
         input_schema: {
-            type: "object";
+            type: 'object';
             properties: Record<
                 string,
                 {
@@ -88,7 +86,7 @@ interface MessageCreateParams {
         };
     }>;
     tool_choice?: {
-        type: "tool";
+        type: 'tool';
         name: string;
     };
 }
@@ -101,7 +99,7 @@ interface RateLimitState {
 interface CircuitBreakerState {
     failures: number;
     lastFailureTime: number;
-    state: "CLOSED" | "OPEN" | "HALF_OPEN";
+    state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 }
 
 interface PerformanceMetrics {
@@ -125,7 +123,7 @@ export class ClaudeClient {
     private circuitBreaker: CircuitBreakerState = {
         failures: 0,
         lastFailureTime: 0,
-        state: "CLOSED",
+        state: 'CLOSED',
     };
     private metrics: PerformanceMetrics = {
         totalRequests: 0,
@@ -138,17 +136,17 @@ export class ClaudeClient {
     };
 
     private static DEFAULT_CONFIG: RequiredClaudeConfig = {
-        apiKey: process.env.ANTHROPIC_API_KEY || "",
-        baseURL: "https://api.anthropic.com",
+        apiKey: process.env.ANTHROPIC_API_KEY || '',
+        baseURL: 'https://api.anthropic.com',
         timeout: 30000,
         maxRetries: 3,
-        model: "claude-3-5-haiku-latest",
+        model: 'claude-3-5-haiku-latest',
         maxTokens: 1024,
         temperature: 0.2,
         topP: 1.0,
         topK: 5,
         stopSequences: [],
-        systemPrompt: "",
+        systemPrompt: '',
         metadata: {},
         batchSize: 10,
         maxConcurrent: 3,
@@ -169,16 +167,14 @@ export class ClaudeClient {
 
     async chatBatch(
         messageBatches: ChatMessage[][],
-        overrideConfig?: Partial<ClaudeConfig>,
+        overrideConfig?: Partial<ClaudeConfig>
     ): Promise<string[]> {
         const config = { ...this.config, ...overrideConfig };
         const results: string[] = [];
         const batches = this.chunkArray(messageBatches, config.batchSize);
 
         for (const batch of batches) {
-            const batchPromises = batch.map((messages) =>
-                this.processSingleChat(messages, config),
-            );
+            const batchPromises = batch.map(messages => this.processSingleChat(messages, config));
 
             while (batchPromises.length > 0) {
                 const chunk = batchPromises.splice(0, config.maxConcurrent);
@@ -190,10 +186,7 @@ export class ClaudeClient {
         return results;
     }
 
-    async chat(
-        messages: ChatMessage[],
-        overrideConfig?: Partial<ClaudeConfig>,
-    ): Promise<string> {
+    async chat(messages: ChatMessage[], overrideConfig?: Partial<ClaudeConfig>): Promise<string> {
         const config = { ...this.config, ...overrideConfig };
         const response = await this.processSingleChat(messages, config);
 
@@ -203,12 +196,7 @@ export class ClaudeClient {
     updateConfig(newConfig: Partial<ClaudeConfig>): void {
         this.config = { ...this.config, ...newConfig };
 
-        if (
-            newConfig.apiKey ||
-            newConfig.baseURL ||
-            newConfig.timeout ||
-            newConfig.maxRetries
-        ) {
+        if (newConfig.apiKey || newConfig.baseURL || newConfig.timeout || newConfig.maxRetries) {
             this.client = new Anthropic({
                 apiKey: this.config.apiKey,
                 baseURL: this.config.baseURL,
@@ -218,7 +206,7 @@ export class ClaudeClient {
         }
     }
 
-    getConfig(): Omit<RequiredClaudeConfig, "apiKey"> {
+    getConfig(): Omit<RequiredClaudeConfig, 'apiKey'> {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { apiKey, ...safeConfig } = this.config;
         return safeConfig;
@@ -226,7 +214,7 @@ export class ClaudeClient {
 
     private async processSingleChat(
         messages: ChatMessage[],
-        config: RequiredClaudeConfig,
+        config: RequiredClaudeConfig
     ): Promise<string> {
         await this.checkCircuitBreaker();
 
@@ -267,12 +255,12 @@ export class ClaudeClient {
                 const delay = this.calculateBackoffDelay(
                     attempt,
                     config.retryDelayMs,
-                    config.maxRetryDelayMs,
+                    config.maxRetryDelayMs
                 );
 
-                await new Promise((resolve) => setTimeout(resolve, delay));
+                await new Promise(resolve => setTimeout(resolve, delay));
             } finally {
-                const index = this.requestQueue.findIndex((r) => r === request);
+                const index = this.requestQueue.findIndex(r => r === request);
                 if (index !== -1) {
                     this.requestQueue.splice(index, 1);
                 }
@@ -280,11 +268,7 @@ export class ClaudeClient {
         }
     }
 
-    private calculateBackoffDelay(
-        attempt: number,
-        baseDelay: number,
-        maxDelay: number,
-    ): number {
+    private calculateBackoffDelay(attempt: number, baseDelay: number, maxDelay: number): number {
         const delay = baseDelay * Math.pow(2, attempt - 1);
         const jitter = Math.random() * (baseDelay * 0.1);
         return Math.min(delay + jitter, maxDelay);
@@ -292,7 +276,7 @@ export class ClaudeClient {
 
     private async makeRequest(
         messages: ChatMessage[],
-        config: RequiredClaudeConfig,
+        config: RequiredClaudeConfig
     ): Promise<string> {
         const requestParams: MessageCreateParams = {
             model: config.model,
@@ -307,11 +291,11 @@ export class ClaudeClient {
         };
 
         if (config.functions) {
-            requestParams.tools = config.functions.map((fn) => ({
+            requestParams.tools = config.functions.map(fn => ({
                 name: fn.name,
                 description: fn.description,
                 input_schema: {
-                    type: "object",
+                    type: 'object',
                     properties: fn.parameters.properties,
                     required: fn.parameters.required,
                 },
@@ -320,7 +304,7 @@ export class ClaudeClient {
 
         if (config.function_call) {
             requestParams.tool_choice = {
-                type: "tool",
+                type: 'tool',
                 name: config.function_call.name,
             };
         }
@@ -328,32 +312,32 @@ export class ClaudeClient {
         const response = await this.client.messages.create(requestParams);
 
         const textContent = response.content
-            .map((block) => this.getTextFromContentBlock(block))
-            .filter((text) => text.length > 0)
-            .join("\n");
+            .map(block => this.getTextFromContentBlock(block))
+            .filter(text => text.length > 0)
+            .join('\n');
 
         if (!textContent) {
-            throw new Error("No text content found in response");
+            throw new Error('No text content found in response');
         }
 
         return textContent;
     }
 
     private getTextFromContentBlock(block: unknown): string {
-        if (typeof block === "object" && block !== null) {
+        if (typeof block === 'object' && block !== null) {
             const b = block as {
                 type?: string;
                 text?: string;
                 input?: unknown;
             };
-            if (b.type === "text" && typeof b.text === "string") {
+            if (b.type === 'text' && typeof b.text === 'string') {
                 return b.text;
             }
-            if (b.type === "tool_use" && b.input) {
+            if (b.type === 'tool_use' && b.input) {
                 return JSON.stringify(b.input);
             }
         }
-        return "";
+        return '';
     }
 
     private chunkArray<T>(array: T[], size: number): T[][] {
@@ -368,15 +352,14 @@ export class ClaudeClient {
         const yamlConfig = loadYamlConfig();
         const now = Date.now();
         const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
-        const REFILL_INTERVAL =
-            yamlConfig.llm?.rateLimit?.refillInterval || 60000;
+        const REFILL_INTERVAL = yamlConfig.llm?.rateLimit?.refillInterval || 60000;
         const MAX_TOKENS = yamlConfig.llm?.rateLimit?.maxTokensPerMinute || 50;
         const REFILL_RATE = MAX_TOKENS;
 
         if (timeSinceLastRefill >= REFILL_INTERVAL) {
             this.rateLimitState.tokens = Math.min(
                 MAX_TOKENS,
-                this.rateLimitState.tokens + REFILL_RATE,
+                this.rateLimitState.tokens + REFILL_RATE
             );
             this.rateLimitState.lastRefill = now;
         }
@@ -385,9 +368,9 @@ export class ClaudeClient {
             const waitTime = REFILL_INTERVAL - timeSinceLastRefill;
             logger.debug(
                 { waitTime, tokens: this.rateLimitState.tokens },
-                "Rate limit reached, waiting for refill",
+                'Rate limit reached, waiting for refill'
             );
-            await new Promise((resolve) => setTimeout(resolve, waitTime));
+            await new Promise(resolve => setTimeout(resolve, waitTime));
             return this.waitForRateLimit();
         }
 
@@ -397,58 +380,44 @@ export class ClaudeClient {
     private async checkCircuitBreaker(): Promise<void> {
         const yamlConfig = loadYamlConfig();
         const now = Date.now();
-        const FAILURE_THRESHOLD =
-            yamlConfig.llm?.circuitBreaker?.failureThreshold || 5;
-        const RESET_TIMEOUT =
-            yamlConfig.llm?.circuitBreaker?.resetTimeout || 60000;
-        const HALF_OPEN_TIMEOUT =
-            yamlConfig.llm?.circuitBreaker?.halfOpenTimeout || 30000;
+        const FAILURE_THRESHOLD = yamlConfig.llm?.circuitBreaker?.failureThreshold || 5;
+        const RESET_TIMEOUT = yamlConfig.llm?.circuitBreaker?.resetTimeout || 60000;
+        const HALF_OPEN_TIMEOUT = yamlConfig.llm?.circuitBreaker?.halfOpenTimeout || 30000;
 
         switch (this.circuitBreaker.state) {
-            case "OPEN":
+            case 'OPEN':
                 if (now - this.circuitBreaker.lastFailureTime > RESET_TIMEOUT) {
-                    this.circuitBreaker.state = "HALF_OPEN";
-                    logger.info("Circuit breaker moved to HALF_OPEN state");
+                    this.circuitBreaker.state = 'HALF_OPEN';
+                    logger.info('Circuit breaker moved to HALF_OPEN state');
                 } else {
-                    throw new Error(
-                        "Circuit breaker is OPEN - API requests are blocked",
-                    );
+                    throw new Error('Circuit breaker is OPEN - API requests are blocked');
                 }
                 break;
 
-            case "HALF_OPEN":
-                if (
-                    now - this.circuitBreaker.lastFailureTime >
-                    HALF_OPEN_TIMEOUT
-                ) {
-                    this.circuitBreaker.state = "CLOSED";
+            case 'HALF_OPEN':
+                if (now - this.circuitBreaker.lastFailureTime > HALF_OPEN_TIMEOUT) {
+                    this.circuitBreaker.state = 'CLOSED';
                     this.circuitBreaker.failures = 0;
-                    logger.info("Circuit breaker moved to CLOSED state");
+                    logger.info('Circuit breaker moved to CLOSED state');
                 }
                 break;
 
-            case "CLOSED":
+            case 'CLOSED':
                 if (this.circuitBreaker.failures >= FAILURE_THRESHOLD) {
-                    this.circuitBreaker.state = "OPEN";
+                    this.circuitBreaker.state = 'OPEN';
                     this.circuitBreaker.lastFailureTime = now;
-                    logger.warn(
-                        "Circuit breaker moved to OPEN state due to failures",
-                    );
-                    throw new Error(
-                        "Circuit breaker is OPEN - too many failures",
-                    );
+                    logger.warn('Circuit breaker moved to OPEN state due to failures');
+                    throw new Error('Circuit breaker is OPEN - too many failures');
                 }
                 break;
         }
     }
 
     private onRequestSuccess(): void {
-        if (this.circuitBreaker.state === "HALF_OPEN") {
-            this.circuitBreaker.state = "CLOSED";
+        if (this.circuitBreaker.state === 'HALF_OPEN') {
+            this.circuitBreaker.state = 'CLOSED';
             this.circuitBreaker.failures = 0;
-            logger.info(
-                "Circuit breaker reset to CLOSED after successful request",
-            );
+            logger.info('Circuit breaker reset to CLOSED after successful request');
         }
     }
 
@@ -460,22 +429,18 @@ export class ClaudeClient {
                 failures: this.circuitBreaker.failures,
                 state: this.circuitBreaker.state,
             },
-            "Request failed, updating circuit breaker",
+            'Request failed, updating circuit breaker'
         );
     }
 
-    private recordMetrics(
-        duration: number,
-        tokensUsed: number,
-        success: boolean,
-    ): void {
+    private recordMetrics(duration: number, tokensUsed: number, success: boolean): void {
         this.metrics.requestDurations.push(duration);
 
         if (success) {
             this.metrics.successfulRequests++;
             this.metrics.totalTokensUsed += tokensUsed;
 
-            const costPerToken = this.config.model.includes("haiku")
+            const costPerToken = this.config.model.includes('haiku')
                 ? 0.00025 / 1000
                 : 0.003 / 1000;
             this.metrics.totalCost += tokensUsed * costPerToken;
@@ -493,21 +458,19 @@ export class ClaudeClient {
                     totalRequests: this.metrics.totalRequests,
                     successRate:
                         (
-                            (this.metrics.successfulRequests /
-                                this.metrics.totalRequests) *
+                            (this.metrics.successfulRequests / this.metrics.totalRequests) *
                             100
-                        ).toFixed(1) + "%",
-                    avgResponseTime:
-                        Math.round(this.metrics.averageResponseTime) + "ms",
-                    totalCost: "$" + this.metrics.totalCost.toFixed(4),
+                        ).toFixed(1) + '%',
+                    avgResponseTime: Math.round(this.metrics.averageResponseTime) + 'ms',
+                    totalCost: '$' + this.metrics.totalCost.toFixed(4),
                     tokensUsed: this.metrics.totalTokensUsed,
                 },
-                "Claude API metrics update",
+                'Claude API metrics update'
             );
         }
     }
 
-    getMetrics(): Omit<PerformanceMetrics, "requestDurations"> {
+    getMetrics(): Omit<PerformanceMetrics, 'requestDurations'> {
         return {
             totalRequests: this.metrics.totalRequests,
             successfulRequests: this.metrics.successfulRequests,
