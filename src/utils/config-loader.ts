@@ -9,7 +9,6 @@ interface YamlConfig {
     excludedTransactionsCsv?: string;
     excludeDisposableIncome?: boolean;
     minTransactionAmount?: number;
-    moneyMarketAccount?: string;
     expectedMonthlyPaycheck?: number;
     monthlyBudget?: number;
     additionalSavingsPercentage?: number;

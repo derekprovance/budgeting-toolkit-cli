@@ -14,7 +14,7 @@ A powerful command-line interface (CLI) for interacting with both the Firefly II
 
 ### Prerequisites
 
-- Node.js (v23.x or later)
+- Node.js (v24.x or later)
 - npm (v10.x or later)
 - A Firefly III instance with API access
 - An Anthropic API key for Claude integration
@@ -38,6 +38,7 @@ A powerful command-line interface (CLI) for interacting with both the Firefly II
 3. Configure your environment:
     ```bash
     cp .env.example .env
+    cp budgeting-toolkit.config.yaml.example budgeting-toolkit.config.yaml
     ```
 
 ## Configuration
@@ -101,7 +102,6 @@ excludedDescriptions:
     - 'ATM FEE'
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
-moneyMarketAccount: 'Money Market'
 monthlyBudget: 4500.00
 additionalSavingsPercentage: 10
 

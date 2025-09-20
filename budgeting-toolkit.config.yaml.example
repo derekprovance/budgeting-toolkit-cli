@@ -15,7 +15,6 @@ excludedDescriptions:
   - "TRANSFER"
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
-moneyMarketAccount: "Money Market"
 monthlyBudget: 4500.00
 additionalSavingsPercentage: 10
 

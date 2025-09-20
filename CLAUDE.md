@@ -37,7 +37,6 @@ Primary configuration file loaded via `src/utils/config-loader.ts`:
 - `excludedTransactionsCsv` - Path to CSV file with excluded transactions
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
 - `minTransactionAmount` - Minimum transaction amount to consider
-- `moneyMarketAccount` - Money market account ID
 - `monthlyBudget` - Monthly budget amount
 - `additionalSavingsPercentage` - Additional savings percentage
 
