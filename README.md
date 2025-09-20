@@ -294,9 +294,6 @@ budgeting-toolkit categorize Import-2025-06-23 --include-classified
 # Preview changes without applying
 budgeting-toolkit categorize Import-2025-06-23 --dry-run
 
-# Auto-apply without confirmation
-budgeting-toolkit categorize Import-2025-06-23 --yes
-
 # Categories only
 budgeting-toolkit categorize Import-2025-06-23 --mode category
 
@@ -311,7 +308,6 @@ budgeting-toolkit cat Import-2025-06-23 --verbose
 
 - `-m, --mode <type>` - What to update: `category`, `budget`, or `both` (default: both)
 - `-i, --include-classified` - Process transactions that already have categories/budgets
-- `-y, --yes` - Skip confirmation prompts and apply changes automatically
 - `-n, --dry-run` - Preview proposed changes without applying them
 
 **Prerequisites:**
@@ -372,7 +368,7 @@ budgeting-toolkit finalize
 # 1. Import transactions to Firefly III (external process)
 # 2. Tag imported transactions with current date
 # 3. Categorize with AI
-budgeting-toolkit categorize Import-$(date +%Y-%m-%d) --yes
+budgeting-toolkit categorize Import-$(date +%Y-%m-%d)
 ```
 
 ## Development
@@ -392,6 +388,11 @@ budgeting-toolkit categorize Import-$(date +%Y-%m-%d) --yes
 3. Development mode:
     ```bash
     npm run start
+    ```
+
+4. Linting
+    ```bash
+    npm run linter
     ```
 
 ## Contributing
