@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "4.3.0",
+    "version": "5.0.0",
     "main": "index.js",
     "scripts": {
         "start": "ts-node src/index.ts",
@@ -20,13 +20,13 @@
     "dependencies": {
         "@anthropic-ai/sdk": "^0.63.0",
         "@derekprovance/firefly-iii-sdk": "^6.1.24-v1.3",
+        "@inquirer/prompts": "^7.8.6",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^24.5.2",
         "chalk": "^4.x.x",
         "commander": "^14.0.1",
         "csv-parse": "^6.1.0",
         "dotenv": "^17.2.2",
-        "inquirer": "^12.9.6",
         "js-yaml": "^4.1.0",
         "pino": "^9.10.0",
         "typescript": "^5.9.2"

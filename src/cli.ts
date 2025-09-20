@@ -214,7 +214,7 @@ Examples:
 
             try {
                 const updateTransactionService =
-                    ServiceFactory.createUpdateTransactionService(
+                    await ServiceFactory.createUpdateTransactionService(
                         apiClient,
                         opts.includeClassified,
                         opts.dryRun,

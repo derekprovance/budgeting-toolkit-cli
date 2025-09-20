@@ -3,4 +3,5 @@ export enum UpdateTransactionMode {
     Budget = "budget",
     Both = "both",
     Abort = "abort",
+    Edit = "edit",
 }

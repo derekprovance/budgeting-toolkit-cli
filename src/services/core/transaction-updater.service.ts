@@ -2,12 +2,14 @@ import {
     TransactionSplit,
     Category,
     BudgetRead,
+    TransactionRead,
 } from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "./transaction.service";
 import { TransactionValidatorService } from "./transaction-validator.service";
 import { UserInputService } from "../user-input.service";
 import { logger } from "../../logger";
 import { UpdateTransactionMode } from "../../types/enum/update-transaction-mode.enum";
+import { EditTransactionAttribute } from "../../types/enum/edit-transaction-attribute.enum";
 
 export class TransactionUpdaterService {
     private readonly updateParameterMap = {
@@ -30,6 +32,8 @@ export class TransactionUpdaterService {
         private readonly validator: TransactionValidatorService,
         private readonly userInputService: UserInputService,
         private readonly dryRun: boolean = false,
+        private readonly categories: Category[],
+        private readonly budgets: BudgetRead[],
     ) {}
 
     /**
@@ -43,8 +47,6 @@ export class TransactionUpdaterService {
     async updateTransaction(
         transaction: TransactionSplit,
         aiResults: Record<string, { category?: string; budget?: string }>,
-        categories?: Category[],
-        budgets?: BudgetRead[],
     ): Promise<TransactionSplit | undefined> {
         if (!this.validator.validateTransactionData(transaction, aiResults)) {
             return undefined;
@@ -72,14 +74,16 @@ export class TransactionUpdaterService {
             // If a category is proposed, it must be non-empty and valid
             let category;
             if (aiCategory && aiCategory !== "") {
-                category = this.getValidCategory(categories, aiCategory);
+                category = this.getValidCategory(aiCategory);
                 if (!category) {
                     logger.warn(
                         {
                             transactionId: journalId,
                             description: transaction.description,
                             attemptedCategory: aiCategory,
-                            validCategories: categories?.map((c) => c.name),
+                            validCategories: this.categories?.map(
+                                (c) => c.name,
+                            ),
                         },
                         "Invalid or unrecognized category from AI, skipping transaction",
                     );
@@ -100,14 +104,14 @@ export class TransactionUpdaterService {
             // If a budget is proposed, it must be non-empty and valid
             let budget;
             if (shouldUpdateBudget && aiBudget && aiBudget !== "") {
-                budget = this.getValidBudget(budgets, aiBudget);
+                budget = this.getValidBudget(aiBudget);
                 if (!budget) {
                     logger.warn(
                         {
                             transactionId: journalId,
                             description: transaction.description,
                             attemptedBudget: aiBudget,
-                            validBudgets: budgets?.map(
+                            validBudgets: this.budgets?.map(
                                 (b) => b.attributes.name,
                             ),
                         },
@@ -153,32 +157,12 @@ export class TransactionUpdaterService {
 
             const transactionRead =
                 this.transactionService.getTransactionReadBySplit(transaction);
-            const action = await this.userInputService.askToUpdateTransaction(
+
+            await this.handleUpdateWorkflow(
                 transaction,
-                transactionRead?.id,
-                {
-                    category: category?.name,
-                    budget: budget?.attributes.name,
-                },
-            );
-
-            if (action === UpdateTransactionMode.Abort) {
-                logger.debug(
-                    { description: transaction.description },
-                    "User skipped transaction update",
-                );
-                return undefined;
-            }
-
-            const [categoryName, budgetId] = this.updateParameterMap[action](
+                transactionRead,
                 category,
                 budget,
-            );
-
-            await this.transactionService.updateTransaction(
-                transaction,
-                categoryName,
-                budgetId,
             );
 
             logger.debug(
@@ -199,21 +183,87 @@ export class TransactionUpdaterService {
         }
     }
 
+    private async handleUpdateWorkflow(
+        transaction: TransactionSplit,
+        transactionRead: TransactionRead | null,
+        category: Category | undefined,
+        budget: BudgetRead | undefined,
+    ) {
+        let action;
+        do {
+            action = await this.userInputService.askToUpdateTransaction(
+                transaction,
+                transactionRead?.id,
+                {
+                    category: category?.name,
+                    budget: budget?.attributes.name,
+                },
+            );
+
+            if (action === UpdateTransactionMode.Abort) {
+                logger.debug(
+                    { description: transaction.description },
+                    "User skipped transaction update",
+                );
+                return undefined;
+            }
+
+            if (action === UpdateTransactionMode.Edit) {
+                [category, budget] = await this.processEditCommand(transaction);
+            }
+        } while (action === UpdateTransactionMode.Edit);
+
+        const [categoryName, budgetId] = this.updateParameterMap[action](
+            category,
+            budget,
+        );
+
+        await this.transactionService.updateTransaction(
+            transaction,
+            categoryName,
+            budgetId,
+        );
+    }
+
+    private async processEditCommand(
+        transaction: TransactionSplit,
+    ): Promise<[Category | undefined, BudgetRead | undefined]> {
+        logger.debug(
+            { description: transaction.description },
+            "User chose the edit option",
+        );
+
+        const answers = await this.userInputService.shouldEditCategoryBudget();
+
+        let newCategory;
+        let newBudget;
+        for (let answer of answers) {
+            if (answer === EditTransactionAttribute.Category) {
+                newCategory = await this.userInputService.getNewCategory(
+                    this.categories,
+                );
+            } else if (answer === EditTransactionAttribute.Budget) {
+                newBudget = await this.userInputService.getNewBudget(
+                    this.budgets,
+                );
+            }
+        }
+
+        return [newCategory, newBudget];
+    }
+
     /**
      * Gets a valid budget from the available budgets
      * @param budgets Available budgets
      * @param value Budget name to find
      * @returns The matching budget or undefined
      */
-    private getValidBudget(
-        budgets: BudgetRead[] | undefined,
-        value: string | undefined,
-    ): BudgetRead | undefined {
+    private getValidBudget(value: string | undefined): BudgetRead | undefined {
         if (!value) {
             return undefined;
         }
 
-        return budgets?.find((b) => b.attributes.name === value);
+        return this.budgets?.find((b) => b.attributes.name === value);
     }
 
     /**
@@ -222,14 +272,11 @@ export class TransactionUpdaterService {
      * @param value Category name to find
      * @returns The matching category or undefined
      */
-    private getValidCategory(
-        categories: Category[] | undefined,
-        value: string | undefined,
-    ): Category | undefined {
+    private getValidCategory(value: string | undefined): Category | undefined {
         if (!value) {
             return undefined;
         }
 
-        return categories?.find((c) => c?.name === value);
+        return this.categories?.find((c) => c?.name === value);
     }
 }

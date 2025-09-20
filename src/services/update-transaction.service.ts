@@ -113,8 +113,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 await this.updateTransactionsWithAIResults(
                     transactions,
                     aiResults,
-                    categories,
-                    budgets,
                     dryRun,
                 );
 
@@ -215,8 +213,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     private async updateTransactionsWithAIResults(
         transactions: TransactionSplit[],
         aiResults: Record<string, { category?: string; budget?: string }>,
-        categories?: Category[],
-        budgets?: BudgetRead[],
         dryRun?: boolean,
     ): Promise<TransactionSplit[]> {
         logger.debug(
@@ -248,8 +244,6 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                     await this.transactionUpdaterService.updateTransaction(
                         transaction,
                         aiResults,
-                        categories || [],
-                        budgets || [],
                     );
 
                 if (updatedTransaction) {

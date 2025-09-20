@@ -1,4 +1,8 @@
-import { FireflyApiClient } from "@derekprovance/firefly-iii-sdk";
+import {
+    BudgetRead,
+    Category,
+    FireflyApiClient,
+} from "@derekprovance/firefly-iii-sdk";
 import { TransactionService } from "../services/core/transaction.service";
 import { BudgetService } from "../services/core/budget.service";
 import { CategoryService } from "../services/core/category.service";
@@ -60,11 +64,11 @@ export class ServiceFactory {
         };
     }
 
-    static createUpdateTransactionService(
+    static async createUpdateTransactionService(
         apiClient: FireflyApiClient,
         includeClassified: boolean = false,
         dryRun: boolean = false,
-    ): UpdateTransactionService {
+    ): Promise<UpdateTransactionService> {
         const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
@@ -77,12 +81,17 @@ export class ServiceFactory {
             llmBudgetService,
         );
 
-        //TODO(DEREK) - Is this actually good practice?
+        const budgets: BudgetRead[] = await services.budgetService.getBudgets();
+        const categories: Category[] =
+            await services.categoryService.getCategories();
+
         const transactionUpdaterService = new TransactionUpdaterService(
             services.transactionService,
             services.transactionValidatorService,
             services.userInputService,
             dryRun,
+            categories,
+            budgets,
         );
 
         return new UpdateTransactionService(

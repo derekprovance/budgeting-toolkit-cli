@@ -22,7 +22,7 @@ export class UpdateTransactionDisplayService {
 
         return [
             chalk.cyan(
-                `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:\n`,
+                `Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`,
             ),
         ].join("\n");
     }
@@ -48,7 +48,6 @@ export class UpdateTransactionDisplayService {
      * Formats the transaction updates section
      * @returns A tuple containing the formatted string and the number of updates
      */
-    //TODO(DEREK) - need to change the "what is updated" to only contain what we updated
     formatTransactionUpdates(
         results: UpdateTransactionStatusDto,
         updateMode: UpdateTransactionMode,
