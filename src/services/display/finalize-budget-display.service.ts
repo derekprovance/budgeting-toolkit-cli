@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { TransactionPropertyService } from '../core/transaction-property.service';
+import { DisplayService } from './display.service';
 
 /**
  * Interface for transaction counts
@@ -16,7 +16,7 @@ export interface TransactionCounts {
  * Service for formatting and displaying finalize budget information
  */
 export class FinalizeBudgetDisplayService {
-    constructor(private readonly transactionPropertyService: TransactionPropertyService) {}
+    constructor(private displayService: DisplayService) {}
 
     /**
      * Formats the header box
@@ -47,50 +47,20 @@ export class FinalizeBudgetDisplayService {
      * Formats the additional income section
      */
     formatAdditionalIncomeSection(transactions: TransactionSplit[]): string {
-        const lines = [chalk.bold('\n=== Additional Income ===\n')];
-
-        if (transactions.length === 0) {
-            lines.push(chalk.dim('No additional income transactions found'));
-        } else {
-            const totalIncome = this.calculateTotal(transactions);
-            transactions.forEach(transaction => {
-                lines.push(this.formatTransaction(transaction));
-            });
-            lines.push(
-                chalk.cyan.bold(
-                    `Total Additional Income: ${
-                        transactions[0]?.currency_symbol
-                    }${totalIncome.toFixed(2)}`
-                )
-            );
-        }
-
-        return lines.join('\n');
+        return this.displayService.listTransactionsWithHeader(
+            transactions,
+            '=== Additional Income ==='
+        );
     }
 
     /**
      * Formats the unbudgeted expenses section
      */
     formatUnbudgetedExpensesSection(transactions: TransactionSplit[]): string {
-        const lines = [chalk.bold('\n=== Unbudgeted Expenses ===\n')];
-
-        if (transactions.length === 0) {
-            lines.push(chalk.dim('No unbudgeted expense transactions found'));
-        } else {
-            const totalExpenses = this.calculateTotal(transactions);
-            transactions.forEach(transaction => {
-                lines.push(this.formatTransaction(transaction));
-            });
-            lines.push(
-                chalk.yellow.bold(
-                    `Total Unbudgeted Expenses: ${
-                        transactions[0]?.currency_symbol
-                    }${totalExpenses.toFixed(2)}`
-                )
-            );
-        }
-
-        return lines.join('\n');
+        return this.displayService.listTransactionsWithHeader(
+            transactions,
+            '=== Unbudgeted Expenses ==='
+        );
     }
 
     /**
@@ -126,43 +96,11 @@ export class FinalizeBudgetDisplayService {
         return lines.join('\n');
     }
 
-    private formatTransaction(transaction: TransactionSplit): string {
-        const type = this.getTransactionTypeIndicator(transaction);
-        const amount = parseFloat(transaction.amount);
-        const date = new Date(transaction.date).toLocaleDateString();
-        const amountStr = `${transaction.currency_symbol}${Math.abs(amount).toFixed(2)}`;
-
-        const lines = [
-            `${type} ${chalk.white(transaction.description)}`,
-            chalk.dim(`    Date: ${date}`).padEnd(35) + chalk.yellow(`Amount: ${amountStr}`),
-        ];
-
-        if (transaction.category_name) {
-            lines.push(chalk.dim(`    Category: ${transaction.category_name}`));
-        }
-
-        lines.push(''); // Add extra spacing between transactions
-        return lines.join('\n');
-    }
-
-    private getTransactionTypeIndicator(transaction: TransactionSplit): string {
-        if (this.transactionPropertyService.isBill(transaction)) {
-            return chalk.redBright('[BILL]');
-        } else if (this.transactionPropertyService.isTransfer(transaction)) {
-            return chalk.yellowBright('[TRANSFER]');
-        } else if (this.transactionPropertyService.isDeposit(transaction)) {
-            return chalk.greenBright('[DEPOSIT]');
-        }
-        return chalk.gray('[OTHER]');
-    }
-
     /**
      * Formats actionable recommendations
      */
     formatActionableRecommendations(
-        additionalIncome: TransactionSplit[],
         unbudgetedExpenses: TransactionSplit[],
-        paycheckSurplus: number,
         netImpact: number
     ): string {
         const lines = [chalk.bold('\n=== Recommendations ==='), ''];

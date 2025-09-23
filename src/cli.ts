@@ -112,7 +112,8 @@ Examples:
                     services.additionalIncomeService,
                     services.unbudgetedExpenseService,
                     services.transactionPropertyService,
-                    services.paycheckSurplusService
+                    services.paycheckSurplusService,
+                    services.finalizeBudgetDisplayService
                 );
                 await command.execute({
                     month: opts.month!,
@@ -150,7 +151,8 @@ Examples:
             try {
                 const command = new BudgetStatusCommand(
                     services.budgetStatus,
-                    services.transactionService
+                    services.transactionService,
+                    services.budgetDisplayService
                 );
                 await command.execute({
                     month: opts.month!,

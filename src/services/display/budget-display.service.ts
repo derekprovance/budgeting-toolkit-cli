@@ -1,11 +1,15 @@
 import chalk from 'chalk';
 import { BudgetStatus } from '../../types/interface/budget-status.interface';
+import { DisplayService } from './display.service';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 /**
  * Service for formatting and displaying budget information
  */
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
+
+    constructor(private displayService: DisplayService) {}
 
     /**
      * Formats the budget status report header
@@ -128,6 +132,20 @@ export class BudgetDisplayService {
             );
         }
         return null;
+    }
+
+    getUnbudgetedExpenseWarning(total: number): string | null {
+        if (total > 0) {
+            return chalk.yellow(`\nWarning: ${total} untracked expense(s).`);
+        }
+        return null;
+    }
+
+    listUnbudgetedTransactions(transactions: TransactionSplit[]): string {
+        return this.displayService.listTransactionsWithHeader(
+            transactions,
+            '=== Unbudgeted Transactions ==='
+        );
     }
 
     private getDailyRateIndicator(

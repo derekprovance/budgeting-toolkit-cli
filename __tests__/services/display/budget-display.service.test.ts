@@ -1,4 +1,7 @@
 import { BudgetDisplayService } from '../../../src/services/display/budget-display.service';
+import { DisplayService } from '../../../src/services/display/display.service';
+import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
+import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 import { BudgetStatus } from '../../../src/types/interface/budget-status.interface';
 
 // Mock chalk to return the input string (disable styling for tests)
@@ -13,11 +16,32 @@ jest.mock('chalk', () => ({
     cyanBright: (str: string) => str,
 }));
 
+jest.mock('../../../src/services/display/display.service');
+jest.mock('../../../src/services/core/transaction-property.service');
+jest.mock('../../../src/services/excluded-transaction.service');
+
 describe('BudgetDisplayService', () => {
     let service: BudgetDisplayService;
+    let displayService: jest.Mocked<DisplayService>;
+    let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
-        service = new BudgetDisplayService();
+        excludedTransactionService =
+            new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
+        transactionPropertyService = new TransactionPropertyService(
+            excludedTransactionService
+        ) as jest.Mocked<TransactionPropertyService>;
+        displayService = new DisplayService(
+            transactionPropertyService
+        ) as jest.Mocked<DisplayService>;
+
+        // Mock the displayService methods
+        displayService.listTransactionsWithHeader = jest
+            .fn()
+            .mockReturnValue('=== Unbudgeted Transactions ===\n\nNo transactions found');
+
+        service = new BudgetDisplayService(displayService);
     });
 
     describe('formatHeader', () => {

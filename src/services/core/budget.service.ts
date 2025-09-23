@@ -6,6 +6,9 @@ import {
     FireflyApiClient,
     FireflyApiError,
     InsightGroup,
+    TransactionArray,
+    TransactionRead,
+    TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
 import { DateRangeService } from '../../types/interface/date-range.service.interface';
 import { DateUtils } from '../../utils/date.utils';
@@ -61,11 +64,26 @@ export class BudgetService implements IBudgetService {
         }
     }
 
+    async getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]> {
+        const range = DateRangeService.getDateRange(month, year);
+        const response = await this.apiClient.get<TransactionArray>(
+            `/budgets/transactions-without-budget?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
+        );
+        if (!response) {
+            throw new FireflyApiError(`Failed to fetch transactions for month: ${month}`);
+        }
+        return this.flattenTransactions(response.data);
+    }
+
     private async fetchBudgets(): Promise<BudgetRead[]> {
         const results = await this.apiClient.get<BudgetArray>(`/budgets`);
         if (!results) {
             throw new FireflyApiError('Failed to fetch budgets');
         }
         return results.data;
+    }
+
+    private flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
+        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
     }
 }

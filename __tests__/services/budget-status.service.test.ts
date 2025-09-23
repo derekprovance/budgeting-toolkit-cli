@@ -1,21 +1,34 @@
 import { BudgetStatusService } from '../../src/services/budget-status.service';
 import { BudgetService } from '../../src/services/core/budget.service';
+import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
 import { BudgetStatusDto } from '../../src/types/dto/budget-status.dto';
 import { BudgetRead, BudgetLimitRead, InsightGroup } from '@derekprovance/firefly-iii-sdk';
 
 jest.mock('../../src/services/core/budget.service');
+jest.mock('../../src/services/core/transaction-property.service');
 
 describe('BudgetStatusService', () => {
     let budgetStatusService: BudgetStatusService;
     let mockBudgetService: jest.Mocked<BudgetService>;
+    let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
 
     beforeEach(() => {
         mockBudgetService = {
             getBudgets: jest.fn(),
             getBudgetLimits: jest.fn(),
             getBudgetExpenseInsights: jest.fn(),
+            getTransactionsWithoutBudget: jest.fn(),
         } as unknown as jest.Mocked<BudgetService>;
-        budgetStatusService = new BudgetStatusService(mockBudgetService);
+
+        mockTransactionPropertyService = {
+            isBill: jest.fn(),
+            isDisposableIncome: jest.fn(),
+        } as unknown as jest.Mocked<TransactionPropertyService>;
+
+        budgetStatusService = new BudgetStatusService(
+            mockBudgetService,
+            mockTransactionPropertyService
+        );
     });
 
     describe('getBudgetStatus', () => {

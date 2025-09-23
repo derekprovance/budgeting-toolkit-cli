@@ -509,9 +509,13 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(UpdateTransactionMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Budget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
-            mockTransactionService.getTransactionReadBySplit.mockReturnValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -536,9 +540,13 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(UpdateTransactionMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Budget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
-            mockTransactionService.getTransactionReadBySplit.mockReturnValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -550,7 +558,11 @@ describe('TransactionUpdaterService', () => {
             // Budget validation runs independently of category validation
             expect(mockValidator.shouldSetBudget).toHaveBeenCalledWith(mockTransaction);
             // categoryOrBudgetChanged is called with undefined category and valid budget
-            expect(mockValidator.categoryOrBudgetChanged).toHaveBeenCalledWith(mockTransaction, undefined, mockBudgets[0]);
+            expect(mockValidator.categoryOrBudgetChanged).toHaveBeenCalledWith(
+                mockTransaction,
+                undefined,
+                mockBudgets[0]
+            );
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 undefined, // Invalid category becomes undefined
@@ -562,9 +574,13 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(false); // Budget should not be set
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(UpdateTransactionMode.Both);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Both
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
-            mockTransactionService.getTransactionReadBySplit.mockReturnValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -588,9 +604,13 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(false); // No budget needed
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(UpdateTransactionMode.Category);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Category
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
-            mockTransactionService.getTransactionReadBySplit.mockReturnValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -614,9 +634,13 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(UpdateTransactionMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Budget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
-            mockTransactionService.getTransactionReadBySplit.mockReturnValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -628,7 +652,11 @@ describe('TransactionUpdaterService', () => {
 
             // Budget validation should run since it's independent of category validation
             expect(mockValidator.shouldSetBudget).toHaveBeenCalledWith(mockTransaction);
-            expect(mockValidator.categoryOrBudgetChanged).toHaveBeenCalledWith(mockTransaction, undefined, mockBudgets[0]);
+            expect(mockValidator.categoryOrBudgetChanged).toHaveBeenCalledWith(
+                mockTransaction,
+                undefined,
+                mockBudgets[0]
+            );
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 undefined, // No category
@@ -665,9 +693,13 @@ describe('TransactionUpdaterService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(UpdateTransactionMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Budget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
-            mockTransactionService.getTransactionReadBySplit.mockReturnValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
@@ -677,7 +709,11 @@ describe('TransactionUpdaterService', () => {
             // Budget-only updates are now supported
             expect(result).toBe(mockTransaction);
             expect(mockValidator.shouldSetBudget).toHaveBeenCalledWith(mockTransaction);
-            expect(mockValidator.categoryOrBudgetChanged).toHaveBeenCalledWith(mockTransaction, undefined, mockBudgets[0]);
+            expect(mockValidator.categoryOrBudgetChanged).toHaveBeenCalledWith(
+                mockTransaction,
+                undefined,
+                mockBudgets[0]
+            );
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 undefined,

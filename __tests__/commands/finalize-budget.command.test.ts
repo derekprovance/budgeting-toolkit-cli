@@ -3,6 +3,7 @@ import { AdditionalIncomeService } from '../../src/services/additional-income.se
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service';
 import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service';
+import { FinalizeBudgetDisplayService } from '../../src/services/display/finalize-budget-display.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 // Mock services
@@ -18,6 +19,7 @@ describe('FinalizeBudgetCommand', () => {
     let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
     let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
     let paycheckSurplusService: jest.Mocked<PaycheckSurplusService>;
+    let finalizeBudgetDisplayService: jest.Mocked<FinalizeBudgetDisplayService>;
     let consoleLogSpy: jest.SpyInstance;
     let consoleErrorSpy: jest.SpyInstance;
 
@@ -52,12 +54,21 @@ describe('FinalizeBudgetCommand', () => {
             calculatePaycheckSurplus: jest.fn().mockResolvedValue(500.0),
         } as unknown as jest.Mocked<PaycheckSurplusService>;
 
+        finalizeBudgetDisplayService = {
+            formatHeader: jest.fn().mockReturnValue('Mock Header'),
+            formatMonthHeader: jest.fn().mockReturnValue('Mock Month Header'),
+            formatAdditionalIncomeSection: jest.fn().mockReturnValue('Mock Additional Income'),
+            formatUnbudgetedExpensesSection: jest.fn().mockReturnValue('Mock Unbudgeted Expenses'),
+            formatSummary: jest.fn().mockReturnValue('Mock Summary'),
+        } as unknown as jest.Mocked<FinalizeBudgetDisplayService>;
+
         // Create command instance
         command = new FinalizeBudgetCommand(
             additionalIncomeService,
             unbudgetedExpenseService,
             transactionPropertyService,
-            paycheckSurplusService
+            paycheckSurplusService,
+            finalizeBudgetDisplayService
         );
 
         // Spy on console methods

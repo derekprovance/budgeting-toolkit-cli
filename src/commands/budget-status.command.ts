@@ -15,7 +15,7 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
     constructor(
         private readonly budgetStatusService: BudgetStatusService,
         private readonly transactionService: TransactionService,
-        private readonly displayService: BudgetDisplayService = new BudgetDisplayService()
+        private readonly budgetDisplayService: BudgetDisplayService
     ) {}
 
     /**
@@ -23,13 +23,6 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
      * @param params The month and year to display budget status for
      */
     async execute({ month, year, shouldList }: BudgetStatusCommandRequest): Promise<void> {
-        /** TODO(DEREK) 
-         * - need to create a repository for the untracked budget. 
-         * - add a new service function that filters the returned results
-         * - connect the service to this function and list the transactions below
-         * - (optional) consider making sure that there's no overlap between this service and the other that lists transactions
-         * - (optional) consider doing a warning dialog when list is false
-        */
         const budgetStatuses = await this.budgetStatusService.getBudgetStatus(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
@@ -49,9 +42,14 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
         const totalSpent = budgetStatuses.reduce((sum, status) => sum + status.spent, 0);
         const totalPercentage = this.getPercentageSpent(totalSpent, totalBudget);
 
+        const unbudgetedTransactions = await this.budgetStatusService.getUntrackedTransactions(
+            month,
+            year
+        );
+
         // Display header
         console.log(
-            this.displayService.formatHeader(
+            this.budgetDisplayService.formatHeader(
                 month,
                 year,
                 isCurrentMonth ? daysLeft : undefined,
@@ -65,7 +63,7 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
 
         budgetStatuses.forEach(status => {
             console.log(
-                this.displayService.formatBudgetItem(
+                this.budgetDisplayService.formatBudgetItem(
                     status,
                     nameWidth,
                     isCurrentMonth,
@@ -79,7 +77,7 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
         // Display summary
         console.log('─'.repeat(nameWidth + 50));
         console.log(
-            this.displayService.formatSummary(
+            this.budgetDisplayService.formatSummary(
                 totalSpent,
                 totalBudget,
                 nameWidth,
@@ -89,12 +87,22 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
             )
         );
 
+        // Display list of unbudgeted transactions
+        if (shouldList) {
+            console.log(
+                this.budgetDisplayService.listUnbudgetedTransactions(unbudgetedTransactions)
+            );
+        }
+
         // Display warning if necessary
         if (isCurrentMonth) {
-            const warning = this.displayService.getSpendRateWarning(
-                totalPercentage,
-                percentageLeft
-            );
+            let warning =
+                this.budgetDisplayService.getSpendRateWarning(totalPercentage, percentageLeft) ??
+                '';
+            warning +=
+                this.budgetDisplayService.getUnbudgetedExpenseWarning(
+                    unbudgetedTransactions.length
+                ) ?? '';
             if (warning) {
                 console.log(warning);
             }

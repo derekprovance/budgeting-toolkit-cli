@@ -16,16 +16,13 @@ import chalk from 'chalk';
 //TODO(DEREK) - calculate the amount of budget left for transfer into and out of disposable
 //TODO(DEREK) - Find a way to list all transactions without a budget that are not a bill or disposable income
 export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
-    private readonly displayService: FinalizeBudgetDisplayService;
-
     constructor(
         private readonly additionalIncomeService: AdditionalIncomeService,
         private readonly unbudgetedExpenseService: UnbudgetedExpenseService,
         private readonly transactionPropertyService: TransactionPropertyService,
-        private readonly paycheckSurplusService: PaycheckSurplusService
-    ) {
-        this.displayService = new FinalizeBudgetDisplayService(transactionPropertyService);
-    }
+        private readonly paycheckSurplusService: PaycheckSurplusService,
+        private readonly finalizeBudgetDisplayService: FinalizeBudgetDisplayService
+    ) {}
 
     /**
      * Executes the finalize budget command
@@ -33,7 +30,9 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
      */
     async execute({ month, year }: BudgetDateParams): Promise<void> {
         try {
-            console.log(this.displayService.formatHeader('Budget Finalization Report'));
+            console.log(
+                this.finalizeBudgetDisplayService.formatHeader('Budget Finalization Report')
+            );
 
             const [additionalIncomeResults, unbudgetedExpenseResults, paycheckSurplus] =
                 await Promise.all([
@@ -42,21 +41,27 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
                     this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
                 ]);
 
-            console.log(this.displayService.formatMonthHeader(month, year));
+            console.log(this.finalizeBudgetDisplayService.formatMonthHeader(month, year));
 
             // Display additional income section
-            console.log(this.displayService.formatAdditionalIncomeSection(additionalIncomeResults));
+            console.log(
+                this.finalizeBudgetDisplayService.formatAdditionalIncomeSection(
+                    additionalIncomeResults
+                )
+            );
 
             // Display unbudgeted expenses section
             console.log(
-                this.displayService.formatUnbudgetedExpensesSection(unbudgetedExpenseResults)
+                this.finalizeBudgetDisplayService.formatUnbudgetedExpensesSection(
+                    unbudgetedExpenseResults
+                )
             );
 
             // Calculate and display enhanced summary
             const allTransactions = [...additionalIncomeResults, ...unbudgetedExpenseResults];
             const counts = this.getTransactionCounts(allTransactions);
             console.log(
-                this.displayService.formatSummary(
+                this.finalizeBudgetDisplayService.formatSummary(
                     counts,
                     additionalIncomeResults,
                     unbudgetedExpenseResults,

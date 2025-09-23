@@ -28,6 +28,7 @@ describe('BudgetStatusCommand', () => {
         // Setup service mocks
         budgetStatusService = {
             getBudgetStatus: jest.fn().mockResolvedValue(mockBudgetStatuses),
+            getUntrackedTransactions: jest.fn().mockResolvedValue([]),
         } as unknown as jest.Mocked<BudgetStatusService>;
 
         transactionService = {
@@ -39,6 +40,8 @@ describe('BudgetStatusCommand', () => {
             formatBudgetItem: jest.fn().mockReturnValue('Formatted Budget Item'),
             formatSummary: jest.fn().mockReturnValue('Formatted Summary'),
             getSpendRateWarning: jest.fn().mockReturnValue(null),
+            getUnbudgetedExpenseWarning: jest.fn().mockReturnValue(null),
+            listUnbudgetedTransactions: jest.fn().mockReturnValue('Unbudgeted Transactions'),
         } as unknown as jest.Mocked<BudgetDisplayService>;
 
         // Create command instance
@@ -58,6 +61,7 @@ describe('BudgetStatusCommand', () => {
             await command.execute({
                 month: currentDate.getMonth() + 1,
                 year: currentDate.getFullYear(),
+                shouldList: false,
             });
 
             expect(budgetStatusService.getBudgetStatus).toHaveBeenCalled();
@@ -74,6 +78,7 @@ describe('BudgetStatusCommand', () => {
             await command.execute({
                 month: currentDate.getMonth(), // Previous month
                 year: currentDate.getFullYear(),
+                shouldList: false,
             });
 
             expect(budgetStatusService.getBudgetStatus).toHaveBeenCalled();
@@ -92,6 +97,7 @@ describe('BudgetStatusCommand', () => {
             await command.execute({
                 month: currentDate.getMonth() + 1,
                 year: currentDate.getFullYear(),
+                shouldList: false,
             });
 
             expect(displayService.getSpendRateWarning).toHaveBeenCalled();

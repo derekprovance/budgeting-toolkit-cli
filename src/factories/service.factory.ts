@@ -17,6 +17,9 @@ import { LLMConfig } from '../config/llm.config';
 import { UserInputService } from '../services/user-input.service';
 import { TransactionUpdaterService } from '../services/core/transaction-updater.service';
 import { baseUrl } from '../config';
+import { DisplayService } from '../services/display/display.service';
+import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service';
+import { BudgetDisplayService } from '../services/display/budget-display.service';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyApiClient) {
@@ -39,11 +42,14 @@ export class ServiceFactory {
             transactionService,
             transactionPropertyService
         );
-        const budgetStatus = new BudgetStatusService(budgetService);
+        const budgetStatus = new BudgetStatusService(budgetService, transactionPropertyService);
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
             transactionPropertyService
         );
+        const displayService = new DisplayService(transactionPropertyService);
+        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(displayService);
+        const budgetDisplayService = new BudgetDisplayService(displayService);
 
         return {
             transactionService,
@@ -57,6 +63,9 @@ export class ServiceFactory {
             excludedTransactionService,
             paycheckSurplusService,
             transactionValidatorService,
+            displayService,
+            finalizeBudgetDisplayService,
+            budgetDisplayService,
         };
     }
 

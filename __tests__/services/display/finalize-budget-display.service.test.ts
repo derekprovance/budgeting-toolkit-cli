@@ -18,14 +18,17 @@ jest.mock('chalk', () => {
 
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { FinalizeBudgetDisplayService } from '../../../src/services/display/finalize-budget-display.service';
+import { DisplayService } from '../../../src/services/display/display.service';
 import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 
+jest.mock('../../../src/services/display/display.service');
 jest.mock('../../../src/services/core/transaction-property.service');
 jest.mock('../../../src/services/excluded-transaction.service');
 
 describe('FinalizeBudgetDisplayService', () => {
     let service: FinalizeBudgetDisplayService;
+    let displayService: jest.Mocked<DisplayService>;
     let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
     let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
@@ -43,7 +46,37 @@ describe('FinalizeBudgetDisplayService', () => {
         transactionPropertyService = new TransactionPropertyService(
             excludedTransactionService
         ) as jest.Mocked<TransactionPropertyService>;
-        service = new FinalizeBudgetDisplayService(transactionPropertyService);
+        displayService = new DisplayService(
+            transactionPropertyService
+        ) as jest.Mocked<DisplayService>;
+
+        // Mock the displayService methods
+        displayService.listTransactionsWithHeader = jest
+            .fn()
+            .mockImplementation((transactions: TransactionSplit[], header: string) => {
+                if (transactions.length === 0) {
+                    const noDataMessage = header.includes('Income')
+                        ? 'No additional income transactions found'
+                        : 'No unbudgeted expense transactions found';
+                    return `\n${header}\n\n${noDataMessage}`;
+                }
+
+                const total = transactions.reduce(
+                    (sum: number, t: TransactionSplit) => sum + parseFloat(t.amount),
+                    0
+                );
+                const typeIndicator = transactionPropertyService.isBill(transactions[0])
+                    ? '[BILL]'
+                    : transactionPropertyService.isTransfer(transactions[0])
+                      ? '[TRANSFER]'
+                      : transactionPropertyService.isDeposit(transactions[0])
+                        ? '[DEPOSIT]'
+                        : '[OTHER]';
+
+                return `\n${header}\n\n${typeIndicator} ${transactions[0].description}\n${transactions[0].currency_symbol}${Math.abs(total).toFixed(2)}\n\nTotal ${header.includes('Income') ? 'Additional Income' : 'Unbudgeted Expenses'}: ${transactions[0].currency_symbol}${Math.abs(total).toFixed(2)}`;
+            });
+
+        service = new FinalizeBudgetDisplayService(displayService);
     });
 
     describe('formatHeader', () => {
