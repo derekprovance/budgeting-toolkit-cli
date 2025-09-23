@@ -33,17 +33,7 @@ export const expectedMonthlyPaycheck = getConfigValue<number>(
 );
 
 //TODO(DEREK) - this needs to be migrated to the yaml configuration
-export enum ExpenseAccount {
-    NO_NAME = '5',
-}
-
-//TODO(DEREK) - this needs to be migrated to the yaml configuration
 export enum Tag {
     DISPOSABLE_INCOME = 'Disposable Income',
     BILLS = 'Bills',
-}
-
-//TODO(DEREK) - this needs to be migrated to the yaml configuration
-export enum Description {
-    PAYROLL = 'PAYROLL',
 }

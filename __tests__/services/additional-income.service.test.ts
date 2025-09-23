@@ -51,6 +51,9 @@ describe('AdditionalIncomeService', () => {
                     TestAccount.CITIBANK_DOUBLECASH,
                 ];
             }
+            if (key === 'excludedDescriptions') {
+                return ['PAYROLL'];
+            }
             return undefined;
         });
         mockApiClient = {} as jest.Mocked<FireflyApiClient>;

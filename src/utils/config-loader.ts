@@ -15,6 +15,11 @@ interface YamlConfig {
     monthlyBudget?: number;
     additionalSavingsPercentage?: number;
 
+    // Firefly Configuration
+    firefly?: {
+        noNameExpenseAccountId: string;
+    };
+
     // LLM Configuration
     llm?: {
         maxTokens?: number;

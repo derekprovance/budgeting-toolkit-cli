@@ -1,6 +1,5 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service';
-import { Description } from '../config';
 import { TransactionPropertyService } from './core/transaction-property.service';
 import { logger } from '../logger';
 import { DateUtils } from '../utils/date.utils';
@@ -39,7 +38,7 @@ interface AdditionalIncomeConfig {
 export class AdditionalIncomeService {
     private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
         validDestinationAccounts: [],
-        excludedDescriptions: [Description.PAYROLL],
+        excludedDescriptions: [],
         excludeDisposableIncome: true,
         minTransactionAmount: 0,
     };

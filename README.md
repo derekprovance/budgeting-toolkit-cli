@@ -87,72 +87,147 @@ LOG_LEVEL=info
 
 ### YAML Configuration
 
-Create a `budgeting-toolkit.config.yaml` file for advanced configuration options:
+Create a `budgeting-toolkit.config.yaml` file for advanced configurations and settings:
+
+The YAML configuration system provides:
+
+- **Type-safe configuration** with validation
+- **Environment-independent settings** that can be version controlled
+- **Hierarchical configuration** with environment variable fallbacks
+- **Account-based filtering** for precise transaction processing
+- **Transfer validation** for complex account relationships
 
 ```yaml
 # Budget Configuration
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
-    - 'Checking Account'
-    - 'Savings Account'
+    - '1'  # Primary Checking Account
+    - '2'  # Savings Account
+    - '3'  # Investment Account
+
 validExpenseAccounts:
-    - 'Credit Card'
+    - '4'  # Main Credit Card
+    - '5'  # Secondary Credit Card
+    - '1'  # Primary Checking Account
+
+validTransfers:
+    - source: '2'       # Savings Account
+      destination: '1'  # Primary Checking
+    - source: '1'       # Primary Checking
+      destination: '3'  # Investment Account
+
 excludedDescriptions:
-    - 'PAYROLL'
+    - PAYROLL
     - 'ATM FEE'
+    - 'AUTOMATIC TRANSFER'
+    
+excludedTransactionsCsv: excluded_transactions.csv
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
 monthlyBudget: 4500.00
+
+# Additional savings percentage (added to base 30%)
 additionalSavingsPercentage: 10
 
-# LLM Configuration
-llm:
-    maxTokens: 1000
-    batchSize: 10
-    maxConcurrent: 3
-    temperature: 0.2
-    model: 'claude-3-5-haiku-latest'
-    retryDelayMs: 1000
-    maxRetryDelayMs: 32000
+# Firefly III Configuration
+firefly:
+    noNameExpenseAccountId: '5'
 
-    # Rate Limiting
+# LLM Configuration for optimal transaction classification
+llm:
+    # Use Claude Sonnet for better reasoning and accuracy
+    model: 'claude-sonnet-4-20250514'
+
+    # Tokens for detailed analysis
+    maxTokens: 2000
+
+    # Lower temperature for consistent categorization
+    temperature: 0.1
+
+    # Batch processing settings
+    batchSize: 5
+    maxConcurrent: 2
+
+    # Retry configuration
+    retryDelayMs: 1500
+    maxRetryDelayMs: 30000
+
+    # Rate limiting
     rateLimit:
-        maxTokensPerMinute: 50
+        maxTokensPerMinute: 40
         refillInterval: 60000
 
-    # Circuit Breaker
+    # Circuit breaker for reliability
     circuitBreaker:
-        failureThreshold: 5
-        resetTimeout: 60000
-        halfOpenTimeout: 30000
+        failureThreshold: 3
+        resetTimeout: 90000
+        halfOpenTimeout: 45000
 ```
+
+#### Budget Configuration Options
+
+| Option                        | Description                         | Default | Type     |
+| ----------------------------- | ----------------------------------- | ------- | -------- |
+| `expectedMonthlyPaycheck`     | Expected monthly paycheck amount    | 0       | number   |
+| `validDestinationAccounts`    | Account IDs for income filtering    | []      | string[] |
+| `validExpenseAccounts`        | Account IDs for expense filtering   | []      | string[] |
+| `validTransfers`              | Valid transfer source/destination   | []      | object[] |
+| `excludedDescriptions`        | Transaction descriptions to exclude | []      | string[] |
+| `excludedTransactionsCsv`     | Path to CSV file with exclusions    | -       | string   |
+| `excludeDisposableIncome`     | Exclude disposable income trans.    | false   | boolean  |
+| `minTransactionAmount`        | Minimum transaction amount          | 0       | number   |
+| `monthlyBudget`               | Monthly budget amount               | 0       | number   |
+| `additionalSavingsPercentage` | Additional savings percentage       | 0       | number   |
+
+#### ValidTransfers Configuration
+
+Configure valid transfer pairs to properly classify transfer transactions:
+
+```yaml
+validTransfers:
+    - source: '2'       # Savings Account
+      destination: '1'  # Primary Checking
+    - source: '1'       # Primary Checking
+      destination: '3'  # Investment Account
+```
+
+Each transfer object requires:
+
+- `source` - Source account ID (string)
+- `destination` - Destination account ID (string)
+
+#### Firefly III Configuration Options
+
+| Option                   | Description                     | Default | Type   |
+| ------------------------ | ------------------------------- | ------- | ------ |
+| `noNameExpenseAccountId` | Account ID for unnamed expenses | '5'     | string |
 
 #### LLM Configuration Options
 
-| Option            | Description                 | Default                 | Type   |
-| ----------------- | --------------------------- | ----------------------- | ------ |
-| `maxTokens`       | Maximum tokens per response | 1000                    | number |
-| `batchSize`       | Transactions per batch      | 10                      | number |
-| `maxConcurrent`   | Concurrent API requests     | 3                       | number |
-| `temperature`     | Response randomness (0-1)   | 0.2                     | number |
-| `model`           | Claude model version        | claude-3-5-haiku-latest | string |
-| `retryDelayMs`    | Initial retry delay         | 1000                    | number |
-| `maxRetryDelayMs` | Maximum retry delay         | 32000                   | number |
+| Option            | Description                 | Default                  | Type   |
+| ----------------- | --------------------------- | ------------------------ | ------ |
+| `maxTokens`       | Maximum tokens per response | 2000                     | number |
+| `batchSize`       | Transactions per batch      | 5                        | number |
+| `maxConcurrent`   | Concurrent API requests     | 2                        | number |
+| `temperature`     | Response randomness (0-1)   | 0.1                      | number |
+| `model`           | Claude model version        | claude-sonnet-4-20250514 | string |
+| `retryDelayMs`    | Initial retry delay         | 1500                     | number |
+| `maxRetryDelayMs` | Maximum retry delay         | 30000                    | number |
 
 #### Rate Limiting Options
 
 | Option               | Description                | Default | Type   |
 | -------------------- | -------------------------- | ------- | ------ |
-| `maxTokensPerMinute` | Rate limit threshold       | 50      | number |
+| `maxTokensPerMinute` | Rate limit threshold       | 40      | number |
 | `refillInterval`     | Token refill interval (ms) | 60000   | number |
 
 #### Circuit Breaker Options
 
 | Option             | Description             | Default | Type   |
 | ------------------ | ----------------------- | ------- | ------ |
-| `failureThreshold` | Failures before opening | 5       | number |
-| `resetTimeout`     | Reset timeout (ms)      | 60000   | number |
-| `halfOpenTimeout`  | Half-open timeout (ms)  | 30000   | number |
+| `failureThreshold` | Failures before opening | 3       | number |
+| `resetTimeout`     | Reset timeout (ms)      | 90000   | number |
+| `halfOpenTimeout`  | Half-open timeout (ms)  | 45000   | number |
 
 ### Transaction Exclusions
 

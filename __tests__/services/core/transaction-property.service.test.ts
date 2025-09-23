@@ -1,7 +1,16 @@
 import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ExpenseAccount, Tag } from '../../../src/config';
+import { Tag } from '../../../src/config';
+
+jest.mock('../../../src/utils/config-loader', () => ({
+    loadYamlConfig: jest.fn(() => ({
+        firefly: {
+            noNameExpenseAccountId: '5',
+        },
+    })),
+    getConfigValue: jest.fn(),
+}));
 
 describe('TransactionPropertyService', () => {
     let service: TransactionPropertyService;
@@ -71,7 +80,7 @@ describe('TransactionPropertyService', () => {
 
     describe('hasNoDestination', () => {
         it('should return true when destination is NO_NAME', () => {
-            expect(service.hasNoDestination(ExpenseAccount.NO_NAME)).toBe(true);
+            expect(service.hasNoDestination('5')).toBe(true);
         });
 
         it('should return false when destination is not NO_NAME', () => {

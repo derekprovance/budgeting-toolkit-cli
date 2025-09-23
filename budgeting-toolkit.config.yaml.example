@@ -4,44 +4,56 @@
 # Budget Configuration
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
-  - "Checking Account"
-  - "Savings Account"
+    - '1' # Checking Account ID
+    - '2' # Savings Account ID
+
 validExpenseAccounts:
-  - "Credit Card"
-  - "Debit Card"
+    - '3' # Credit Card Account ID
+    - '4' # Debit Card Account ID
+
 excludedDescriptions:
-  - "PAYROLL"
-  - "ATM FEE"
-  - "TRANSFER"
+    - 'PAYROLL'
+    - 'ATM FEE'
+    - 'TRANSFER'
+
+# These are transfers that would be counted towards unbudgeted expenses
+validTransfers:
+    - source: '5' # Remote Investment Account ID
+      destination: '1' # Checking Account ID
+
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
 monthlyBudget: 4500.00
 additionalSavingsPercentage: 10
 
 # Excluded transactions CSV file
-excludedTransactionsCsv: "excluded_transactions.csv"
+excludedTransactionsCsv: 'excluded_transactions.csv'
+
+# Firefly specific configurations
+firefly:
+    noNameExpenseAccountId: '5' # ID of the (no name) expense account that firefly creates automatically on installation
 
 # LLM Configuration (Advanced)
 llm:
-  # Basic LLM Settings
-  maxTokens: 1000              # Maximum tokens per response
-  batchSize: 10                # Transactions processed per batch
-  maxConcurrent: 3             # Maximum concurrent API requests
-  temperature: 0.2             # Response randomness (0-1, lower = more deterministic)
-  model: "claude-3-5-haiku-latest"  # Claude model version
-  retryDelayMs: 1000          # Initial retry delay in milliseconds
-  maxRetryDelayMs: 32000      # Maximum retry delay in milliseconds
-  
-  # Rate Limiting Configuration
-  rateLimit:
-    maxTokensPerMinute: 50    # Rate limit threshold
-    refillInterval: 60000     # Token refill interval in milliseconds
-  
-  # Circuit Breaker Configuration
-  circuitBreaker:
-    failureThreshold: 5       # Number of failures before opening circuit
-    resetTimeout: 60000       # Time to wait before attempting reset (ms)
-    halfOpenTimeout: 30000    # Time to stay in half-open state (ms)
+    # Basic LLM Settings
+    maxTokens: 1000 # Maximum tokens per response
+    batchSize: 10 # Transactions processed per batch
+    maxConcurrent: 3 # Maximum concurrent API requests
+    temperature: 0.2 # Response randomness (0-1, lower = more deterministic)
+    model: 'claude-3-5-haiku-latest' # Claude model version
+    retryDelayMs: 1000 # Initial retry delay in milliseconds
+    maxRetryDelayMs: 32000 # Maximum retry delay in milliseconds
+
+    # Rate Limiting Configuration
+    rateLimit:
+        maxTokensPerMinute: 50 # Rate limit threshold
+        refillInterval: 60000 # Token refill interval in milliseconds
+
+    # Circuit Breaker Configuration
+    circuitBreaker:
+        failureThreshold: 5 # Number of failures before opening circuit
+        resetTimeout: 60000 # Time to wait before attempting reset (ms)
+        halfOpenTimeout: 30000 # Time to stay in half-open state (ms)
 
 # Performance Notes:
 # - Batch processing reduces API calls by 80-90%

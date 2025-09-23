@@ -1,9 +1,15 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ExpenseAccount, Tag } from '../../config';
+import { Tag } from '../../config';
 import { ExcludedTransactionService } from '../excluded-transaction.service';
+import { loadYamlConfig } from '../../utils/config-loader';
 
 export class TransactionPropertyService {
-    constructor(private readonly excludedTransactionService: ExcludedTransactionService) {}
+    private fireflyConfig;
+
+    constructor(private readonly excludedTransactionService: ExcludedTransactionService) {
+        const yamlConfig = loadYamlConfig();
+        this.fireflyConfig = yamlConfig.firefly;
+    }
 
     isTransfer(transaction: TransactionSplit): boolean {
         return transaction.type === 'transfer';
@@ -22,7 +28,7 @@ export class TransactionPropertyService {
     }
 
     hasNoDestination(destinationId: string | null): boolean {
-        return destinationId === ExpenseAccount.NO_NAME;
+        return destinationId === (this.fireflyConfig?.noNameExpenseAccountId || '5');
     }
 
     isSupplementedByDisposable(tags: string[] | null | undefined): boolean {
