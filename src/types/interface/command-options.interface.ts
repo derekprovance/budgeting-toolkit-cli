@@ -5,6 +5,10 @@ export interface BudgetDateOptions {
     year?: number;
 }
 
+export interface BudgetStatusOptions extends BudgetDateOptions {
+    list: boolean;
+}
+
 export interface UpdateTransactionOptions {
     tag: string;
     mode: UpdateTransactionMode;

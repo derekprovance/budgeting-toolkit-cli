@@ -7,6 +7,7 @@ import { UpdateTransactionsCommand } from './commands/update-transaction.command
 import { ServiceFactory } from './factories/service.factory';
 import {
     BudgetDateOptions,
+    BudgetStatusOptions,
     UpdateTransactionOptions,
 } from './types/interface/command-options.interface';
 import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum';
@@ -136,6 +137,7 @@ Examples:
                 .argParser(validateYear)
                 .default(getCurrentYear(), 'current year')
         )
+        .addOption(new Option('-l, --list', 'list untracked expenses').default(false))
         .addHelpText(
             'after',
             `
@@ -144,7 +146,7 @@ Examples:
   $ budgeting-toolkit status -m 8                 # August status
   $ budgeting-toolkit st                          # current month (using alias)`
         )
-        .action(async (opts: BudgetDateOptions) => {
+        .action(async (opts: BudgetStatusOptions) => {
             try {
                 const command = new BudgetStatusCommand(
                     services.budgetStatus,
@@ -153,6 +155,7 @@ Examples:
                 await command.execute({
                     month: opts.month!,
                     year: opts.year!,
+                    shouldList: opts.list!,
                 });
             } catch (error) {
                 handleError(error, 'getting budget status');

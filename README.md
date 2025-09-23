@@ -248,6 +248,9 @@ budgeting-toolkit status
 # Specific month
 budgeting-toolkit status --month 8
 
+# Specific list
+budgeting-toolkit status --month 8 --list
+
 # Different year
 budgeting-toolkit status --month 12 --year 2024
 
@@ -259,6 +262,7 @@ budgeting-toolkit st
 
 - `-m, --month <1-12>` - Target month (default: current month)
 - `-y, --year <year>` - Target year (default: current year)
+- `-l, --list` - Lists untracked transactions (default: false)
 
 #### 📊 Budget Finalization
 
@@ -386,6 +390,7 @@ budgeting-toolkit categorize Import-$(date +%Y-%m-%d)
     ```
 
 3. Development mode:
+
     ```bash
     npm run start
     ```

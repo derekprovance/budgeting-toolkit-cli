@@ -4,10 +4,14 @@ import { Command } from '../types/interface/command.interface';
 import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
 import { BudgetDisplayService } from '../services/display/budget-display.service';
 
+interface BudgetStatusCommandRequest extends BudgetDateParams {
+    shouldList: boolean;
+}
+
 /**
  * Command for displaying budget status
  */
-export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
+export class BudgetStatusCommand implements Command<void, BudgetStatusCommandRequest> {
     constructor(
         private readonly budgetStatusService: BudgetStatusService,
         private readonly transactionService: TransactionService,
@@ -18,7 +22,14 @@ export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
      * Executes the budget status command
      * @param params The month and year to display budget status for
      */
-    async execute({ month, year }: BudgetDateParams): Promise<void> {
+    async execute({ month, year, shouldList }: BudgetStatusCommandRequest): Promise<void> {
+        /** TODO(DEREK) 
+         * - need to create a repository for the untracked budget. 
+         * - add a new service function that filters the returned results
+         * - connect the service to this function and list the transactions below
+         * - (optional) consider making sure that there's no overlap between this service and the other that lists transactions
+         * - (optional) consider doing a warning dialog when list is false
+        */
         const budgetStatuses = await this.budgetStatusService.getBudgetStatus(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
