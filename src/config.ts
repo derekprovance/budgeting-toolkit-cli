@@ -33,17 +33,6 @@ export const expectedMonthlyPaycheck = getConfigValue<number>(
 );
 
 //TODO(DEREK) - this needs to be migrated to the yaml configuration
-export enum Account {
-    PRIMARY = '1',
-    DISPOSABLE = '13',
-    SAVINGS = '2',
-    MONEY_MARKET = '27',
-    CHASE_AMAZON = '8',
-    CHASE_SAPPHIRE = '11',
-    CITIBANK_DOUBLECASH = '14',
-}
-
-//TODO(DEREK) - this needs to be migrated to the yaml configuration
 export enum ExpenseAccount {
     NO_NAME = '5',
 }

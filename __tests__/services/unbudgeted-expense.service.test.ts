@@ -2,9 +2,17 @@ import { TransactionSplit, FireflyApiClient } from '@derekprovance/firefly-iii-s
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
-import { Account } from '../../src/config';
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
 import { getConfigValue } from '../../src/utils/config-loader';
+
+// Test account IDs - these are hardcoded for test isolation
+const TestAccount = {
+    PRIMARY: 'test-primary-account',
+    CHASE_SAPPHIRE: 'test-chase-sapphire',
+    CHASE_AMAZON: 'test-chase-amazon',
+    CITIBANK_DOUBLECASH: 'test-citibank-doublecash',
+    MONEY_MARKET: 'test-money-market',
+} as const;
 
 // Mock dependencies
 jest.mock('../../src/services/core/transaction.service');
@@ -35,10 +43,18 @@ describe('UnbudgetedExpenseService', () => {
         mockGetConfigValue.mockImplementation((key: string) => {
             if (key === 'validExpenseAccounts') {
                 return [
-                    Account.CHASE_AMAZON,
-                    Account.CHASE_SAPPHIRE,
-                    Account.CITIBANK_DOUBLECASH,
-                    Account.PRIMARY,
+                    TestAccount.CHASE_AMAZON,
+                    TestAccount.CHASE_SAPPHIRE,
+                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.PRIMARY,
+                ];
+            }
+            if (key === 'validTransfers') {
+                return [
+                    {
+                        source: TestAccount.PRIMARY,
+                        destination: TestAccount.MONEY_MARKET,
+                    },
                 ];
             }
             return undefined;
@@ -116,110 +132,12 @@ describe('UnbudgetedExpenseService', () => {
                 createMockTransaction({
                     description: 'Budgeted Expense',
                     budget_id: '123',
-                    source_id: Account.PRIMARY,
+                    source_id: TestAccount.PRIMARY,
                 }),
                 createMockTransaction({
                     description: 'Unbudgeted Expense',
                     budget_id: null,
-                    source_id: Account.PRIMARY,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Unbudgeted Expense');
-        });
-
-        it('should filter out excluded transactions', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Excluded Expense',
-                    source_id: Account.PRIMARY,
-                }),
-                createMockTransaction({
-                    description: 'Valid Expense',
-                    source_id: Account.PRIMARY,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction
-                .mockResolvedValueOnce(true)
-                .mockResolvedValueOnce(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Valid Expense');
-        });
-
-        it('should filter out disposable income supplemented transactions', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Disposable Supplemented',
-                    source_id: Account.PRIMARY,
-                }),
-                createMockTransaction({
-                    description: 'Regular Expense',
-                    source_id: Account.PRIMARY,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Regular Expense');
-        });
-
-        it('should handle transfers from PRIMARY to MONEY_MARKET', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Valid Transfer',
-                    source_id: Account.PRIMARY,
-                    destination_id: Account.MONEY_MARKET,
-                }),
-                createMockTransaction({
-                    description: 'Invalid Transfer',
-                    source_id: Account.PRIMARY,
-                    destination_id: Account.CHASE_SAPPHIRE,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(true);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Valid Transfer');
-        });
-
-        it('should filter out non-expense account transactions', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Non-Expense Account',
-                    source_id: Account.MONEY_MARKET,
-                }),
-                createMockTransaction({
-                    description: 'Expense Account',
-                    source_id: Account.PRIMARY,
+                    source_id: TestAccount.PRIMARY,
                 }),
             ];
 
@@ -232,19 +150,121 @@ describe('UnbudgetedExpenseService', () => {
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
             expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Expense Account');
+            expect(result[0].description).toBe('Unbudgeted Expense');
+        });
+
+        it('should filter out excluded transactions', async () => {
+            const mockTransactions = [
+                createMockTransaction({
+                    description: 'Excluded Expense',
+                    source_id: TestAccount.PRIMARY,
+                }),
+                createMockTransaction({
+                    description: 'Valid Expense',
+                    source_id: TestAccount.PRIMARY,
+                }),
+            ];
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+            mockTransactionPropertyService.isExcludedTransaction
+                .mockResolvedValueOnce(true)
+                .mockResolvedValueOnce(false);
+            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionPropertyService.isBill.mockReturnValue(false);
+
+            const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].description).toBe('Valid Expense');
+        });
+
+        it('should filter out disposable income supplemented transactions', async () => {
+            const mockTransactions = [
+                createMockTransaction({
+                    description: 'Disposable Supplemented',
+                    source_id: TestAccount.PRIMARY,
+                }),
+                createMockTransaction({
+                    description: 'Regular Expense',
+                    source_id: TestAccount.PRIMARY,
+                }),
+            ];
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionPropertyService.isSupplementedByDisposable
+                .mockReturnValueOnce(true)
+                .mockReturnValueOnce(false);
+            mockTransactionPropertyService.isBill.mockReturnValue(false);
+
+            const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].description).toBe('Regular Expense');
+        });
+
+        it('should handle transfers from PRIMARY to MONEY_MARKET', async () => {
+            const mockTransactions = [
+                createMockTransaction({
+                    description: 'Valid Transfer',
+                    source_id: TestAccount.PRIMARY,
+                    destination_id: TestAccount.MONEY_MARKET,
+                }),
+                createMockTransaction({
+                    description: 'Invalid Transfer',
+                    source_id: TestAccount.PRIMARY,
+                    destination_id: TestAccount.CHASE_SAPPHIRE,
+                }),
+            ];
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+            mockTransactionPropertyService.isTransfer.mockReturnValue(true);
+            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionPropertyService.isBill.mockReturnValue(false);
+
+            const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].description).toBe('Valid Transfer');
+        });
+
+        it('should filter out non-expense account transactions', async () => {
+            const mockTransactions = [
+                createMockTransaction({
+                    description: 'Non-Expense TestAccount',
+                    source_id: TestAccount.MONEY_MARKET,
+                }),
+                createMockTransaction({
+                    description: 'Expense TestAccount',
+                    source_id: TestAccount.PRIMARY,
+                }),
+            ];
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
+            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionPropertyService.isBill.mockReturnValue(false);
+
+            const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].description).toBe('Expense TestAccount');
         });
 
         it('should include bills regardless of other criteria', async () => {
             const mockTransactions = [
                 createMockTransaction({
                     description: 'Regular Bill',
-                    source_id: Account.CHASE_SAPPHIRE,
+                    source_id: TestAccount.CHASE_SAPPHIRE,
                     tags: ['Bills'],
                 }),
                 createMockTransaction({
                     description: 'Regular Expense',
-                    source_id: Account.PRIMARY,
+                    source_id: TestAccount.PRIMARY,
                 }),
             ];
 
@@ -267,13 +287,13 @@ describe('UnbudgetedExpenseService', () => {
             const mockTransactions = [
                 createMockTransaction({
                     description: 'Budgeted Bill',
-                    source_id: Account.CHASE_SAPPHIRE,
+                    source_id: TestAccount.CHASE_SAPPHIRE,
                     budget_id: '123',
                     tags: ['Bills'],
                 }),
                 createMockTransaction({
                     description: 'Regular Expense',
-                    source_id: Account.PRIMARY,
+                    source_id: TestAccount.PRIMARY,
                 }),
             ];
 
@@ -296,12 +316,12 @@ describe('UnbudgetedExpenseService', () => {
             const mockTransactions = [
                 createMockTransaction({
                     description: 'Excluded Bill',
-                    source_id: Account.CHASE_SAPPHIRE,
+                    source_id: TestAccount.CHASE_SAPPHIRE,
                     tags: ['Bills'],
                 }),
                 createMockTransaction({
                     description: 'Regular Expense',
-                    source_id: Account.PRIMARY,
+                    source_id: TestAccount.PRIMARY,
                     budget_id: null,
                 }),
             ];
@@ -326,22 +346,22 @@ describe('UnbudgetedExpenseService', () => {
             const mockTransactions = [
                 createMockTransaction({
                     description: 'Chase Amazon Expense',
-                    source_id: Account.CHASE_AMAZON,
+                    source_id: TestAccount.CHASE_AMAZON,
                 }),
                 createMockTransaction({
                     description: 'Chase Sapphire Expense',
-                    source_id: Account.CHASE_SAPPHIRE,
+                    source_id: TestAccount.CHASE_SAPPHIRE,
                 }),
                 createMockTransaction({
                     description: 'Citi Double Cash Expense',
-                    source_id: Account.CITIBANK_DOUBLECASH,
+                    source_id: TestAccount.CITIBANK_DOUBLECASH,
                 }),
                 createMockTransaction({
-                    description: 'Primary Account Expense',
-                    source_id: Account.PRIMARY,
+                    description: 'Primary TestAccount Expense',
+                    source_id: TestAccount.PRIMARY,
                 }),
                 createMockTransaction({
-                    description: 'Invalid Account Expense',
+                    description: 'Invalid TestAccount Expense',
                     source_id: 'invalid-account',
                 }),
             ];
@@ -359,7 +379,7 @@ describe('UnbudgetedExpenseService', () => {
                 'Chase Amazon Expense',
                 'Chase Sapphire Expense',
                 'Citi Double Cash Expense',
-                'Primary Account Expense',
+                'Primary TestAccount Expense',
             ]);
         });
 
@@ -399,7 +419,7 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Bill with Disposable',
-                        source_id: Account.CHASE_SAPPHIRE,
+                        source_id: TestAccount.CHASE_SAPPHIRE,
                         tags: ['Bills', 'Disposable'],
                     }),
                 ];
@@ -420,7 +440,7 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Bill from Non-Expense',
-                        source_id: Account.MONEY_MARKET,
+                        source_id: TestAccount.MONEY_MARKET,
                         tags: ['Bills'],
                     }),
                 ];
@@ -441,7 +461,7 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Excluded Bill',
-                        source_id: Account.PRIMARY,
+                        source_id: TestAccount.PRIMARY,
                         tags: ['Bills'],
                     }),
                 ];
@@ -465,7 +485,7 @@ describe('UnbudgetedExpenseService', () => {
                     createMockTransaction({
                         description: 'No Source Transfer',
                         source_id: null,
-                        destination_id: Account.MONEY_MARKET,
+                        destination_id: TestAccount.MONEY_MARKET,
                     }),
                 ];
 
@@ -473,6 +493,7 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionPropertyService.isTransfer.mockReturnValue(true);
                 mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
                 mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionPropertyService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -483,7 +504,7 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'No Destination Transfer',
-                        source_id: Account.PRIMARY,
+                        source_id: TestAccount.PRIMARY,
                         destination_id: null,
                     }),
                 ];
@@ -492,6 +513,7 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionPropertyService.isTransfer.mockReturnValue(true);
                 mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
                 mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionPropertyService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -503,8 +525,8 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Invalid Transfer',
-                        source_id: Account.CHASE_SAPPHIRE,
-                        destination_id: Account.MONEY_MARKET,
+                        source_id: TestAccount.CHASE_SAPPHIRE,
+                        destination_id: TestAccount.MONEY_MARKET,
                     }),
                 ];
 
@@ -512,6 +534,7 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionPropertyService.isTransfer.mockReturnValue(true);
                 mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
                 mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionPropertyService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -522,10 +545,10 @@ describe('UnbudgetedExpenseService', () => {
         describe('account validation', () => {
             it('should handle transactions from all valid expense accounts', async () => {
                 const validAccounts = [
-                    Account.PRIMARY,
-                    Account.CHASE_AMAZON,
-                    Account.CHASE_SAPPHIRE,
-                    Account.CITIBANK_DOUBLECASH,
+                    TestAccount.PRIMARY,
+                    TestAccount.CHASE_AMAZON,
+                    TestAccount.CHASE_SAPPHIRE,
+                    TestAccount.CITIBANK_DOUBLECASH,
                 ];
 
                 const mockTransactions = validAccounts.map(account =>
@@ -539,6 +562,7 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionPropertyService.isTransfer.mockReturnValue(false);
                 mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
                 mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionPropertyService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -549,7 +573,7 @@ describe('UnbudgetedExpenseService', () => {
             });
 
             it('should exclude transactions from invalid accounts', async () => {
-                const invalidAccounts = [Account.MONEY_MARKET, 'INVALID_ACCOUNT'];
+                const invalidAccounts = [TestAccount.MONEY_MARKET, 'INVALID_ACCOUNT'];
 
                 const mockTransactions = invalidAccounts.map(account =>
                     createMockTransaction({
@@ -562,6 +586,7 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionPropertyService.isTransfer.mockReturnValue(false);
                 mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
                 mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionPropertyService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -571,7 +596,7 @@ describe('UnbudgetedExpenseService', () => {
             it('should handle transactions with null source accounts', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: 'Null Source Account',
+                        description: 'Null Source TestAccount',
                         source_id: null,
                     }),
                 ];
@@ -580,6 +605,7 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionPropertyService.isTransfer.mockReturnValue(false);
                 mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
                 mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionPropertyService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 

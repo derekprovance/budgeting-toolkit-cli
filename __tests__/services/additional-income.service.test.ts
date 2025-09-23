@@ -2,13 +2,25 @@ import { TransactionSplit, FireflyApiClient } from '@derekprovance/firefly-iii-s
 import { AdditionalIncomeService } from '../../src/services/additional-income.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
-import { Account } from '../../src/config';
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
+import { getConfigValue } from '../../src/utils/config-loader';
+
+// Test account IDs - these are hardcoded for test isolation
+const TestAccount = {
+    PRIMARY: 'test-primary-account',
+    CHASE_SAPPHIRE: 'test-chase-sapphire',
+    CHASE_AMAZON: 'test-chase-amazon',
+    CITIBANK_DOUBLECASH: 'test-citibank-doublecash',
+    MONEY_MARKET: 'test-money-market',
+} as const;
 
 // Mock dependencies
 jest.mock('../../src/services/core/transaction.service');
 jest.mock('../../src/services/core/transaction-property.service');
 jest.mock('../../src/services/excluded-transaction.service');
+jest.mock('../../src/utils/config-loader', () => ({
+    getConfigValue: jest.fn(),
+}));
 jest.mock('../../src/logger', () => ({
     logger: {
         debug: jest.fn(),
@@ -25,8 +37,22 @@ describe('AdditionalIncomeService', () => {
     let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
     let mockApiClient: jest.Mocked<FireflyApiClient>;
+    let mockGetConfigValue: jest.MockedFunction<typeof getConfigValue>;
 
     beforeEach(() => {
+        mockGetConfigValue = getConfigValue as jest.MockedFunction<typeof getConfigValue>;
+        // Set up valid destination accounts for tests
+        mockGetConfigValue.mockImplementation((key: string) => {
+            if (key === 'validDestinationAccounts') {
+                return [
+                    TestAccount.PRIMARY,
+                    TestAccount.CHASE_SAPPHIRE,
+                    TestAccount.CHASE_AMAZON,
+                    TestAccount.CITIBANK_DOUBLECASH,
+                ];
+            }
+            return undefined;
+        });
         mockApiClient = {} as jest.Mocked<FireflyApiClient>;
         mockExcludedTransactionService =
             new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
@@ -70,7 +96,7 @@ describe('AdditionalIncomeService', () => {
                 mockTransactionService,
                 mockTransactionPropertyService,
                 {
-                    validDestinationAccounts: [Account.PRIMARY],
+                    validDestinationAccounts: [TestAccount.PRIMARY],
                     excludedDescriptions: ['PAYROLL'],
                     minTransactionAmount: 100,
                     excludeDisposableIncome: false,
@@ -395,10 +421,10 @@ describe('AdditionalIncomeService', () => {
         describe('account validation', () => {
             it('should handle all valid destination accounts', async () => {
                 const validAccounts = [
-                    Account.PRIMARY,
-                    Account.CHASE_SAPPHIRE,
-                    Account.CHASE_AMAZON,
-                    Account.CITIBANK_DOUBLECASH,
+                    TestAccount.PRIMARY,
+                    TestAccount.CHASE_SAPPHIRE,
+                    TestAccount.CHASE_AMAZON,
+                    TestAccount.CITIBANK_DOUBLECASH,
                 ];
 
                 const mockTransactions = validAccounts.map(account =>
@@ -421,7 +447,7 @@ describe('AdditionalIncomeService', () => {
             });
 
             it('should exclude transactions to invalid destination accounts', async () => {
-                const invalidAccounts = [Account.MONEY_MARKET, 'INVALID_ACCOUNT'];
+                const invalidAccounts = [TestAccount.MONEY_MARKET, 'INVALID_ACCOUNT'];
 
                 const mockTransactions = invalidAccounts.map(account =>
                     createMockTransaction({
@@ -442,7 +468,7 @@ describe('AdditionalIncomeService', () => {
             it('should handle transactions with null destination accounts', async () => {
                 const mockTransactions = [
                     createMockTransaction({
-                        description: 'Null Destination Account',
+                        description: 'Null Destination TestAccount',
                         destination_id: null,
                     }),
                 ];
@@ -468,7 +494,7 @@ function createMockTransaction(overrides: Partial<TransactionSplit>): Transactio
         amount: '100.00',
         description: 'Test Transaction',
         source_id: null,
-        destination_id: Account.PRIMARY,
+        destination_id: TestAccount.PRIMARY,
         ...overrides,
     } as TransactionSplit;
 }

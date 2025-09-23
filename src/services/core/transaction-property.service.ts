@@ -40,27 +40,4 @@ export class TransactionPropertyService {
     hasACategory(transaction: TransactionSplit): boolean {
         return !(transaction.category_id === undefined || transaction.category_id === null);
     }
-
-    private convertCurrencyToFloat(amount: string): string {
-        if (!amount) {
-            throw new Error('Amount cannot be empty');
-        }
-
-        const isNegative = amount.includes('(') && amount.includes(')');
-
-        const cleanAmount = amount
-            .replace(/[()]/g, '')
-            .replace(/[$€£¥]/g, '')
-            .replace(/,/g, '')
-            .trim();
-
-        if (!/^-?\d*\.?\d+$/.test(cleanAmount)) {
-            throw new Error(`Invalid amount format: ${amount}`);
-        }
-
-        const parsedAmount = parseFloat(cleanAmount);
-        const finalAmount = isNegative ? -Math.abs(parsedAmount) : parsedAmount;
-
-        return (Math.round(finalAmount * 100) / 100).toFixed(2);
-    }
 }

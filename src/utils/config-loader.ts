@@ -1,10 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import { ValidTransfer } from '../types/interface/valid-transfer.interface';
 
 interface YamlConfig {
     validDestinationAccounts?: string[];
     validExpenseAccounts?: string[];
+    validTransfers?: ValidTransfer[];
     excludedDescriptions?: string[];
     excludedTransactionsCsv?: string;
     excludeDisposableIncome?: boolean;

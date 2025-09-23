@@ -1,10 +1,10 @@
 import { TransactionService } from './core/transaction.service';
-import { Account } from '../config';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionPropertyService } from './core/transaction-property.service';
 import { logger } from '../logger';
 import { DateUtils } from '../utils/date.utils';
 import { getConfigValue } from '../utils/config-loader';
+import { ValidTransfer } from '../types/interface/valid-transfer.interface';
 
 /**
  * Service for calculating unbudgeted expenses.
@@ -17,18 +17,13 @@ import { getConfigValue } from '../utils/config-loader';
  *      - Not in excluded transactions list
  *      - From a valid expense account
  *
- * 2. Valid expense accounts are:
- *    - PRIMARY
- *    - CHASE_AMAZON
- *    - CHASE_SAPPHIRE
- *    - CITIBANK_DOUBLECASH
+ * 2. Valid expense accounts defined in yaml config
  *
- * 3. Transfers are handled specially:
- *    - Must be from PRIMARY to MONEY_MARKET
- *    - Must meet all other criteria
+ * 3. Transfers are ignored unless specified in yaml config
  */
 export class UnbudgetedExpenseService {
     private readonly validExpenseAccounts: string[];
+    private readonly validTransfers: ValidTransfer[];
 
     constructor(
         private readonly transactionService: TransactionService,
@@ -36,6 +31,7 @@ export class UnbudgetedExpenseService {
     ) {
         // Load valid expense accounts from YAML config with fallback to defaults
         this.validExpenseAccounts = getConfigValue<string[]>('validExpenseAccounts') ?? [];
+        this.validTransfers = getConfigValue<ValidTransfer[]>('validTransfers') ?? [];
     }
 
     /**
@@ -110,16 +106,17 @@ export class UnbudgetedExpenseService {
      * Checks if a transfer should be counted as an unbudgeted expense.
      *
      * 1. If no destination account, count it
-     * 2. Otherwise, must be from PRIMARY to MONEY_MARKET
+     * 2. Otherwise, must be an object defined in yaml configuration
      */
     private shouldCountTransfer(transaction: TransactionSplit): boolean {
         if (!transaction.destination_id) {
             return true;
         }
 
-        return (
-            transaction.source_id === Account.PRIMARY &&
-            [Account.MONEY_MARKET].includes(transaction.destination_id as Account)
+        return this.validTransfers.some(
+            transfer =>
+                transaction.source_id === transfer.source &&
+                transaction.destination_id === transfer.destination
         );
     }
 

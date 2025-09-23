@@ -1,19 +1,10 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service';
-import { Account, Description } from '../config';
+import { Description } from '../config';
 import { TransactionPropertyService } from './core/transaction-property.service';
 import { logger } from '../logger';
 import { DateUtils } from '../utils/date.utils';
 import { getConfigValue } from '../utils/config-loader';
-
-/**
- * Valid destination accounts for additional income.
- * These are the accounts where additional income can be deposited.
- */
-type ValidDestinationAccount = Extract<
-    Account,
-    Account.PRIMARY | Account.CHASE_SAPPHIRE | Account.CHASE_AMAZON | Account.CITIBANK_DOUBLECASH
->;
 
 /**
  * Configuration for filtering additional income transactions.
@@ -24,7 +15,7 @@ type ValidDestinationAccount = Extract<
  * 4. minTransactionAmount: Minimum amount to consider as additional income
  */
 interface AdditionalIncomeConfig {
-    validDestinationAccounts: readonly ValidDestinationAccount[];
+    validDestinationAccounts: string[];
     excludedDescriptions: readonly string[];
     excludeDisposableIncome: boolean;
     minTransactionAmount?: number;
@@ -47,12 +38,7 @@ interface AdditionalIncomeConfig {
  */
 export class AdditionalIncomeService {
     private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
-        validDestinationAccounts: [
-            Account.PRIMARY,
-            Account.CHASE_SAPPHIRE,
-            Account.CHASE_AMAZON,
-            Account.CITIBANK_DOUBLECASH,
-        ],
+        validDestinationAccounts: [],
         excludedDescriptions: [Description.PAYROLL],
         excludeDisposableIncome: true,
         minTransactionAmount: 0,
@@ -87,8 +73,7 @@ export class AdditionalIncomeService {
         const yamlConfig: Partial<AdditionalIncomeConfig> = {};
 
         if (validDestinationAccounts) {
-            yamlConfig.validDestinationAccounts =
-                validDestinationAccounts as ValidDestinationAccount[];
+            yamlConfig.validDestinationAccounts = validDestinationAccounts;
         }
 
         if (excludedDescriptions) {
@@ -208,9 +193,7 @@ export class AdditionalIncomeService {
      */
     private hasValidDestinationAccount = (transaction: TransactionSplit): boolean =>
         transaction.destination_id != null &&
-        this.config.validDestinationAccounts.includes(
-            transaction.destination_id as ValidDestinationAccount
-        );
+        this.config.validDestinationAccounts.includes(transaction.destination_id);
 
     /**
      * Checks if a transaction is not payroll.
