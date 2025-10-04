@@ -23,8 +23,6 @@ validTransfers:
 
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
-monthlyBudget: 4500.00
-additionalSavingsPercentage: 10
 
 # Excluded transactions CSV file
 excludedTransactionsCsv: 'excluded_transactions.csv'
@@ -40,7 +38,7 @@ llm:
     batchSize: 10 # Transactions processed per batch
     maxConcurrent: 3 # Maximum concurrent API requests
     temperature: 0.2 # Response randomness (0-1, lower = more deterministic)
-    model: 'claude-3-5-haiku-latest' # Claude model version
+    model: 'claude-sonnet-4-5-20250929' # Claude model version
     retryDelayMs: 1000 # Initial retry delay in milliseconds
     maxRetryDelayMs: 32000 # Maximum retry delay in milliseconds
 

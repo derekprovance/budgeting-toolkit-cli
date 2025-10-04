@@ -124,10 +124,6 @@ excludedDescriptions:
 excludedTransactionsCsv: excluded_transactions.csv
 excludeDisposableIncome: false
 minTransactionAmount: 1.00
-monthlyBudget: 4500.00
-
-# Additional savings percentage (added to base 30%)
-additionalSavingsPercentage: 10
 
 # Firefly III Configuration
 firefly:
@@ -136,7 +132,7 @@ firefly:
 # LLM Configuration for optimal transaction classification
 llm:
     # Use Claude Sonnet for better reasoning and accuracy
-    model: 'claude-sonnet-4-20250514'
+    model: 'claude-sonnet-4-5-20250929'
 
     # Tokens for detailed analysis
     maxTokens: 2000
@@ -176,8 +172,6 @@ llm:
 | `excludedTransactionsCsv`     | Path to CSV file with exclusions    | -       | string   |
 | `excludeDisposableIncome`     | Exclude disposable income trans.    | false   | boolean  |
 | `minTransactionAmount`        | Minimum transaction amount          | 0       | number   |
-| `monthlyBudget`               | Monthly budget amount               | 0       | number   |
-| `additionalSavingsPercentage` | Additional savings percentage       | 0       | number   |
 
 #### ValidTransfers Configuration
 

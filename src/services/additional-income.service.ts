@@ -38,9 +38,9 @@ interface AdditionalIncomeConfig {
 export class AdditionalIncomeService {
     private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
         validDestinationAccounts: [],
-        excludedDescriptions: [],
+        excludedDescriptions: [], //TODO(DEREK) - evaluate need for excluded descriptions
         excludeDisposableIncome: true,
-        minTransactionAmount: 0,
+        minTransactionAmount: 0, //TODO(DEREK) - evaluate need for minimal transaction amount
     };
 
     private readonly config: AdditionalIncomeConfig;
@@ -227,6 +227,7 @@ export class AdditionalIncomeService {
             return false;
         }
 
+        //TODO(DEREK) - evaluate the need for this
         if (!this.config.minTransactionAmount) {
             return true;
         }

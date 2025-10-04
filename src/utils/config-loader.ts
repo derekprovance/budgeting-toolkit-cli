@@ -12,8 +12,6 @@ interface YamlConfig {
     excludeDisposableIncome?: boolean;
     minTransactionAmount?: number;
     expectedMonthlyPaycheck?: number;
-    monthlyBudget?: number;
-    additionalSavingsPercentage?: number;
 
     // Firefly Configuration
     firefly?: {
