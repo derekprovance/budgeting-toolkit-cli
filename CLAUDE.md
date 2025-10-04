@@ -34,7 +34,7 @@ Primary configuration file loaded via `src/utils/config-loader.ts`:
 - `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations
 - `validDestinationAccounts` / `validExpenseAccounts` - Account IDs for filtering transactions
 - `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude (e.g., "PAYROLL")
-- `excludedTransactionsCsv` - Path to CSV file with excluded transactions
+- `excludedTransactionsCsv` - Path to CSV file with globally excluded transactions
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
 
 ### Environment Variables (`.env`)

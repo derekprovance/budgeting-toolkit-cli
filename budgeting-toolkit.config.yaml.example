@@ -23,7 +23,7 @@ validTransfers:
 
 excludeDisposableIncome: false
 
-# Excluded transactions CSV file
+# Globally excluded transactions CSV
 excludedTransactionsCsv: 'excluded_transactions.csv'
 
 # Firefly specific configurations

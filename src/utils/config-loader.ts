@@ -8,7 +8,7 @@ interface YamlConfig {
     validExpenseAccounts?: string[];
     validTransfers?: ValidTransfer[];
     excludedAdditionalIncomePatterns?: string[];
-    excludedTransactionsCsv?: string;
+    excludedTransactionsCsv?: string; //TODO(DEREK) - Implement global transaction exclusion
     excludeDisposableIncome?: boolean;
     expectedMonthlyPaycheck?: number;
 
