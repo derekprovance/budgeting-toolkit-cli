@@ -132,8 +132,7 @@ export class AdditionalIncomeService {
     /**
      * Validates the configuration to ensure it's valid.
      *
-     * 1. Must have at least one valid destination account
-     * 2. Minimum transaction amount cannot be negative
+     * Must have at least one valid destination account
      */
     private validateConfig(): void {
         if (!this.config.validDestinationAccounts.length) {
@@ -161,6 +160,7 @@ export class AdditionalIncomeService {
             .filter(t => this.transactionPropertyService.isDeposit(t))
             .filter(this.hasValidDestinationAccount)
             .filter(this.isNotPayroll)
+            .filter(t => Number(t.amount) > 0)
             .filter(
                 t =>
                     !this.config.excludeDisposableIncome ||

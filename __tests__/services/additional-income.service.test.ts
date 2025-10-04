@@ -82,18 +82,7 @@ describe('AdditionalIncomeService', () => {
                     )
             ).toThrow('At least one valid destination account must be specified');
         });
-
-        it('should throw error for negative minimum transaction amount', () => {
-            expect(
-                () =>
-                    new AdditionalIncomeService(
-                        mockTransactionService,
-                        mockTransactionPropertyService,
-                        { minTransactionAmount: -1 }
-                    )
-            ).toThrow('Minimum transaction amount cannot be negative');
-        });
-
+        
         it('should accept custom configuration', async () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
@@ -101,7 +90,6 @@ describe('AdditionalIncomeService', () => {
                 {
                     validDestinationAccounts: [TestAccount.PRIMARY],
                     excludedDescriptions: ['PAYROLL'],
-                    minTransactionAmount: 100,
                     excludeDisposableIncome: false,
                 }
             );
@@ -164,17 +152,16 @@ describe('AdditionalIncomeService', () => {
         });
 
         describe('transaction filtering', () => {
-            it('should filter by minimum amount when configured', async () => {
+            it('should filter negative numbers', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
-                    mockTransactionPropertyService,
-                    { minTransactionAmount: 100 }
+                    mockTransactionPropertyService
                 );
 
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Small Amount',
-                        amount: '50.00',
+                        amount: '-50.00',
                     }),
                     createMockTransaction({
                         description: 'Large Amount',
@@ -195,8 +182,7 @@ describe('AdditionalIncomeService', () => {
             it('should handle invalid amount formats', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
-                    mockTransactionPropertyService,
-                    { minTransactionAmount: 100 }
+                    mockTransactionPropertyService
                 );
 
                 const mockTransactions = [
