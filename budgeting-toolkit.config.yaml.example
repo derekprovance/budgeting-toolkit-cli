@@ -11,7 +11,7 @@ validExpenseAccounts:
     - '3' # Credit Card Account ID
     - '4' # Debit Card Account ID
 
-excludedDescriptions:
+excludedAdditionalIncomePatterns:
     - 'PAYROLL'
     - 'ATM FEE'
     - 'TRANSFER'

@@ -51,7 +51,7 @@ describe('AdditionalIncomeService', () => {
                     TestAccount.CITIBANK_DOUBLECASH,
                 ];
             }
-            if (key === 'excludedDescriptions') {
+            if (key === 'excludedAdditionalIncomePatterns') {
                 return ['PAYROLL'];
             }
             return undefined;
@@ -89,7 +89,7 @@ describe('AdditionalIncomeService', () => {
                 mockTransactionPropertyService,
                 {
                     validDestinationAccounts: [TestAccount.PRIMARY],
-                    excludedDescriptions: ['PAYROLL'],
+                    excludedAdditionalIncomePatterns: ['PAYROLL'],
                     excludeDisposableIncome: false,
                 }
             );

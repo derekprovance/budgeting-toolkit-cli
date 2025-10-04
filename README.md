@@ -116,7 +116,7 @@ validTransfers:
     - source: '1'       # Primary Checking
       destination: '3'  # Investment Account
 
-excludedDescriptions:
+excludedAdditionalIncomePatterns:
     - PAYROLL
     - 'ATM FEE'
     - 'AUTOMATIC TRANSFER'
@@ -161,15 +161,15 @@ llm:
 
 #### Budget Configuration Options
 
-| Option                        | Description                         | Default | Type     |
-| ----------------------------- | ----------------------------------- | ------- | -------- |
-| `expectedMonthlyPaycheck`     | Expected monthly paycheck amount    | 0       | number   |
-| `validDestinationAccounts`    | Account IDs for income filtering    | []      | string[] |
-| `validExpenseAccounts`        | Account IDs for expense filtering   | []      | string[] |
-| `validTransfers`              | Valid transfer source/destination   | []      | object[] |
-| `excludedDescriptions`        | Transaction descriptions to exclude | []      | string[] |
-| `excludedTransactionsCsv`     | Path to CSV file with exclusions    | -       | string   |
-| `excludeDisposableIncome`     | Exclude disposable income trans.    | false   | boolean  |
+| Option                             | Description                            | Default | Type     |
+| ---------------------------------- | -------------------------------------- | ------- | -------- |
+| `expectedMonthlyPaycheck`          | Expected monthly paycheck amount       | 0       | number   |
+| `validDestinationAccounts`         | Account IDs for income calculations    | []      | string[] |
+| `validExpenseAccounts`             | Account IDs for expense caluclations   | []      | string[] |
+| `validTransfers`                   | Valid transfer source/destination      | []      | object[] |
+| `excludedAdditionalIncomePatterns` | Transaction descriptions to exclude    | []      | string[] |
+| `excludedTransactionsCsv`          | Path to CSV file with exclusions       | -       | string   |
+| `excludeDisposableIncome`          | Exclude disposable income transactions | false   | boolean  |
 
 #### ValidTransfers Configuration
 

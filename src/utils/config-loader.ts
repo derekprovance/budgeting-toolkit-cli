@@ -7,7 +7,7 @@ interface YamlConfig {
     validDestinationAccounts?: string[];
     validExpenseAccounts?: string[];
     validTransfers?: ValidTransfer[];
-    excludedDescriptions?: string[];
+    excludedAdditionalIncomePatterns?: string[];
     excludedTransactionsCsv?: string;
     excludeDisposableIncome?: boolean;
     expectedMonthlyPaycheck?: number;

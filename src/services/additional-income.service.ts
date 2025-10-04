@@ -9,12 +9,12 @@ import { getConfigValue } from '../utils/config-loader';
  * Configuration for filtering additional income transactions.
  *
  * 1. validDestinationAccounts: Where the income can be deposited
- * 2. excludedDescriptions: What descriptions to exclude (e.g., payroll)
+ * 2. excludedAdditionalIncomePatterns: What descriptions to exclude (e.g., payroll)
  * 3. excludeDisposableIncome: Whether to exclude disposable income
  */
 interface AdditionalIncomeConfig {
     validDestinationAccounts: string[];
-    excludedDescriptions: readonly string[];
+    excludedAdditionalIncomePatterns: readonly string[];
     excludeDisposableIncome: boolean;
 }
 
@@ -36,7 +36,7 @@ interface AdditionalIncomeConfig {
 export class AdditionalIncomeService {
     private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
         validDestinationAccounts: [],
-        excludedDescriptions: [], //TODO(DEREK) - evaluate need for excluded descriptions
+        excludedAdditionalIncomePatterns: [], //TODO(DEREK) - evaluate need for excluded descriptions
         excludeDisposableIncome: true,
     };
 
@@ -62,7 +62,9 @@ export class AdditionalIncomeService {
      */
     private loadConfigFromYaml(): Partial<AdditionalIncomeConfig> {
         const validDestinationAccounts = getConfigValue<string[]>('validDestinationAccounts');
-        const excludedDescriptions = getConfigValue<string[]>('excludedDescriptions');
+        const excludedAdditionalIncomePatterns = getConfigValue<string[]>(
+            'excludedAdditionalIncomePatterns'
+        );
         const excludeDisposableIncome = getConfigValue<boolean>('excludeDisposableIncome');
 
         const yamlConfig: Partial<AdditionalIncomeConfig> = {};
@@ -71,8 +73,8 @@ export class AdditionalIncomeService {
             yamlConfig.validDestinationAccounts = validDestinationAccounts;
         }
 
-        if (excludedDescriptions) {
-            yamlConfig.excludedDescriptions = excludedDescriptions;
+        if (excludedAdditionalIncomePatterns) {
+            yamlConfig.excludedAdditionalIncomePatterns = excludedAdditionalIncomePatterns;
         }
 
         if (excludeDisposableIncome !== undefined) {
@@ -139,7 +141,7 @@ export class AdditionalIncomeService {
             throw new Error('At least one valid destination account must be specified');
         }
 
-        if (!this.config.excludedDescriptions.length) {
+        if (!this.config.excludedAdditionalIncomePatterns.length) {
             logger.warn(
                 'No excluded descriptions specified - all deposits will be considered additional income'
             );
@@ -192,7 +194,7 @@ export class AdditionalIncomeService {
         }
 
         const normalizedDescription = this.normalizeString(transaction.description);
-        return !this.config.excludedDescriptions.some(desc =>
+        return !this.config.excludedAdditionalIncomePatterns.some(desc =>
             normalizedDescription.includes(this.normalizeString(desc))
         );
     };
