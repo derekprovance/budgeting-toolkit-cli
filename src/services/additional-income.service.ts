@@ -11,13 +11,11 @@ import { getConfigValue } from '../utils/config-loader';
  * 1. validDestinationAccounts: Where the income can be deposited
  * 2. excludedDescriptions: What descriptions to exclude (e.g., payroll)
  * 3. excludeDisposableIncome: Whether to exclude disposable income
- * 4. minTransactionAmount: Minimum amount to consider as additional income
  */
 interface AdditionalIncomeConfig {
     validDestinationAccounts: string[];
     excludedDescriptions: readonly string[];
     excludeDisposableIncome: boolean;
-    minTransactionAmount?: number;
 }
 
 /**
@@ -40,7 +38,6 @@ export class AdditionalIncomeService {
         validDestinationAccounts: [],
         excludedDescriptions: [], //TODO(DEREK) - evaluate need for excluded descriptions
         excludeDisposableIncome: true,
-        minTransactionAmount: 0, //TODO(DEREK) - evaluate need for minimal transaction amount
     };
 
     private readonly config: AdditionalIncomeConfig;
@@ -67,7 +64,6 @@ export class AdditionalIncomeService {
         const validDestinationAccounts = getConfigValue<string[]>('validDestinationAccounts');
         const excludedDescriptions = getConfigValue<string[]>('excludedDescriptions');
         const excludeDisposableIncome = getConfigValue<boolean>('excludeDisposableIncome');
-        const minTransactionAmount = getConfigValue<number>('minTransactionAmount');
 
         const yamlConfig: Partial<AdditionalIncomeConfig> = {};
 
@@ -81,10 +77,6 @@ export class AdditionalIncomeService {
 
         if (excludeDisposableIncome !== undefined) {
             yamlConfig.excludeDisposableIncome = excludeDisposableIncome;
-        }
-
-        if (minTransactionAmount !== undefined) {
-            yamlConfig.minTransactionAmount = minTransactionAmount;
         }
 
         return yamlConfig;
@@ -153,13 +145,6 @@ export class AdditionalIncomeService {
                 'No excluded descriptions specified - all deposits will be considered additional income'
             );
         }
-
-        if (
-            this.config.minTransactionAmount !== undefined &&
-            this.config.minTransactionAmount < 0
-        ) {
-            throw new Error('Minimum transaction amount cannot be negative');
-        }
     }
 
     /**
@@ -176,7 +161,6 @@ export class AdditionalIncomeService {
             .filter(t => this.transactionPropertyService.isDeposit(t))
             .filter(this.hasValidDestinationAccount)
             .filter(this.isNotPayroll)
-            .filter(this.meetsMinimumAmount)
             .filter(
                 t =>
                     !this.config.excludeDisposableIncome ||
@@ -211,28 +195,6 @@ export class AdditionalIncomeService {
         return !this.config.excludedDescriptions.some(desc =>
             normalizedDescription.includes(this.normalizeString(desc))
         );
-    };
-
-    /**
-     * Checks if a transaction meets the minimum amount requirement.
-     *
-     * Core Logic:
-     * 1. If no minimum amount is set, all positive amounts are valid
-     * 2. Otherwise, amount must be greater than or equal to minimum
-     * 3. Zero and negative amounts are always excluded
-     */
-    private meetsMinimumAmount = (transaction: TransactionSplit): boolean => {
-        const amount = parseFloat(transaction.amount);
-        if (isNaN(amount) || amount <= 0) {
-            return false;
-        }
-
-        //TODO(DEREK) - evaluate the need for this
-        if (!this.config.minTransactionAmount) {
-            return true;
-        }
-
-        return amount >= this.config.minTransactionAmount;
     };
 
     /**

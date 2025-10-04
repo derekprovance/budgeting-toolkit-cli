@@ -36,7 +36,6 @@ Primary configuration file loaded via `src/utils/config-loader.ts`:
 - `excludedDescriptions` - Transaction descriptions to exclude (e.g., "PAYROLL")
 - `excludedTransactionsCsv` - Path to CSV file with excluded transactions
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
-- `minTransactionAmount` - Minimum transaction amount to consider
 
 ### Environment Variables (`.env`)
 

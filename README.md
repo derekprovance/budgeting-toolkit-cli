@@ -123,7 +123,6 @@ excludedDescriptions:
     
 excludedTransactionsCsv: excluded_transactions.csv
 excludeDisposableIncome: false
-minTransactionAmount: 1.00
 
 # Firefly III Configuration
 firefly:
@@ -171,7 +170,6 @@ llm:
 | `excludedDescriptions`        | Transaction descriptions to exclude | []      | string[] |
 | `excludedTransactionsCsv`     | Path to CSV file with exclusions    | -       | string   |
 | `excludeDisposableIncome`     | Exclude disposable income trans.    | false   | boolean  |
-| `minTransactionAmount`        | Minimum transaction amount          | 0       | number   |
 
 #### ValidTransfers Configuration
 

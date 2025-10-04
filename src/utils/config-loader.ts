@@ -10,7 +10,6 @@ interface YamlConfig {
     excludedDescriptions?: string[];
     excludedTransactionsCsv?: string;
     excludeDisposableIncome?: boolean;
-    minTransactionAmount?: number;
     expectedMonthlyPaycheck?: number;
 
     // Firefly Configuration

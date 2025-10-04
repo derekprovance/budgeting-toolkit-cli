@@ -6,4 +6,4 @@ if [ ! -d "./dist" ]; then
     exit 1
 fi
 
-node --no-deprecation dist/index.js $@
+node dist/index.js $@

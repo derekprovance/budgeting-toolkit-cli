@@ -22,7 +22,6 @@ validTransfers:
       destination: '1' # Checking Account ID
 
 excludeDisposableIncome: false
-minTransactionAmount: 1.00
 
 # Excluded transactions CSV file
 excludedTransactionsCsv: 'excluded_transactions.csv'
