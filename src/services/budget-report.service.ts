@@ -12,7 +12,7 @@ export class BudgetReportService implements IBudgetReportService {
         private readonly transactionPropertyService: TransactionPropertyService
     ) {}
 
-    async getBudgetStatus(month: number, year: number): Promise<BudgetReportDto[]> {
+    async getBudgetReport(month: number, year: number): Promise<BudgetReportDto[]> {
         try {
             DateUtils.validateMonthYear(month, year);
             const budgetReports: BudgetReportDto[] = [];

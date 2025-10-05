@@ -27,7 +27,7 @@ describe('BudgetReportCommand', () => {
 
         // Setup service mocks
         budgetReportService = {
-            getBudgetStatus: jest.fn().mockResolvedValue(mockBudgetReports),
+            getBudgetReport: jest.fn().mockResolvedValue(mockBudgetReports),
             getUntrackedTransactions: jest.fn().mockResolvedValue([]),
         } as unknown as jest.Mocked<BudgetReportService>;
 
@@ -63,7 +63,7 @@ describe('BudgetReportCommand', () => {
                 year: currentDate.getFullYear(),
             });
 
-            expect(budgetReportService.getBudgetStatus).toHaveBeenCalled();
+            expect(budgetReportService.getBudgetReport).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(displayService.formatHeader).toHaveBeenCalled();
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);
@@ -79,7 +79,7 @@ describe('BudgetReportCommand', () => {
                 year: currentDate.getFullYear(),
             });
 
-            expect(budgetReportService.getBudgetStatus).toHaveBeenCalled();
+            expect(budgetReportService.getBudgetReport).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(displayService.formatHeader).toHaveBeenCalled();
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);

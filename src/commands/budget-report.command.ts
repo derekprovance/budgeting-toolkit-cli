@@ -9,7 +9,7 @@ import { BudgetDisplayService } from '../services/display/budget-display.service
  */
 export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     constructor(
-        private readonly BudgetReportService: BudgetReportService,
+        private readonly budgetReportService: BudgetReportService,
         private readonly transactionService: TransactionService,
         private readonly budgetDisplayService: BudgetDisplayService
     ) {}
@@ -19,7 +19,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
      * @param params The month and year to display budget report for
      */
     async execute({ month, year }: BudgetDateParams): Promise<void> {
-        const budgetReports = await this.BudgetReportService.getBudgetStatus(month, year);
+        const budgetReports = await this.budgetReportService.getBudgetReport(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
         const isCurrentMonth =
@@ -38,7 +38,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         const totalSpent = budgetReports.reduce((sum, report) => sum + report.spent, 0);
         const totalPercentage = this.getPercentageSpent(totalSpent, totalBudget);
 
-        const unbudgetedTransactions = await this.BudgetReportService.getUntrackedTransactions(
+        const unbudgetedTransactions = await this.budgetReportService.getUntrackedTransactions(
             month,
             year
         );

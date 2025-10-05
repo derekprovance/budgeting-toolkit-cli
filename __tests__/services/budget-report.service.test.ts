@@ -31,7 +31,7 @@ describe('BudgetReportService', () => {
         );
     });
 
-    describe('getBudgetStatus', () => {
+    describe('getBudgetReport', () => {
         it('should return budget report for all budgets', async () => {
             const mockBudgets: BudgetRead[] = [
                 {
@@ -70,7 +70,7 @@ describe('BudgetReportService', () => {
             mockBudgetService.getBudgetLimits.mockResolvedValueOnce(mockLimits);
             mockBudgetService.getBudgetExpenseInsights.mockResolvedValueOnce(mockInsights);
 
-            const result = await budgetReportService.getBudgetStatus(1, 2024);
+            const result = await budgetReportService.getBudgetReport(1, 2024);
 
             expect(result).toHaveLength(2);
             expect(result[0]).toEqual({
@@ -99,7 +99,7 @@ describe('BudgetReportService', () => {
                 [] as unknown as InsightGroup
             );
 
-            const result = await budgetReportService.getBudgetStatus(1, 2024);
+            const result = await budgetReportService.getBudgetReport(1, 2024);
 
             expect(result).toHaveLength(1);
             expect(result[0]).toEqual({
@@ -112,14 +112,14 @@ describe('BudgetReportService', () => {
         it('should throw error when API call fails', async () => {
             mockBudgetService.getBudgets.mockRejectedValueOnce(new Error('API Error'));
 
-            await expect(budgetReportService.getBudgetStatus(1, 2024)).rejects.toThrow(
+            await expect(budgetReportService.getBudgetReport(1, 2024)).rejects.toThrow(
                 'Failed to get budget report for month 1'
             );
         });
 
         it('should validate month and year', async () => {
-            await expect(budgetReportService.getBudgetStatus(0, 2024)).rejects.toThrow();
-            await expect(budgetReportService.getBudgetStatus(13, 2024)).rejects.toThrow();
+            await expect(budgetReportService.getBudgetReport(0, 2024)).rejects.toThrow();
+            await expect(budgetReportService.getBudgetReport(13, 2024)).rejects.toThrow();
         });
     });
 });
