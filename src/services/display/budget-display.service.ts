@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { BudgetStatus } from '../../types/interface/budget-status.interface';
+import { BudgetReport } from '../../types/interface/budget-report.interface';
 import { DisplayService } from './display.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
@@ -49,7 +49,7 @@ export class BudgetDisplayService {
      * Formats an individual budget item
      */
     formatBudgetItem(
-        status: BudgetStatus,
+        status: BudgetReport,
         nameWidth: number,
         isCurrentMonth: boolean,
         currentDay?: number,

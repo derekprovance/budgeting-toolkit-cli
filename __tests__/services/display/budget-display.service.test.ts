@@ -2,7 +2,7 @@ import { BudgetDisplayService } from '../../../src/services/display/budget-displ
 import { DisplayService } from '../../../src/services/display/display.service';
 import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
-import { BudgetStatus } from '../../../src/types/interface/budget-status.interface';
+import { BudgetReport } from '../../../src/types/interface/budget-report.interface';
 
 // Mock chalk to return the input string (disable styling for tests)
 jest.mock('chalk', () => ({
@@ -63,7 +63,7 @@ describe('BudgetDisplayService', () => {
     });
 
     describe('formatBudgetItem', () => {
-        const mockStatus: BudgetStatus = {
+        const mockStatus: BudgetReport = {
             name: 'Test Budget',
             amount: 1000,
             spent: -500,

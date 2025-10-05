@@ -4,7 +4,7 @@ import { BudgetService } from '../services/core/budget.service';
 import { CategoryService } from '../services/core/category.service';
 import { AdditionalIncomeService } from '../services/additional-income.service';
 import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service';
-import { BudgetStatusService } from '../services/budget-status.service';
+import { BudgetReportService } from '../services/budget-report.service';
 import { ExcludedTransactionService } from '../services/excluded-transaction.service';
 import { TransactionPropertyService } from '../services/core/transaction-property.service';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
@@ -42,7 +42,7 @@ export class ServiceFactory {
             transactionService,
             transactionPropertyService
         );
-        const budgetStatus = new BudgetStatusService(budgetService, transactionPropertyService);
+        const budgetStatus = new BudgetReportService(budgetService, transactionPropertyService);
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
             transactionPropertyService

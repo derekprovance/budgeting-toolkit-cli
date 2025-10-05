@@ -1,22 +1,22 @@
-import { BudgetStatusCommand } from '../../src/commands/budget-status.command';
-import { BudgetStatusService } from '../../src/services/budget-status.service';
+import { BudgetReportCommand } from '../../src/commands/budget-report.command';
+import { BudgetReportService } from '../../src/services/budget-report.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { BudgetDisplayService } from '../../src/services/display/budget-display.service';
-import { BudgetStatus } from '../../src/types/interface/budget-status.interface';
+import { BudgetReport } from '../../src/types/interface/budget-report.interface';
 
 // Mock services
-jest.mock('../../src/services/budget-status.service');
+jest.mock('../../src/services/budget-report.service');
 jest.mock('../../src/services/core/transaction.service');
 jest.mock('../../src/services/display/budget-display.service');
 
-describe('BudgetStatusCommand', () => {
-    let command: BudgetStatusCommand;
-    let budgetStatusService: jest.Mocked<BudgetStatusService>;
+describe('BudgetReportCommand', () => {
+    let command: BudgetReportCommand;
+    let BudgetReportService: jest.Mocked<BudgetReportService>;
     let transactionService: jest.Mocked<TransactionService>;
     let displayService: jest.Mocked<BudgetDisplayService>;
     let consoleLogSpy: jest.SpyInstance;
 
-    const mockBudgetStatuses: BudgetStatus[] = [
+    const mockBudgetStatuses: BudgetReport[] = [
         { name: 'Test Budget 1', amount: 1000, spent: -500 },
         { name: 'Test Budget 2', amount: 2000, spent: -1000 },
     ];
@@ -26,10 +26,10 @@ describe('BudgetStatusCommand', () => {
         jest.clearAllMocks();
 
         // Setup service mocks
-        budgetStatusService = {
+        BudgetReportService = {
             getBudgetStatus: jest.fn().mockResolvedValue(mockBudgetStatuses),
             getUntrackedTransactions: jest.fn().mockResolvedValue([]),
-        } as unknown as jest.Mocked<BudgetStatusService>;
+        } as unknown as jest.Mocked<BudgetReportService>;
 
         transactionService = {
             getMostRecentTransactionDate: jest.fn().mockResolvedValue(new Date('2024-05-15')),
@@ -45,7 +45,7 @@ describe('BudgetStatusCommand', () => {
         } as unknown as jest.Mocked<BudgetDisplayService>;
 
         // Create command instance
-        command = new BudgetStatusCommand(budgetStatusService, transactionService, displayService);
+        command = new BudgetReportCommand(BudgetReportService, transactionService, displayService);
 
         // Spy on console.log
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -56,38 +56,36 @@ describe('BudgetStatusCommand', () => {
     });
 
     describe('execute', () => {
-        it('should display budget status for current month', async () => {
+        it('should display budget report for current month', async () => {
             const currentDate = new Date();
             await command.execute({
                 month: currentDate.getMonth() + 1,
                 year: currentDate.getFullYear(),
-                shouldList: false,
             });
 
-            expect(budgetStatusService.getBudgetStatus).toHaveBeenCalled();
+            expect(BudgetReportService.getBudgetStatus).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(displayService.formatHeader).toHaveBeenCalled();
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);
             expect(displayService.formatSummary).toHaveBeenCalled();
             expect(displayService.getSpendRateWarning).toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalledTimes(7); // Header + 2 items + separator + summary
+            expect(consoleLogSpy).toHaveBeenCalledTimes(8); // Header + 2 items + separator + summary + unbudgeted
         });
 
-        it('should display budget status for non-current month', async () => {
+        it('should display budget report for non-current month', async () => {
             const currentDate = new Date();
             await command.execute({
                 month: currentDate.getMonth(), // Previous month
                 year: currentDate.getFullYear(),
-                shouldList: false,
             });
 
-            expect(budgetStatusService.getBudgetStatus).toHaveBeenCalled();
+            expect(BudgetReportService.getBudgetStatus).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(displayService.formatHeader).toHaveBeenCalled();
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);
             expect(displayService.formatSummary).toHaveBeenCalled();
             expect(displayService.getSpendRateWarning).not.toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalledTimes(7); // Header + 2 items + separator + summary + newline
+            expect(consoleLogSpy).toHaveBeenCalledTimes(8); // Header + 2 items + separator + summary + newline + unbudgeted
         });
 
         it('should display warning when spend rate is too high', async () => {
@@ -97,7 +95,6 @@ describe('BudgetStatusCommand', () => {
             await command.execute({
                 month: currentDate.getMonth() + 1,
                 year: currentDate.getFullYear(),
-                shouldList: false,
             });
 
             expect(displayService.getSpendRateWarning).toHaveBeenCalled();

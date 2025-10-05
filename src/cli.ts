@@ -2,12 +2,11 @@ import { Command, Option } from 'commander';
 import { FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
 import { config } from './config';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command';
-import { BudgetStatusCommand } from './commands/budget-status.command';
+import { BudgetReportCommand } from './commands/budget-report.command';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command';
 import { ServiceFactory } from './factories/service.factory';
 import {
     BudgetDateOptions,
-    BudgetStatusOptions,
     UpdateTransactionOptions,
 } from './types/interface/command-options.interface';
 import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum';
@@ -142,23 +141,23 @@ Examples:
             'after',
             `
 Examples:
-  $ budgeting-toolkit status                      # current month status
-  $ budgeting-toolkit status -m 8                 # August status
-  $ budgeting-toolkit st                          # current month (using alias)`
+  $ budgeting-toolkit report                      # current month report
+  $ budgeting-toolkit report -m 8                 # August report
+  $ budgeting-toolkit rp                          # current month (using alias)`
         )
-        .action(async (opts: BudgetStatusOptions) => {
+        .action(async (opts: BudgetDateOptions) => {
             try {
-                const command = new BudgetStatusCommand(
+                const command = new BudgetReportCommand(
                     services.budgetStatus,
                     services.transactionService,
                     services.budgetDisplayService
                 );
                 await command.execute({
                     month: opts.month!,
-                    year: opts.year!
+                    year: opts.year!,
                 });
             } catch (error) {
-                handleError(error, 'getting budget status');
+                handleError(error, 'getting budget report');
             }
         });
 

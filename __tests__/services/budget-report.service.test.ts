@@ -1,4 +1,4 @@
-import { BudgetStatusService } from '../../src/services/budget-status.service';
+import { BudgetReportService } from '../../src/services/budget-report.service';
 import { BudgetService } from '../../src/services/core/budget.service';
 import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
 import { BudgetStatusDto } from '../../src/types/dto/budget-status.dto';
@@ -7,8 +7,8 @@ import { BudgetRead, BudgetLimitRead, InsightGroup } from '@derekprovance/firefl
 jest.mock('../../src/services/core/budget.service');
 jest.mock('../../src/services/core/transaction-property.service');
 
-describe('BudgetStatusService', () => {
-    let budgetStatusService: BudgetStatusService;
+describe('BudgetReportService', () => {
+    let budgetReportService: BudgetReportService;
     let mockBudgetService: jest.Mocked<BudgetService>;
     let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
 
@@ -25,7 +25,7 @@ describe('BudgetStatusService', () => {
             isDisposableIncome: jest.fn(),
         } as unknown as jest.Mocked<TransactionPropertyService>;
 
-        budgetStatusService = new BudgetStatusService(
+        budgetReportService = new BudgetReportService(
             mockBudgetService,
             mockTransactionPropertyService
         );
@@ -70,7 +70,7 @@ describe('BudgetStatusService', () => {
             mockBudgetService.getBudgetLimits.mockResolvedValueOnce(mockLimits);
             mockBudgetService.getBudgetExpenseInsights.mockResolvedValueOnce(mockInsights);
 
-            const result = await budgetStatusService.getBudgetStatus(1, 2024);
+            const result = await budgetReportService.getBudgetStatus(1, 2024);
 
             expect(result).toHaveLength(2);
             expect(result[0]).toEqual({
@@ -99,7 +99,7 @@ describe('BudgetStatusService', () => {
                 [] as unknown as InsightGroup
             );
 
-            const result = await budgetStatusService.getBudgetStatus(1, 2024);
+            const result = await budgetReportService.getBudgetStatus(1, 2024);
 
             expect(result).toHaveLength(1);
             expect(result[0]).toEqual({
@@ -112,14 +112,14 @@ describe('BudgetStatusService', () => {
         it('should throw error when API call fails', async () => {
             mockBudgetService.getBudgets.mockRejectedValueOnce(new Error('API Error'));
 
-            await expect(budgetStatusService.getBudgetStatus(1, 2024)).rejects.toThrow(
+            await expect(budgetReportService.getBudgetStatus(1, 2024)).rejects.toThrow(
                 'Failed to get budget status for month 1'
             );
         });
 
         it('should validate month and year', async () => {
-            await expect(budgetStatusService.getBudgetStatus(0, 2024)).rejects.toThrow();
-            await expect(budgetStatusService.getBudgetStatus(13, 2024)).rejects.toThrow();
+            await expect(budgetReportService.getBudgetStatus(0, 2024)).rejects.toThrow();
+            await expect(budgetReportService.getBudgetStatus(13, 2024)).rejects.toThrow();
         });
     });
 });

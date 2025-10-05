@@ -1,12 +1,12 @@
 import { BudgetStatusDto } from '../types/dto/budget-status.dto';
 import { BudgetService } from './core/budget.service';
-import { BudgetStatusService as IBudgetStatusService } from '../types/interface/budget-status.service.interface';
+import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface';
 import { DateUtils } from '../utils/date.utils';
 import { logger } from '../logger';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionPropertyService } from './core/transaction-property.service';
 
-export class BudgetStatusService implements IBudgetStatusService {
+export class BudgetReportService implements IBudgetReportService {
     constructor(
         private budgetService: BudgetService,
         private readonly transactionPropertyService: TransactionPropertyService

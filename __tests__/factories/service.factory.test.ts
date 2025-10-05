@@ -8,7 +8,7 @@ jest.mock('../../src/services/core/budget.service');
 jest.mock('../../src/services/core/category.service');
 jest.mock('../../src/services/additional-income.service');
 jest.mock('../../src/services/unbudgeted-expense.service');
-jest.mock('../../src/services/budget-status.service');
+jest.mock('../../src/services/budget-report.service');
 jest.mock('../../src/services/excluded-transaction.service');
 jest.mock('../../src/services/core/transaction-property.service');
 jest.mock('../../src/services/paycheck-surplus.service');

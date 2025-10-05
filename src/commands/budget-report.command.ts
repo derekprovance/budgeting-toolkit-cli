@@ -1,4 +1,4 @@
-import { BudgetStatusService } from '../services/budget-status.service';
+import { BudgetReportService } from '../services/budget-report.service';
 import { TransactionService } from '../services/core/transaction.service';
 import { Command } from '../types/interface/command.interface';
 import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
@@ -7,9 +7,9 @@ import { BudgetDisplayService } from '../services/display/budget-display.service
 /**
  * Command for displaying budget status
  */
-export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
+export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     constructor(
-        private readonly budgetStatusService: BudgetStatusService,
+        private readonly BudgetReportService: BudgetReportService,
         private readonly transactionService: TransactionService,
         private readonly budgetDisplayService: BudgetDisplayService
     ) {}
@@ -19,7 +19,7 @@ export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
      * @param params The month and year to display budget status for
      */
     async execute({ month, year }: BudgetDateParams): Promise<void> {
-        const budgetStatuses = await this.budgetStatusService.getBudgetStatus(month, year);
+        const budgetStatuses = await this.BudgetReportService.getBudgetStatus(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
         const isCurrentMonth =
@@ -38,7 +38,7 @@ export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
         const totalSpent = budgetStatuses.reduce((sum, status) => sum + status.spent, 0);
         const totalPercentage = this.getPercentageSpent(totalSpent, totalBudget);
 
-        const unbudgetedTransactions = await this.budgetStatusService.getUntrackedTransactions(
+        const unbudgetedTransactions = await this.BudgetReportService.getUntrackedTransactions(
             month,
             year
         );
