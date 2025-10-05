@@ -65,7 +65,7 @@ describe('ServiceFactory', () => {
             expect(services).toHaveProperty('categoryService');
             expect(services).toHaveProperty('additionalIncomeService');
             expect(services).toHaveProperty('unbudgetedExpenseService');
-            expect(services).toHaveProperty('budgetStatus');
+            expect(services).toHaveProperty('budgetReport');
             expect(services).toHaveProperty('transactionPropertyService');
             expect(services).toHaveProperty('excludedTransactionService');
             expect(services).toHaveProperty('paycheckSurplusService');

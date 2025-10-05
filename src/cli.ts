@@ -148,7 +148,7 @@ Examples:
         .action(async (opts: BudgetDateOptions) => {
             try {
                 const command = new BudgetReportCommand(
-                    services.budgetStatus,
+                    services.budgetReport,
                     services.transactionService,
                     services.budgetDisplayService
                 );

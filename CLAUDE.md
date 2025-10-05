@@ -61,7 +61,7 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
     - Unbudgeted expenses (bills/expenses not in budget)
     - Paycheck surplus (actual vs expected paycheck amounts)
 
-2. **budget-status** - Shows current budget status for a given month
+2. **budget-report** - Shows current budget report for a given month
 
 3. **update-transactions** - Uses Claude AI to automatically categorize and budget transactions
 

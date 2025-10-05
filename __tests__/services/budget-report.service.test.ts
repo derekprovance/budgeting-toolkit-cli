@@ -1,7 +1,7 @@
 import { BudgetReportService } from '../../src/services/budget-report.service';
 import { BudgetService } from '../../src/services/core/budget.service';
 import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
-import { BudgetStatusDto } from '../../src/types/dto/budget-status.dto';
+import { BudgetReportDto } from '../../src/types/dto/budget-report.dto';
 import { BudgetRead, BudgetLimitRead, InsightGroup } from '@derekprovance/firefly-iii-sdk';
 
 jest.mock('../../src/services/core/budget.service');
@@ -32,7 +32,7 @@ describe('BudgetReportService', () => {
     });
 
     describe('getBudgetStatus', () => {
-        it('should return budget status for all budgets', async () => {
+        it('should return budget report for all budgets', async () => {
             const mockBudgets: BudgetRead[] = [
                 {
                     id: '1',
@@ -77,12 +77,12 @@ describe('BudgetReportService', () => {
                 name: 'Budget 1',
                 amount: 100.0,
                 spent: 50.0,
-            } as BudgetStatusDto);
+            } as BudgetReportDto);
             expect(result[1]).toEqual({
                 name: 'Budget 2',
                 amount: 200.0,
                 spent: 150.0,
-            } as BudgetStatusDto);
+            } as BudgetReportDto);
         });
 
         it('should handle budgets with no limits or insights', async () => {
@@ -106,14 +106,14 @@ describe('BudgetReportService', () => {
                 name: 'Budget 1',
                 amount: 0.0,
                 spent: 0.0,
-            } as BudgetStatusDto);
+            } as BudgetReportDto);
         });
 
         it('should throw error when API call fails', async () => {
             mockBudgetService.getBudgets.mockRejectedValueOnce(new Error('API Error'));
 
             await expect(budgetReportService.getBudgetStatus(1, 2024)).rejects.toThrow(
-                'Failed to get budget status for month 1'
+                'Failed to get budget report for month 1'
             );
         });
 

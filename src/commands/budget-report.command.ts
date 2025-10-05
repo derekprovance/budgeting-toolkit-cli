@@ -5,7 +5,7 @@ import { BudgetDateParams } from '../types/interface/budget-date-params.interfac
 import { BudgetDisplayService } from '../services/display/budget-display.service';
 
 /**
- * Command for displaying budget status
+ * Command for displaying budget report
  */
 export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     constructor(
@@ -15,11 +15,11 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     ) {}
 
     /**
-     * Executes the budget status command
-     * @param params The month and year to display budget status for
+     * Executes the budget report command
+     * @param params The month and year to display budget report for
      */
     async execute({ month, year }: BudgetDateParams): Promise<void> {
-        const budgetStatuses = await this.BudgetReportService.getBudgetStatus(month, year);
+        const budgetReports = await this.BudgetReportService.getBudgetStatus(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
         const isCurrentMonth =
@@ -34,8 +34,8 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                   totalDays: 0,
               };
 
-        const totalBudget = budgetStatuses.reduce((sum, status) => sum + status.amount, 0);
-        const totalSpent = budgetStatuses.reduce((sum, status) => sum + status.spent, 0);
+        const totalBudget = budgetReports.reduce((sum, report) => sum + report.amount, 0);
+        const totalSpent = budgetReports.reduce((sum, report) => sum + report.spent, 0);
         const totalPercentage = this.getPercentageSpent(totalSpent, totalBudget);
 
         const unbudgetedTransactions = await this.BudgetReportService.getUntrackedTransactions(
@@ -55,12 +55,12 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         );
 
         // Display individual budget items
-        const nameWidth = Math.max(...budgetStatuses.map(status => status.name.length), 20);
+        const nameWidth = Math.max(...budgetReports.map(report => report.name.length), 20);
 
-        budgetStatuses.forEach(status => {
+        budgetReports.forEach(report => {
             console.log(
                 this.budgetDisplayService.formatBudgetItem(
-                    status,
+                    report,
                     nameWidth,
                     isCurrentMonth,
                     currentDay,

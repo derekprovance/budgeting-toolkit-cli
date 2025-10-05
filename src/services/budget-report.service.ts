@@ -1,4 +1,4 @@
-import { BudgetStatusDto } from '../types/dto/budget-status.dto';
+import { BudgetReportDto } from '../types/dto/budget-report.dto';
 import { BudgetService } from './core/budget.service';
 import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface';
 import { DateUtils } from '../utils/date.utils';
@@ -12,17 +12,17 @@ export class BudgetReportService implements IBudgetReportService {
         private readonly transactionPropertyService: TransactionPropertyService
     ) {}
 
-    async getBudgetStatus(month: number, year: number): Promise<BudgetStatusDto[]> {
+    async getBudgetStatus(month: number, year: number): Promise<BudgetReportDto[]> {
         try {
             DateUtils.validateMonthYear(month, year);
-            const budgetStatuses: BudgetStatusDto[] = [];
+            const budgetReports: BudgetReportDto[] = [];
 
             logger.debug(
                 {
                     month,
                     year,
                 },
-                'Fetching budget status'
+                'Fetching budget report'
             );
 
             const budgets = await this.budgetService.getBudgets();
@@ -38,14 +38,14 @@ export class BudgetReportService implements IBudgetReportService {
                 )[0];
                 const insight = insights.find(insight => insight.id == budgetId);
 
-                budgetStatuses.push({
+                budgetReports.push({
                     name: budgetName,
                     amount: budgetLimit ? Number(budgetLimit.attributes.amount) : 0.0,
                     spent: insight ? insight.difference_float : 0.0,
-                } as BudgetStatusDto);
+                } as BudgetReportDto);
             });
 
-            return budgetStatuses;
+            return budgetReports;
         } catch (error) {
             logger.error(
                 {
@@ -53,12 +53,12 @@ export class BudgetReportService implements IBudgetReportService {
                     year,
                     error: error instanceof Error ? error.message : 'Unknown error',
                 },
-                'Failed to get budget status'
+                'Failed to get budget report'
             );
             if (error instanceof Error) {
-                throw new Error(`Failed to get budget status for month ${month}: ${error.message}`);
+                throw new Error(`Failed to get budget report for month ${month}: ${error.message}`);
             }
-            throw new Error(`Failed to get budget status for month ${month}`);
+            throw new Error(`Failed to get budget report for month ${month}`);
         }
     }
 

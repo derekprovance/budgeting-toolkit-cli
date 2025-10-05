@@ -11,12 +11,12 @@ jest.mock('../../src/services/display/budget-display.service');
 
 describe('BudgetReportCommand', () => {
     let command: BudgetReportCommand;
-    let BudgetReportService: jest.Mocked<BudgetReportService>;
+    let budgetReportService: jest.Mocked<BudgetReportService>;
     let transactionService: jest.Mocked<TransactionService>;
     let displayService: jest.Mocked<BudgetDisplayService>;
     let consoleLogSpy: jest.SpyInstance;
 
-    const mockBudgetStatuses: BudgetReport[] = [
+    const mockBudgetReports: BudgetReport[] = [
         { name: 'Test Budget 1', amount: 1000, spent: -500 },
         { name: 'Test Budget 2', amount: 2000, spent: -1000 },
     ];
@@ -26,8 +26,8 @@ describe('BudgetReportCommand', () => {
         jest.clearAllMocks();
 
         // Setup service mocks
-        BudgetReportService = {
-            getBudgetStatus: jest.fn().mockResolvedValue(mockBudgetStatuses),
+        budgetReportService = {
+            getBudgetStatus: jest.fn().mockResolvedValue(mockBudgetReports),
             getUntrackedTransactions: jest.fn().mockResolvedValue([]),
         } as unknown as jest.Mocked<BudgetReportService>;
 
@@ -45,7 +45,7 @@ describe('BudgetReportCommand', () => {
         } as unknown as jest.Mocked<BudgetDisplayService>;
 
         // Create command instance
-        command = new BudgetReportCommand(BudgetReportService, transactionService, displayService);
+        command = new BudgetReportCommand(budgetReportService, transactionService, displayService);
 
         // Spy on console.log
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -63,7 +63,7 @@ describe('BudgetReportCommand', () => {
                 year: currentDate.getFullYear(),
             });
 
-            expect(BudgetReportService.getBudgetStatus).toHaveBeenCalled();
+            expect(budgetReportService.getBudgetStatus).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(displayService.formatHeader).toHaveBeenCalled();
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);
@@ -79,7 +79,7 @@ describe('BudgetReportCommand', () => {
                 year: currentDate.getFullYear(),
             });
 
-            expect(BudgetReportService.getBudgetStatus).toHaveBeenCalled();
+            expect(budgetReportService.getBudgetStatus).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(displayService.formatHeader).toHaveBeenCalled();
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);

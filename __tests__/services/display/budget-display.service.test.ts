@@ -47,7 +47,7 @@ describe('BudgetDisplayService', () => {
     describe('formatHeader', () => {
         it('should format header with current month info', () => {
             const result = service.formatHeader(5, 2024, 15, 50, new Date('2024-05-15'));
-            expect(result).toContain('Budget Status Report');
+            expect(result).toContain('Budget Report');
             expect(result).toContain('May 2024');
             expect(result).toContain('15 days remaining');
             expect(result).toContain('Last Updated: 2024-05-15');
@@ -55,7 +55,7 @@ describe('BudgetDisplayService', () => {
 
         it('should format header without current month info', () => {
             const result = service.formatHeader(5, 2024);
-            expect(result).toContain('Budget Status Report');
+            expect(result).toContain('Budget Report');
             expect(result).toContain('May 2024');
             expect(result).not.toContain('days remaining');
             expect(result).not.toContain('Last Updated');

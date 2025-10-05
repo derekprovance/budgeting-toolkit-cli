@@ -42,7 +42,7 @@ export class ServiceFactory {
             transactionService,
             transactionPropertyService
         );
-        const budgetStatus = new BudgetReportService(budgetService, transactionPropertyService);
+        const budgetReport = new BudgetReportService(budgetService, transactionPropertyService);
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
             transactionPropertyService
@@ -58,7 +58,7 @@ export class ServiceFactory {
             userInputService,
             additionalIncomeService,
             unbudgetedExpenseService,
-            budgetStatus,
+            budgetReport,
             transactionPropertyService,
             excludedTransactionService,
             paycheckSurplusService,

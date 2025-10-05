@@ -12,7 +12,7 @@ export class BudgetDisplayService {
     constructor(private displayService: DisplayService) {}
 
     /**
-     * Formats the budget status report header
+     * Formats the budget report header
      */
     formatHeader(
         month: number,
@@ -23,7 +23,7 @@ export class BudgetDisplayService {
     ): string {
         const header = [
             '\n' +
-                chalk.bold('Budget Status Report') +
+                chalk.bold('Budget Report') +
                 chalk.gray(
                     ` - ${new Date(year, month - 1).toLocaleString('default', {
                         month: 'long',
@@ -49,31 +49,31 @@ export class BudgetDisplayService {
      * Formats an individual budget item
      */
     formatBudgetItem(
-        status: BudgetReport,
+        report: BudgetReport,
         nameWidth: number,
         isCurrentMonth: boolean,
         currentDay?: number,
         totalDays?: number
     ): string {
-        const percentage = this.getPercentageSpent(status.spent, status.amount);
+        const percentage = this.getPercentageSpent(report.spent, report.amount);
         const color = this.getColorForPercentage(
             percentage,
             isCurrentMonth ? 100 - (currentDay! / totalDays!) * 100 : undefined
         );
 
-        const remaining = status.amount + status.spent;
+        const remaining = report.amount + report.spent;
         const progressBar = this.createProgressBar(percentage);
 
         const dailyRateInfo =
             isCurrentMonth && currentDay && totalDays
-                ? this.getDailyRateIndicator(status.spent, status.amount, currentDay, totalDays)
+                ? this.getDailyRateIndicator(report.spent, report.amount, currentDay, totalDays)
                 : '';
 
         return (
-            chalk.bold(status.name.padEnd(nameWidth)) +
-            color(this.formatCurrency(Math.abs(status.spent)).padStart(12)) +
+            chalk.bold(report.name.padEnd(nameWidth)) +
+            color(this.formatCurrency(Math.abs(report.spent)).padStart(12)) +
             ' of ' +
-            chalk.bold(this.formatCurrency(status.amount).padStart(12)) +
+            chalk.bold(this.formatCurrency(report.amount).padStart(12)) +
             color(` (${percentage.toFixed(1)}%)`.padStart(8)) +
             '  ' +
             color(progressBar) +
