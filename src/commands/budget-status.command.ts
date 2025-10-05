@@ -4,14 +4,10 @@ import { Command } from '../types/interface/command.interface';
 import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
 import { BudgetDisplayService } from '../services/display/budget-display.service';
 
-interface BudgetStatusCommandRequest extends BudgetDateParams {
-    shouldList: boolean;
-}
-
 /**
  * Command for displaying budget status
  */
-export class BudgetStatusCommand implements Command<void, BudgetStatusCommandRequest> {
+export class BudgetStatusCommand implements Command<void, BudgetDateParams> {
     constructor(
         private readonly budgetStatusService: BudgetStatusService,
         private readonly transactionService: TransactionService,
@@ -22,7 +18,7 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
      * Executes the budget status command
      * @param params The month and year to display budget status for
      */
-    async execute({ month, year, shouldList }: BudgetStatusCommandRequest): Promise<void> {
+    async execute({ month, year }: BudgetDateParams): Promise<void> {
         const budgetStatuses = await this.budgetStatusService.getBudgetStatus(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
@@ -88,11 +84,7 @@ export class BudgetStatusCommand implements Command<void, BudgetStatusCommandReq
         );
 
         // Display list of unbudgeted transactions
-        if (shouldList) {
-            console.log(
-                this.budgetDisplayService.listUnbudgetedTransactions(unbudgetedTransactions)
-            );
-        }
+        console.log(this.budgetDisplayService.listUnbudgetedTransactions(unbudgetedTransactions));
 
         // Display warning if necessary
         if (isCurrentMonth) {

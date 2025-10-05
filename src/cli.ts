@@ -125,9 +125,9 @@ Examples:
         });
 
     program
-        .command('status')
+        .command('report')
         .alias('st')
-        .description('Display current budget status and spending analysis')
+        .description('Display current budget report and spending analysis')
         .addOption(
             new Option('-m, --month <month>', 'target month (1-12)')
                 .argParser(validateMonth)
@@ -138,7 +138,6 @@ Examples:
                 .argParser(validateYear)
                 .default(getCurrentYear(), 'current year')
         )
-        .addOption(new Option('-l, --list', 'list untracked expenses').default(false))
         .addHelpText(
             'after',
             `
@@ -156,8 +155,7 @@ Examples:
                 );
                 await command.execute({
                     month: opts.month!,
-                    year: opts.year!,
-                    shouldList: opts.list!,
+                    year: opts.year!
                 });
             } catch (error) {
                 handleError(error, 'getting budget status');

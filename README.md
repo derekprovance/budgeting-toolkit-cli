@@ -4,11 +4,11 @@ A powerful command-line interface (CLI) for interacting with both the Firefly II
 
 ## Features
 
-- ✨ Secure authentication using client certificates and API tokens
-- 🤖 Intelligent financial analysis powered by Claude AI
-- 🔄 Batch processing support for multiple operations
-- 🛠 Configurable retry mechanisms and concurrent request handling
-- 📦 Extensible architecture for adding more commands
+- Secure authentication using client certificates and API tokens
+- Intelligent categorization powered by Claude AI
+- Batch processing support for multiple operations
+- Configurable retry mechanisms and concurrent request handling
+- Extensible architecture for adding more commands
 
 ## Getting Started
 
@@ -304,32 +304,31 @@ Available for all commands:
 
 ### Commands
 
-#### 🔍 Budget Status
+#### 🔍 Budget Report
 
-View current budget status and spending analysis:
+View current budget report and spending analysis:
 
 ```bash
-# Current month status
-budgeting-toolkit status
+# Current month report
+budgeting-toolkit report
 
 # Specific month
-budgeting-toolkit status --month 8
+budgeting-toolkit report --month 8
 
 # Specific list
-budgeting-toolkit status --month 8 --list
+budgeting-toolkit report --month 8 --list
 
 # Different year
-budgeting-toolkit status --month 12 --year 2024
+budgeting-toolkit report --month 12 --year 2024
 
 # Using alias
-budgeting-toolkit st
+budgeting-toolkit report
 ```
 
 **Options:**
 
 - `-m, --month <1-12>` - Target month (default: current month)
 - `-y, --year <year>` - Target year (default: current year)
-- `-l, --list` - Lists untracked transactions (default: false)
 
 #### 📊 Budget Finalization
 
@@ -398,15 +397,6 @@ budgeting-toolkit categorize Import-2025-06-23 --verbose
 LOG_LEVEL=debug budgeting-toolkit categorize Import-2025-06-23
 ```
 
-#### Batch Processing
-
-```bash
-# Process multiple months
-for month in {1..12}; do
-  budgeting-toolkit status --month $month --year 2024
-done
-```
-
 #### Configuration Testing
 
 ```bash
@@ -416,21 +406,6 @@ budgeting-toolkit categorize Import-2025-06-23 --dry-run --verbose
 # Test with different modes
 budgeting-toolkit categorize Import-2025-06-23 --mode category --dry-run
 budgeting-toolkit categorize Import-2025-06-23 --mode budget --dry-run
-```
-
-### Common Workflows
-
-#### Monthly Budget Review
-
-```bash
-# 1. Check current status
-budgeting-toolkit status
-
-# 2. Categorize new transactions
-budgeting-toolkit categorize Import-$(date +%Y-%m-%d)
-
-# 3. Review finalization
-budgeting-toolkit finalize
 ```
 
 #### Transaction Import & Processing
