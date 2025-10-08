@@ -35,14 +35,13 @@ export class LLMConfig {
             apiKey: claudeAPIKey,
 
             // All other settings from YAML (user-configurable)
-            model: llmConfig.model || 'claude-3-5-haiku-latest',
-            maxTokens: llmConfig.maxTokens || 2000,
-            maxRetries: 3,
-            batchSize: llmConfig.batchSize || 5,
-            maxConcurrent: llmConfig.maxConcurrent || 2,
-            temperature: llmConfig.temperature || 0.1,
-            retryDelayMs: llmConfig.retryDelayMs || 1500,
-            maxRetryDelayMs: llmConfig.maxRetryDelayMs || 30000,
+            model: llmConfig.model,
+            maxTokens: llmConfig.maxTokens,
+            batchSize: llmConfig.batchSize,
+            maxConcurrent: llmConfig.maxConcurrent,
+            temperature: llmConfig.temperature,
+            retryDelayMs: llmConfig.retryDelayMs,
+            maxRetryDelayMs: llmConfig.maxRetryDelayMs,
         });
     }
 }

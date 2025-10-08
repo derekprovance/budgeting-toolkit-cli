@@ -12,27 +12,27 @@ interface ClaudeConfig {
     apiKey?: string;
     baseURL?: string;
     timeout?: number;
-    maxRetries?: number;
+    maxRetries: number;
 
     // Model Configuration
-    model?: string;
+    model: string;
 
     // Message Parameters
-    maxTokens?: number;
-    temperature?: number;
+    maxTokens: number;
+    temperature: number;
     topP?: number;
     topK?: number;
-    stopSequences?: string[];
+    stopSequences: string[];
 
     // System Configuration
     systemPrompt?: string;
     metadata?: Record<string, string>;
 
     // Batch Processing Configuration
-    batchSize?: number;
-    maxConcurrent?: number;
-    retryDelayMs?: number;
-    maxRetryDelayMs?: number;
+    batchSize: number;
+    maxConcurrent: number;
+    retryDelayMs: number;
+    maxRetryDelayMs: number;
 
     // Function Calling Configuration
     functions?: Array<{
@@ -54,7 +54,7 @@ interface ClaudeConfig {
     function_call?: { name: string };
 }
 
-type RequiredClaudeConfig = Required<Omit<ClaudeConfig, 'functions' | 'function_call'>> & {
+type RequiredClaudeConfig = Omit<ClaudeConfig, 'functions' | 'function_call'> & {
     functions?: ClaudeConfig['functions'];
     function_call?: ClaudeConfig['function_call'];
 };
@@ -64,8 +64,8 @@ interface MessageCreateParams {
     messages: ChatMessage[];
     max_tokens: number;
     temperature: number;
-    top_p: number;
-    top_k: number;
+    top_p?: number;
+    top_k?: number;
     stop_sequences: string[];
     system?: string;
     metadata?: Record<string, string>;
@@ -140,21 +140,19 @@ export class ClaudeClient {
         baseURL: 'https://api.anthropic.com',
         timeout: 30000,
         maxRetries: 3,
-        model: 'claude-3-5-haiku-latest',
-        maxTokens: 1024,
+        model: 'claude-sonnet-4-5',
+        maxTokens: 2000,
         temperature: 0.2,
-        topP: 1.0,
-        topK: 5,
         stopSequences: [],
         systemPrompt: '',
         metadata: {},
         batchSize: 10,
         maxConcurrent: 3,
-        retryDelayMs: 1000,
+        retryDelayMs: 1500,
         maxRetryDelayMs: 32000,
     };
 
-    constructor(config: ClaudeConfig = {}) {
+    constructor(config: Partial<ClaudeConfig> = {}) {
         this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...config };
         this.client = new Anthropic({
             apiKey: this.config.apiKey,
@@ -209,6 +207,7 @@ export class ClaudeClient {
     getConfig(): Omit<RequiredClaudeConfig, 'apiKey'> {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { apiKey, ...safeConfig } = this.config;
+        console.log("foobar");
         return safeConfig;
     }
 

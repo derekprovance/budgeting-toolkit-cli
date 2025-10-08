@@ -34,7 +34,7 @@ describe('LLMConfig', () => {
             mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: 'claude-3-5-sonnet-latest',
+                    model: 'claude-sonnet-4-5',
                     maxTokens: 4000,
                     batchSize: 10,
                     maxConcurrent: 3,
@@ -48,9 +48,8 @@ describe('LLMConfig', () => {
 
             expect(ClaudeClient).toHaveBeenCalledWith({
                 apiKey: 'test-api-key',
-                model: 'claude-3-5-sonnet-latest',
+                model: 'claude-sonnet-4-5',
                 maxTokens: 4000,
-                maxRetries: 3,
                 batchSize: 10,
                 maxConcurrent: 3,
                 temperature: 0.2,
@@ -59,32 +58,11 @@ describe('LLMConfig', () => {
             });
         });
 
-        it('should use default values when LLM config values are not provided', () => {
-            mockClaudeAPIKey.mockReturnValue('test-api-key');
-            mockLoadYamlConfig.mockReturnValue({
-                llm: {}, // Empty LLM config
-            });
-
-            LLMConfig.createClient();
-
-            expect(ClaudeClient).toHaveBeenCalledWith({
-                apiKey: 'test-api-key',
-                model: 'claude-3-5-haiku-latest',
-                maxTokens: 2000,
-                maxRetries: 3,
-                batchSize: 5,
-                maxConcurrent: 2,
-                temperature: 0.1,
-                retryDelayMs: 1500,
-                maxRetryDelayMs: 30000,
-            });
-        });
-
         it('should throw error when Claude API key is missing', () => {
             mockClaudeAPIKey.mockReturnValue('');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: 'claude-3-5-sonnet-latest',
+                    model: 'claude-sonnet-4-5',
                 },
             });
 
@@ -95,7 +73,7 @@ describe('LLMConfig', () => {
             mockClaudeAPIKey.mockReturnValue(undefined);
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: 'claude-3-5-sonnet-latest',
+                    model: 'claude-sonnet-4-5',
                 },
             });
 
@@ -124,7 +102,6 @@ describe('LLMConfig', () => {
                 llm: {
                     model: 'custom-model',
                     maxTokens: 3000,
-                    // Missing other values - should use defaults
                 },
             });
 
@@ -134,12 +111,12 @@ describe('LLMConfig', () => {
                 apiKey: 'test-api-key',
                 model: 'custom-model',
                 maxTokens: 3000,
-                maxRetries: 3,
-                batchSize: 5, // default
-                maxConcurrent: 2, // default
-                temperature: 0.1, // default
-                retryDelayMs: 1500, // default
-                maxRetryDelayMs: 30000, // default
+                maxRetries: undefined, // not set
+                batchSize: undefined, // not set
+                maxConcurrent: undefined, // not set
+                temperature: undefined, // not set
+                retryDelayMs: undefined, // not set
+                maxRetryDelayMs: undefined, // not set
             });
         });
 
@@ -152,7 +129,7 @@ describe('LLMConfig', () => {
             mockClaudeAPIKey.mockReturnValue('test-api-key');
             mockLoadYamlConfig.mockReturnValue({
                 llm: {
-                    model: 'claude-3-5-sonnet-latest',
+                    model: 'claude-sonnet-4-5',
                 },
             });
 
