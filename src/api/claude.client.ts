@@ -102,16 +102,6 @@ interface CircuitBreakerState {
     state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 }
 
-interface PerformanceMetrics {
-    totalRequests: number;
-    successfulRequests: number;
-    failedRequests: number;
-    totalTokensUsed: number;
-    totalCost: number;
-    averageResponseTime: number;
-    requestDurations: number[];
-}
-
 export class ClaudeClient {
     private client: Anthropic;
     private config: RequiredClaudeConfig;
@@ -124,15 +114,6 @@ export class ClaudeClient {
         failures: 0,
         lastFailureTime: 0,
         state: 'CLOSED',
-    };
-    private metrics: PerformanceMetrics = {
-        totalRequests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        totalTokensUsed: 0,
-        totalCost: 0,
-        averageResponseTime: 0,
-        requestDurations: [],
     };
 
     private static DEFAULT_CONFIG: RequiredClaudeConfig = {
@@ -153,7 +134,7 @@ export class ClaudeClient {
     };
 
     constructor(config: Partial<ClaudeConfig> = {}) {
-        this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...config };
+        this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...this.clearUndefined(config) };
         this.client = new Anthropic({
             apiKey: this.config.apiKey,
             baseURL: this.config.baseURL,
@@ -207,7 +188,7 @@ export class ClaudeClient {
     getConfig(): Omit<RequiredClaudeConfig, 'apiKey'> {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { apiKey, ...safeConfig } = this.config;
-        console.log("foobar");
+        console.log('foobar');
         return safeConfig;
     }
 
@@ -216,9 +197,6 @@ export class ClaudeClient {
         config: RequiredClaudeConfig
     ): Promise<string> {
         await this.checkCircuitBreaker();
-
-        const startTime = Date.now();
-        this.metrics.totalRequests++;
 
         let attempt = 0;
         let request: Promise<string>;
@@ -236,8 +214,6 @@ export class ClaudeClient {
 
                 const response = await request;
 
-                const duration = Date.now() - startTime;
-                this.recordMetrics(duration, config.maxTokens, true);
                 this.onRequestSuccess();
 
                 return response;
@@ -246,8 +222,6 @@ export class ClaudeClient {
                 attempt++;
 
                 if (attempt >= config.maxRetries) {
-                    const duration = Date.now() - startTime;
-                    this.recordMetrics(duration, 0, false);
                     throw error;
                 }
 
@@ -432,51 +406,10 @@ export class ClaudeClient {
         );
     }
 
-    private recordMetrics(duration: number, tokensUsed: number, success: boolean): void {
-        this.metrics.requestDurations.push(duration);
-
-        if (success) {
-            this.metrics.successfulRequests++;
-            this.metrics.totalTokensUsed += tokensUsed;
-
-            const costPerToken = this.config.model.includes('haiku')
-                ? 0.00025 / 1000
-                : 0.003 / 1000;
-            this.metrics.totalCost += tokensUsed * costPerToken;
-        } else {
-            this.metrics.failedRequests++;
-        }
-
-        const recentDurations = this.metrics.requestDurations.slice(-100);
-        this.metrics.averageResponseTime =
-            recentDurations.reduce((a, b) => a + b, 0) / recentDurations.length;
-
-        if (this.metrics.totalRequests % 10 === 0) {
-            logger.debug(
-                {
-                    totalRequests: this.metrics.totalRequests,
-                    successRate:
-                        (
-                            (this.metrics.successfulRequests / this.metrics.totalRequests) *
-                            100
-                        ).toFixed(1) + '%',
-                    avgResponseTime: Math.round(this.metrics.averageResponseTime) + 'ms',
-                    totalCost: '$' + this.metrics.totalCost.toFixed(4),
-                    tokensUsed: this.metrics.totalTokensUsed,
-                },
-                'Claude API metrics update'
-            );
-        }
-    }
-
-    getMetrics(): Omit<PerformanceMetrics, 'requestDurations'> {
-        return {
-            totalRequests: this.metrics.totalRequests,
-            successfulRequests: this.metrics.successfulRequests,
-            failedRequests: this.metrics.failedRequests,
-            totalTokensUsed: this.metrics.totalTokensUsed,
-            totalCost: this.metrics.totalCost,
-            averageResponseTime: this.metrics.averageResponseTime,
-        };
+    private clearUndefined<T extends object>(obj: T): Partial<T> {
+        return Object.fromEntries(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            Object.entries(obj).filter(([_, v]) => v !== undefined)
+        ) as Partial<T>;
     }
 }

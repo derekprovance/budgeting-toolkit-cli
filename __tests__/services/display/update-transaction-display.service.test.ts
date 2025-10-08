@@ -71,7 +71,7 @@ describe('UpdateTransactionDisplayService', () => {
     describe('formatEmptyTag', () => {
         it('should format the empty tag message correctly', () => {
             const result = service.formatEmptyTag('test-tag');
-            expect(result).toContain('No transactions found with tag "test-tag"');
+            expect(result).toContain('No processable transactions found with tag "test-tag"');
         });
     });
 

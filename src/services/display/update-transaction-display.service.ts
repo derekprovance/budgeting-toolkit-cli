@@ -35,7 +35,9 @@ export class UpdateTransactionDisplayService {
      * Formats the empty tag message
      */
     formatEmptyTag(tag: string): string {
-        return ['\n', chalk.yellow(`No transactions found with tag "${tag}"`)].join('\n');
+        return ['\n', chalk.yellow(`No processable transactions found with tag "${tag}"`)].join(
+            '\n'
+        );
     }
 
     /**

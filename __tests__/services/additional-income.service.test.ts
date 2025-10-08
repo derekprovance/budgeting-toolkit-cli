@@ -82,7 +82,7 @@ describe('AdditionalIncomeService', () => {
                     )
             ).toThrow('At least one valid destination account must be specified');
         });
-        
+
         it('should accept custom configuration', async () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
