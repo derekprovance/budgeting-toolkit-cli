@@ -1,4 +1,7 @@
 .env
+.env.local
+.env.*.local
+.env.docker.local
 node_modules
 dist/
 
@@ -13,6 +16,17 @@ certs/
 excluded_transactions.csv
 
 budgeting-toolkit.config.yaml
+
+# Docker
+docker/db-init/*.sql
+docker/firefly-init/*.sh
+!docker/seed-data/
+budget-dev.sh
+
+# Database backups
+*.sql
+*.dump
+backup.sql
 
 #Mac Specific
 Icon?

@@ -1,0 +1,174 @@
+{
+  "transactions": [
+    {
+      "type": "deposit",
+      "description": "PAYROLL - Monthly Salary",
+      "amount": "3500.00",
+      "source": "Salary Income",
+      "destination": "Main Checking Account",
+      "category": "Paycheck",
+      "tags": []
+    },
+    {
+      "type": "deposit",
+      "description": "Freelance Project Payment",
+      "amount": "500.00",
+      "source": "Freelance Income",
+      "destination": "Main Checking Account",
+      "category": null,
+      "tags": []
+    },
+    {
+      "type": "withdrawal",
+      "description": "Whole Foods Market",
+      "amount": "125.50",
+      "source": "Main Checking Account",
+      "destination": "Grocery Store",
+      "category": "Groceries",
+      "budget": "Grocery Budget",
+      "tags": []
+    },
+    {
+      "type": "withdrawal",
+      "description": "Trader Joe's",
+      "amount": "87.32",
+      "source": "Main Checking Account",
+      "destination": "Grocery Store",
+      "category": "Groceries",
+      "budget": "Grocery Budget",
+      "tags": []
+    },
+    {
+      "type": "withdrawal",
+      "description": "Electric Bill Payment",
+      "amount": "85.00",
+      "source": "Main Checking Account",
+      "destination": "Utility Company",
+      "category": "Bills",
+      "budget": "Bills Budget",
+      "tags": ["Bills"]
+    },
+    {
+      "type": "withdrawal",
+      "description": "Internet Service",
+      "amount": "65.00",
+      "source": "Main Checking Account",
+      "destination": "ISP Provider",
+      "category": "Bills",
+      "budget": "Bills Budget",
+      "tags": ["Bills"]
+    },
+    {
+      "type": "withdrawal",
+      "description": "Monthly Rent",
+      "amount": "1200.00",
+      "source": "Main Checking Account",
+      "destination": "Landlord",
+      "category": "Housing",
+      "budget": null,
+      "tags": ["Bills"]
+    },
+    {
+      "type": "transfer",
+      "description": "Monthly Savings Transfer",
+      "amount": "500.00",
+      "source": "Main Checking Account",
+      "destination": "Savings Account",
+      "category": null,
+      "tags": []
+    },
+    {
+      "type": "withdrawal",
+      "description": "Coffee Shop",
+      "amount": "15.50",
+      "source": "Main Checking Account",
+      "destination": "Local Coffee Shop",
+      "category": null,
+      "budget": null,
+      "tags": ["Disposable Income"]
+    },
+    {
+      "type": "withdrawal",
+      "description": "Gas Station",
+      "amount": "45.00",
+      "source": "Main Checking Account",
+      "destination": "Gas Station",
+      "category": "Transportation",
+      "budget": null,
+      "tags": []
+    }
+  ],
+  "accounts": [
+    {
+      "type": "asset",
+      "name": "Main Checking Account",
+      "account_role": "defaultAsset",
+      "currency_code": "USD",
+      "current_balance": "5000.00",
+      "include_net_worth": true
+    },
+    {
+      "type": "asset",
+      "name": "Savings Account",
+      "account_role": "savingAsset",
+      "currency_code": "USD",
+      "current_balance": "10000.00",
+      "include_net_worth": true
+    },
+    {
+      "type": "revenue",
+      "name": "Salary Income",
+      "currency_code": "USD"
+    },
+    {
+      "type": "revenue",
+      "name": "Freelance Income",
+      "currency_code": "USD"
+    },
+    {
+      "type": "expense",
+      "name": "Grocery Store",
+      "currency_code": "USD"
+    },
+    {
+      "type": "expense",
+      "name": "Utility Company",
+      "currency_code": "USD"
+    },
+    {
+      "type": "expense",
+      "name": "ISP Provider",
+      "currency_code": "USD"
+    },
+    {
+      "type": "expense",
+      "name": "Landlord",
+      "currency_code": "USD"
+    },
+    {
+      "type": "expense",
+      "name": "Local Coffee Shop",
+      "currency_code": "USD"
+    },
+    {
+      "type": "expense",
+      "name": "Gas Station",
+      "currency_code": "USD"
+    }
+  ],
+  "categories": [
+    {"name": "Paycheck"},
+    {"name": "Groceries"},
+    {"name": "Bills"},
+    {"name": "Housing"},
+    {"name": "Transportation"}
+  ],
+  "budgets": [
+    {"name": "Grocery Budget"},
+    {"name": "Bills Budget"}
+  ],
+  "tags": [
+    {"name": "Bills"},
+    {"name": "Disposable Income"}
+  ]
+}
