@@ -1,103 +1,76 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
-import { FireflyClient, OpenAPI } from '@derekprovance/firefly-iii-sdk';
-import { CertificateManager, CertificateConfig } from './certificate-manager';
+import { FireflyClient, BaseHttpRequest, CancelablePromise } from '@derekprovance/firefly-iii-sdk';
+import type { OpenAPIConfig } from '@derekprovance/firefly-iii-sdk';
+import type { ApiRequestOptions } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/ApiRequestOptions';
+import { createCustomAxiosInstance, CertificateConfig } from '../utils/custom-fetch';
+import { request as __request } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/request';
+import type { AxiosInstance } from 'axios';
 
 export interface FireflyClientWithCertsConfig extends CertificateConfig {
-    baseUrl: string;
-    apiToken: string;
-    timeout?: number;
+    BASE: string;
+    TOKEN: string;
+}
+
+/**
+ * Custom HTTP Request implementation that uses a custom axios instance
+ * with client certificate support.
+ */
+class CustomAxiosHttpRequest extends BaseHttpRequest {
+    private axiosInstance: AxiosInstance;
+
+    constructor(config: OpenAPIConfig, axiosInstance: AxiosInstance) {
+        super(config);
+        this.axiosInstance = axiosInstance;
+    }
+
+    public override request<T>(options: ApiRequestOptions): CancelablePromise<T> {
+        return __request(this.config, options, this.axiosInstance);
+    }
 }
 
 /**
  * Firefly III SDK Client with Client Certificate Support
  *
- * Extends the standard Firefly III SDK to support client certificate authentication.
- * Uses axios with custom HTTPS agent for certificate handling.
+ * Extends the standard Firefly III SDK to support client certificate authentication
+ * by using a custom axios instance with HTTPS agent support.
  *
  * @example
  * ```typescript
  * const client = new FireflyClientWithCerts({
- *   baseUrl: 'https://your-firefly-instance.com/api/v1',
- *   apiToken: 'your-api-token',
+ *   BASE: 'https://your-firefly-instance.com/api',
+ *   TOKEN: 'your-api-token',
  *   caCertPath: '/path/to/ca.pem',
  *   clientCertPath: '/path/to/client.p12',
  *   clientCertPassword: 'password'
  * });
  *
  * // Use the client services
- * const transactions = await client.transactions.listTransaction({ limit: 10 });
+ * const transactions = await client.transactions.listTransaction();
  * ```
  */
 export class FireflyClientWithCerts extends FireflyClient {
-    private axiosInstance: AxiosInstance;
-
     constructor(config: FireflyClientWithCertsConfig) {
-        // Initialize the base FireflyClient
-        super({
-            baseUrl: config.baseUrl,
-            apiToken: config.apiToken,
-        });
+        // Create custom axios instance with client certificates if provided
+        const axiosInstance = config.clientCertPath
+            ? createCustomAxiosInstance({
+                  caCertPath: config.caCertPath,
+                  clientCertPath: config.clientCertPath,
+                  clientCertPassword: config.clientCertPassword,
+              })
+            : undefined;
 
-        // Create certificate manager
-        const certManager = new CertificateManager(config);
-        const httpsAgent = certManager.createHttpsAgent();
-
-        // Create axios instance with certificate support
-        this.axiosInstance = axios.create({
-            baseURL: config.baseUrl,
-            httpsAgent,
-            timeout: config.timeout || 30000,
-            headers: {
-                Authorization: `Bearer ${config.apiToken}`,
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
+        // Initialize the base FireflyClient with custom HttpRequest constructor
+        super(
+            {
+                BASE: config.BASE,
+                TOKEN: config.TOKEN,
             },
-        });
-
-        // Override the OpenAPI request handler to use our axios instance
-        this.overrideRequestHandler();
-    }
-
-    /**
-     * Overrides the OpenAPI request function to use axios with certificates
-     * instead of the default fetch() API
-     */
-    private overrideRequestHandler(): void {
-        // Store reference to axios instance for use in the override
-        const axiosInstance = this.axiosInstance;
-
-        // Override the OpenAPI.REQUEST function
-        // @ts-expect-error - We're overriding an internal implementation detail
-        OpenAPI.REQUEST = async (options: {
-            method: string;
-            url: string;
-            headers?: Record<string, string>;
-            body?: unknown;
-            query?: Record<string, unknown>;
-        }): Promise<unknown> => {
-            const axiosConfig: AxiosRequestConfig = {
-                method: options.method,
-                url: options.url,
-                headers: options.headers || {},
-                data: options.body,
-                params: options.query,
-            };
-
-            try {
-                const response = await axiosInstance.request(axiosConfig);
-                return response.data;
-            } catch (error) {
-                if (axios.isAxiosError(error)) {
-                    // Transform axios error to match expected format
-                    throw {
-                        status: error.response?.status,
-                        statusText: error.response?.statusText,
-                        body: error.response?.data,
-                        url: options.url,
-                    };
-                }
-                throw error;
-            }
-        };
+            axiosInstance
+                ? (class extends CustomAxiosHttpRequest {
+                      constructor(cfg: OpenAPIConfig) {
+                          super(cfg, axiosInstance!);
+                      }
+                  } as any)
+                : undefined
+        );
     }
 }

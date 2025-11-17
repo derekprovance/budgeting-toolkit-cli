@@ -19,7 +19,7 @@
     },
     "dependencies": {
         "@anthropic-ai/sdk": "^0.68.0",
-        "@derekprovance/firefly-iii-sdk": "file:../firefly-iii-sdk",
+        "@derekprovance/firefly-iii-sdk": "6.4.4",
         "@inquirer/prompts": "^7.9.0",
         "axios": "^1.7.9",
         "chalk": "^4.x.x",

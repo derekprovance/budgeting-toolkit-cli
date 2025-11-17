@@ -1,6 +1,6 @@
 import { Command, Option } from 'commander';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs';
-import { config } from './config';
+import { config, validateCertificateConfig } from './config';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command';
 import { BudgetReportCommand } from './commands/budget-report.command';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command';
@@ -54,6 +54,9 @@ export const createCli = (): Command => {
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
     try {
+        // Validate certificate configuration before attempting to create client
+        validateCertificateConfig(config);
+
         apiClient = new FireflyClientWithCerts(config);
         services = ServiceFactory.createServices(apiClient);
     } catch (error) {
@@ -61,9 +64,9 @@ export const createCli = (): Command => {
             'Failed to initialize API client:',
             error instanceof Error ? error.message : String(error)
         );
-        console.log(
-            '\nCheck your .env file and ensure FIREFLY_API_URL and FIREFLY_API_TOKEN are set.'
-        );
+        console.log('\nCheck your configuration:');
+        console.log('  - .env file with FIREFLY_API_URL and FIREFLY_API_TOKEN');
+        console.log('  - Certificate paths (if using mTLS): CLIENT_CERT_PATH, CLIENT_CERT_CA_PATH');
         process.exit(1);
     }
 
