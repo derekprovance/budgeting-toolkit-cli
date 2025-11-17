@@ -4,7 +4,7 @@ import { TransactionPropertyService } from '../../src/services/core/transaction-
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../../src/logger';
 import { DateUtils } from '../../src/utils/date.utils';
-import { FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
 
 jest.mock('../../src/services/core/transaction.service');
@@ -29,12 +29,12 @@ describe('PaycheckSurplusService', () => {
     let service: PaycheckSurplusService;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
-    let mockApiClient: jest.Mocked<FireflyApiClient>;
+    let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockApiClient = {} as jest.Mocked<FireflyApiClient>;
+        mockApiClient = {} as jest.Mocked<FireflyClientWithCerts>;
         mockExcludedTransactionService = {} as jest.Mocked<ExcludedTransactionService>;
         mockTransactionService = new TransactionService(
             mockApiClient

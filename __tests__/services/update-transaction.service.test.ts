@@ -27,7 +27,7 @@ import { TransactionUpdaterService } from '../../src/services/core/transaction-u
 import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
 import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { Category } from '@derekprovance/firefly-iii-sdk';
+import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { createMockTransaction } from '../shared/test-data';
 
@@ -43,7 +43,7 @@ describe('UpdateTransactionService', () => {
     let mockTransactions: Partial<TransactionSplit>[];
     let mockAIResults: { [key: string]: { category: string; budget: string } };
 
-    const mockCategories: Partial<Category>[] = [
+    const mockCategories: Partial<CategoryProperties>[] = [
         { name: 'New Category 1' },
         { name: 'New Category 2' },
     ];
@@ -207,7 +207,7 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             // Dynamically generate mockAIResults to match filtered transactions
@@ -259,7 +259,7 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(false);
@@ -278,7 +278,7 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -332,7 +332,7 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
@@ -364,7 +364,7 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
@@ -393,7 +393,7 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as Category[]);
+            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
@@ -430,7 +430,7 @@ describe('UpdateTransactionService', () => {
                 amount: '100.00',
             });
 
-            const mockCategory: Category = {
+            const mockCategory: CategoryProperties = {
                 name: 'Test Category',
                 created_at: '2024-01-01T00:00:00Z',
                 updated_at: '2024-01-01T00:00:00Z',
@@ -447,8 +447,6 @@ describe('UpdateTransactionService', () => {
                     updated_at: '2024-01-01T00:00:00Z',
                     spent: [],
                     auto_budget_type: null,
-                    auto_budget_currency_id: null,
-                    auto_budget_currency_code: null,
                     auto_budget_amount: null,
                     auto_budget_period: null,
                 },
@@ -501,7 +499,7 @@ describe('UpdateTransactionService', () => {
                 amount: '100.00',
             });
 
-            const mockCategory: Category = {
+            const mockCategory: CategoryProperties = {
                 name: 'Test Category',
                 created_at: '2024-01-01T00:00:00Z',
                 updated_at: '2024-01-01T00:00:00Z',
@@ -518,8 +516,6 @@ describe('UpdateTransactionService', () => {
                     updated_at: '2024-01-01T00:00:00Z',
                     spent: [],
                     auto_budget_type: null,
-                    auto_budget_currency_id: null,
-                    auto_budget_currency_code: null,
                     auto_budget_amount: null,
                     auto_budget_period: null,
                 },

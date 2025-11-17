@@ -1,11 +1,9 @@
 import {
-    FireflyApiClient,
-    FireflyApiError,
-    TagSingle,
-    TransactionArray,
     TransactionRead,
     TransactionSplit,
+    TransactionUpdate,
 } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs';
 import { logger } from '../../logger';
 import { DateRangeService } from '../../types/interface/date-range.service.interface';
 
@@ -26,7 +24,7 @@ export class TransactionService {
     private readonly splitTransactionIdx: TransactionSplitIndex;
 
     constructor(
-        private readonly apiClient: FireflyApiClient,
+        private readonly client: FireflyClientWithCerts,
         cacheImplementation: TransactionCache = new Map()
     ) {
         this.cache = cacheImplementation;
@@ -50,9 +48,9 @@ export class TransactionService {
     }
 
     async getMostRecentTransactionDate(): Promise<Date | null> {
-        const response = await this.apiClient.get<TransactionArray>(`/transactions?limit=1`);
-        if (!response) {
-            throw new FireflyApiError(`Failed to fetch transactions`);
+        const response = await this.client.transactions.listTransaction(undefined, 1);
+        if (!response || !response.data || response.data.length === 0) {
+            throw new Error(`Failed to fetch transactions`);
         }
         const transaction = response.data[0];
         return transaction.attributes && transaction.attributes.created_at
@@ -81,8 +79,13 @@ export class TransactionService {
     }
 
     async tagExists(tag: string): Promise<boolean> {
-        const response = await this.apiClient.get<TagSingle>(`/tags/${encodeURIComponent(tag)}`);
-        return response?.data !== undefined;
+        try {
+            const response = await this.client.tags.getTag(tag);
+            return response?.data !== undefined;
+        } catch {
+            // Tag doesn't exist
+            return false;
+        }
     }
 
     async updateTransaction(
@@ -125,7 +128,7 @@ export class TransactionService {
                 return;
             }
 
-            const updatePayload = {
+            const updatePayload: TransactionUpdate = {
                 apply_rules: true,
                 fire_webhooks: true,
                 transactions: [
@@ -137,19 +140,19 @@ export class TransactionService {
                 ],
             };
 
-            const updatedTransaction = await this.apiClient.put<TransactionRead>(
-                `/transactions/${transactionRead.id}`,
+            const updatedTransaction = await this.client.transactions.updateTransaction(
+                transactionRead.id,
                 updatePayload
             );
             logger.debug(
                 {
                     transactionId: transaction.transaction_journal_id,
-                    updatedFields: Object.keys(updatePayload.transactions[0]),
+                    updatedFields: Object.keys(updatePayload.transactions?.[0] ?? {}),
                 },
                 `Transaction updated successfully`
             );
 
-            return updatedTransaction;
+            return updatedTransaction.data;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
@@ -217,11 +220,9 @@ export class TransactionService {
     }
 
     private async fetchTransactionsByTag(tag: string): Promise<TransactionRead[]> {
-        const response = await this.apiClient.get<TransactionArray>(
-            `/tags/${encodeURIComponent(tag)}/transactions`
-        );
-        if (!response) {
-            throw new FireflyApiError(`Failed to fetch transactions for tag: ${tag}`);
+        const response = await this.client.tags.listTransactionByTag(tag);
+        if (!response || !response.data) {
+            throw new Error(`Failed to fetch transactions for tag: ${tag}`);
         }
         return response.data;
     }
@@ -231,11 +232,15 @@ export class TransactionService {
         year: number
     ): Promise<TransactionRead[]> {
         const range = DateRangeService.getDateRange(month, year);
-        const response = await this.apiClient.get<TransactionArray>(
-            `/transactions?start=${range.startDate.toISOString()}&end=${range.endDate.toISOString()}`
+        const response = await this.client.transactions.listTransaction(
+            undefined, // xTraceId
+            undefined, // limit
+            undefined, // page
+            range.startDate.toISOString().split('T')[0],
+            range.endDate.toISOString().split('T')[0]
         );
-        if (!response) {
-            throw new FireflyApiError(`Failed to fetch transactions for month: ${month}`);
+        if (!response || !response.data) {
+            throw new Error(`Failed to fetch transactions for month: ${month}`);
         }
         return response.data;
     }

@@ -1,6 +1,6 @@
 import {
     TransactionSplit,
-    Category,
+    CategoryProperties,
     BudgetRead,
     TransactionRead,
 } from '@derekprovance/firefly-iii-sdk';
@@ -13,12 +13,12 @@ import { EditTransactionAttribute } from '../../types/enum/edit-transaction-attr
 
 export class TransactionUpdaterService {
     private readonly updateParameterMap = {
-        [UpdateTransactionMode.Both]: (category?: Category, budget?: BudgetRead) =>
+        [UpdateTransactionMode.Both]: (category?: CategoryProperties, budget?: BudgetRead) =>
             [category?.name, budget?.id] as const,
-        [UpdateTransactionMode.Budget]: (_category?: Category, budget?: BudgetRead) =>
+        [UpdateTransactionMode.Budget]: (_category?: CategoryProperties, budget?: BudgetRead) =>
             [undefined, budget?.id] as const,
         [UpdateTransactionMode.Category]: (
-            category?: Category,
+            category?: CategoryProperties,
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             _budget?: BudgetRead
         ) => [category?.name, undefined] as const,
@@ -29,7 +29,7 @@ export class TransactionUpdaterService {
         private readonly validator: TransactionValidatorService,
         private readonly userInputService: UserInputService,
         private readonly dryRun: boolean = false,
-        private readonly categories: Category[],
+        private readonly categories: CategoryProperties[],
         private readonly budgets: BudgetRead[]
     ) {}
 
@@ -111,7 +111,7 @@ export class TransactionUpdaterService {
     private validateAICategory(
         aiCategory: string | undefined,
         transaction: TransactionSplit
-    ): Category | undefined {
+    ): CategoryProperties | undefined {
         let category;
         if (aiCategory && aiCategory !== '') {
             category = this.getValidCategory(aiCategory);
@@ -181,7 +181,7 @@ export class TransactionUpdaterService {
     private async handleUpdateWorkflow(
         transaction: TransactionSplit,
         transactionRead: TransactionRead | undefined,
-        category: Category | undefined,
+        category: CategoryProperties | undefined,
         budget: BudgetRead | undefined
     ): Promise<TransactionRead | undefined> {
         let action;
@@ -215,7 +215,7 @@ export class TransactionUpdaterService {
 
     private async processEditCommand(
         transaction: TransactionSplit
-    ): Promise<[Category | undefined, BudgetRead | undefined]> {
+    ): Promise<[CategoryProperties | undefined, BudgetRead | undefined]> {
         logger.debug({ description: transaction.description }, 'User chose the edit option');
 
         const answers = await this.userInputService.shouldEditCategoryBudget();
@@ -253,7 +253,7 @@ export class TransactionUpdaterService {
      * @param value Category name to find
      * @returns The matching category or undefined
      */
-    private getValidCategory(value: string | undefined): Category | undefined {
+    private getValidCategory(value: string | undefined): CategoryProperties | undefined {
         if (!value) {
             return;
         }

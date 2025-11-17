@@ -1,17 +1,13 @@
-import {
-    Category,
-    CategoryArray,
-    FireflyApiClient,
-    FireflyApiError,
-} from '@derekprovance/firefly-iii-sdk';
+import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs';
 
 export class CategoryService {
-    constructor(private readonly apiClient: FireflyApiClient) {}
+    constructor(private readonly client: FireflyClientWithCerts) {}
 
-    async getCategories(): Promise<Category[]> {
-        const response = await this.apiClient.get<CategoryArray>(`/categories`);
+    async getCategories(): Promise<CategoryProperties[]> {
+        const response = await this.client.categories.listCategory();
         if (!response || !response.data) {
-            throw new FireflyApiError('Failed to fetch categories');
+            throw new Error('Failed to fetch categories');
         }
         return response.data.map(category => category.attributes);
     }

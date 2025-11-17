@@ -5,6 +5,7 @@ This guide explains how to set up and use the Docker development environment for
 ## Overview
 
 The Docker setup includes:
+
 - **Firefly III** - Personal finance manager (port 8080)
 - **PostgreSQL** - Database backend (port 5432)
 - **Data Importer** - Bulk import tool (port 8081)
@@ -30,8 +31,8 @@ Wait for Firefly III to initialize (about 1-2 minutes). Services should show as 
 
 1. Open http://localhost:8080 in your browser
 2. Register a new account (first user becomes admin)
-   - Email: `admin@example.com` (or any email)
-   - Password: Choose a secure password
+    - Email: `admin@example.com` (or any email)
+    - Password: Choose a secure password
 3. Complete the setup wizard
 
 ### 4. Generate API Token
@@ -42,6 +43,7 @@ Wait for Firefly III to initialize (about 1-2 minutes). Services should show as 
 ```
 
 Follow the instructions to:
+
 1. Access Firefly III → **Options** → **Profile** → **OAuth**
 2. Create a **Personal Access Token** named `Budgeting Toolkit CLI`
 3. Copy the generated token
@@ -85,6 +87,7 @@ chmod +x budget-dev.sh
 ```
 
 This creates:
+
 - 2 asset accounts (Checking, Savings)
 - 2 revenue accounts (Salary, Freelance)
 - 4 expense accounts
@@ -138,15 +141,17 @@ docker-compose logs -f db
 ### Database Access
 
 #### Via Adminer (Web UI)
+
 1. Open http://localhost:8082
 2. Login with:
-   - System: `PostgreSQL`
-   - Server: `db`
-   - Username: `firefly`
-   - Password: `firefly_secret`
-   - Database: `firefly`
+    - System: `PostgreSQL`
+    - Server: `db`
+    - Username: `firefly`
+    - Password: `firefly_secret`
+    - Database: `firefly`
 
 #### Via psql CLI
+
 ```bash
 docker-compose exec db psql -U firefly -d firefly
 
@@ -159,16 +164,19 @@ SELECT * FROM transactions;   # View transactions
 ### Backup and Restore
 
 #### Backup Database
+
 ```bash
 docker-compose exec db pg_dump -U firefly firefly > backup.sql
 ```
 
 #### Restore Database
+
 ```bash
 docker-compose exec -T db psql -U firefly firefly < backup.sql
 ```
 
 #### Export Firefly Data
+
 ```bash
 # In Firefly UI: Options → Export data
 # Or use the API
@@ -191,6 +199,7 @@ Key variables in `docker-compose.yml`:
 ### Ports
 
 Default ports (change in `docker-compose.yml` if needed):
+
 - Firefly III: `8080`
 - Data Importer: `8081`
 - Adminer: `8082`
@@ -253,21 +262,21 @@ To use MySQL instead of PostgreSQL:
 
 ```yaml
 db:
-  image: mysql:8
-  environment:
-    - MYSQL_ROOT_PASSWORD=root_secret
-    - MYSQL_DATABASE=firefly
-    - MYSQL_USER=firefly
-    - MYSQL_PASSWORD=firefly_secret
+    image: mysql:8
+    environment:
+        - MYSQL_ROOT_PASSWORD=root_secret
+        - MYSQL_DATABASE=firefly
+        - MYSQL_USER=firefly
+        - MYSQL_PASSWORD=firefly_secret
 
 firefly:
-  environment:
-    - DB_CONNECTION=mysql
-    - DB_HOST=db
-    - DB_PORT=3306
-    - DB_DATABASE=firefly
-    - DB_USERNAME=firefly
-    - DB_PASSWORD=firefly_secret
+    environment:
+        - DB_CONNECTION=mysql
+        - DB_HOST=db
+        - DB_PORT=3306
+        - DB_DATABASE=firefly
+        - DB_USERNAME=firefly
+        - DB_PASSWORD=firefly_secret
 ```
 
 2. Restart services:
@@ -407,17 +416,17 @@ Your `budgeting-toolkit.config.yaml` should match the seeded data:
 ```yaml
 expectedMonthlyPaycheck: 3500
 validDestinationAccounts:
-  - "Main Checking Account"
-  - "Savings Account"
+    - 'Main Checking Account'
+    - 'Savings Account'
 validExpenseAccounts:
-  - "Grocery Store"
-  - "Utility Company"
-  - "Landlord"
-  - "ISP Provider"
-  - "Gas Station"
-  - "Local Coffee Shop"
+    - 'Grocery Store'
+    - 'Utility Company'
+    - 'Landlord'
+    - 'ISP Provider'
+    - 'Gas Station'
+    - 'Local Coffee Shop'
 excludedAdditionalIncomePatterns:
-  - "PAYROLL"
+    - 'PAYROLL'
 ```
 
 ### Testing AI Features

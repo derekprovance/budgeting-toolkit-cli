@@ -1,4 +1,5 @@
-import { BudgetRead, Category, FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { BudgetRead, CategoryProperties } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../api/firefly-client-with-certs';
 import { TransactionService } from '../services/core/transaction.service';
 import { BudgetService } from '../services/core/budget.service';
 import { CategoryService } from '../services/core/category.service';
@@ -22,7 +23,7 @@ import { FinalizeBudgetDisplayService } from '../services/display/finalize-budge
 import { BudgetDisplayService } from '../services/display/budget-display.service';
 
 export class ServiceFactory {
-    static createServices(apiClient: FireflyApiClient) {
+    static createServices(apiClient: FireflyClientWithCerts) {
         const transactionService = new TransactionService(apiClient);
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
@@ -70,7 +71,7 @@ export class ServiceFactory {
     }
 
     static async createUpdateTransactionService(
-        apiClient: FireflyApiClient,
+        apiClient: FireflyClientWithCerts,
         includeClassified: boolean = false,
         dryRun: boolean = false
     ): Promise<UpdateTransactionService> {
@@ -85,7 +86,7 @@ export class ServiceFactory {
         );
 
         const budgets: BudgetRead[] = await services.budgetService.getBudgets();
-        const categories: Category[] = await services.categoryService.getCategories();
+        const categories: CategoryProperties[] = await services.categoryService.getCategories();
 
         const transactionUpdaterService = new TransactionUpdaterService(
             services.transactionService,

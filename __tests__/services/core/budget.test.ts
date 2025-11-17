@@ -1,15 +1,22 @@
 import { BudgetService } from '../../../src/services/core/budget.service';
-import { FireflyApiClient, FireflyApiError } from '@derekprovance/firefly-iii-sdk';
 import { BudgetArray, BudgetLimitArray, InsightGroup } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs';
 
 describe('BudgetService', () => {
     let budgetService: BudgetService;
-    let mockApiClient: jest.Mocked<FireflyApiClient>;
+    let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
         mockApiClient = {
-            get: jest.fn(),
-        } as unknown as jest.Mocked<FireflyApiClient>;
+            budgets: {
+                listBudget: jest.fn(),
+                listBudgetLimit: jest.fn(),
+                listTransactionWithoutBudget: jest.fn(),
+            },
+            insight: {
+                insightExpenseBudget: jest.fn(),
+            },
+        } as unknown as jest.Mocked<FireflyClientWithCerts>;
         budgetService = new BudgetService(mockApiClient);
     });
 
@@ -45,24 +52,24 @@ describe('BudgetService', () => {
                 },
             };
 
-            mockApiClient.get.mockResolvedValue(mockBudgets);
+            (mockApiClient.budgets.listBudget as jest.Mock).mockResolvedValue(mockBudgets);
 
             const result = await budgetService.getBudgets();
 
-            expect(mockApiClient.get).toHaveBeenCalledWith('/budgets');
+            expect(mockApiClient.budgets.listBudget).toHaveBeenCalled();
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe('1');
             expect(result[0].attributes.name).toBe('Test Budget 1');
         });
 
         it('should throw error when API call fails', async () => {
-            mockApiClient.get.mockRejectedValue(new FireflyApiError('Failed to fetch budgets'));
+            (mockApiClient.budgets.listBudget as jest.Mock).mockRejectedValue(new Error('Failed to fetch budgets'));
 
             await expect(budgetService.getBudgets()).rejects.toThrow('Failed to fetch budgets');
         });
 
         it('should throw error when API returns null', async () => {
-            mockApiClient.get.mockResolvedValue(null);
+            (mockApiClient.budgets.listBudget as jest.Mock).mockResolvedValue(null);
 
             await expect(budgetService.getBudgets()).rejects.toThrow('Failed to fetch budgets');
         });
@@ -80,13 +87,11 @@ describe('BudgetService', () => {
                 },
             ] as unknown as InsightGroup;
 
-            mockApiClient.get.mockResolvedValue(mockInsights);
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValue(mockInsights);
 
             const result = await budgetService.getBudgetExpenseInsights(3, 2024);
 
-            expect(mockApiClient.get).toHaveBeenCalledWith(
-                expect.stringContaining('/insight/expense/budget')
-            );
+            expect(mockApiClient.insight.insightExpenseBudget).toHaveBeenCalled();
             expect(result).toEqual(mockInsights);
         });
 
@@ -95,8 +100,8 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            mockApiClient.get.mockRejectedValue(
-                new FireflyApiError('Failed to get budget expense insights for month 3')
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockRejectedValue(
+                new Error('Failed to get budget expense insights for month 3')
             );
 
             await expect(budgetService.getBudgetExpenseInsights(3, 2024)).rejects.toThrow(
@@ -105,7 +110,7 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API returns null', async () => {
-            mockApiClient.get.mockResolvedValue(null);
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValue(null);
 
             await expect(budgetService.getBudgetExpenseInsights(3, 2024)).rejects.toThrow(
                 'Failed to fetch expense insights for budget'
@@ -113,7 +118,7 @@ describe('BudgetService', () => {
         });
 
         it('should handle non-Error exceptions', async () => {
-            mockApiClient.get.mockRejectedValue('Some non-error rejection');
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockRejectedValue('Some non-error rejection');
 
             await expect(budgetService.getBudgetExpenseInsights(3, 2024)).rejects.toThrow(
                 'Failed to get budget expense insights for month 3'
@@ -147,13 +152,11 @@ describe('BudgetService', () => {
                 },
             };
 
-            mockApiClient.get.mockResolvedValue(mockLimits);
+            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockResolvedValue(mockLimits);
 
             const result = await budgetService.getBudgetLimits(3, 2024);
 
-            expect(mockApiClient.get).toHaveBeenCalledWith(
-                expect.stringContaining('/budget-limits')
-            );
+            expect(mockApiClient.budgets.listBudgetLimit).toHaveBeenCalled();
             expect(result).toEqual(mockLimits.data);
         });
 
@@ -162,8 +165,8 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            mockApiClient.get.mockRejectedValue(
-                new FireflyApiError('Failed to get budget limits for month 3')
+            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockRejectedValue(
+                new Error('Failed to get budget limits for month 3')
             );
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
@@ -172,7 +175,7 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API returns null', async () => {
-            mockApiClient.get.mockResolvedValue(null);
+            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockResolvedValue(null);
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
                 'Failed to fetch expense insights for budget'
@@ -180,7 +183,7 @@ describe('BudgetService', () => {
         });
 
         it('should handle non-Error exceptions', async () => {
-            mockApiClient.get.mockRejectedValue('Some non-error rejection');
+            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockRejectedValue('Some non-error rejection');
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
                 'Failed to get budget limits for month 3'

@@ -4,7 +4,7 @@ import { TransactionValidatorService } from '../../../src/services/core/transact
 import { UserInputService } from '../../../src/services/user-input.service';
 import { UpdateTransactionMode } from '../../../src/types/enum/update-transaction-mode.enum';
 import { EditTransactionAttribute } from '../../../src/types/enum/edit-transaction-attribute.enum';
-import { TransactionSplit, Category, BudgetRead } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit, CategoryProperties, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 
 // Mock the logger to prevent console output during tests
 jest.mock('../../../src/logger', () => ({
@@ -35,7 +35,7 @@ describe('TransactionUpdaterService', () => {
         budget_name: 'Old Budget',
     };
 
-    const mockCategories: Partial<Category>[] = [{ name: 'New Category' }];
+    const mockCategories: Partial<CategoryProperties>[] = [{ name: 'New Category' }];
 
     const mockBudgets: Partial<BudgetRead>[] = [
         { id: '2', type: 'budget', attributes: { name: 'New Budget' } },
@@ -69,7 +69,7 @@ describe('TransactionUpdaterService', () => {
             mockValidator,
             mockUserInputService,
             false,
-            mockCategories as Category[],
+            mockCategories as CategoryProperties[],
             mockBudgets as BudgetRead[]
         );
     });
@@ -190,7 +190,7 @@ describe('TransactionUpdaterService', () => {
                 mockValidator,
                 mockUserInputService,
                 true,
-                mockCategories as Category[],
+                mockCategories as CategoryProperties[],
                 mockBudgets as BudgetRead[]
             );
 
@@ -231,7 +231,7 @@ describe('TransactionUpdaterService', () => {
                 mockValidator,
                 mockUserInputService,
                 true,
-                mockCategories as Category[],
+                mockCategories as CategoryProperties[],
                 mockBudgets as BudgetRead[]
             );
 
@@ -258,7 +258,7 @@ describe('TransactionUpdaterService', () => {
                 mockValidator,
                 mockUserInputService,
                 true,
-                mockCategories as Category[],
+                mockCategories as CategoryProperties[],
                 mockBudgets as BudgetRead[]
             );
 
@@ -279,7 +279,7 @@ describe('TransactionUpdaterService', () => {
                 mockValidator,
                 mockUserInputService,
                 true,
-                mockCategories as Category[],
+                mockCategories as CategoryProperties[],
                 mockBudgets as BudgetRead[]
             );
 
@@ -383,7 +383,7 @@ describe('TransactionUpdaterService', () => {
                 EditTransactionAttribute.Category,
                 EditTransactionAttribute.Budget,
             ]);
-            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as Category);
+            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as CategoryProperties);
             mockUserInputService.getNewBudget.mockResolvedValue(mockBudgets[0] as BudgetRead);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
@@ -417,7 +417,7 @@ describe('TransactionUpdaterService', () => {
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
-            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as Category);
+            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as CategoryProperties);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -484,7 +484,7 @@ describe('TransactionUpdaterService', () => {
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
-            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as Category);
+            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as CategoryProperties);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any

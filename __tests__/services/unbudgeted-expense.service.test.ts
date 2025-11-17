@@ -1,4 +1,5 @@
-import { TransactionSplit, FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
@@ -59,7 +60,7 @@ describe('UnbudgetedExpenseService', () => {
             }
             return undefined;
         });
-        const mockApiClient = {} as FireflyApiClient;
+        const mockApiClient = {} as jest.Mocked<FireflyClientWithCerts>;
         const mockExcludedTransactionService =
             new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
         mockTransactionService = new TransactionService(

@@ -1,14 +1,13 @@
 import { TransactionService } from '../../../src/services/core/transaction.service';
 import {
-    FireflyApiClient,
     TransactionArray,
     TransactionRead,
     TransactionSplit,
     TransactionTypeProperty,
 } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs';
 import { logger } from '../../../src/logger';
 
-jest.mock('@derekprovance/firefly-iii-sdk');
 jest.mock('../../../src/logger', () => ({
     logger: {
         debug: jest.fn(),
@@ -20,13 +19,19 @@ jest.mock('../../../src/logger', () => ({
 
 describe('TransactionService', () => {
     let service: TransactionService;
-    let mockApiClient: jest.Mocked<FireflyApiClient>;
+    let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
         mockApiClient = {
-            get: jest.fn(),
-            put: jest.fn(),
-        } as unknown as jest.Mocked<FireflyApiClient>;
+            transactions: {
+                listTransaction: jest.fn(),
+                updateTransaction: jest.fn(),
+            },
+            tags: {
+                getTag: jest.fn(),
+                listTransactionByTag: jest.fn(),
+            },
+        } as unknown as jest.Mocked<FireflyClientWithCerts>;
         service = new TransactionService(mockApiClient);
     });
 
@@ -52,7 +57,7 @@ describe('TransactionService', () => {
                 },
             ] as TransactionRead[];
 
-            mockApiClient.get.mockResolvedValueOnce({
+            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
                 data: mockTransactions,
             } as TransactionArray);
 
@@ -65,7 +70,7 @@ describe('TransactionService', () => {
                 date: '2024-01-01',
                 type: 'withdrawal',
             });
-            expect(mockApiClient.get).toHaveBeenCalledWith('/tags/test-tag/transactions');
+            expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledWith('test-tag');
         });
 
         it('should throw error when tag is empty', async () => {
@@ -75,7 +80,7 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            mockApiClient.get.mockRejectedValueOnce(new Error('API Error'));
+            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
 
             await expect(service.getTransactionsByTag('test-tag')).rejects.toThrow(
                 'Failed to fetch transactions by tag test-tag'
@@ -100,21 +105,23 @@ describe('TransactionService', () => {
             } as TransactionRead;
 
             // First, populate the transaction index by fetching transactions
-            mockApiClient.get.mockResolvedValueOnce({
+            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
             // Call getTransactionsByTag to populate the index
             await service.getTransactionsByTag('test-tag');
 
-            // Reset the mock to avoid interference with updateTransaction
-            mockApiClient.get.mockReset();
+            // Mock the updateTransaction response
+            (mockApiClient.transactions.updateTransaction as jest.Mock).mockResolvedValueOnce({
+                data: mockTransactionRead,
+            });
 
             // Now call updateTransaction
             await service.updateTransaction(mockTransaction, 'New Category', '2');
 
-            expect(mockApiClient.put).toHaveBeenCalledWith(
-                '/transactions/1',
+            expect(mockApiClient.transactions.updateTransaction).toHaveBeenCalledWith(
+                '1',
                 expect.objectContaining({
                     apply_rules: true,
                     fire_webhooks: true,
@@ -152,7 +159,7 @@ describe('TransactionService', () => {
         });
 
         it('should handle error when transaction read is not found', async () => {
-            mockApiClient.get.mockResolvedValueOnce({
+            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
                 data: [],
                 meta: {},
                 links: {},

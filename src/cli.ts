@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander';
-import { FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from './api/firefly-client-with-certs';
 import { config } from './config';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command';
 import { BudgetReportCommand } from './commands/budget-report.command';
@@ -50,11 +50,11 @@ export const createCli = (): Command => {
     const program = new Command();
 
     // Initialize API client with error handling
-    let apiClient: FireflyApiClient;
+    let apiClient: FireflyClientWithCerts;
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
     try {
-        apiClient = new FireflyApiClient(config);
+        apiClient = new FireflyClientWithCerts(config);
         services = ServiceFactory.createServices(apiClient);
     } catch (error) {
         console.error(

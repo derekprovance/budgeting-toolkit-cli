@@ -1,6 +1,6 @@
 import {
     BudgetRead,
-    Category,
+    CategoryProperties,
     TransactionRead,
     TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
@@ -84,7 +84,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                 'Processing transactions'
             );
 
-            let categories: Category[] | undefined;
+            let categories: CategoryProperties[] | undefined;
             if (updateMode !== UpdateTransactionMode.Budget) {
                 categories = await this.categoryService.getCategories();
             }
@@ -149,7 +149,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
     private async getAIResultsForTransactions(
         transactions: TransactionSplit[],
         updateMode: UpdateTransactionMode,
-        categories?: Category[],
+        categories?: CategoryProperties[],
         budgets?: BudgetRead[]
     ): Promise<AIResponse> {
         const categoryNames = categories?.map(c => c.name);

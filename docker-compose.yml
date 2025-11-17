@@ -1,126 +1,126 @@
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    container_name: firefly-db
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=firefly
-      - POSTGRES_PASSWORD=firefly_secret
-      - POSTGRES_DB=firefly
-    volumes:
-      - firefly-db-data:/var/lib/postgresql/data
-      - ./docker/db-init:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U firefly"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    # PostgreSQL Database
+    db:
+        image: postgres:15-alpine
+        container_name: firefly-db
+        restart: unless-stopped
+        environment:
+            - POSTGRES_USER=firefly
+            - POSTGRES_PASSWORD=firefly_secret
+            - POSTGRES_DB=firefly
+        volumes:
+            - firefly-db-data:/var/lib/postgresql/data
+            - ./docker/db-init:/docker-entrypoint-initdb.d
+        ports:
+            - '5432:5432'
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U firefly']
+            interval: 10s
+            timeout: 5s
+            retries: 5
 
-  # Firefly III Application
-  firefly:
-    image: fireflyiii/core:latest
-    container_name: firefly-app
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      # Database settings
-      - DB_CONNECTION=pgsql
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_DATABASE=firefly
-      - DB_USERNAME=firefly
-      - DB_PASSWORD=firefly_secret
+    # Firefly III Application
+    firefly:
+        image: fireflyiii/core:latest
+        container_name: firefly-app
+        restart: unless-stopped
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            # Database settings
+            - DB_CONNECTION=pgsql
+            - DB_HOST=db
+            - DB_PORT=5432
+            - DB_DATABASE=firefly
+            - DB_USERNAME=firefly
+            - DB_PASSWORD=firefly_secret
 
-      # Application settings
-      - APP_KEY=${FIREFLY_APP_KEY:-SomeRandomStringOf32CharsExactly}
-      - APP_URL=http://localhost:8080
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - LOG_CHANNEL=stack
-      - LOG_LEVEL=debug
+            # Application settings
+            - APP_KEY=${FIREFLY_APP_KEY:-SomeRandomStringOf32CharsExactly}
+            - APP_URL=http://localhost:8080
+            - APP_ENV=local
+            - APP_DEBUG=true
+            - LOG_CHANNEL=stack
+            - LOG_LEVEL=debug
 
-      # Security
-      - TRUSTED_PROXIES=**
+            # Security
+            - TRUSTED_PROXIES=**
 
-      # Email settings (optional, for testing)
-      - MAIL_MAILER=log
-      - MAIL_HOST=null
-      - MAIL_PORT=2525
-      - MAIL_FROM=changeme@example.com
-      - MAIL_USERNAME=null
-      - MAIL_PASSWORD=null
-      - MAIL_ENCRYPTION=null
+            # Email settings (optional, for testing)
+            - MAIL_MAILER=log
+            - MAIL_HOST=null
+            - MAIL_PORT=2525
+            - MAIL_FROM=changeme@example.com
+            - MAIL_USERNAME=null
+            - MAIL_PASSWORD=null
+            - MAIL_ENCRYPTION=null
 
-      # Authentication
-      - LOGIN_PROVIDER=eloquent
-      - AUTHENTICATION_GUARD=web
+            # Authentication
+            - LOGIN_PROVIDER=eloquent
+            - AUTHENTICATION_GUARD=web
 
-      # Feature flags
-      - DISABLE_FRAME_HEADER=false
-      - DKR_BUILD_LOCALE=true
-      - DKR_CHECK_SQLITE=false
-      - DKR_RUN_MIGRATION=true
-      - DKR_RUN_UPGRADE=true
-      - DKR_RUN_VERIFY=true
-      - DKR_RUN_REPORT=true
-      - DKR_RUN_PASSPORT_INSTALL=true
+            # Feature flags
+            - DISABLE_FRAME_HEADER=false
+            - DKR_BUILD_LOCALE=true
+            - DKR_CHECK_SQLITE=false
+            - DKR_RUN_MIGRATION=true
+            - DKR_RUN_UPGRADE=true
+            - DKR_RUN_VERIFY=true
+            - DKR_RUN_REPORT=true
+            - DKR_RUN_PASSPORT_INSTALL=true
 
-    volumes:
-      - firefly-upload:/var/www/html/storage/upload
-      - ./docker/firefly-init:/docker-entrypoint-init.d
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+        volumes:
+            - firefly-upload:/var/www/html/storage/upload
+            - ./docker/firefly-init:/docker-entrypoint-init.d
+        ports:
+            - '8080:8080'
+        healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 60s
 
-  # Data Importer (optional, useful for bulk imports)
-  importer:
-    image: fireflyiii/data-importer:latest
-    container_name: firefly-importer
-    restart: unless-stopped
-    depends_on:
-      firefly:
-        condition: service_healthy
-    environment:
-      - FIREFLY_III_URL=http://firefly:8080
-      - VANITY_URL=http://localhost:8080
-      - FIREFLY_III_ACCESS_TOKEN=${FIREFLY_API_TOKEN:-}
-      - TRUSTED_PROXIES=**
-      - EXPECT_SECURE_URL=false
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - LOG_LEVEL=debug
-    ports:
-      - "8081:8080"
+    # Data Importer (optional, useful for bulk imports)
+    importer:
+        image: fireflyiii/data-importer:latest
+        container_name: firefly-importer
+        restart: unless-stopped
+        depends_on:
+            firefly:
+                condition: service_healthy
+        environment:
+            - FIREFLY_III_URL=http://firefly:8080
+            - VANITY_URL=http://localhost:8080
+            - FIREFLY_III_ACCESS_TOKEN=${FIREFLY_API_TOKEN:-}
+            - TRUSTED_PROXIES=**
+            - EXPECT_SECURE_URL=false
+            - APP_ENV=local
+            - APP_DEBUG=true
+            - LOG_LEVEL=debug
+        ports:
+            - '8081:8080'
 
-  # Adminer for database management (optional)
-  adminer:
-    image: adminer:latest
-    container_name: firefly-adminer
-    restart: unless-stopped
-    depends_on:
-      - db
-    ports:
-      - "8082:8080"
-    environment:
-      - ADMINER_DEFAULT_SERVER=db
-      - ADMINER_DESIGN=nette
+    # Adminer for database management (optional)
+    adminer:
+        image: adminer:latest
+        container_name: firefly-adminer
+        restart: unless-stopped
+        depends_on:
+            - db
+        ports:
+            - '8082:8080'
+        environment:
+            - ADMINER_DEFAULT_SERVER=db
+            - ADMINER_DESIGN=nette
 
 volumes:
-  firefly-db-data:
-    driver: local
-  firefly-upload:
-    driver: local
+    firefly-db-data:
+        driver: local
+    firefly-upload:
+        driver: local
 
 networks:
-  default:
-    name: firefly-network
+    default:
+        name: firefly-network

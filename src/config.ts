@@ -1,7 +1,7 @@
 import path from 'path';
 import dotenv from 'dotenv';
-import { ApiClientConfig } from '@derekprovance/firefly-iii-sdk';
 import { getConfigValue } from './utils/config-loader';
+import { FireflyClientWithCertsConfig } from './api/firefly-client-with-certs';
 
 dotenv.config({
     quiet: true,
@@ -9,7 +9,7 @@ dotenv.config({
 
 export const baseUrl: string = process.env.FIREFLY_API_URL || '';
 
-export const config: ApiClientConfig = {
+export const config: FireflyClientWithCertsConfig = {
     baseUrl:
         (process.env.FIREFLY_API_URL?.trim() || 'https://your-firefly-instance.com') + '/api/v1/',
     apiToken: process.env.FIREFLY_API_TOKEN || '',

@@ -1,4 +1,4 @@
-import { FireflyApiClient } from '@derekprovance/firefly-iii-sdk';
+import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { ServiceFactory } from '../../src/factories/service.factory';
 import { UpdateTransactionService } from '../../src/services/update-transaction.service';
 
@@ -44,12 +44,12 @@ import { CategoryService } from '../../src/services/core/category.service';
     .mockResolvedValue([]);
 
 describe('ServiceFactory', () => {
-    let mockApiClient: jest.Mocked<FireflyApiClient>;
+    let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
         mockApiClient = {
             // Mock only the properties we need for tests
-        } as unknown as jest.Mocked<FireflyApiClient>;
+        } as unknown as jest.Mocked<FireflyClientWithCerts>;
     });
 
     afterEach(() => {

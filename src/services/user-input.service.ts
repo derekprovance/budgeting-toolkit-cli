@@ -1,4 +1,4 @@
-import { BudgetRead, Category, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, select } from '@inquirer/prompts';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
@@ -67,7 +67,9 @@ export class UserInputService {
         return answer;
     }
 
-    async getNewCategory(categories: Category[]): Promise<Category | undefined> {
+    async getNewCategory(
+        categories: CategoryProperties[]
+    ): Promise<CategoryProperties | undefined> {
         const answer = await this.createSelectDropdown(
             categories.map(category => category.name),
             'Select a new Category'
