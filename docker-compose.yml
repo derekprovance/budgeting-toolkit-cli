@@ -1,5 +1,4 @@
 services:
-    # PostgreSQL Database
     db:
         image: postgres:15-alpine
         container_name: firefly-db
@@ -72,7 +71,6 @@ services:
 
         volumes:
             - firefly-upload:/var/www/html/storage/upload
-            - ./docker/firefly-init:/docker-entrypoint-init.d
         ports:
             - '8080:8080'
         healthcheck:
@@ -101,19 +99,6 @@ services:
             - LOG_LEVEL=debug
         ports:
             - '8081:8080'
-
-    # Adminer for database management (optional)
-    adminer:
-        image: adminer:latest
-        container_name: firefly-adminer
-        restart: unless-stopped
-        depends_on:
-            - db
-        ports:
-            - '8082:8080'
-        environment:
-            - ADMINER_DEFAULT_SERVER=db
-            - ADMINER_DESIGN=nette
 
 volumes:
     firefly-db-data:
