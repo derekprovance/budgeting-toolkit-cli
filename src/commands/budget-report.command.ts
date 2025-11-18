@@ -3,6 +3,7 @@ import { TransactionService } from '../services/core/transaction.service';
 import { Command } from '../types/interface/command.interface';
 import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
 import { BudgetDisplayService } from '../services/display/budget-display.service';
+import { BillComparisonService } from '../services/bill-comparison.service';
 
 /**
  * Command for displaying budget report
@@ -11,7 +12,8 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     constructor(
         private readonly budgetReportService: BudgetReportService,
         private readonly transactionService: TransactionService,
-        private readonly budgetDisplayService: BudgetDisplayService
+        private readonly budgetDisplayService: BudgetDisplayService,
+        private readonly billComparisonService: BillComparisonService
     ) {}
 
     /**
@@ -85,6 +87,13 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
         // Display list of unbudgeted transactions
         console.log(this.budgetDisplayService.listUnbudgetedTransactions(unbudgetedTransactions));
+
+        // Display bill comparison
+        const billComparison = await this.billComparisonService.calculateBillComparison(
+            month,
+            year
+        );
+        console.log(this.budgetDisplayService.formatBillComparisonSection(billComparison));
 
         // Display warning if necessary
         if (isCurrentMonth) {

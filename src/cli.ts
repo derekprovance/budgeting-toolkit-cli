@@ -153,7 +153,8 @@ Examples:
                 const command = new BudgetReportCommand(
                     services.budgetReport,
                     services.transactionService,
-                    services.budgetDisplayService
+                    services.budgetDisplayService,
+                    services.billComparisonService
                 );
                 await command.execute({
                     month: opts.month!,

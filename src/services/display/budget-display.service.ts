@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { BudgetReport } from '../../types/interface/budget-report.interface';
 import { DisplayService } from './display.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { BillComparisonDto } from '../../types/dto/bill-comparison.dto';
 
 /**
  * Service for formatting and displaying budget information
@@ -146,6 +147,71 @@ export class BudgetDisplayService {
             transactions,
             '=== Unbudgeted Transactions ==='
         );
+    }
+
+    /**
+     * Formats the bill comparison section
+     */
+    formatBillComparisonSection(comparison: BillComparisonDto): string {
+        if (comparison.bills.length === 0) {
+            return chalk.gray('\n=== Bill Comparison ===\nNo bills configured.');
+        }
+
+        const output: string[] = [];
+        output.push('\n' + chalk.bold('=== Bill Comparison ==='));
+
+        // Format predicted monthly average
+        const predicted = this.formatCurrencyWithSymbol(
+            comparison.predictedMonthlyAverage,
+            comparison.currencySymbol
+        );
+        output.push(chalk.gray(`Predicted Monthly Avg: ${chalk.white(predicted)}`));
+
+        // Format actual monthly total
+        const actual = this.formatCurrencyWithSymbol(
+            comparison.actualMonthlyTotal,
+            comparison.currencySymbol
+        );
+        output.push(chalk.gray(`Actual Month Total:    ${chalk.white(actual)}`));
+
+        // Format variance with color
+        const variance = this.formatCurrencyWithSymbol(
+            Math.abs(comparison.variance),
+            comparison.currencySymbol
+        );
+        const varianceColor = comparison.variance > 0 ? chalk.red : chalk.green;
+        const varianceLabel = comparison.variance > 0 ? 'Over' : 'Under';
+        output.push(
+            chalk.gray(`Variance:              `) +
+                varianceColor(`${varianceLabel} ${variance}`)
+        );
+
+        // Add individual bill details if there are any with actual amounts
+        const billsWithActuals = comparison.bills.filter(b => b.actual > 0);
+        if (billsWithActuals.length > 0) {
+            output.push('\n' + chalk.gray('Bill Details:'));
+            for (const bill of billsWithActuals) {
+                const billPredicted = this.formatCurrencyWithSymbol(
+                    bill.predicted,
+                    comparison.currencySymbol
+                );
+                const billActual = this.formatCurrencyWithSymbol(
+                    bill.actual,
+                    comparison.currencySymbol
+                );
+                output.push(
+                    chalk.gray(`  ${bill.name}: `) +
+                        chalk.white(`${billActual}`) +
+                        chalk.gray(` (predicted: ${billPredicted})`)
+                );
+            }
+        }
+
+        return output.join('\n');
+    }
+
+    private formatCurrencyWithSymbol(amount: number, symbol: string): string {
+        return `${symbol}${amount.toFixed(2)}`;
     }
 
     private getDailyRateIndicator(

@@ -383,7 +383,9 @@ describe('TransactionUpdaterService', () => {
                 EditTransactionAttribute.Category,
                 EditTransactionAttribute.Budget,
             ]);
-            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as CategoryProperties);
+            mockUserInputService.getNewCategory.mockResolvedValue(
+                mockCategories[0] as CategoryProperties
+            );
             mockUserInputService.getNewBudget.mockResolvedValue(mockBudgets[0] as BudgetRead);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
@@ -417,7 +419,9 @@ describe('TransactionUpdaterService', () => {
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
-            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as CategoryProperties);
+            mockUserInputService.getNewCategory.mockResolvedValue(
+                mockCategories[0] as CategoryProperties
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -484,7 +488,9 @@ describe('TransactionUpdaterService', () => {
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
-            mockUserInputService.getNewCategory.mockResolvedValue(mockCategories[0] as CategoryProperties);
+            mockUserInputService.getNewCategory.mockResolvedValue(
+                mockCategories[0] as CategoryProperties
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any

@@ -2,24 +2,30 @@ import { BudgetReportCommand } from '../../src/commands/budget-report.command';
 import { BudgetReportService } from '../../src/services/budget-report.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { BudgetDisplayService } from '../../src/services/display/budget-display.service';
+import { BillComparisonService } from '../../src/services/bill-comparison.service';
 import { BudgetReport } from '../../src/types/interface/budget-report.interface';
+import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto';
 
 // Mock services
 jest.mock('../../src/services/budget-report.service');
 jest.mock('../../src/services/core/transaction.service');
 jest.mock('../../src/services/display/budget-display.service');
+jest.mock('../../src/services/bill-comparison.service');
 
 describe('BudgetReportCommand', () => {
     let command: BudgetReportCommand;
     let budgetReportService: jest.Mocked<BudgetReportService>;
     let transactionService: jest.Mocked<TransactionService>;
     let displayService: jest.Mocked<BudgetDisplayService>;
+    let billComparisonService: jest.Mocked<BillComparisonService>;
     let consoleLogSpy: jest.SpyInstance;
 
     const mockBudgetReports: BudgetReport[] = [
         { name: 'Test Budget 1', amount: 1000, spent: -500 },
         { name: 'Test Budget 2', amount: 2000, spent: -1000 },
     ];
+
+    const mockBillComparison = BillComparisonDto.create(500, 450, [], 'USD', '$');
 
     beforeEach(() => {
         // Reset mocks
@@ -42,10 +48,20 @@ describe('BudgetReportCommand', () => {
             getSpendRateWarning: jest.fn().mockReturnValue(null),
             getUnbudgetedExpenseWarning: jest.fn().mockReturnValue(null),
             listUnbudgetedTransactions: jest.fn().mockReturnValue('Unbudgeted Transactions'),
+            formatBillComparisonSection: jest.fn().mockReturnValue('Bill Comparison'),
         } as unknown as jest.Mocked<BudgetDisplayService>;
 
+        billComparisonService = {
+            calculateBillComparison: jest.fn().mockResolvedValue(mockBillComparison),
+        } as unknown as jest.Mocked<BillComparisonService>;
+
         // Create command instance
-        command = new BudgetReportCommand(budgetReportService, transactionService, displayService);
+        command = new BudgetReportCommand(
+            budgetReportService,
+            transactionService,
+            displayService,
+            billComparisonService
+        );
 
         // Spy on console.log
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -69,7 +85,9 @@ describe('BudgetReportCommand', () => {
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);
             expect(displayService.formatSummary).toHaveBeenCalled();
             expect(displayService.getSpendRateWarning).toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalledTimes(8); // Header + 2 items + separator + summary + unbudgeted
+            expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
+            expect(displayService.formatBillComparisonSection).toHaveBeenCalled();
+            expect(consoleLogSpy).toHaveBeenCalledTimes(9); // Header + 2 items + separator + summary + unbudgeted + bill comparison
         });
 
         it('should display budget report for non-current month', async () => {
@@ -85,7 +103,9 @@ describe('BudgetReportCommand', () => {
             expect(displayService.formatBudgetItem).toHaveBeenCalledTimes(2);
             expect(displayService.formatSummary).toHaveBeenCalled();
             expect(displayService.getSpendRateWarning).not.toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalledTimes(8); // Header + 2 items + separator + summary + newline + unbudgeted
+            expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
+            expect(displayService.formatBillComparisonSection).toHaveBeenCalled();
+            expect(consoleLogSpy).toHaveBeenCalledTimes(9); // Header + 2 items + separator + summary + newline + unbudgeted + bill comparison
         });
 
         it('should display warning when spend rate is too high', async () => {

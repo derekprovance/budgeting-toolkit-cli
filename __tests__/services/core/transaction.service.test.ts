@@ -80,7 +80,9 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockRejectedValueOnce(
+                new Error('API Error')
+            );
 
             await expect(service.getTransactionsByTag('test-tag')).rejects.toThrow(
                 'Failed to fetch transactions by tag test-tag'

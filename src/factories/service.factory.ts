@@ -21,6 +21,8 @@ import { baseUrl } from '../config';
 import { DisplayService } from '../services/display/display.service';
 import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service';
 import { BudgetDisplayService } from '../services/display/budget-display.service';
+import { BillService } from '../services/core/bill.service';
+import { BillComparisonService } from '../services/bill-comparison.service';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
@@ -51,6 +53,8 @@ export class ServiceFactory {
         const displayService = new DisplayService(transactionPropertyService);
         const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(displayService);
         const budgetDisplayService = new BudgetDisplayService(displayService);
+        const billService = new BillService(apiClient);
+        const billComparisonService = new BillComparisonService(billService, transactionService);
 
         return {
             transactionService,
@@ -67,6 +71,8 @@ export class ServiceFactory {
             displayService,
             finalizeBudgetDisplayService,
             budgetDisplayService,
+            billService,
+            billComparisonService,
         };
     }
 

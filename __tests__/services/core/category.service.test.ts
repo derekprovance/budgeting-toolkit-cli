@@ -43,7 +43,9 @@ describe('CategoryService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockClient.categories.listCategory as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+            (mockClient.categories.listCategory as jest.Mock).mockRejectedValueOnce(
+                new Error('API Error')
+            );
 
             await expect(service.getCategories()).rejects.toThrow('API Error');
         });

@@ -49,7 +49,9 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.budgets.listBudget as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+            (mockApiClient.budgets.listBudget as jest.Mock).mockRejectedValueOnce(
+                new Error('API Error')
+            );
 
             await expect(budgetService.getBudgets()).rejects.toThrow('API Error');
         });
@@ -74,7 +76,9 @@ describe('BudgetService', () => {
                 ],
             } as unknown as InsightGroup;
 
-            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValueOnce(mockInsights);
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValueOnce(
+                mockInsights
+            );
 
             const result = await budgetService.getBudgetExpenseInsights(1, 2024);
 
@@ -94,7 +98,9 @@ describe('BudgetService', () => {
                 endDate: mockEndDate,
             });
 
-            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValueOnce({} as InsightGroup);
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValueOnce(
+                {} as InsightGroup
+            );
 
             await budgetService.getBudgetExpenseInsights(1, 2024);
 
@@ -105,7 +111,9 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockRejectedValueOnce(
+                new Error('API Error')
+            );
 
             await expect(budgetService.getBudgetExpenseInsights(1, 2024)).rejects.toThrow(
                 'Failed to get budget expense insights for month 1'
@@ -159,7 +167,9 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockRejectedValueOnce(
+                new Error('API Error')
+            );
 
             await expect(budgetService.getBudgetLimits(1, 2024)).rejects.toThrow(
                 'Failed to get budget limits for month 1'

@@ -63,7 +63,9 @@ describe('BudgetService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.budgets.listBudget as jest.Mock).mockRejectedValue(new Error('Failed to fetch budgets'));
+            (mockApiClient.budgets.listBudget as jest.Mock).mockRejectedValue(
+                new Error('Failed to fetch budgets')
+            );
 
             await expect(budgetService.getBudgets()).rejects.toThrow('Failed to fetch budgets');
         });
@@ -87,7 +89,9 @@ describe('BudgetService', () => {
                 },
             ] as unknown as InsightGroup;
 
-            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValue(mockInsights);
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValue(
+                mockInsights
+            );
 
             const result = await budgetService.getBudgetExpenseInsights(3, 2024);
 
@@ -118,7 +122,9 @@ describe('BudgetService', () => {
         });
 
         it('should handle non-Error exceptions', async () => {
-            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockRejectedValue('Some non-error rejection');
+            (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockRejectedValue(
+                'Some non-error rejection'
+            );
 
             await expect(budgetService.getBudgetExpenseInsights(3, 2024)).rejects.toThrow(
                 'Failed to get budget expense insights for month 3'
@@ -183,7 +189,9 @@ describe('BudgetService', () => {
         });
 
         it('should handle non-Error exceptions', async () => {
-            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockRejectedValue('Some non-error rejection');
+            (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockRejectedValue(
+                'Some non-error rejection'
+            );
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
                 'Failed to get budget limits for month 3'

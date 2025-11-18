@@ -207,7 +207,9 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             // Dynamically generate mockAIResults to match filtered transactions
@@ -259,7 +261,9 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(false);
@@ -278,7 +282,9 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
@@ -332,7 +338,9 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
@@ -364,7 +372,9 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
@@ -393,7 +403,9 @@ describe('UpdateTransactionService', () => {
             mockTransactionService.getTransactionsByTag.mockResolvedValue(
                 mockTransactions as TransactionSplit[]
             );
-            mockCategoryService.getCategories.mockResolvedValue(mockCategories as CategoryProperties[]);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
