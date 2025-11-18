@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "5.2.1",
+    "version": "5.2.2",
     "main": "index.js",
     "scripts": {
         "start": "ts-node src/index.ts",
@@ -25,10 +25,8 @@
         "axios": "^1.7.9",
         "chalk": "^4.x.x",
         "commander": "^14.0.2",
-        "csv-parse": "^6.1.0",
         "dotenv": "^17.2.3",
         "js-yaml": "^4.1.0",
-        "node-forge": "^1.3.1",
         "pino": "^10.1.0"
     },
     "devDependencies": {
@@ -36,12 +34,10 @@
         "@types/jest": "^30.0.0",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^24.10.0",
-        "@types/node-forge": "^1.3.11",
         "eslint": "^9.39.1",
         "eslint-config-prettier": "^10.1.8",
         "globals": "^16.5.0",
         "jest": "^30.2.0",
-        "jiti": "^2.6.1",
         "prettier": "^3.6.2",
         "ts-jest": "^29.4.5",
         "ts-node": "^10.9.2",

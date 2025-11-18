@@ -1,6 +1,4 @@
-import { createReadStream } from 'fs';
-import { access, constants } from 'fs/promises';
-import { parse } from 'csv-parse';
+import { readFile, access, constants } from 'fs/promises';
 import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto';
 import { join } from 'path';
 import { logger } from '../logger';
@@ -20,17 +18,16 @@ export class ExcludedTransactionService {
             return [];
         }
 
-        const parser = parse({
-            columns: ['description', 'amount'],
-            skip_empty_lines: true,
-            trim: true,
-        });
-
         const records: ExcludedTransactionDto[] = [];
-        const stream = createReadStream(this.excludedTransactionsPath);
 
         try {
-            for await (const record of stream.pipe(parser)) {
+            const csvContent = await readFile(this.excludedTransactionsPath, 'utf-8');
+            const lines = csvContent.split('\n').filter(line => line.trim());
+
+            for (const line of lines) {
+                const [description, amount] = line.split(',').map(s => s.trim());
+                const record = { description, amount };
+
                 if (this.isValidExcludedTransaction(record)) {
                     records.push({
                         description: record.description,

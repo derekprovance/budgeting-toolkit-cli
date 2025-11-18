@@ -1,5 +1,4 @@
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
-import { createReadStream } from 'fs';
 import { logger } from '../../src/logger';
 import { ExcludedTransactionDto } from '../../src/types/dto/excluded-transaction.dto';
 
@@ -16,32 +15,22 @@ jest.mock('../../src/logger', () => ({
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
     access: jest.fn(),
+    readFile: jest.fn(),
     constants: { F_OK: 0 },
-}));
-
-// Mock fs
-jest.mock('fs', () => ({
-    createReadStream: jest.fn(),
-}));
-
-// Mock csv-parse
-jest.mock('csv-parse', () => ({
-    parse: jest.fn().mockReturnValue({
-        [Symbol.asyncIterator]: () => ({
-            next: jest.fn(),
-        }),
-    }),
 }));
 
 describe('ExcludedTransactionService', () => {
     let service: ExcludedTransactionService;
     let mockAccess: jest.Mock;
+    let mockReadFile: jest.Mock;
 
     beforeEach(() => {
         jest.clearAllMocks();
         service = new ExcludedTransactionService();
         mockAccess = jest.fn();
+        mockReadFile = jest.fn();
         jest.requireMock('fs/promises').access = mockAccess;
+        jest.requireMock('fs/promises').readFile = mockReadFile;
     });
 
     describe('getExcludedTransactions', () => {
@@ -57,29 +46,11 @@ describe('ExcludedTransactionService', () => {
         });
 
         it('should parse valid CSV file and return transactions', async () => {
-            const mockRecords = [
-                { description: 'VANGUARD BUY INVESTMENT', amount: '4400' },
-                { description: 'CRT Management', amount: '1047.66' },
-            ];
+            const csvContent = `VANGUARD BUY INVESTMENT,4400
+CRT Management,1047.66`;
 
             mockAccess.mockResolvedValueOnce(undefined);
-            (createReadStream as jest.Mock).mockReturnValueOnce({
-                pipe: jest.fn().mockReturnThis(),
-                [Symbol.asyncIterator]: () => {
-                    let index = 0;
-                    return {
-                        next: async () => {
-                            if (index < mockRecords.length) {
-                                return {
-                                    value: mockRecords[index++],
-                                    done: false,
-                                };
-                            }
-                            return { value: undefined, done: true };
-                        },
-                    };
-                },
-            });
+            mockReadFile.mockResolvedValueOnce(csvContent);
 
             const result = await service.getExcludedTransactions();
 
@@ -102,29 +73,11 @@ describe('ExcludedTransactionService', () => {
         });
 
         it('should skip invalid records and log warnings', async () => {
-            const mockRecords = [
-                { description: '', amount: '4400' }, // Invalid: empty description
-                { description: 'VANGUARD BUY INVESTMENT', amount: '4400' }, // Valid
-            ];
+            const csvContent = `,4400
+VANGUARD BUY INVESTMENT,4400`;
 
             mockAccess.mockResolvedValueOnce(undefined);
-            (createReadStream as jest.Mock).mockReturnValueOnce({
-                pipe: jest.fn().mockReturnThis(),
-                [Symbol.asyncIterator]: () => {
-                    let index = 0;
-                    return {
-                        next: async () => {
-                            if (index < mockRecords.length) {
-                                return {
-                                    value: mockRecords[index++],
-                                    done: false,
-                                };
-                            }
-                            return { value: undefined, done: true };
-                        },
-                    };
-                },
-            });
+            mockReadFile.mockResolvedValueOnce(csvContent);
 
             const result = await service.getExcludedTransactions();
 
@@ -136,22 +89,13 @@ describe('ExcludedTransactionService', () => {
                 },
             ]);
             expect(logger.warn).toHaveBeenCalledWith(
-                `Invalid excluded transaction record: ${JSON.stringify(mockRecords[0])}`
+                `Invalid excluded transaction record: ${JSON.stringify({ description: '', amount: '4400' })}`
             );
         });
 
         it('should handle CSV parsing errors', async () => {
             mockAccess.mockResolvedValueOnce(undefined);
-            (createReadStream as jest.Mock).mockReturnValueOnce({
-                pipe: jest.fn().mockReturnThis(),
-                [Symbol.asyncIterator]: () => {
-                    return {
-                        next: async () => {
-                            throw new Error('CSV parsing error');
-                        },
-                    };
-                },
-            });
+            mockReadFile.mockRejectedValueOnce(new Error('File read error'));
 
             await expect(service.getExcludedTransactions()).rejects.toThrow(
                 'Failed to parse excluded transactions file'
