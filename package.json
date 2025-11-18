@@ -1,9 +1,10 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "5.2.0",
+    "version": "5.2.1",
     "main": "index.js",
     "scripts": {
         "start": "ts-node src/index.ts",
+        "start:dev": "ENV_FILE=.env.dev npm start",
         "compile": "rm -Rf ./dist && tsc",
         "test": "jest",
         "test:coverage": "jest --coverage",

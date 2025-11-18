@@ -1,462 +1,313 @@
 # Docker Development Environment
 
-This guide explains how to set up and use the Docker development environment for testing the Budgeting Toolkit CLI with Firefly III.
+Docker setup for testing the Budgeting Toolkit CLI with Firefly III locally.
 
 ## Overview
 
-The Docker setup includes:
+Services included:
 
 - **Firefly III** - Personal finance manager (port 8080)
 - **PostgreSQL** - Database backend (port 5432)
-- **Data Importer** - Bulk import tool (port 8081)
-- **Adminer** - Database management UI (port 8082)
+- **Data Importer** - CSV import tool (port 8081)
 
 ## Quick Start
 
-### 1. Start the Environment
+### 1. Configure Environment
+
+```bash
+# Copy template
+cp .env.example .env.dev
+
+# Edit .env.dev and set:
+# - FIREFLY_APP_KEY (generate: head /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c 32)
+# - ANTHROPIC_API_KEY (if using AI features)
+# - Leave FIREFLY_API_TOKEN empty (generate after Firefly starts)
+```
+
+The `.env.dev` file is gitignored and safe for local secrets.
+
+### 2. Start Services
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
-# Check service status
-./docker/docker-dev.sh status
+# Check status
+docker compose ps
 ```
 
-### 2. Initial Setup
+### 3. Setup Firefly III
 
-Wait for Firefly III to initialize (about 1-2 minutes). Services should show as "healthy".
+Wait 1-2 minutes for initialization, then:
 
-### 3. Access Firefly III
-
-1. Open http://localhost:8080 in your browser
-2. Register a new account (first user becomes admin)
-    - Email: `admin@example.com` (or any email)
-    - Password: Choose a secure password
-3. Complete the setup wizard
+1. Open http://localhost:8080
+2. Register new account (first user becomes admin)
+3. Complete setup wizard
 
 ### 4. Generate API Token
 
+1. In Firefly: **Options** → **Profile** → **OAuth**
+2. Under **Personal Access Tokens**, click **Create New Token**
+3. Name: `Budgeting Toolkit CLI`
+4. Copy token and add to `.env.dev`:
+
 ```bash
-# Get instructions for token generation
-./docker/docker-dev.sh token
+FIREFLY_API_TOKEN=<your_token_here>
 ```
 
-Follow the instructions to:
-
-1. Access Firefly III → **Options** → **Profile** → **OAuth**
-2. Create a **Personal Access Token** named `Budgeting Toolkit CLI`
-3. Copy the generated token
-
-### 5. Set Environment Variables
-
-**Following 12-factor app principles**, this project uses environment variables for configuration:
+### 5. Verify Connection
 
 ```bash
-# Set environment variables for Docker development
-export FIREFLY_API_URL=http://localhost:8080/api/v1
-export FIREFLY_API_TOKEN=<paste_your_token_here>
-
-# Verify configuration
-./docker/docker-dev.sh env
+# Test CLI connection
+npm run start:dev -- report -m 1
 ```
 
-**Important:** Do NOT modify your production `.env` file for Docker development. Environment variables keep development and production configurations separate.
+### 6. Import Test Data
 
-**Optional:** For convenience, you can create a local helper script (gitignored):
+Use the Data Importer at http://localhost:8081:
+
+1. Configure connection:
+   - Firefly URL: `http://firefly:8080`
+   - Token: Your API token
+2. Upload CSV files
+3. Map columns and import
+
+## Development Workflows
+
+### npm run Scripts (Recommended)
+
+Best for active development with TypeScript:
 
 ```bash
-# Create a personal wrapper (not committed to git)
-cat > budget-dev.sh << 'EOF'
-#!/bin/bash
-export FIREFLY_API_URL=http://localhost:8080/api/v1
-export FIREFLY_API_TOKEN=<your-token>
-./budget.sh "$@"
-EOF
-chmod +x budget-dev.sh
-
-# Use it
-./budget-dev.sh finalize-budget -m 1
+# Run without compilation
+npm run start:dev -- report -m 1
+npm run start:dev -- finalize -m 1
+npm run start:dev -- categorize Import-2024
 ```
 
-### 6. Seed Test Data
+### Production Mode
+
+Compile and run:
 
 ```bash
-# Seed the database (requires FIREFLY_API_TOKEN to be set)
-./docker/docker-dev.sh seed
-```
-
-This creates:
-
-- 2 asset accounts (Checking, Savings)
-- 2 revenue accounts (Salary, Freelance)
-- 4 expense accounts
-- 5 categories
-- 2 budgets
-- 2 tags
-- 6 sample transactions
-
-### 7. Test Your CLI
-
-```bash
-# Compile TypeScript
 npm run compile
-
-# Test connection
-./docker/docker-dev.sh test
-
-# Run commands (with environment variables set)
-./budget.sh budget-report -m 1
-./budget.sh finalize-budget -m 1
-
-# Or use your helper script if created
-./budget-dev.sh budget-report -m 1
+./budget.sh report -m 1
 ```
 
-## Docker Commands Reference
+### Environment Separation
+
+- **Production**: `npm start` or `./budget.sh` (uses `.env`)
+- **Docker**: Same commands automatically use `.env.dev` when `.env` is symlinked
+
+## Docker Commands
 
 ### Service Management
 
 ```bash
-# Start all services
-docker-compose up -d
+# Start/stop
+docker compose up -d
+docker compose stop
+docker compose restart firefly
 
-# Stop all services
-docker-compose stop
+# Remove containers (keeps data)
+docker compose down
 
-# Stop and remove containers (keeps data)
-docker-compose down
-
-# Stop and remove everything including data
-docker-compose down -v
-
-# Restart a specific service
-docker-compose restart firefly
+# Remove everything including data
+docker compose down -v
 
 # View logs
-docker-compose logs -f firefly
-docker-compose logs -f db
+docker compose logs -f firefly
+docker compose logs -f db
 ```
 
 ### Database Access
 
-#### Via Adminer (Web UI)
-
-1. Open http://localhost:8082
-2. Login with:
-    - System: `PostgreSQL`
-    - Server: `db`
-    - Username: `firefly`
-    - Password: `firefly_secret`
-    - Database: `firefly`
-
 #### Via psql CLI
 
 ```bash
-docker-compose exec db psql -U firefly -d firefly
+docker compose exec db psql -U firefly -d firefly
 
 # Example queries
-\dt                           # List tables
-SELECT * FROM users;          # View users
-SELECT * FROM transactions;   # View transactions
+\dt                          # List tables
+SELECT * FROM users;         # View users
+SELECT * FROM transactions;  # View transactions
 ```
 
 ### Backup and Restore
 
-#### Backup Database
-
 ```bash
-docker-compose exec db pg_dump -U firefly firefly > backup.sql
-```
+# Backup
+docker compose exec db pg_dump -U firefly firefly > backup.sql
 
-#### Restore Database
-
-```bash
-docker-compose exec -T db psql -U firefly firefly < backup.sql
-```
-
-#### Export Firefly Data
-
-```bash
-# In Firefly UI: Options → Export data
-# Or use the API
-curl -H "Authorization: Bearer $FIREFLY_API_TOKEN" \
-  http://localhost:8080/api/v1/data/export
+# Restore
+docker compose exec -T db psql -U firefly firefly < backup.sql
 ```
 
 ## Configuration
 
-### Environment Variables
+### Environment Variables (.env.dev)
 
-Key variables in `docker-compose.yml`:
+**Required:**
+- `FIREFLY_APP_KEY` - Exactly 32 characters for encryption
+- `FIREFLY_API_URL` - Set to `http://localhost:8080`
+- `FIREFLY_API_TOKEN` - Generate from Firefly UI
 
-- `DB_CONNECTION=pgsql` - Use PostgreSQL (can switch to `mysql`)
-- `APP_KEY` - Must be exactly 32 characters
-- `APP_DEBUG=true` - Enable debug mode for development
-- `DKR_RUN_MIGRATION=true` - Auto-run database migrations
-- `TRUSTED_PROXIES=**` - Allow all proxies (dev only)
+**Optional:**
+- `ANTHROPIC_API_KEY` - For AI categorization
+- `LOG_LEVEL` - Set to `debug` for verbose logging
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` - Database credentials
+
+**Not Required:**
+- `CLIENT_CERT_*` - Skip for local Docker (no mTLS needed)
 
 ### Ports
 
-Default ports (change in `docker-compose.yml` if needed):
+Configurable in `.env.dev`:
 
 - Firefly III: `8080`
 - Data Importer: `8081`
-- Adminer: `8082`
 - PostgreSQL: `5432`
 
-## Data Seeding
+## Troubleshooting
 
-### Using the Helper Script (Recommended)
-
-```bash
-# Set your API token first
-export FIREFLY_API_TOKEN="your_token"
-
-# Run seeding through the helper
-./docker/docker-dev.sh seed
-```
-
-### Using the Provided Script Directly
-
-The `seed-firefly.sh` script creates a complete test environment:
+### Firefly Won't Start
 
 ```bash
-# Basic usage (uses FIREFLY_API_TOKEN from environment)
-export FIREFLY_API_TOKEN="your_token"
-./docker/seed-data/seed-firefly.sh
+# Check logs
+docker compose logs firefly
 
-# With custom URL
-export FIREFLY_URL="http://localhost:8080"
-export FIREFLY_API_TOKEN="your_token"
-./docker/seed-data/seed-firefly.sh
+# Common issues:
+# - APP_KEY must be 32 characters exactly
+# - Database not ready - wait longer
+# - Port 8080 in use
 ```
 
-### Manual Seeding via API
+### Database Connection Errors
 
 ```bash
-# Example: Create an account
-curl -X POST http://localhost:8080/api/v1/accounts \
-  -H "Authorization: Bearer $FIREFLY_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "asset",
-    "name": "Test Account",
-    "currency_code": "USD",
-    "current_balance": "1000"
-  }'
+# Check DB health
+docker compose ps db
+docker compose logs db
+
+# Test connection
+docker compose exec db psql -U firefly -d firefly -c "SELECT 1;"
 ```
 
-### Using the Data Importer
+### API Returns 401 Unauthorized
 
-1. Access http://localhost:8081
-2. Configure connection to Firefly III
-3. Upload CSV files with transactions
-4. Map columns and import
+1. Verify token in `.env.dev`
+2. Regenerate token in Firefly UI
+3. Check URL format: `http://localhost:8080` (no /api/v1 suffix or trailing slash)
 
-## Switching to MySQL
+### Permission Errors
 
-To use MySQL instead of PostgreSQL:
+```bash
+# Fix storage permissions
+docker compose exec firefly chown -R www-data:www-data /var/www/html/storage
+```
 
-1. Edit `docker-compose.yml`:
+### Reset Everything
+
+```bash
+# Nuclear option - removes all data
+docker compose down -v
+docker volume prune -f
+docker compose up -d
+```
+
+## Advanced Configuration
+
+### Switch to MySQL
+
+Edit `docker-compose.yml`:
 
 ```yaml
 db:
     image: mysql:8
     environment:
-        - MYSQL_ROOT_PASSWORD=root_secret
-        - MYSQL_DATABASE=firefly
-        - MYSQL_USER=firefly
-        - MYSQL_PASSWORD=firefly_secret
+        MYSQL_ROOT_PASSWORD: root_secret
+        MYSQL_DATABASE: firefly
+        MYSQL_USER: firefly
+        MYSQL_PASSWORD: firefly_secret
 
 firefly:
     environment:
-        - DB_CONNECTION=mysql
-        - DB_HOST=db
-        - DB_PORT=3306
-        - DB_DATABASE=firefly
-        - DB_USERNAME=firefly
-        - DB_PASSWORD=firefly_secret
+        DB_CONNECTION: mysql
+        DB_PORT: 3306
 ```
 
-2. Restart services:
+Then restart:
 
 ```bash
-docker-compose down -v
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
-## Troubleshooting
+### Update budgeting-toolkit.config.yaml
 
-### Firefly won't start
-
-```bash
-# Check logs
-docker-compose logs firefly
-
-# Common issues:
-# 1. APP_KEY must be exactly 32 characters
-# 2. Database not ready - wait longer
-# 3. Port 8080 already in use
-```
-
-### Database connection errors
-
-```bash
-# Ensure DB is healthy
-docker-compose ps db
-
-# Check DB logs
-docker-compose logs db
-
-# Test connection
-docker-compose exec db psql -U firefly -d firefly -c "SELECT 1;"
-```
-
-### Permission errors
-
-```bash
-# Fix volume permissions
-docker-compose exec firefly chown -R www-data:www-data /var/www/html/storage
-```
-
-### Reset everything
-
-```bash
-# Nuclear option - removes all data
-docker-compose down -v
-docker volume prune -f
-docker-compose up -d
-```
-
-### API returns 401 Unauthorized
-
-1. Verify token is correct
-2. Regenerate token in Firefly UI
-3. Check token hasn't expired
-4. Ensure URL format: `http://localhost:8080/api/v1` (no trailing slash)
-
-## Development Workflow
-
-### Typical Development Session (12-Factor Approach)
-
-```bash
-# 1. Start Docker environment
-docker-compose up -d
-./docker/docker-dev.sh status
-
-# 2. Set environment variables (once per terminal session)
-export FIREFLY_API_URL=http://localhost:8080/api/v1
-export FIREFLY_API_TOKEN="your_token"
-
-# 3. Verify configuration
-./docker/docker-dev.sh env
-
-# 4. Seed data (first time only)
-./docker/docker-dev.sh seed
-
-# 5. Test connection
-./docker/docker-dev.sh test
-
-# 6. Compile and test
-npm run compile
-./budget.sh budget-report -m 1
-
-# 7. Make code changes and test
-npm run compile && ./budget.sh finalize-budget -m 1
-
-# 8. Run tests
-npm test
-
-# 9. When done
-docker-compose stop
-```
-
-### Using a Helper Script (Optional)
-
-For convenience, create a local wrapper:
-
-```bash
-# Create once (gitignored)
-cat > budget-dev.sh << 'EOF'
-#!/bin/bash
-export FIREFLY_API_URL=http://localhost:8080/api/v1
-export FIREFLY_API_TOKEN=your_actual_token_here
-./budget.sh "$@"
-EOF
-chmod +x budget-dev.sh
-
-# Then use it for all commands
-./budget-dev.sh budget-report -m 1
-./budget-dev.sh finalize-budget -m 1
-```
-
-This keeps your production `.env` file untouched.
-
-### Testing Different Scenarios
-
-```bash
-# Create test transactions for different months
-./docker/seed-data/seed-firefly.sh
-
-# Or manually via CLI
-./budget.sh update-transactions "test-import" -y
-
-# View results
-./budget.sh budget-report -m $(date +%m)
-./budget.sh finalize-budget -m $(date +%m)
-```
-
-## Integration with CLI
-
-### Update Configuration Files
-
-Your `budgeting-toolkit.config.yaml` should match the seeded data:
+Match configuration to your test data:
 
 ```yaml
 expectedMonthlyPaycheck: 3500
 validDestinationAccounts:
-    - 'Main Checking Account'
-    - 'Savings Account'
+    - '1'  # Main Checking
+    - '2'  # Savings
 validExpenseAccounts:
-    - 'Grocery Store'
-    - 'Utility Company'
-    - 'Landlord'
-    - 'ISP Provider'
-    - 'Gas Station'
-    - 'Local Coffee Shop'
+    - '3'  # Credit Card
 excludedAdditionalIncomePatterns:
-    - 'PAYROLL'
+    - PAYROLL
 ```
 
-### Testing AI Features
+## Typical Development Session
 
 ```bash
-# Make sure ANTHROPIC_API_KEY is set
-export ANTHROPIC_API_KEY="your_claude_api_key"
+# 1. First time setup
+cp .env.example .env.dev
+# Edit .env.dev
 
-# Test transaction updates
-./budget.sh update-transactions "test-batch" -y
+# 2. Start environment
+docker compose up -d
+
+# 3. Setup Firefly (first time)
+# - Open http://localhost:8080
+# - Register admin account
+# - Generate API token
+# - Add token to .env.dev
+
+# 4. Load test data (first time)
+# - Use Data Importer at http://localhost:8081
+
+# 5. Test commands
+npm start -- report -m 1
+npm start -- finalize -m 1
+npm start -- categorize Import-2024
+
+# 6. Make changes and test
+npm test
+npm start -- finalize -m 1
+
+# 7. Stop when done
+docker compose stop
 ```
 
 ## Additional Resources
 
 - [Firefly III Documentation](https://docs.firefly-iii.org/)
-- [Firefly III API Documentation](https://api-docs.firefly-iii.org/)
+- [Firefly III API Docs](https://api-docs.firefly-iii.org/)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 
 ## Clean Up
 
 ```bash
-# Stop containers but keep data
-docker-compose stop
+# Stop containers, keep data
+docker compose stop
 
-# Remove containers but keep data
-docker-compose down
+# Remove containers, keep data
+docker compose down
 
-# Remove everything including volumes
-docker-compose down -v
+# Remove everything including data
+docker compose down -v
 
-# Remove Docker images
-docker-compose down --rmi all -v
+# Remove images too
+docker compose down --rmi all -v
 ```

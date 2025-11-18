@@ -7,8 +7,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Building and Running
 
 - `npm run compile` - Compile TypeScript to JavaScript in `/dist`
-- `./budget.sh [command] [options]` - Run the CLI (requires compilation first)
 - `npm start -- [command] [options]` - Run in development mode with ts-node
+- `./budget.sh [command] [options]` - Run compiled CLI (production mode)
+
+### Docker Development
+
+- See `DOCKER.md` for Docker environment setup
+- Docker uses `.env.dev` for environment configuration
+- `npm run start:dev -- [command]` - Run with Docker environment (loads `.env.dev`)
+- Or use `npm start` if `.env` is symlinked to `.env.dev`
 
 ### Testing
 
@@ -56,14 +63,14 @@ Fallback configuration loaded via `src/config.ts`:
 
 The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 
-1. **finalize-budget** - Calculates budget finalization report including:
+1. **finalize** (alias: `fin`) - Calculates budget finalization report including:
     - Additional income (deposits not from payroll)
     - Unbudgeted expenses (bills/expenses not in budget)
     - Paycheck surplus (actual vs expected paycheck amounts)
 
-2. **budget-report** - Shows current budget report for a given month
+2. **report** (alias: `st`) - Shows current budget report for a given month
 
-3. **update-transactions** - Uses Claude AI to automatically categorize and budget transactions
+3. **categorize** (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions
 
 ### Service Layer Architecture
 

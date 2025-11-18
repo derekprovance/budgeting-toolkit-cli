@@ -1,7 +1,5 @@
 .env
-.env.local
-.env.*.local
-.env.docker.local
+.env.dev
 node_modules
 dist/
 
@@ -16,12 +14,6 @@ certs/
 excluded_transactions.csv
 
 budgeting-toolkit.config.yaml
-
-# Docker
-docker/db-init/*.sql
-docker/firefly-init/*.sh
-!docker/seed-data/
-budget-dev.sh
 
 # Database backups
 *.sql

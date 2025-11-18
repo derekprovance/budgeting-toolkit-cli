@@ -4,9 +4,9 @@ services:
         container_name: firefly-db
         restart: unless-stopped
         environment:
-            - POSTGRES_USER=firefly
-            - POSTGRES_PASSWORD=firefly_secret
-            - POSTGRES_DB=firefly
+            - POSTGRES_USER=${POSTGRES_USER:-firefly}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-firefly_secret}
+            - POSTGRES_DB=${POSTGRES_DB:-firefly}
         volumes:
             - firefly-db-data:/var/lib/postgresql/data
             - ./docker/db-init:/docker-entrypoint-initdb.d
@@ -21,6 +21,8 @@ services:
     # Firefly III Application
     firefly:
         image: fireflyiii/core:latest
+        env_file:
+            - .env.dev
         container_name: firefly-app
         restart: unless-stopped
         depends_on:
@@ -83,6 +85,8 @@ services:
     # Data Importer (optional, useful for bulk imports)
     importer:
         image: fireflyiii/data-importer:latest
+        env_file:
+            - .env.dev
         container_name: firefly-importer
         restart: unless-stopped
         depends_on:

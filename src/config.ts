@@ -4,7 +4,10 @@ import dotenv from 'dotenv';
 import { getConfigValue } from './utils/config-loader';
 import { FireflyClientWithCertsConfig } from './api/firefly-client-with-certs';
 
+// Load environment variables from custom file or default .env
+const envFile = process.env.ENV_FILE || '.env';
 dotenv.config({
+    path: envFile,
     quiet: true,
 });
 
