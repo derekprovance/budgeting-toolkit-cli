@@ -125,13 +125,13 @@ View current budget status for a month:
 
 ```bash
 # Current month
-npm start -- report
+./budget.sh report
 
 # Specific month/year
-npm start -- report -m 8 -y 2024
+./budget.sh report -m 8 -y 2024
 
 # List format
-npm start -- report -m 8 --list
+./budget.sh report -m 8 --list
 ```
 
 **Options:**
@@ -144,10 +144,10 @@ Calculate surplus/deficit with additional income and unbudgeted expenses:
 
 ```bash
 # Current month
-npm start -- finalize
+./budget.sh finalize
 
 # Specific month
-npm start -- finalize -m 6 -y 2024
+./budget.sh finalize -m 6 -y 2024
 ```
 
 **Options:**
@@ -160,17 +160,17 @@ Automatically categorize and budget transactions using Claude:
 
 ```bash
 # Categorize transactions with tag
-npm start -- categorize Import-2025-06-23
+./budget.sh categorize Import-2025-06-23
 
 # Preview without applying
-npm start -- categorize Import-2025-06-23 --dry-run
+./budget.sh categorize Import-2025-06-23 --dry-run
 
 # Include already categorized
-npm start -- categorize Import-2025-06-23 --include-classified
+./budget.sh categorize Import-2025-06-23 --include-classified
 
 # Categories only or budgets only
-npm start -- categorize Import-2025-06-23 --mode category
-npm start -- categorize Import-2025-06-23 --mode budget
+./budget.sh categorize Import-2025-06-23 --mode category
+./budget.sh categorize Import-2025-06-23 --mode budget
 ```
 
 **Options:**
@@ -195,14 +195,14 @@ Available for all commands:
 
 ```bash
 # Verbose logging
-npm start -- categorize Import-2025-06-23 --verbose
+./budget.sh categorize Import-2025-06-23 --verbose
 LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
 
 # Test AI configuration
-npm start -- categorize Import-2025-06-23 --dry-run --verbose
+./budget.sh categorize Import-2025-06-23 --dry-run --verbose
 
 # Import workflow
-npm start -- categorize Import-$(date +%Y-%m-%d)
+./budget.sh categorize Import-$(date +%Y-%m-%d)
 ```
 
 ## Docker Development
