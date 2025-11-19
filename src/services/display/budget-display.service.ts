@@ -3,6 +3,7 @@ import { BudgetReport } from '../../types/interface/budget-report.interface';
 import { DisplayService } from './display.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from '../../types/dto/bill-comparison.dto';
+import { CurrencyUtils } from '../../utils/currency.utils';
 
 /**
  * Service for formatting and displaying budget information
@@ -252,11 +253,7 @@ export class BudgetDisplayService {
     }
 
     private formatCurrency(amount: number): string {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2,
-        }).format(amount);
+        return CurrencyUtils.format(amount, 'USD', 'en-US');
     }
 
     private getPercentageSpent(spent: number, amount: number): number {

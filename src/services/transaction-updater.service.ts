@@ -4,12 +4,12 @@ import {
     BudgetRead,
     TransactionRead,
 } from '@derekprovance/firefly-iii-sdk';
-import { TransactionService } from './transaction.service';
-import { TransactionValidatorService } from './transaction-validator.service';
-import { UserInputService } from '../user-input.service';
-import { logger } from '../../logger';
-import { UpdateTransactionMode } from '../../types/enum/update-transaction-mode.enum';
-import { EditTransactionAttribute } from '../../types/enum/edit-transaction-attribute.enum';
+import { TransactionService } from './core/transaction.service';
+import { TransactionValidatorService } from './core/transaction-validator.service';
+import { UserInputService } from './user-input.service';
+import { logger } from '../logger';
+import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
+import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum';
 
 export class TransactionUpdaterService {
     private readonly updateParameterMap = {

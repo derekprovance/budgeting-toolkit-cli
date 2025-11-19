@@ -1,6 +1,6 @@
 import { TransactionService } from './core/transaction.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionPropertyService } from './core/transaction-property.service';
+import { TransactionClassificationService } from './core/transaction-classification.service';
 import { logger } from '../logger';
 import { DateUtils } from '../utils/date.utils';
 import { getConfigValue } from '../utils/config-loader';
@@ -27,7 +27,7 @@ export class UnbudgetedExpenseService {
 
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly transactionPropertyService: TransactionPropertyService
+        private readonly transactionClassificationService: TransactionClassificationService
     ) {
         // Load valid expense accounts from YAML config with fallback to defaults
         this.validExpenseAccounts = getConfigValue<string[]>('validExpenseAccounts') ?? [];
@@ -89,7 +89,7 @@ export class UnbudgetedExpenseService {
     private async filterExpenses(transactions: TransactionSplit[]) {
         const results = await Promise.all(
             transactions.map(async transaction => {
-                const isTransfer = this.transactionPropertyService.isTransfer(transaction);
+                const isTransfer = this.transactionClassificationService.isTransfer(transaction);
                 const shouldCountExpense = await this.shouldCountExpense(transaction);
 
                 return (
@@ -127,7 +127,7 @@ export class UnbudgetedExpenseService {
      * 2. Otherwise, check regular expense criteria
      */
     private async shouldCountExpense(transaction: TransactionSplit): Promise<boolean> {
-        if (this.transactionPropertyService.isBill(transaction)) {
+        if (this.transactionClassificationService.isBill(transaction)) {
             return true;
         }
         return this.isRegularExpenseTransaction(transaction);
@@ -142,7 +142,7 @@ export class UnbudgetedExpenseService {
      * 4. Must be from a valid expense account
      */
     private async isRegularExpenseTransaction(transaction: TransactionSplit): Promise<boolean> {
-        const isExcludedTransaction = await this.transactionPropertyService.isExcludedTransaction(
+        const isExcludedTransaction = await this.transactionClassificationService.isExcludedTransaction(
             transaction.description,
             transaction.amount
         );
@@ -150,7 +150,7 @@ export class UnbudgetedExpenseService {
         const conditions = {
             hasNoBudget: !transaction.budget_id,
             isNotDisposableSupplemented:
-                !this.transactionPropertyService.isSupplementedByDisposable(transaction.tags),
+                !this.transactionClassificationService.isSupplementedByDisposable(transaction.tags),
             isNotExcludedTransaction: !isExcludedTransaction,
             isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
         };

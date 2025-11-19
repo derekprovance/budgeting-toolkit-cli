@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service';
-import { TransactionPropertyService } from './core/transaction-property.service';
+import { TransactionClassificationService } from './core/transaction-classification.service';
 import { logger } from '../logger';
 import { DateUtils } from '../utils/date.utils';
 import { getConfigValue } from '../utils/config-loader';
@@ -44,7 +44,7 @@ export class AdditionalIncomeService {
 
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly transactionPropertyService: TransactionPropertyService,
+        private readonly transactionClassificationService: TransactionClassificationService,
         config: Partial<AdditionalIncomeConfig> = {}
     ) {
         const yamlConfig = this.loadConfigFromYaml();
@@ -159,14 +159,14 @@ export class AdditionalIncomeService {
      */
     private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
         return transactions
-            .filter(t => this.transactionPropertyService.isDeposit(t))
+            .filter(t => this.transactionClassificationService.isDeposit(t))
             .filter(this.hasValidDestinationAccount)
             .filter(this.isNotPayroll)
             .filter(t => Number(t.amount) > 0)
             .filter(
                 t =>
                     !this.config.excludeDisposableIncome ||
-                    !this.transactionPropertyService.isDisposableIncome(t)
+                    !this.transactionClassificationService.isDisposableIncome(t)
             );
     }
 

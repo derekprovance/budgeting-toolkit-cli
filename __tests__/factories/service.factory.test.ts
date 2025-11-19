@@ -10,7 +10,7 @@ jest.mock('../../src/services/additional-income.service');
 jest.mock('../../src/services/unbudgeted-expense.service');
 jest.mock('../../src/services/budget-report.service');
 jest.mock('../../src/services/excluded-transaction.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/paycheck-surplus.service');
 jest.mock('../../src/services/core/transaction-validator.service');
 jest.mock('../../src/services/ai/llm-assignment.service');
@@ -18,7 +18,7 @@ jest.mock('../../src/services/ai/llm-transaction-processing.service');
 jest.mock('../../src/services/update-transaction.service');
 jest.mock('../../src/config/llm.config');
 jest.mock('../../src/services/user-input.service');
-jest.mock('../../src/services/core/transaction-updater.service');
+jest.mock('../../src/services/transaction-updater.service');
 
 // Mock the logger
 jest.mock('../../src/logger', () => ({
@@ -65,7 +65,7 @@ describe('ServiceFactory', () => {
             expect(services).toHaveProperty('additionalIncomeService');
             expect(services).toHaveProperty('unbudgetedExpenseService');
             expect(services).toHaveProperty('budgetReport');
-            expect(services).toHaveProperty('transactionPropertyService');
+            expect(services).toHaveProperty('transactionClassificationService');
             expect(services).toHaveProperty('excludedTransactionService');
             expect(services).toHaveProperty('paycheckSurplusService');
             expect(services).toHaveProperty('transactionValidatorService');

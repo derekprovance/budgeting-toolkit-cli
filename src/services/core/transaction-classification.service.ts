@@ -3,7 +3,7 @@ import { Tag } from '../../config';
 import { ExcludedTransactionService } from '../excluded-transaction.service';
 import { loadYamlConfig } from '../../utils/config-loader';
 
-export class TransactionPropertyService {
+export class TransactionClassificationService {
     private fireflyConfig;
 
     constructor(private readonly excludedTransactionService: ExcludedTransactionService) {

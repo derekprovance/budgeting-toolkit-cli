@@ -1,6 +1,6 @@
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
-import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../../src/logger';
 import { DateUtils } from '../../src/utils/date.utils';
@@ -8,7 +8,7 @@ import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs'
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
 
 jest.mock('../../src/services/core/transaction.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/logger', () => {
     const mockLogger = {
         debug: jest.fn(),
@@ -28,7 +28,7 @@ jest.mock('../../src/config', () => ({
 describe('PaycheckSurplusService', () => {
     let service: PaycheckSurplusService;
     let mockTransactionService: jest.Mocked<TransactionService>;
-    let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
@@ -39,12 +39,12 @@ describe('PaycheckSurplusService', () => {
         mockTransactionService = new TransactionService(
             mockApiClient
         ) as jest.Mocked<TransactionService>;
-        mockTransactionPropertyService = new TransactionPropertyService(
+        mockTransactionClassificationService = new TransactionClassificationService(
             mockExcludedTransactionService
-        ) as jest.Mocked<TransactionPropertyService>;
+        ) as jest.Mocked<TransactionClassificationService>;
         service = new PaycheckSurplusService(
             mockTransactionService,
-            mockTransactionPropertyService
+            mockTransactionClassificationService
         );
     });
 
@@ -60,7 +60,7 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('3000.00'), mockPaycheck('3000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -84,7 +84,7 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('2000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -96,7 +96,7 @@ describe('PaycheckSurplusService', () => {
         it('should handle no paychecks found', async () => {
             // Arrange
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -109,7 +109,7 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('3000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
             // Mock logger and config modules
             const mockLogger = {
@@ -138,7 +138,7 @@ describe('PaycheckSurplusService', () => {
             );
             const testService = new PaycheckSurplusService(
                 mockTransactionService,
-                mockTransactionPropertyService
+                mockTransactionClassificationService
             );
 
             // Act
@@ -156,7 +156,7 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('3000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
             // Mock logger and config modules
             const mockLogger = {
@@ -185,7 +185,7 @@ describe('PaycheckSurplusService', () => {
             );
             const testService = new PaycheckSurplusService(
                 mockTransactionService,
-                mockTransactionPropertyService
+                mockTransactionClassificationService
             );
 
             // Act
@@ -203,7 +203,7 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('3000.00'), mockPaycheck('invalid')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);

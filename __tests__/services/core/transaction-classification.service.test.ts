@@ -1,4 +1,4 @@
-import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { Tag } from '../../../src/config';
@@ -12,15 +12,15 @@ jest.mock('../../../src/utils/config-loader', () => ({
     getConfigValue: jest.fn(),
 }));
 
-describe('TransactionPropertyService', () => {
-    let service: TransactionPropertyService;
+describe('TransactionClassificationService', () => {
+    let service: TransactionClassificationService;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
         mockExcludedTransactionService = {
             isExcludedTransaction: jest.fn(),
         } as any;
-        service = new TransactionPropertyService(mockExcludedTransactionService);
+        service = new TransactionClassificationService(mockExcludedTransactionService);
     });
 
     describe('isTransfer', () => {

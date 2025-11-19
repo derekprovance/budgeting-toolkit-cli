@@ -1,6 +1,6 @@
 import { BudgetDisplayService } from '../../../src/services/display/budget-display.service';
 import { DisplayService } from '../../../src/services/display/display.service';
-import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 import { BudgetReport } from '../../../src/types/interface/budget-report.interface';
 
@@ -18,23 +18,23 @@ jest.mock('chalk', () => ({
 }));
 
 jest.mock('../../../src/services/display/display.service');
-jest.mock('../../../src/services/core/transaction-property.service');
+jest.mock('../../../src/services/core/transaction-classification.service');
 jest.mock('../../../src/services/excluded-transaction.service');
 
 describe('BudgetDisplayService', () => {
     let service: BudgetDisplayService;
     let displayService: jest.Mocked<DisplayService>;
-    let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
         excludedTransactionService =
             new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
-        transactionPropertyService = new TransactionPropertyService(
+        transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService
-        ) as jest.Mocked<TransactionPropertyService>;
+        ) as jest.Mocked<TransactionClassificationService>;
         displayService = new DisplayService(
-            transactionPropertyService
+            transactionClassificationService
         ) as jest.Mocked<DisplayService>;
 
         // Mock the displayService methods

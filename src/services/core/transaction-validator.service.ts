@@ -1,9 +1,9 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionPropertyService } from './transaction-property.service';
+import { TransactionClassificationService } from './transaction-classification.service';
 import { logger } from '../../logger';
 
 export class TransactionValidatorService {
-    constructor(private readonly transactionPropertyService: TransactionPropertyService) {}
+    constructor(private readonly transactionClassificationService: TransactionClassificationService) {}
 
     /**
      * Validates if a transaction should be processed
@@ -16,8 +16,8 @@ export class TransactionValidatorService {
         processTransactionsWithCategories: boolean
     ): boolean {
         const conditions = {
-            notATransfer: !this.transactionPropertyService.isTransfer(transaction),
-            hasACategory: this.transactionPropertyService.hasACategory(transaction),
+            notATransfer: !this.transactionClassificationService.isTransfer(transaction),
+            hasACategory: this.transactionClassificationService.hasACategory(transaction),
         };
 
         return processTransactionsWithCategories
@@ -31,16 +31,16 @@ export class TransactionValidatorService {
      * @returns A promise that resolves to true if the transaction should have a budget, false otherwise
      */
     async shouldSetBudget(transaction: TransactionSplit): Promise<boolean> {
-        const isExcludedTransaction = await this.transactionPropertyService.isExcludedTransaction(
+        const isExcludedTransaction = await this.transactionClassificationService.isExcludedTransaction(
             transaction.description,
             transaction.amount
         );
 
         const conditions = {
-            notABill: !this.transactionPropertyService.isBill(transaction),
-            notDisposableIncome: !this.transactionPropertyService.isDisposableIncome(transaction),
+            notABill: !this.transactionClassificationService.isBill(transaction),
+            notDisposableIncome: !this.transactionClassificationService.isDisposableIncome(transaction),
             notAnExcludedTransaction: !isExcludedTransaction,
-            notADeposit: !this.transactionPropertyService.isDeposit(transaction),
+            notADeposit: !this.transactionClassificationService.isDeposit(transaction),
         };
 
         return (

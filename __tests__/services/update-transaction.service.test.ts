@@ -12,18 +12,18 @@ jest.mock('../../src/services/core/transaction.service');
 jest.mock('../../src/services/core/category.service');
 jest.mock('../../src/services/core/budget.service');
 jest.mock('../../src/services/ai/llm-transaction-processing.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/core/transaction-validator.service');
-jest.mock('../../src/services/core/transaction-updater.service');
+jest.mock('../../src/services/transaction-updater.service');
 
 import { UpdateTransactionService } from '../../src/services/update-transaction.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { CategoryService } from '../../src/services/core/category.service';
 import { BudgetService } from '../../src/services/core/budget.service';
 import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service';
-import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
-import { TransactionUpdaterService } from '../../src/services/core/transaction-updater.service';
+import { TransactionUpdaterService } from '../../src/services/transaction-updater.service';
 import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
 import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
@@ -38,7 +38,7 @@ describe('UpdateTransactionService', () => {
     let mockCategoryService: jest.Mocked<CategoryService>;
     let mockBudgetService: jest.Mocked<BudgetService>;
     let mockLLMService: jest.Mocked<LLMTransactionProcessingService>;
-    let mockPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockPropertyService: jest.Mocked<TransactionClassificationService>;
     let mockValidator: jest.Mocked<TransactionValidatorService>;
     let mockTransactions: Partial<TransactionSplit>[];
     let mockAIResults: { [key: string]: { category: string; budget: string } };
@@ -129,14 +129,14 @@ describe('UpdateTransactionService', () => {
             isBill: jest.fn(),
             isTransfer: jest.fn(),
             isDeposit: jest.fn(),
-        } as unknown as jest.Mocked<TransactionPropertyService>;
+        } as unknown as jest.Mocked<TransactionClassificationService>;
 
         mockValidator = {
             shouldProcessTransaction: jest.fn(),
             shouldSetBudget: jest.fn(),
             validateTransactionData: jest.fn(),
             categoryOrBudgetChanged: jest.fn(),
-            transactionPropertyService: mockPropertyService,
+            transactionClassificationService: mockPropertyService,
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
         // Mock the services directly

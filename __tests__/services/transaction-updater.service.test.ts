@@ -1,13 +1,13 @@
-import { TransactionUpdaterService } from '../../../src/services/core/transaction-updater.service';
-import { TransactionService } from '../../../src/services/core/transaction.service';
-import { TransactionValidatorService } from '../../../src/services/core/transaction-validator.service';
-import { UserInputService } from '../../../src/services/user-input.service';
-import { UpdateTransactionMode } from '../../../src/types/enum/update-transaction-mode.enum';
-import { EditTransactionAttribute } from '../../../src/types/enum/edit-transaction-attribute.enum';
+import { TransactionUpdaterService } from '../../src/services/transaction-updater.service';
+import { TransactionService } from '../../src/services/core/transaction.service';
+import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
+import { UserInputService } from '../../src/services/user-input.service';
+import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
+import { EditTransactionAttribute } from '../../src/types/enum/edit-transaction-attribute.enum';
 import { TransactionSplit, CategoryProperties, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 
 // Mock the logger to prevent console output during tests
-jest.mock('../../../src/logger', () => ({
+jest.mock('../../src/logger', () => ({
     logger: {
         debug: jest.fn(),
         warn: jest.fn(),
@@ -16,9 +16,9 @@ jest.mock('../../../src/logger', () => ({
     },
 }));
 
-jest.mock('../../../src/services/core/transaction.service');
-jest.mock('../../../src/services/core/transaction-validator.service');
-jest.mock('../../../src/services/user-input.service');
+jest.mock('../../src/services/core/transaction.service');
+jest.mock('../../src/services/core/transaction-validator.service');
+jest.mock('../../src/services/user-input.service');
 
 describe('TransactionUpdaterService', () => {
     let service: TransactionUpdaterService;

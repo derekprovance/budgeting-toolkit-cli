@@ -2,7 +2,7 @@ import { Command } from '../types/interface/command.interface';
 import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
 import { AdditionalIncomeService } from '../services/additional-income.service';
 import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service';
-import { TransactionPropertyService } from '../services/core/transaction-property.service';
+import { TransactionClassificationService } from '../services/core/transaction-classification.service';
 import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
@@ -13,13 +13,11 @@ import chalk from 'chalk';
  * Command for finalizing budget and displaying the finalization report
  */
 
-//TODO(DEREK) - calculate the amount of budget left for transfer into and out of disposable
-//TODO(DEREK) - Find a way to list all transactions without a budget that are not a bill or disposable income
 export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
     constructor(
         private readonly additionalIncomeService: AdditionalIncomeService,
         private readonly unbudgetedExpenseService: UnbudgetedExpenseService,
-        private readonly transactionPropertyService: TransactionPropertyService,
+        private readonly transactionClassificationService: TransactionClassificationService,
         private readonly paycheckSurplusService: PaycheckSurplusService,
         private readonly finalizeBudgetDisplayService: FinalizeBudgetDisplayService
     ) {}
@@ -82,11 +80,11 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
         let other = 0;
 
         transactions.forEach(t => {
-            if (this.transactionPropertyService.isBill(t)) {
+            if (this.transactionClassificationService.isBill(t)) {
                 bills++;
-            } else if (this.transactionPropertyService.isTransfer(t)) {
+            } else if (this.transactionClassificationService.isTransfer(t)) {
                 transfers++;
-            } else if (this.transactionPropertyService.isDeposit(t)) {
+            } else if (this.transactionClassificationService.isDeposit(t)) {
                 deposits++;
             } else {
                 other++;

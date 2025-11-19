@@ -19,17 +19,17 @@ jest.mock('chalk', () => {
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { FinalizeBudgetDisplayService } from '../../../src/services/display/finalize-budget-display.service';
 import { DisplayService } from '../../../src/services/display/display.service';
-import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 
 jest.mock('../../../src/services/display/display.service');
-jest.mock('../../../src/services/core/transaction-property.service');
+jest.mock('../../../src/services/core/transaction-classification.service');
 jest.mock('../../../src/services/excluded-transaction.service');
 
 describe('FinalizeBudgetDisplayService', () => {
     let service: FinalizeBudgetDisplayService;
     let displayService: jest.Mocked<DisplayService>;
-    let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     const mockTransaction: Partial<TransactionSplit> = {
@@ -43,11 +43,11 @@ describe('FinalizeBudgetDisplayService', () => {
     beforeEach(() => {
         excludedTransactionService =
             new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
-        transactionPropertyService = new TransactionPropertyService(
+        transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService
-        ) as jest.Mocked<TransactionPropertyService>;
+        ) as jest.Mocked<TransactionClassificationService>;
         displayService = new DisplayService(
-            transactionPropertyService
+            transactionClassificationService
         ) as jest.Mocked<DisplayService>;
 
         // Mock the displayService methods
@@ -65,11 +65,11 @@ describe('FinalizeBudgetDisplayService', () => {
                     (sum: number, t: TransactionSplit) => sum + parseFloat(t.amount),
                     0
                 );
-                const typeIndicator = transactionPropertyService.isBill(transactions[0])
+                const typeIndicator = transactionClassificationService.isBill(transactions[0])
                     ? '[BILL]'
-                    : transactionPropertyService.isTransfer(transactions[0])
+                    : transactionClassificationService.isTransfer(transactions[0])
                       ? '[TRANSFER]'
-                      : transactionPropertyService.isDeposit(transactions[0])
+                      : transactionClassificationService.isDeposit(transactions[0])
                         ? '[DEPOSIT]'
                         : '[OTHER]';
 
@@ -105,7 +105,7 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format additional income section with bill transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(true);
+            transactionClassificationService.isBill.mockReturnValueOnce(true);
             const result = service.formatAdditionalIncomeSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -117,8 +117,8 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format additional income section with transfer transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(false);
-            transactionPropertyService.isTransfer.mockReturnValueOnce(true);
+            transactionClassificationService.isBill.mockReturnValueOnce(false);
+            transactionClassificationService.isTransfer.mockReturnValueOnce(true);
             const result = service.formatAdditionalIncomeSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -130,9 +130,9 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format additional income section with deposit transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(false);
-            transactionPropertyService.isTransfer.mockReturnValueOnce(false);
-            transactionPropertyService.isDeposit.mockReturnValueOnce(true);
+            transactionClassificationService.isBill.mockReturnValueOnce(false);
+            transactionClassificationService.isTransfer.mockReturnValueOnce(false);
+            transactionClassificationService.isDeposit.mockReturnValueOnce(true);
             const result = service.formatAdditionalIncomeSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -144,9 +144,9 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format additional income section with other transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(false);
-            transactionPropertyService.isTransfer.mockReturnValueOnce(false);
-            transactionPropertyService.isDeposit.mockReturnValueOnce(false);
+            transactionClassificationService.isBill.mockReturnValueOnce(false);
+            transactionClassificationService.isTransfer.mockReturnValueOnce(false);
+            transactionClassificationService.isDeposit.mockReturnValueOnce(false);
             const result = service.formatAdditionalIncomeSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -166,7 +166,7 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format unbudgeted expenses section with bill transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(true);
+            transactionClassificationService.isBill.mockReturnValueOnce(true);
             const result = service.formatUnbudgetedExpensesSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -178,8 +178,8 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format unbudgeted expenses section with transfer transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(false);
-            transactionPropertyService.isTransfer.mockReturnValueOnce(true);
+            transactionClassificationService.isBill.mockReturnValueOnce(false);
+            transactionClassificationService.isTransfer.mockReturnValueOnce(true);
             const result = service.formatUnbudgetedExpensesSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -191,9 +191,9 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format unbudgeted expenses section with deposit transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(false);
-            transactionPropertyService.isTransfer.mockReturnValueOnce(false);
-            transactionPropertyService.isDeposit.mockReturnValueOnce(true);
+            transactionClassificationService.isBill.mockReturnValueOnce(false);
+            transactionClassificationService.isTransfer.mockReturnValueOnce(false);
+            transactionClassificationService.isDeposit.mockReturnValueOnce(true);
             const result = service.formatUnbudgetedExpensesSection([
                 mockTransaction as TransactionSplit,
             ]);
@@ -205,9 +205,9 @@ describe('FinalizeBudgetDisplayService', () => {
         });
 
         it('should format unbudgeted expenses section with other transaction', () => {
-            transactionPropertyService.isBill.mockReturnValueOnce(false);
-            transactionPropertyService.isTransfer.mockReturnValueOnce(false);
-            transactionPropertyService.isDeposit.mockReturnValueOnce(false);
+            transactionClassificationService.isBill.mockReturnValueOnce(false);
+            transactionClassificationService.isTransfer.mockReturnValueOnce(false);
+            transactionClassificationService.isDeposit.mockReturnValueOnce(false);
             const result = service.formatUnbudgetedExpensesSection([
                 mockTransaction as TransactionSplit,
             ]);

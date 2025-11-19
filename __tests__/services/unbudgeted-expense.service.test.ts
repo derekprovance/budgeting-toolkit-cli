@@ -2,7 +2,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
-import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
 import { getConfigValue } from '../../src/utils/config-loader';
 
@@ -17,7 +17,7 @@ const TestAccount = {
 
 // Mock dependencies
 jest.mock('../../src/services/core/transaction.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/excluded-transaction.service');
 jest.mock('../../src/utils/config-loader', () => ({
     getConfigValue: jest.fn(),
@@ -35,7 +35,7 @@ jest.mock('../../src/logger', () => ({
 describe('UnbudgetedExpenseService', () => {
     let service: UnbudgetedExpenseService;
     let mockTransactionService: jest.Mocked<TransactionService>;
-    let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let mockGetConfigValue: jest.MockedFunction<typeof getConfigValue>;
 
     beforeEach(() => {
@@ -66,12 +66,12 @@ describe('UnbudgetedExpenseService', () => {
         mockTransactionService = new TransactionService(
             mockApiClient
         ) as jest.Mocked<TransactionService>;
-        mockTransactionPropertyService = new TransactionPropertyService(
+        mockTransactionClassificationService = new TransactionClassificationService(
             mockExcludedTransactionService
-        ) as jest.Mocked<TransactionPropertyService>;
+        ) as jest.Mocked<TransactionClassificationService>;
         service = new UnbudgetedExpenseService(
             mockTransactionService,
-            mockTransactionPropertyService
+            mockTransactionClassificationService
         );
     });
 
@@ -143,10 +143,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -167,12 +167,12 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction
                 .mockResolvedValueOnce(true)
                 .mockResolvedValueOnce(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -193,12 +193,12 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
-            mockTransactionPropertyService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -221,10 +221,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(true);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -245,10 +245,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -270,10 +270,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
 
@@ -299,10 +299,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
 
@@ -328,10 +328,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
 
@@ -340,7 +340,7 @@ describe('UnbudgetedExpenseService', () => {
             expect(result).toHaveLength(2);
             expect(result[0].description).toBe('Excluded Bill');
             expect(result[1].description).toBe('Regular Expense');
-            expect(mockTransactionPropertyService.isExcludedTransaction).toHaveBeenCalledTimes(1);
+            expect(mockTransactionClassificationService.isExcludedTransaction).toHaveBeenCalledTimes(1);
         });
 
         it('should include expenses from all valid expense accounts', async () => {
@@ -368,10 +368,10 @@ describe('UnbudgetedExpenseService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-            mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-            mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-            mockTransactionPropertyService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+            mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -426,10 +426,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(true);
-                mockTransactionPropertyService.isBill.mockReturnValue(true);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(true);
+                mockTransactionClassificationService.isBill.mockReturnValue(true);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -447,10 +447,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(true);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(true);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -468,10 +468,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(true);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(true);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(true);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(true);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -491,10 +491,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(true);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(false);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(true);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -511,10 +511,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(true);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(false);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(true);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -532,10 +532,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(true);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(false);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(true);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -560,10 +560,10 @@ describe('UnbudgetedExpenseService', () => {
                 );
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(false);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -584,10 +584,10 @@ describe('UnbudgetedExpenseService', () => {
                 );
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(false);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
@@ -603,10 +603,10 @@ describe('UnbudgetedExpenseService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isTransfer.mockReturnValue(false);
-                mockTransactionPropertyService.isExcludedTransaction.mockResolvedValue(false);
-                mockTransactionPropertyService.isSupplementedByDisposable.mockReturnValue(false);
-                mockTransactionPropertyService.isBill.mockReturnValue(false);
+                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+                mockTransactionClassificationService.isExcludedTransaction.mockResolvedValue(false);
+                mockTransactionClassificationService.isSupplementedByDisposable.mockReturnValue(false);
+                mockTransactionClassificationService.isBill.mockReturnValue(false);
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 

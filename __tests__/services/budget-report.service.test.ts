@@ -1,16 +1,16 @@
 import { BudgetReportService } from '../../src/services/budget-report.service';
 import { BudgetService } from '../../src/services/core/budget.service';
-import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto';
 import { BudgetRead, BudgetLimitRead, InsightGroup } from '@derekprovance/firefly-iii-sdk';
 
 jest.mock('../../src/services/core/budget.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 
 describe('BudgetReportService', () => {
     let budgetReportService: BudgetReportService;
     let mockBudgetService: jest.Mocked<BudgetService>;
-    let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
 
     beforeEach(() => {
         mockBudgetService = {
@@ -20,14 +20,14 @@ describe('BudgetReportService', () => {
             getTransactionsWithoutBudget: jest.fn(),
         } as unknown as jest.Mocked<BudgetService>;
 
-        mockTransactionPropertyService = {
+        mockTransactionClassificationService = {
             isBill: jest.fn(),
             isDisposableIncome: jest.fn(),
-        } as unknown as jest.Mocked<TransactionPropertyService>;
+        } as unknown as jest.Mocked<TransactionClassificationService>;
 
         budgetReportService = new BudgetReportService(
             mockBudgetService,
-            mockTransactionPropertyService
+            mockTransactionClassificationService
         );
     });
 

@@ -1,9 +1,10 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { TransactionPropertyService } from '../core/transaction-property.service';
+import { TransactionClassificationService } from '../core/transaction-classification.service';
+import { TransactionUtils } from '../../utils/transaction.utils';
 
 export class DisplayService {
-    constructor(private readonly transactionPropertyService: TransactionPropertyService) {}
+    constructor(private readonly transactionClassificationService: TransactionClassificationService) {}
 
     listTransactionsWithHeader(transactions: TransactionSplit[], description: string) {
         const lines = [chalk.bold(`\n${description}\n`)];
@@ -11,7 +12,7 @@ export class DisplayService {
         if (transactions.length === 0) {
             lines.push(chalk.dim('No transactions found'));
         } else {
-            const totalExpenses = this.calculateTotal(transactions);
+            const totalExpenses = TransactionUtils.calculateTotal(transactions);
             transactions.forEach(transaction => {
                 lines.push(this.formatTransaction(transaction));
             });
@@ -23,10 +24,6 @@ export class DisplayService {
         }
 
         return lines.join('\n');
-    }
-
-    private calculateTotal(transactions: TransactionSplit[]): number {
-        return transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
     }
 
     private formatTransaction(transaction: TransactionSplit): string {
@@ -49,11 +46,11 @@ export class DisplayService {
     }
 
     private getTransactionTypeIndicator(transaction: TransactionSplit): string {
-        if (this.transactionPropertyService.isBill(transaction)) {
+        if (this.transactionClassificationService.isBill(transaction)) {
             return chalk.redBright('[BILL]');
-        } else if (this.transactionPropertyService.isTransfer(transaction)) {
+        } else if (this.transactionClassificationService.isTransfer(transaction)) {
             return chalk.yellowBright('[TRANSFER]');
-        } else if (this.transactionPropertyService.isDeposit(transaction)) {
+        } else if (this.transactionClassificationService.isDeposit(transaction)) {
             return chalk.greenBright('[DEPOSIT]');
         }
         return chalk.gray('[OTHER]');

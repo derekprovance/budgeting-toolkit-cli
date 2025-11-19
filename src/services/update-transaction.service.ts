@@ -17,7 +17,7 @@ import { UpdateTransactionStatusDto } from '../types/dto/update-transaction-stat
 import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum';
 import { IUpdateTransactionService } from '../types/interface/update-transaction.service.interface';
 import { TransactionValidatorService } from './core/transaction-validator.service';
-import { TransactionUpdaterService } from './core/transaction-updater.service';
+import { TransactionUpdaterService } from './transaction-updater.service';
 
 export class UpdateTransactionService implements IUpdateTransactionService {
     constructor(

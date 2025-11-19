@@ -1,6 +1,8 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { DisplayService } from './display.service';
+import { TransactionUtils } from '../../utils/transaction.utils';
+import { CurrencyUtils } from '../../utils/currency.utils';
 
 /**
  * Interface for transaction counts
@@ -75,8 +77,8 @@ export class FinalizeBudgetDisplayService {
         const currencySymbol =
             additionalIncome[0]?.currency_symbol || unbudgetedExpenses[0]?.currency_symbol || '$';
 
-        const totalIncome = this.calculateTotal(additionalIncome);
-        const totalExpenses = this.calculateTotal(unbudgetedExpenses);
+        const totalIncome = TransactionUtils.calculateTotal(additionalIncome);
+        const totalExpenses = TransactionUtils.calculateTotal(unbudgetedExpenses);
 
         const lines = [
             chalk.bold('\n=== Transaction Summary ==='),
@@ -164,7 +166,7 @@ export class FinalizeBudgetDisplayService {
         currencySymbol: string,
         type: 'positive' | 'negative' | 'neutral' = 'neutral'
     ): string {
-        const formattedAmount = `${currencySymbol}${Math.abs(amount).toFixed(2)}`;
+        const formattedAmount = CurrencyUtils.formatWithSymbol(amount, currencySymbol);
 
         switch (type) {
             case 'positive':
@@ -180,7 +182,4 @@ export class FinalizeBudgetDisplayService {
         }
     }
 
-    private calculateTotal(transactions: TransactionSplit[]): number {
-        return transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
-    }
 }

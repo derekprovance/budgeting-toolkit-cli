@@ -1,7 +1,7 @@
 import { FinalizeBudgetCommand } from '../../src/commands/finalize-budget.command';
 import { AdditionalIncomeService } from '../../src/services/additional-income.service';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service';
-import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service';
 import { FinalizeBudgetDisplayService } from '../../src/services/display/finalize-budget-display.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
@@ -9,7 +9,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 // Mock services
 jest.mock('../../src/services/additional-income.service');
 jest.mock('../../src/services/unbudgeted-expense.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/display/finalize-budget-display.service');
 jest.mock('../../src/services/paycheck-surplus.service');
 
@@ -17,7 +17,7 @@ describe('FinalizeBudgetCommand', () => {
     let command: FinalizeBudgetCommand;
     let additionalIncomeService: jest.Mocked<AdditionalIncomeService>;
     let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
-    let transactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let paycheckSurplusService: jest.Mocked<PaycheckSurplusService>;
     let finalizeBudgetDisplayService: jest.Mocked<FinalizeBudgetDisplayService>;
     let consoleLogSpy: jest.SpyInstance;
@@ -44,11 +44,11 @@ describe('FinalizeBudgetCommand', () => {
             calculateUnbudgetedExpenses: jest.fn().mockResolvedValue([mockTransaction]),
         } as unknown as jest.Mocked<UnbudgetedExpenseService>;
 
-        transactionPropertyService = {
+        transactionClassificationService = {
             isBill: jest.fn().mockReturnValue(false),
             isTransfer: jest.fn().mockReturnValue(false),
             isDeposit: jest.fn().mockReturnValue(false),
-        } as unknown as jest.Mocked<TransactionPropertyService>;
+        } as unknown as jest.Mocked<TransactionClassificationService>;
 
         paycheckSurplusService = {
             calculatePaycheckSurplus: jest.fn().mockResolvedValue(500.0),
@@ -66,7 +66,7 @@ describe('FinalizeBudgetCommand', () => {
         command = new FinalizeBudgetCommand(
             additionalIncomeService,
             unbudgetedExpenseService,
-            transactionPropertyService,
+            transactionClassificationService,
             paycheckSurplusService,
             finalizeBudgetDisplayService
         );

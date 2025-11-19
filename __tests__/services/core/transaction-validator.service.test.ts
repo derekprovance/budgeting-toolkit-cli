@@ -1,5 +1,5 @@
 import { TransactionValidatorService } from '../../../src/services/core/transaction-validator.service';
-import { TransactionPropertyService } from '../../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 // Mock the logger to prevent console output during tests
@@ -12,11 +12,11 @@ jest.mock('../../../src/logger', () => ({
     },
 }));
 
-jest.mock('../../../src/services/core/transaction-property.service');
+jest.mock('../../../src/services/core/transaction-classification.service');
 
 describe('TransactionValidatorService', () => {
     let service: TransactionValidatorService;
-    let mockPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockPropertyService: jest.Mocked<TransactionClassificationService>;
 
     const mockTransaction: Partial<TransactionSplit> = {
         transaction_journal_id: '1',
@@ -35,7 +35,7 @@ describe('TransactionValidatorService', () => {
             isDisposableIncome: jest.fn(),
             isExcludedTransaction: jest.fn(),
             isDeposit: jest.fn(),
-        } as unknown as jest.Mocked<TransactionPropertyService>;
+        } as unknown as jest.Mocked<TransactionClassificationService>;
 
         service = new TransactionValidatorService(mockPropertyService);
     });

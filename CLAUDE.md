@@ -79,7 +79,7 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 - `TransactionService` - Firefly III transaction API operations
 - `BudgetService` - Budget API operations
 - `CategoryService` - Category API operations
-- `TransactionPropertyService` - Transaction classification logic (deposit, bill, transfer, etc.)
+- `TransactionClassificationService` - Transaction classification logic (deposit, bill, transfer, etc.)
 - `TransactionValidatorService` - Transaction validation
 - `TransactionUpdaterService` - Handles transaction updates with user workflow
 
@@ -109,7 +109,7 @@ Services are created and wired together in `ServiceFactory.createServices()`. Th
 
 ### Transaction Classification System
 
-The `TransactionPropertyService` provides the core logic for classifying transactions:
+The `TransactionClassificationService` provides the core logic for classifying transactions:
 
 - **Deposits**: `type === "deposit"`
 - **Transfers**: `type === "transfer"`

@@ -113,7 +113,7 @@ Examples:
                 const command = new FinalizeBudgetCommand(
                     services.additionalIncomeService,
                     services.unbudgetedExpenseService,
-                    services.transactionPropertyService,
+                    services.transactionClassificationService,
                     services.paycheckSurplusService,
                     services.finalizeBudgetDisplayService
                 );

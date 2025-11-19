@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service';
-import { TransactionPropertyService } from './core/transaction-property.service';
+import { TransactionClassificationService } from './core/transaction-classification.service';
 import { logger } from '../logger';
 import { DateUtils } from '../utils/date.utils';
 import { expectedMonthlyPaycheck } from '../config';
@@ -11,7 +11,7 @@ import { expectedMonthlyPaycheck } from '../config';
 export class PaycheckSurplusService {
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly transactionPropertyService: TransactionPropertyService
+        private readonly transactionClassificationService: TransactionClassificationService
     ) {}
 
     /**
@@ -103,7 +103,7 @@ export class PaycheckSurplusService {
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
             const paycheckCandidates = transactions
-                .filter(t => this.transactionPropertyService.isDeposit(t))
+                .filter(t => this.transactionClassificationService.isDeposit(t))
                 .filter(t => this.isPaycheck(t))
                 .sort((a, b) => {
                     const amountA = parseFloat(a.amount);

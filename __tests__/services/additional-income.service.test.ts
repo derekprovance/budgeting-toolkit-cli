@@ -2,7 +2,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { AdditionalIncomeService } from '../../src/services/additional-income.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
-import { TransactionPropertyService } from '../../src/services/core/transaction-property.service';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
 import { getConfigValue } from '../../src/utils/config-loader';
 
@@ -17,7 +17,7 @@ const TestAccount = {
 
 // Mock dependencies
 jest.mock('../../src/services/core/transaction.service');
-jest.mock('../../src/services/core/transaction-property.service');
+jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/excluded-transaction.service');
 jest.mock('../../src/utils/config-loader', () => ({
     getConfigValue: jest.fn(),
@@ -35,7 +35,7 @@ jest.mock('../../src/logger', () => ({
 describe('AdditionalIncomeService', () => {
     let service: AdditionalIncomeService;
     let mockTransactionService: jest.Mocked<TransactionService>;
-    let mockTransactionPropertyService: jest.Mocked<TransactionPropertyService>;
+    let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
     let mockGetConfigValue: jest.MockedFunction<typeof getConfigValue>;
@@ -63,12 +63,12 @@ describe('AdditionalIncomeService', () => {
         mockTransactionService = new TransactionService(
             mockApiClient
         ) as jest.Mocked<TransactionService>;
-        mockTransactionPropertyService = new TransactionPropertyService(
+        mockTransactionClassificationService = new TransactionClassificationService(
             mockExcludedTransactionService
-        ) as jest.Mocked<TransactionPropertyService>;
+        ) as jest.Mocked<TransactionClassificationService>;
         service = new AdditionalIncomeService(
             mockTransactionService,
-            mockTransactionPropertyService
+            mockTransactionClassificationService
         );
     });
 
@@ -78,7 +78,7 @@ describe('AdditionalIncomeService', () => {
                 () =>
                     new AdditionalIncomeService(
                         mockTransactionService,
-                        mockTransactionPropertyService,
+                        mockTransactionClassificationService,
                         { validDestinationAccounts: [] }
                     )
             ).toThrow('At least one valid destination account must be specified');
@@ -87,7 +87,7 @@ describe('AdditionalIncomeService', () => {
         it('should accept custom configuration', async () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
-                mockTransactionPropertyService,
+                mockTransactionClassificationService,
                 {
                     validDestinationAccounts: [TestAccount.PRIMARY],
                     excludedAdditionalIncomePatterns: ['PAYROLL'],
@@ -107,8 +107,8 @@ describe('AdditionalIncomeService', () => {
             ];
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-            mockTransactionPropertyService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
 
             const result = await customService.calculateAdditionalIncome(4, 2024);
 
@@ -156,7 +156,7 @@ describe('AdditionalIncomeService', () => {
             it('should filter negative numbers', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
-                    mockTransactionPropertyService
+                    mockTransactionClassificationService
                 );
 
                 const mockTransactions = [
@@ -171,8 +171,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await serviceWithMinAmount.calculateAdditionalIncome(4, 2024);
 
@@ -183,7 +183,7 @@ describe('AdditionalIncomeService', () => {
             it('should handle invalid amount formats', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
-                    mockTransactionPropertyService
+                    mockTransactionClassificationService
                 );
 
                 const mockTransactions = [
@@ -194,8 +194,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await serviceWithMinAmount.calculateAdditionalIncome(4, 2024);
 
@@ -217,8 +217,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -239,8 +239,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -285,8 +285,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -306,8 +306,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -327,8 +327,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -346,8 +346,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -363,8 +363,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -380,8 +380,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -398,8 +398,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -425,8 +425,8 @@ describe('AdditionalIncomeService', () => {
                 );
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -447,8 +447,8 @@ describe('AdditionalIncomeService', () => {
                 );
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
@@ -464,8 +464,8 @@ describe('AdditionalIncomeService', () => {
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionPropertyService.isDeposit.mockReturnValue(true);
-                mockTransactionPropertyService.isDisposableIncome.mockReturnValue(false);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 

@@ -4,12 +4,12 @@ import { BudgetReportService as IBudgetReportService } from '../types/interface/
 import { DateUtils } from '../utils/date.utils';
 import { logger } from '../logger';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionPropertyService } from './core/transaction-property.service';
+import { TransactionClassificationService } from './core/transaction-classification.service';
 
 export class BudgetReportService implements IBudgetReportService {
     constructor(
         private budgetService: BudgetService,
-        private readonly transactionPropertyService: TransactionPropertyService
+        private readonly transactionClassificationService: TransactionClassificationService
     ) {}
 
     async getBudgetReport(month: number, year: number): Promise<BudgetReportDto[]> {
@@ -75,8 +75,8 @@ export class BudgetReportService implements IBudgetReportService {
 
         transactions = transactions.filter(t => {
             return (
-                !this.transactionPropertyService.isBill(t) &&
-                !this.transactionPropertyService.isDisposableIncome(t)
+                !this.transactionClassificationService.isBill(t) &&
+                !this.transactionClassificationService.isDisposableIncome(t)
             );
         });
 

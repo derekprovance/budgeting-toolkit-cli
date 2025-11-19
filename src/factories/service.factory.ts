@@ -7,7 +7,7 @@ import { AdditionalIncomeService } from '../services/additional-income.service';
 import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service';
 import { BudgetReportService } from '../services/budget-report.service';
 import { ExcludedTransactionService } from '../services/excluded-transaction.service';
-import { TransactionPropertyService } from '../services/core/transaction-property.service';
+import { TransactionClassificationService } from '../services/core/transaction-classification.service';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service';
@@ -15,7 +15,7 @@ import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-
 import { UpdateTransactionService } from '../services/update-transaction.service';
 import { LLMConfig } from '../config/llm.config';
 import { UserInputService } from '../services/user-input.service';
-import { TransactionUpdaterService } from '../services/core/transaction-updater.service';
+import { TransactionUpdaterService } from '../services/transaction-updater.service';
 import { baseUrl } from '../config';
 import { DisplayService } from '../services/display/display.service';
 import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service';
@@ -30,26 +30,26 @@ export class ServiceFactory {
         const categoryService = new CategoryService(apiClient);
         const userInputService = new UserInputService(baseUrl);
         const excludedTransactionService = new ExcludedTransactionService();
-        const transactionPropertyService = new TransactionPropertyService(
+        const transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService
         );
         const transactionValidatorService = new TransactionValidatorService(
-            transactionPropertyService
+            transactionClassificationService
         );
         const additionalIncomeService = new AdditionalIncomeService(
             transactionService,
-            transactionPropertyService
+            transactionClassificationService
         );
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
-            transactionPropertyService
+            transactionClassificationService
         );
-        const budgetReport = new BudgetReportService(budgetService, transactionPropertyService);
+        const budgetReport = new BudgetReportService(budgetService, transactionClassificationService);
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
-            transactionPropertyService
+            transactionClassificationService
         );
-        const displayService = new DisplayService(transactionPropertyService);
+        const displayService = new DisplayService(transactionClassificationService);
         const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(displayService);
         const budgetDisplayService = new BudgetDisplayService(displayService);
         const billService = new BillService(apiClient);
@@ -63,7 +63,7 @@ export class ServiceFactory {
             additionalIncomeService,
             unbudgetedExpenseService,
             budgetReport,
-            transactionPropertyService,
+            transactionClassificationService,
             excludedTransactionService,
             paycheckSurplusService,
             transactionValidatorService,
