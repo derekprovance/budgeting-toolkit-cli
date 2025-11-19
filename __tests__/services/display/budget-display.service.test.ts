@@ -1,5 +1,5 @@
 import { BudgetDisplayService } from '../../../src/services/display/budget-display.service';
-import { DisplayService } from '../../../src/services/display/display.service';
+import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service';
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 import { BudgetReport } from '../../../src/types/interface/budget-report.interface';
@@ -17,13 +17,13 @@ jest.mock('chalk', () => ({
     white: (str: string) => str,
 }));
 
-jest.mock('../../../src/services/display/display.service');
+jest.mock('../../../src/services/display/base-transaction-display.service');
 jest.mock('../../../src/services/core/transaction-classification.service');
 jest.mock('../../../src/services/excluded-transaction.service');
 
 describe('BudgetDisplayService', () => {
     let service: BudgetDisplayService;
-    let displayService: jest.Mocked<DisplayService>;
+    let baseTransactionDisplayService: jest.Mocked<BaseTransactionDisplayService>;
     let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
@@ -33,16 +33,16 @@ describe('BudgetDisplayService', () => {
         transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService
         ) as jest.Mocked<TransactionClassificationService>;
-        displayService = new DisplayService(
+        baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
-        ) as jest.Mocked<DisplayService>;
+        ) as jest.Mocked<BaseTransactionDisplayService>;
 
         // Mock the displayService methods
-        displayService.listTransactionsWithHeader = jest
+        baseTransactionDisplayService.listTransactionsWithHeader = jest
             .fn()
             .mockReturnValue('=== Unbudgeted Transactions ===\n\nNo transactions found');
 
-        service = new BudgetDisplayService(displayService);
+        service = new BudgetDisplayService(baseTransactionDisplayService);
     });
 
     describe('formatHeader', () => {

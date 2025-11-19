@@ -1,4 +1,4 @@
-import { UpdateTransactionService } from '../services/update-transaction.service';
+import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
 import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum';
 import { Command } from '../types/interface/command.interface';
@@ -13,7 +13,7 @@ interface UpdateTransactionsParams {
 export class UpdateTransactionsCommand implements Command<void, UpdateTransactionsParams> {
     private readonly displayService: UpdateTransactionDisplayService;
 
-    constructor(private readonly updateTransactionService: UpdateTransactionService) {
+    constructor(private readonly aiTransactionUpdateOrchestrator: AITransactionUpdateOrchestrator) {
         this.displayService = new UpdateTransactionDisplayService();
     }
 
@@ -21,7 +21,7 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
         console.log(this.displayService.formatProcessingHeader(tag, updateMode, dryRun));
 
         try {
-            const results = await this.updateTransactionService.updateTransactionsByTag(
+            const results = await this.aiTransactionUpdateOrchestrator.updateTransactionsByTag(
                 tag,
                 updateMode,
                 dryRun

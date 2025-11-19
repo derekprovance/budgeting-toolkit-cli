@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { DisplayService } from './display.service';
+import { BaseTransactionDisplayService } from './base-transaction-display.service';
 import { TransactionUtils } from '../../utils/transaction.utils';
 import { CurrencyUtils } from '../../utils/currency.utils';
 
@@ -18,7 +18,7 @@ export interface TransactionCounts {
  * Service for formatting and displaying finalize budget information
  */
 export class FinalizeBudgetDisplayService {
-    constructor(private displayService: DisplayService) {}
+    constructor(private baseTransactionDisplayService: BaseTransactionDisplayService) {}
 
     /**
      * Formats the header box
@@ -49,7 +49,7 @@ export class FinalizeBudgetDisplayService {
      * Formats the additional income section
      */
     formatAdditionalIncomeSection(transactions: TransactionSplit[]): string {
-        return this.displayService.listTransactionsWithHeader(
+        return this.baseTransactionDisplayService.listTransactionsWithHeader(
             transactions,
             '=== Additional Income ==='
         );
@@ -59,7 +59,7 @@ export class FinalizeBudgetDisplayService {
      * Formats the unbudgeted expenses section
      */
     formatUnbudgetedExpensesSection(transactions: TransactionSplit[]): string {
-        return this.displayService.listTransactionsWithHeader(
+        return this.baseTransactionDisplayService.listTransactionsWithHeader(
             transactions,
             '=== Unbudgeted Expenses ==='
         );

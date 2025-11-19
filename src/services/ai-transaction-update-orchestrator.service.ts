@@ -15,14 +15,14 @@ import {
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
 import { UpdateTransactionStatusDto } from '../types/dto/update-transaction-status.dto';
 import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum';
-import { IUpdateTransactionService } from '../types/interface/update-transaction.service.interface';
+import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface';
 import { TransactionValidatorService } from './core/transaction-validator.service';
-import { TransactionUpdaterService } from './transaction-updater.service';
+import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service';
 
-export class UpdateTransactionService implements IUpdateTransactionService {
+export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrchestrator {
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly transactionUpdaterService: TransactionUpdaterService,
+        private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
         private readonly categoryService: CategoryService,
         private readonly budgetService: BudgetService,
         private readonly llmService: LLMTransactionProcessingService,
@@ -217,7 +217,7 @@ export class UpdateTransactionService implements IUpdateTransactionService {
                     continue;
                 }
 
-                const updatedTransaction = await this.transactionUpdaterService.updateTransaction(
+                const updatedTransaction = await this.interactiveTransactionUpdater.updateTransaction(
                     transaction,
                     aiResults
                 );

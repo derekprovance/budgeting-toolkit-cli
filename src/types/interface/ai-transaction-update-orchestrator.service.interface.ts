@@ -1,7 +1,7 @@
 import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum';
 import { UpdateTransactionStatusDto } from '../dto/update-transaction-status.dto';
 
-export interface IUpdateTransactionService {
+export interface IAITransactionUpdateOrchestrator {
     /**
      * Updates transactions with a given tag based on the specified mode
      * @param tag The tag to filter transactions by

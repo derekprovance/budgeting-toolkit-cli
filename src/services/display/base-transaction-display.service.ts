@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { TransactionClassificationService } from '../core/transaction-classification.service';
 import { TransactionUtils } from '../../utils/transaction.utils';
 
-export class DisplayService {
+export class BaseTransactionDisplayService {
     constructor(private readonly transactionClassificationService: TransactionClassificationService) {}
 
     listTransactionsWithHeader(transactions: TransactionSplit[], description: string) {

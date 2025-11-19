@@ -11,7 +11,7 @@ import { logger } from '../logger';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum';
 
-export class TransactionUpdaterService {
+export class InteractiveTransactionUpdater {
     private readonly updateParameterMap = {
         [UpdateTransactionMode.Both]: (category?: CategoryProperties, budget?: BudgetRead) =>
             [category?.name, budget?.id] as const,

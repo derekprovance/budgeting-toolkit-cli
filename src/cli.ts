@@ -203,14 +203,14 @@ Examples:
             }
 
             try {
-                const updateTransactionService =
-                    await ServiceFactory.createUpdateTransactionService(
+                const aiTransactionUpdateOrchestrator =
+                    await ServiceFactory.createAITransactionUpdateOrchestrator(
                         apiClient,
                         opts.includeClassified,
                         opts.dryRun
                     );
 
-                const command = new UpdateTransactionsCommand(updateTransactionService);
+                const command = new UpdateTransactionsCommand(aiTransactionUpdateOrchestrator);
                 await command.execute({
                     tag,
                     updateMode: opts.mode as UpdateTransactionMode,

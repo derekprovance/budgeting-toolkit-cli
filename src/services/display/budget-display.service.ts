@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { BudgetReport } from '../../types/interface/budget-report.interface';
-import { DisplayService } from './display.service';
+import { BaseTransactionDisplayService } from './base-transaction-display.service';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from '../../types/dto/bill-comparison.dto';
 import { CurrencyUtils } from '../../utils/currency.utils';
@@ -11,7 +11,7 @@ import { CurrencyUtils } from '../../utils/currency.utils';
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
 
-    constructor(private displayService: DisplayService) {}
+    constructor(private baseTransactionDisplayService: BaseTransactionDisplayService) {}
 
     /**
      * Formats the budget report header
@@ -144,7 +144,7 @@ export class BudgetDisplayService {
     }
 
     listUnbudgetedTransactions(transactions: TransactionSplit[]): string {
-        return this.displayService.listTransactionsWithHeader(
+        return this.baseTransactionDisplayService.listTransactionsWithHeader(
             transactions,
             '=== Unbudgeted Transactions ==='
         );

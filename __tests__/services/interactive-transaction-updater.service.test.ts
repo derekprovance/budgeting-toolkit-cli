@@ -1,4 +1,4 @@
-import { TransactionUpdaterService } from '../../src/services/transaction-updater.service';
+import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
 import { UserInputService } from '../../src/services/user-input.service';
@@ -20,8 +20,8 @@ jest.mock('../../src/services/core/transaction.service');
 jest.mock('../../src/services/core/transaction-validator.service');
 jest.mock('../../src/services/user-input.service');
 
-describe('TransactionUpdaterService', () => {
-    let service: TransactionUpdaterService;
+describe('InteractiveTransactionUpdater', () => {
+    let service: InteractiveTransactionUpdater;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockValidator: jest.Mocked<TransactionValidatorService>;
     let mockUserInputService: jest.Mocked<UserInputService>;
@@ -64,7 +64,7 @@ describe('TransactionUpdaterService', () => {
             getNewBudget: jest.fn(),
         } as unknown as jest.Mocked<UserInputService>;
 
-        service = new TransactionUpdaterService(
+        service = new InteractiveTransactionUpdater(
             mockTransactionService,
             mockValidator,
             mockUserInputService,
@@ -185,7 +185,7 @@ describe('TransactionUpdaterService', () => {
         });
 
         it('should skip user confirmation when in dry run mode', async () => {
-            const serviceWithDryRun = new TransactionUpdaterService(
+            const serviceWithDryRun = new InteractiveTransactionUpdater(
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
@@ -226,7 +226,7 @@ describe('TransactionUpdaterService', () => {
         });
 
         it('should return transaction without updating when in dry run mode', async () => {
-            const serviceWithDryRun = new TransactionUpdaterService(
+            const serviceWithDryRun = new InteractiveTransactionUpdater(
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
@@ -253,7 +253,7 @@ describe('TransactionUpdaterService', () => {
         });
 
         it('should skip validation in dry run mode if transaction data is invalid', async () => {
-            const serviceWithDryRun = new TransactionUpdaterService(
+            const serviceWithDryRun = new InteractiveTransactionUpdater(
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,
@@ -274,7 +274,7 @@ describe('TransactionUpdaterService', () => {
         });
 
         it('should combine dry run with no confirmation', async () => {
-            const serviceWithBoth = new TransactionUpdaterService(
+            const serviceWithBoth = new InteractiveTransactionUpdater(
                 mockTransactionService,
                 mockValidator,
                 mockUserInputService,

@@ -18,17 +18,17 @@ jest.mock('chalk', () => {
 
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { FinalizeBudgetDisplayService } from '../../../src/services/display/finalize-budget-display.service';
-import { DisplayService } from '../../../src/services/display/display.service';
+import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service';
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
 
-jest.mock('../../../src/services/display/display.service');
+jest.mock('../../../src/services/display/base-transaction-display.service');
 jest.mock('../../../src/services/core/transaction-classification.service');
 jest.mock('../../../src/services/excluded-transaction.service');
 
 describe('FinalizeBudgetDisplayService', () => {
     let service: FinalizeBudgetDisplayService;
-    let displayService: jest.Mocked<DisplayService>;
+    let baseTransactionDisplayService: jest.Mocked<BaseTransactionDisplayService>;
     let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
@@ -46,12 +46,12 @@ describe('FinalizeBudgetDisplayService', () => {
         transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService
         ) as jest.Mocked<TransactionClassificationService>;
-        displayService = new DisplayService(
+        baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
-        ) as jest.Mocked<DisplayService>;
+        ) as jest.Mocked<BaseTransactionDisplayService>;
 
         // Mock the displayService methods
-        displayService.listTransactionsWithHeader = jest
+        baseTransactionDisplayService.listTransactionsWithHeader = jest
             .fn()
             .mockImplementation((transactions: TransactionSplit[], header: string) => {
                 if (transactions.length === 0) {
@@ -76,7 +76,7 @@ describe('FinalizeBudgetDisplayService', () => {
                 return `\n${header}\n\n${typeIndicator} ${transactions[0].description}\n${transactions[0].currency_symbol}${Math.abs(total).toFixed(2)}\n\nTotal ${header.includes('Income') ? 'Additional Income' : 'Unbudgeted Expenses'}: ${transactions[0].currency_symbol}${Math.abs(total).toFixed(2)}`;
             });
 
-        service = new FinalizeBudgetDisplayService(displayService);
+        service = new FinalizeBudgetDisplayService(baseTransactionDisplayService);
     });
 
     describe('formatHeader', () => {

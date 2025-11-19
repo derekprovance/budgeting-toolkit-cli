@@ -1,21 +1,21 @@
 import { UpdateTransactionsCommand } from '../../src/commands/update-transaction.command';
-import { UpdateTransactionService } from '../../src/services/update-transaction.service';
+import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service';
 import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
 import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
 import { UpdateTransactionDisplayService } from '../../src/services/display/update-transaction-display.service';
 
-jest.mock('../../src/services/update-transaction.service');
+jest.mock('../../src/services/ai-transaction-update-orchestrator.service');
 jest.mock('../../src/services/display/update-transaction-display.service');
 
 describe('UpdateTransactionsCommand', () => {
     let command: UpdateTransactionsCommand;
-    let mockUpdateService: jest.Mocked<UpdateTransactionService>;
+    let mockAIOrchestrator: jest.Mocked<AITransactionUpdateOrchestrator>;
     let mockDisplayService: jest.Mocked<UpdateTransactionDisplayService>;
 
     beforeEach(() => {
-        mockUpdateService = {
+        mockAIOrchestrator = {
             updateTransactionsByTag: jest.fn(),
-        } as unknown as jest.Mocked<UpdateTransactionService>;
+        } as unknown as jest.Mocked<AITransactionUpdateOrchestrator>;
 
         mockDisplayService = {
             formatProcessingHeader: jest.fn().mockReturnValue('Processing header'),
@@ -39,7 +39,7 @@ describe('UpdateTransactionsCommand', () => {
             mockDisplayService.formatError
         );
 
-        command = new UpdateTransactionsCommand(mockUpdateService);
+        command = new UpdateTransactionsCommand(mockAIOrchestrator);
     });
 
     afterEach(() => {
@@ -53,14 +53,14 @@ describe('UpdateTransactionsCommand', () => {
                 updateMode: UpdateTransactionMode.Both,
             };
 
-            mockUpdateService.updateTransactionsByTag.mockResolvedValue({
+            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
                 status: UpdateTransactionStatus.NO_TAG,
                 transactionsUpdated: 0,
             });
 
             await command.execute(params);
 
-            expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
+            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
                 false
@@ -79,14 +79,14 @@ describe('UpdateTransactionsCommand', () => {
                 updateMode: UpdateTransactionMode.Both,
             };
 
-            mockUpdateService.updateTransactionsByTag.mockResolvedValue({
+            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
                 status: UpdateTransactionStatus.EMPTY_TAG,
                 transactionsUpdated: 0,
             });
 
             await command.execute(params);
 
-            expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
+            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
                 false
@@ -110,14 +110,14 @@ describe('UpdateTransactionsCommand', () => {
                 transactionsUpdated: 5,
             };
 
-            mockUpdateService.updateTransactionsByTag.mockResolvedValue(results);
+            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
 
             // Mock console.log to verify output
             const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
             await command.execute(params);
 
-            expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
+            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
                 false
@@ -144,14 +144,14 @@ describe('UpdateTransactionsCommand', () => {
                 transactionsUpdated: 3,
             };
 
-            mockUpdateService.updateTransactionsByTag.mockResolvedValue(results);
+            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
 
             // Mock console.log to verify output
             const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
             await command.execute(params);
 
-            expect(mockUpdateService.updateTransactionsByTag).toHaveBeenCalledWith(
+            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
                 params.updateMode,
                 true
@@ -173,7 +173,7 @@ describe('UpdateTransactionsCommand', () => {
             };
 
             const error = new Error('Test error');
-            mockUpdateService.updateTransactionsByTag.mockRejectedValue(error);
+            mockAIOrchestrator.updateTransactionsByTag.mockRejectedValue(error);
 
             await expect(command.execute(params)).rejects.toThrow(error);
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(

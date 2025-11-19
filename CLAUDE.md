@@ -81,7 +81,6 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 - `CategoryService` - Category API operations
 - `TransactionClassificationService` - Transaction classification logic (deposit, bill, transfer, etc.)
 - `TransactionValidatorService` - Transaction validation
-- `TransactionUpdaterService` - Handles transaction updates with user workflow
 
 **Business Logic Services** (`src/services/`):
 
@@ -89,7 +88,8 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 - `UnbudgetedExpenseService` - Finds expenses not covered by budget
 - `PaycheckSurplusService` - Calculates paycheck surplus/deficit
 - `ExcludedTransactionService` - Manages transaction exclusions via CSV
-- `UpdateTransactionService` - Orchestrates AI-powered transaction updates
+- `AITransactionUpdateOrchestrator` - Orchestrates AI-powered transaction updates
+- `InteractiveTransactionUpdater` - Handles transaction updates with interactive user workflow
 - `UserInputService` - Handles user interactions, prompts, and multiple-choice inputs
 
 **AI Services** (`src/services/ai/`):
@@ -101,7 +101,10 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 
 **Display Services** (`src/services/display/`):
 
-- Formatters for command output (tables, summaries, etc.)
+- `BaseTransactionDisplayService` - Base service for formatting transaction lists with type indicators
+- `BudgetDisplayService` - Formats budget reports with spending visualizations
+- `FinalizeBudgetDisplayService` - Formats finalize budget output with recommendations
+- `UpdateTransactionDisplayService` - Formats status messages for categorize command
 
 ### Dependency Injection
 
@@ -148,7 +151,7 @@ Enhanced user experience with `@inquirer/prompts`:
 
 - `src/factories/service.factory.ts` - Central service factory
 - All services should be instantiated here for consistent DI
-- Recent additions: `UserInputService` and `TransactionUpdaterService` integration
+- Recent additions: `UserInputService` and `InteractiveTransactionUpdater` integration
 
 ### Error Handling
 

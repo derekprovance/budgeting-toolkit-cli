@@ -1,6 +1,6 @@
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { ServiceFactory } from '../../src/factories/service.factory';
-import { UpdateTransactionService } from '../../src/services/update-transaction.service';
+import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service';
 
 // Mock all dependencies
 jest.mock('../../src/services/core/transaction.service');
@@ -15,10 +15,10 @@ jest.mock('../../src/services/paycheck-surplus.service');
 jest.mock('../../src/services/core/transaction-validator.service');
 jest.mock('../../src/services/ai/llm-assignment.service');
 jest.mock('../../src/services/ai/llm-transaction-processing.service');
-jest.mock('../../src/services/update-transaction.service');
+jest.mock('../../src/services/ai-transaction-update-orchestrator.service');
 jest.mock('../../src/config/llm.config');
 jest.mock('../../src/services/user-input.service');
-jest.mock('../../src/services/transaction-updater.service');
+jest.mock('../../src/services/interactive-transaction-updater.service');
 
 // Mock the logger
 jest.mock('../../src/logger', () => ({
@@ -72,21 +72,21 @@ describe('ServiceFactory', () => {
         });
     });
 
-    describe('createUpdateTransactionService', () => {
-        it('should create UpdateTransactionService with default parameters', async () => {
-            const service = await ServiceFactory.createUpdateTransactionService(mockApiClient);
+    describe('createAITransactionUpdateOrchestrator', () => {
+        it('should create AITransactionUpdateOrchestrator with default parameters', async () => {
+            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(mockApiClient);
 
-            expect(service).toBeInstanceOf(UpdateTransactionService);
+            expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
         });
 
-        it('should create UpdateTransactionService with custom parameters', async () => {
-            const service = await ServiceFactory.createUpdateTransactionService(
+        it('should create AITransactionUpdateOrchestrator with custom parameters', async () => {
+            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(
                 mockApiClient,
                 true, // includeClassified
                 true // dryRun
             );
 
-            expect(service).toBeInstanceOf(UpdateTransactionService);
+            expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
         });
     });
 });

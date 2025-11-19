@@ -14,16 +14,16 @@ jest.mock('../../src/services/core/budget.service');
 jest.mock('../../src/services/ai/llm-transaction-processing.service');
 jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/core/transaction-validator.service');
-jest.mock('../../src/services/transaction-updater.service');
+jest.mock('../../src/services/interactive-transaction-updater.service');
 
-import { UpdateTransactionService } from '../../src/services/update-transaction.service';
+import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service';
 import { TransactionService } from '../../src/services/core/transaction.service';
 import { CategoryService } from '../../src/services/core/category.service';
 import { BudgetService } from '../../src/services/core/budget.service';
 import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
-import { TransactionUpdaterService } from '../../src/services/transaction-updater.service';
+import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service';
 import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
 import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
@@ -31,10 +31,10 @@ import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { createMockTransaction } from '../shared/test-data';
 
-describe('UpdateTransactionService', () => {
-    let service: UpdateTransactionService;
+describe('AITransactionUpdateOrchestrator', () => {
+    let service: AITransactionUpdateOrchestrator;
     let mockTransactionService: jest.Mocked<TransactionService>;
-    let mockTransactionUpdaterService: jest.Mocked<TransactionUpdaterService>;
+    let mockInteractiveTransactionUpdater: jest.Mocked<InteractiveTransactionUpdater>;
     let mockCategoryService: jest.Mocked<CategoryService>;
     let mockBudgetService: jest.Mocked<BudgetService>;
     let mockLLMService: jest.Mocked<LLMTransactionProcessingService>;
@@ -99,7 +99,7 @@ describe('UpdateTransactionService', () => {
             updateTransaction: jest.fn(),
         } as unknown as jest.Mocked<TransactionService>;
 
-        mockTransactionUpdaterService = {
+        mockInteractiveTransactionUpdater = {
             updateTransaction: jest.fn().mockImplementation(async (transaction, aiResults) => {
                 // Return the transaction with updated category and budget
                 const journalId = transaction.transaction_journal_id!;
@@ -111,7 +111,7 @@ describe('UpdateTransactionService', () => {
                 };
                 return Promise.resolve(result);
             }),
-        } as unknown as jest.Mocked<TransactionUpdaterService>;
+        } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
 
         mockCategoryService = {
             getCategories: jest.fn(),
@@ -156,9 +156,9 @@ describe('UpdateTransactionService', () => {
             'categoryOrBudgetChanged'
         ).mockImplementation(mockValidator.categoryOrBudgetChanged);
 
-        service = new UpdateTransactionService(
+        service = new AITransactionUpdateOrchestrator(
             mockTransactionService,
-            mockTransactionUpdaterService,
+            mockInteractiveTransactionUpdater,
             mockCategoryService,
             mockBudgetService,
             mockLLMService,
@@ -235,7 +235,7 @@ describe('UpdateTransactionService', () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledTimes(
+            expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledTimes(
                 mockTransactions.length
             );
         });
@@ -274,7 +274,7 @@ describe('UpdateTransactionService', () => {
             );
 
             expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
-            expect(mockTransactionUpdaterService.updateTransaction).not.toHaveBeenCalled();
+            expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
         });
 
         it('should handle category-only update mode', async () => {
@@ -289,7 +289,7 @@ describe('UpdateTransactionService', () => {
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
                 mockTransactions[0] as any
             );
 
@@ -300,7 +300,7 @@ describe('UpdateTransactionService', () => {
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
-            expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
+            expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.any(Object)
             );
@@ -316,7 +316,7 @@ describe('UpdateTransactionService', () => {
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
                 mockTransactions[0] as any
             );
 
@@ -327,7 +327,7 @@ describe('UpdateTransactionService', () => {
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockCategoryService.getCategories).not.toHaveBeenCalled();
-            expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
+            expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.any(Object)
             );
@@ -347,9 +347,9 @@ describe('UpdateTransactionService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
-            const serviceWithDryRun = new UpdateTransactionService(
+            const serviceWithDryRun = new AITransactionUpdateOrchestrator(
                 mockTransactionService,
-                mockTransactionUpdaterService,
+                mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
                 mockLLMService,
@@ -381,9 +381,9 @@ describe('UpdateTransactionService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
-            const serviceWithDryRun = new UpdateTransactionService(
+            const serviceWithDryRun = new AITransactionUpdateOrchestrator(
                 mockTransactionService,
-                mockTransactionUpdaterService,
+                mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
                 mockLLMService,
@@ -412,9 +412,9 @@ describe('UpdateTransactionService', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
-            const serviceWithBoth = new UpdateTransactionService(
+            const serviceWithBoth = new AITransactionUpdateOrchestrator(
                 mockTransactionService,
-                mockTransactionUpdaterService,
+                mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
                 mockLLMService,
@@ -472,7 +472,7 @@ describe('UpdateTransactionService', () => {
             mockLLMService.processTransactions.mockResolvedValue({
                 '1': { category: 'New Category', budget: 'New Budget' },
             });
-            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
                 mockTransaction as any
             );
 
@@ -492,7 +492,7 @@ describe('UpdateTransactionService', () => {
                 [mockCategory.name],
                 [mockBudget.attributes.name]
             );
-            expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
+            expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 {
                     '1': { category: 'New Category', budget: 'New Budget' },
@@ -541,7 +541,7 @@ describe('UpdateTransactionService', () => {
             mockLLMService.processTransactions.mockResolvedValue({
                 '1': { category: 'New Category', budget: 'New Budget' },
             });
-            mockTransactionUpdaterService.updateTransaction.mockResolvedValue(
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
                 mockTransaction as any
             );
 
@@ -561,7 +561,7 @@ describe('UpdateTransactionService', () => {
                 [mockCategory.name],
                 [mockBudget.attributes.name]
             );
-            expect(mockTransactionUpdaterService.updateTransaction).toHaveBeenCalledWith(
+            expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 {
                     '1': { category: 'New Category', budget: 'New Budget' },
@@ -594,7 +594,7 @@ describe('UpdateTransactionService', () => {
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
-            expect(mockTransactionUpdaterService.updateTransaction).not.toHaveBeenCalled();
+            expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
         });
     });
 });

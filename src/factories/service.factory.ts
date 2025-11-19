@@ -12,12 +12,12 @@ import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service';
 import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service';
-import { UpdateTransactionService } from '../services/update-transaction.service';
+import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service';
 import { LLMConfig } from '../config/llm.config';
 import { UserInputService } from '../services/user-input.service';
-import { TransactionUpdaterService } from '../services/transaction-updater.service';
+import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service';
 import { baseUrl } from '../config';
-import { DisplayService } from '../services/display/display.service';
+import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service';
 import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service';
 import { BudgetDisplayService } from '../services/display/budget-display.service';
 import { BillService } from '../services/core/bill.service';
@@ -49,9 +49,9 @@ export class ServiceFactory {
             transactionService,
             transactionClassificationService
         );
-        const displayService = new DisplayService(transactionClassificationService);
-        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(displayService);
-        const budgetDisplayService = new BudgetDisplayService(displayService);
+        const baseTransactionDisplayService = new BaseTransactionDisplayService(transactionClassificationService);
+        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(baseTransactionDisplayService);
+        const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
         const billService = new BillService(apiClient);
         const billComparisonService = new BillComparisonService(billService, transactionService);
 
@@ -67,7 +67,7 @@ export class ServiceFactory {
             excludedTransactionService,
             paycheckSurplusService,
             transactionValidatorService,
-            displayService,
+            baseTransactionDisplayService,
             finalizeBudgetDisplayService,
             budgetDisplayService,
             billService,
@@ -75,11 +75,11 @@ export class ServiceFactory {
         };
     }
 
-    static async createUpdateTransactionService(
+    static async createAITransactionUpdateOrchestrator(
         apiClient: FireflyClientWithCerts,
         includeClassified: boolean = false,
         dryRun: boolean = false
-    ): Promise<UpdateTransactionService> {
+    ): Promise<AITransactionUpdateOrchestrator> {
         const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
@@ -91,7 +91,7 @@ export class ServiceFactory {
         const budgets: BudgetRead[] = await services.budgetService.getBudgets();
         const categories: CategoryProperties[] = await services.categoryService.getCategories();
 
-        const transactionUpdaterService = new TransactionUpdaterService(
+        const interactiveTransactionUpdater = new InteractiveTransactionUpdater(
             services.transactionService,
             services.transactionValidatorService,
             services.userInputService,
@@ -100,9 +100,9 @@ export class ServiceFactory {
             budgets
         );
 
-        return new UpdateTransactionService(
+        return new AITransactionUpdateOrchestrator(
             services.transactionService,
-            transactionUpdaterService,
+            interactiveTransactionUpdater,
             services.categoryService,
             services.budgetService,
             llmProcessingService,
