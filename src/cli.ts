@@ -140,17 +140,15 @@ Examples:
                 .argParser(validateYear)
                 .default(getCurrentYear(), 'current year')
         )
-        .option('--verbose', 'show detailed bill information')
         .addHelpText(
             'after',
             `
 Examples:
   $ budgeting-toolkit report                      # current month report
   $ budgeting-toolkit report -m 8                 # August report
-  $ budgeting-toolkit report --verbose            # show bill details
   $ budgeting-toolkit rp                          # current month (using alias)`
         )
-        .action(async (opts: BudgetDateOptions & { verbose?: boolean }) => {
+        .action(async (opts: BudgetDateOptions) => {
             try {
                 const command = new BudgetReportCommand(
                     services.budgetReport,
@@ -161,7 +159,7 @@ Examples:
                 await command.execute({
                     month: opts.month!,
                     year: opts.year!,
-                    verbose: opts.verbose,
+                    verbose: program?.opts().verbose || false,
                 });
             } catch (error) {
                 handleError(error, 'getting budget report');
