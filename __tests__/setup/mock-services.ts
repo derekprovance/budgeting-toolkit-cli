@@ -53,27 +53,29 @@ export const createMockBudgetService = (): jest.Mocked<BudgetService> => {
 /**
  * Creates a mocked TransactionClassificationService
  */
-export const createMockTransactionClassificationService = (): jest.Mocked<TransactionClassificationService> => {
-    return {
-        isDeposit: jest.fn(),
-        isTransfer: jest.fn(),
-        isBill: jest.fn(),
-        isPaycheck: jest.fn(),
-        isDisposableIncome: jest.fn(),
-    } as unknown as jest.Mocked<TransactionClassificationService>;
-};
+export const createMockTransactionClassificationService =
+    (): jest.Mocked<TransactionClassificationService> => {
+        return {
+            isDeposit: jest.fn(),
+            isTransfer: jest.fn(),
+            isBill: jest.fn(),
+            isPaycheck: jest.fn(),
+            isDisposableIncome: jest.fn(),
+        } as unknown as jest.Mocked<TransactionClassificationService>;
+    };
 
 /**
  * Creates a mocked TransactionValidatorService
  */
-export const createMockTransactionValidatorService = (): jest.Mocked<TransactionValidatorService> => {
-    return {
-        validateTransaction: jest.fn(),
-        validateTransactionSplit: jest.fn(),
-        isValidAmount: jest.fn(),
-        isValidAccount: jest.fn(),
-    } as unknown as jest.Mocked<TransactionValidatorService>;
-};
+export const createMockTransactionValidatorService =
+    (): jest.Mocked<TransactionValidatorService> => {
+        return {
+            validateTransaction: jest.fn(),
+            validateTransactionSplit: jest.fn(),
+            isValidAmount: jest.fn(),
+            isValidAccount: jest.fn(),
+        } as unknown as jest.Mocked<TransactionValidatorService>;
+    };
 
 /**
  * Creates a mocked ExcludedTransactionService
@@ -103,12 +105,13 @@ export const createMockUserInputService = (): jest.Mocked<UserInputService> => {
 /**
  * Creates a mocked InteractiveTransactionUpdater
  */
-export const createMockInteractiveTransactionUpdater = (): jest.Mocked<InteractiveTransactionUpdater> => {
-    return {
-        updateTransaction: jest.fn(),
-        updateTransactions: jest.fn(),
-    } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
-};
+export const createMockInteractiveTransactionUpdater =
+    (): jest.Mocked<InteractiveTransactionUpdater> => {
+        return {
+            updateTransaction: jest.fn(),
+            updateTransactions: jest.fn(),
+        } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
+    };
 
 /**
  * Creates a mocked LLMAssignmentService

@@ -66,7 +66,7 @@ export const getAllLoggerCalls = (): Array<{ level: string; args: unknown[] }> =
  */
 export const expectLoggerToHaveBeenCalledWith = (
     level: keyof typeof mockLogger,
-    message: string | RegExp,
+    message: string | RegExp
 ): void => {
     const calls = mockLogger[level].mock.calls;
     const found = calls.some(callArgs => {
@@ -80,7 +80,7 @@ export const expectLoggerToHaveBeenCalledWith = (
     if (!found) {
         throw new Error(
             `Expected logger.${level} to have been called with "${message}", but it wasn't.\n` +
-            `Actual calls: ${JSON.stringify(calls, null, 2)}`
+                `Actual calls: ${JSON.stringify(calls, null, 2)}`
         );
     }
 };

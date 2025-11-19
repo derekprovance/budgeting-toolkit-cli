@@ -181,5 +181,4 @@ export class FinalizeBudgetDisplayService {
                 return chalk.white(formattedAmount);
         }
     }
-
 }

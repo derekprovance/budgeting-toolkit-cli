@@ -48,7 +48,10 @@ export function getUserPrompt(
     const noMatchValue = type === 'category' ? '(no category)' : '(no budget)';
 
     const transactionList = transactions
-        .map((tx, i) => `${i + 1}. ${tx.description} - $${tx.amount} - ${tx.date} (${tx.source_account} → ${tx.destination_account})`)
+        .map(
+            (tx, i) =>
+                `${i + 1}. ${tx.description} - $${tx.amount} - ${tx.date} (${tx.source_account} → ${tx.destination_account})`
+        )
         .join('\n');
 
     const optionsList = validOptions.map(opt => `- ${opt}`).join('\n');

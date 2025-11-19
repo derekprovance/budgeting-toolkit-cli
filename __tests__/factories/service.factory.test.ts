@@ -74,7 +74,8 @@ describe('ServiceFactory', () => {
 
     describe('createAITransactionUpdateOrchestrator', () => {
         it('should create AITransactionUpdateOrchestrator with default parameters', async () => {
-            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(mockApiClient);
+            const service =
+                await ServiceFactory.createAITransactionUpdateOrchestrator(mockApiClient);
 
             expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
         });

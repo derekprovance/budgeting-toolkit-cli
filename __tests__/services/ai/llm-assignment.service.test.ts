@@ -409,9 +409,7 @@ describe('LLMAssignmentService', () => {
                 mockClaudeClient.chat.mockResolvedValue(
                     JSON.stringify({ categories: assignments })
                 );
-                (promptTemplates.parseAssignmentResponse as jest.Mock).mockReturnValue(
-                    assignments
-                );
+                (promptTemplates.parseAssignmentResponse as jest.Mock).mockReturnValue(assignments);
 
                 const result = await service.assign('category', manyTransactions, validCategories);
 
@@ -466,11 +464,9 @@ describe('LLMAssignmentService', () => {
 
     describe('assignCategories', () => {
         it('should delegate to assign with category type', async () => {
-            const assignSpy = jest.spyOn(service, 'assign').mockResolvedValue([
-                'Groceries',
-                'Healthcare',
-                'Groceries',
-            ]);
+            const assignSpy = jest
+                .spyOn(service, 'assign')
+                .mockResolvedValue(['Groceries', 'Healthcare', 'Groceries']);
 
             const result = await service.assignCategories(mockTransactions, validCategories);
 
@@ -497,11 +493,9 @@ describe('LLMAssignmentService', () => {
 
     describe('assignBudgets', () => {
         it('should delegate to assign with budget type', async () => {
-            const assignSpy = jest.spyOn(service, 'assign').mockResolvedValue([
-                'Food',
-                'Medical',
-                'Food',
-            ]);
+            const assignSpy = jest
+                .spyOn(service, 'assign')
+                .mockResolvedValue(['Food', 'Medical', 'Food']);
 
             const result = await service.assignBudgets(mockTransactions, validBudgets);
 

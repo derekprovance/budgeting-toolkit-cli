@@ -39,6 +39,12 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
 
             const prefix = dryRun ? '[DRYRUN] ' : '';
             console.log(`\n${prefix}Updated ${results.transactionsUpdated} Transaction(s)!`);
+
+            if (results.transactionErrors && results.transactionErrors > 0) {
+                console.log(
+                    `\n⚠️  Warning: ${results.transactionErrors} transaction(s) failed to update. Check logs for details.`
+                );
+            }
         } catch (error) {
             console.log(this.displayService.formatError(error));
             throw error;

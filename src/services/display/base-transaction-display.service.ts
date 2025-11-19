@@ -4,7 +4,9 @@ import { TransactionClassificationService } from '../core/transaction-classifica
 import { TransactionUtils } from '../../utils/transaction.utils';
 
 export class BaseTransactionDisplayService {
-    constructor(private readonly transactionClassificationService: TransactionClassificationService) {}
+    constructor(
+        private readonly transactionClassificationService: TransactionClassificationService
+    ) {}
 
     listTransactionsWithHeader(transactions: TransactionSplit[], description: string) {
         const lines = [chalk.bold(`\n${description}\n`)];

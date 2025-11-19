@@ -98,9 +98,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should successfully make a chat request', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Hello, Claude!' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Hello, Claude!' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [
@@ -125,9 +123,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should handle multiple text blocks in response', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [
@@ -159,27 +155,27 @@ describe('ClaudeClient', () => {
 
             const response = await client.chat(messages);
 
-            expect(response).toBe(JSON.stringify({
-                categories: ['Groceries', 'Healthcare'],
-            }));
+            expect(response).toBe(
+                JSON.stringify({
+                    categories: ['Groceries', 'Healthcare'],
+                })
+            );
         });
 
         it('should throw error when response has no text content', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [],
             });
 
-            await expect(client.chat(messages)).rejects.toThrow('No text content found in response');
+            await expect(client.chat(messages)).rejects.toThrow(
+                'No text content found in response'
+            );
         });
 
         it('should use override configuration', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [{ type: 'text', text: 'Response' }],
@@ -199,9 +195,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should include system prompt when provided', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [{ type: 'text', text: 'Response' }],
@@ -219,9 +213,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should include functions as tools when provided', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [{ type: 'tool_use', input: { result: 'success' } }],
@@ -269,9 +261,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should include tool_choice when function_call is specified', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockResolvedValue({
                 content: [{ type: 'tool_use', input: { result: 'success' } }],
@@ -313,9 +303,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should retry on failure and eventually succeed', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate
                 .mockRejectedValueOnce(new Error('API error'))
@@ -332,9 +320,7 @@ describe('ClaudeClient', () => {
         }, 10000); // Increase timeout for retry delays
 
         it('should throw error after max retries exceeded', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockRejectedValue(new Error('Persistent API error'));
 
@@ -352,9 +338,7 @@ describe('ClaudeClient', () => {
         });
 
         it('should open circuit breaker after failure threshold', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Test' },
-            ];
+            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
 
             mockMessagesCreate.mockRejectedValue(new Error('API error'));
 
@@ -362,15 +346,14 @@ describe('ClaudeClient', () => {
             for (let i = 0; i < 5; i++) {
                 try {
                     await client.chat(messages);
-                } catch (error) {
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                } catch (_error) {
                     // Expected to fail
                 }
             }
 
             // Next request should fail immediately due to circuit breaker
-            await expect(client.chat(messages)).rejects.toThrow(
-                'Circuit breaker is OPEN'
-            );
+            await expect(client.chat(messages)).rejects.toThrow('Circuit breaker is OPEN');
         });
     });
 

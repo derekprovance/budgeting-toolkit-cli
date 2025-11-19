@@ -53,7 +53,7 @@ describe('validateCertificateConfig', () => {
     });
 
     it('should throw when CA certificate does not exist', () => {
-        mockExistsSync.mockImplementation((path) => {
+        mockExistsSync.mockImplementation(path => {
             // Client cert exists, CA cert does not
             return path === '/path/to/client.p12';
         });

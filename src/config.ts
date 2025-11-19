@@ -34,8 +34,7 @@ function resolveCertPath(envPath: string | undefined): string | undefined {
 export const baseUrl: string = process.env.FIREFLY_API_URL || '';
 
 export const config: FireflyClientWithCertsConfig = {
-    BASE:
-        (process.env.FIREFLY_API_URL?.trim() || 'https://your-firefly-instance.com') + '/api',
+    BASE: (process.env.FIREFLY_API_URL?.trim() || 'https://your-firefly-instance.com') + '/api',
     TOKEN: process.env.FIREFLY_API_TOKEN || '',
     caCertPath: resolveCertPath(process.env.CLIENT_CERT_CA_PATH),
     clientCertPath: resolveCertPath(process.env.CLIENT_CERT_PATH),

@@ -137,10 +137,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
                 'Processing budgets'
             );
 
-            const results = await this.llmAssignmentService.assignBudgets(
-                transactions,
-                budgets
-            );
+            const results = await this.llmAssignmentService.assignBudgets(transactions, budgets);
 
             logger.debug(
                 {

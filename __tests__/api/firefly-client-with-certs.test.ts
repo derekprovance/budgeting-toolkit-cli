@@ -1,11 +1,12 @@
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
 import { createCustomAxiosInstance } from '../../src/utils/custom-fetch';
-import { OpenAPI } from '@derekprovance/firefly-iii-sdk';
 
 jest.mock('../../src/utils/custom-fetch');
 
 describe('FireflyClientWithCerts', () => {
-    const mockCreateCustomAxiosInstance = createCustomAxiosInstance as jest.MockedFunction<typeof createCustomAxiosInstance>;
+    const mockCreateCustomAxiosInstance = createCustomAxiosInstance as jest.MockedFunction<
+        typeof createCustomAxiosInstance
+    >;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -158,7 +159,7 @@ describe('FireflyClientWithCerts', () => {
                 'webhooks',
             ];
 
-            expectedServices.forEach((service) => {
+            expectedServices.forEach(service => {
                 expect(client).toHaveProperty(service);
             });
         });

@@ -1,5 +1,4 @@
 import { BillService } from '../../../src/services/core/bill.service';
-import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs';
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 
 describe('BillService', () => {

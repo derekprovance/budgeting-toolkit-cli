@@ -53,8 +53,8 @@ export function createCustomAxiosInstance(config: CertificateConfig): AxiosInsta
             rejectUnauthorized = false;
             logger.debug(
                 'TLS validation disabled (no CA certificate provided). ' +
-                'This is common for self-signed certificates. ' +
-                'For production, provide CLIENT_CERT_CA_PATH or set STRICT_TLS=true.'
+                    'This is common for self-signed certificates. ' +
+                    'For production, provide CLIENT_CERT_CA_PATH or set STRICT_TLS=true.'
             );
         }
 

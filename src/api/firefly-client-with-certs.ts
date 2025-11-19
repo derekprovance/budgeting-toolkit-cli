@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { FireflyClient, BaseHttpRequest, CancelablePromise } from '@derekprovance/firefly-iii-sdk';
 import type { OpenAPIConfig } from '@derekprovance/firefly-iii-sdk';
 import type { ApiRequestOptions } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/ApiRequestOptions';
@@ -58,7 +60,6 @@ export class FireflyClientWithCerts extends FireflyClient {
               })
             : undefined;
 
-        // Initialize the base FireflyClient with custom HttpRequest constructor
         super(
             {
                 BASE: config.BASE,

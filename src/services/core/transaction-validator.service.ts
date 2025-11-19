@@ -3,7 +3,9 @@ import { TransactionClassificationService } from './transaction-classification.s
 import { logger } from '../../logger';
 
 export class TransactionValidatorService {
-    constructor(private readonly transactionClassificationService: TransactionClassificationService) {}
+    constructor(
+        private readonly transactionClassificationService: TransactionClassificationService
+    ) {}
 
     /**
      * Validates if a transaction should be processed
@@ -31,14 +33,16 @@ export class TransactionValidatorService {
      * @returns A promise that resolves to true if the transaction should have a budget, false otherwise
      */
     async shouldSetBudget(transaction: TransactionSplit): Promise<boolean> {
-        const isExcludedTransaction = await this.transactionClassificationService.isExcludedTransaction(
-            transaction.description,
-            transaction.amount
-        );
+        const isExcludedTransaction =
+            await this.transactionClassificationService.isExcludedTransaction(
+                transaction.description,
+                transaction.amount
+            );
 
         const conditions = {
             notABill: !this.transactionClassificationService.isBill(transaction),
-            notDisposableIncome: !this.transactionClassificationService.isDisposableIncome(transaction),
+            notDisposableIncome:
+                !this.transactionClassificationService.isDisposableIncome(transaction),
             notAnExcludedTransaction: !isExcludedTransaction,
             notADeposit: !this.transactionClassificationService.isDeposit(transaction),
         };

@@ -1,5 +1,7 @@
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { mapTransactionForLLM, LLMTransactionData } from '../../../../src/services/ai/utils/transaction-mapper';
+import {
+    mapTransactionForLLM,
+    LLMTransactionData,
+} from '../../../../src/services/ai/utils/transaction-mapper';
 import { createMockTransaction } from '../../../shared/test-data';
 
 describe('transaction-mapper', () => {

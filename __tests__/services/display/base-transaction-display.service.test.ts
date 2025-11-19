@@ -3,7 +3,6 @@ import { BaseTransactionDisplayService } from '../../../src/services/display/bas
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
 import { createMockTransaction } from '../../shared/test-data';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import chalk from 'chalk';
 
 // Mock TransactionUtils
 jest.mock('../../../src/utils/transaction.utils', () => ({
@@ -87,7 +86,10 @@ describe('BaseTransactionDisplayService', () => {
             mockTransactionClassificationService.isDeposit.mockReturnValue(false);
             (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(150);
 
-            const result = service.listTransactionsWithHeader(transactions, 'Shopping Transactions');
+            const result = service.listTransactionsWithHeader(
+                transactions,
+                'Shopping Transactions'
+            );
 
             expect(result).toContain('Walmart');
             expect(result).toContain('Target');

@@ -40,7 +40,7 @@ describe('createCustomAxiosInstance', () => {
 
     describe('certificate file validation', () => {
         it('should fallback to default axios when CA cert file does not exist', () => {
-            mockFs.existsSync.mockImplementation((path) => {
+            mockFs.existsSync.mockImplementation(path => {
                 if (typeof path === 'string') {
                     return path.includes('client.p12');
                 }
@@ -157,7 +157,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should handle missing key file gracefully', () => {
-            mockFs.existsSync.mockImplementation((path) => {
+            mockFs.existsSync.mockImplementation(path => {
                 if (typeof path === 'string') {
                     return !path.endsWith('.key');
                 }

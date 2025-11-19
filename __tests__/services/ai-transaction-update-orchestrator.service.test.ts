@@ -111,6 +111,8 @@ describe('AITransactionUpdateOrchestrator', () => {
                 };
                 return Promise.resolve(result);
             }),
+            getErrors: jest.fn().mockReturnValue([]),
+            clearErrors: jest.fn(),
         } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
 
         mockCategoryService = {

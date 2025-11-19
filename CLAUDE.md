@@ -94,10 +94,11 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 
 **AI Services** (`src/services/ai/`):
 
-- `LLMTransactionCategoryService` - Claude-powered transaction categorization
-- `LLMTransactionBudgetService` - Claude-powered budget assignment
-- `LLMTransactionProcessingService` - Orchestrates AI processing
-- `LLMResponseValidatorService` - Validates AI responses
+- `LLMAssignmentService` - Unified service for Claude-powered category and budget assignment
+- `LLMTransactionProcessingService` - Orchestrates AI processing and coordinates with ClaudeClient
+- **AI Utilities** (`src/services/ai/utils/`):
+    - `prompt-templates.ts` - Structured prompt generation with function calling schemas
+    - `transaction-mapper.ts` - Maps Firefly III transactions to LLM-friendly format
 
 **Display Services** (`src/services/display/`):
 
@@ -125,9 +126,17 @@ The `TransactionClassificationService` provides the core logic for classifying t
 Claude AI integration through `@anthropic-ai/sdk`:
 
 - Configuration in `src/config/llm.config.ts`
-- Batch processing support for multiple transactions
-- Validation of AI responses before applying changes
-- Dry-run mode for testing AI suggestions
+- **Function Calling**: Uses Claude's function calling feature for structured responses
+    - Eliminates need for fuzzy string matching
+    - Enforces response schema with enum validation
+    - Provides reliable, type-safe AI responses
+- **Unified Assignment Service**: `LLMAssignmentService` handles both categories and budgets
+    - Single implementation using DRY principles
+    - Delegates batching to `ClaudeClient` for optimal performance
+    - No retry logic in service layer (handled by client)
+- **Batch Processing**: Handled by `ClaudeClient` with rate limiting and concurrency control
+- **Validation**: AI responses validated against available options before applying
+- **Dry-run mode**: Test AI suggestions without making changes
 
 ### User Interface and Workflow
 
@@ -158,6 +167,20 @@ Enhanced user experience with `@inquirer/prompts`:
 - Structured logging via Pino logger (`src/logger.ts`)
 - Services throw descriptive errors with context
 - Commands catch and log errors before exiting
+- **Error Collection**: `InteractiveTransactionUpdater` collects errors during batch operations
+    - Errors are tracked and reported via `getErrors()` method
+    - Error statistics are included in update results
+    - Users are notified of failed transactions with counts
+
+### Logging Best Practices
+
+- **User-facing output**: Use `console.log/error` for CLI output (reports, summaries, results)
+    - This goes to stdout/stderr and can be piped/redirected
+    - Clean, formatted output without JSON structure
+- **Diagnostic logging**: Use `logger.debug/info/warn/error` for operational diagnostics
+    - Structured JSON logs controlled by `LOG_LEVEL` environment variable
+    - Includes context objects for troubleshooting
+    - Examples: API errors, validation failures, processing statistics
 
 ### Transaction Filtering
 

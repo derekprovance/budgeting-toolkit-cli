@@ -93,9 +93,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             month,
             year
         );
-        console.log(
-            this.budgetDisplayService.formatBillComparisonSection(billComparison, verbose)
-        );
+        console.log(this.budgetDisplayService.formatBillComparisonSection(billComparison, verbose));
 
         // Display warning if necessary
         if (isCurrentMonth) {

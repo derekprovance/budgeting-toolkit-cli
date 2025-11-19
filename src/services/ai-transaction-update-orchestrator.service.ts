@@ -107,6 +107,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 dryRun
             );
 
+            const errorCount = this.interactiveTransactionUpdater.getErrors().length;
+
             logger.debug(
                 {
                     tag,
@@ -114,6 +116,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     dryRun,
                     totalTransactions: transactions.length,
                     updatedTransactions: updatedTransactions.length,
+                    errors: errorCount,
                     categories: categories?.length,
                     budgets: budgets?.length,
                 },
@@ -123,6 +126,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             return {
                 status: UpdateTransactionStatus.HAS_RESULTS,
                 transactionsUpdated: updatedTransactions.length,
+                transactionErrors: errorCount,
             };
         } catch (ex) {
             logger.error(
@@ -217,10 +221,11 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     continue;
                 }
 
-                const updatedTransaction = await this.interactiveTransactionUpdater.updateTransaction(
-                    transaction,
-                    aiResults
-                );
+                const updatedTransaction =
+                    await this.interactiveTransactionUpdater.updateTransaction(
+                        transaction,
+                        aiResults
+                    );
 
                 if (updatedTransaction) {
                     results.push(updatedTransaction);
@@ -229,16 +234,33 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
             const totalTransactions = transactions.length;
             const updatedCount = results.length;
-            const skippedCount = totalTransactions - updatedCount;
+            const errors = this.interactiveTransactionUpdater.getErrors();
+            const errorCount = errors.length;
+            const skippedCount = totalTransactions - updatedCount - errorCount;
 
             logger.debug(
                 {
                     totalTransactions,
                     updated: updatedCount,
                     skipped: skippedCount,
+                    errors: errorCount,
                 },
-                `${dryRun ?? '[DRYRUN] '} Transaction update completed`
+                `${dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
             );
+
+            // Log error details if any occurred
+            if (errorCount > 0) {
+                logger.warn(
+                    {
+                        errorCount,
+                        errors: errors.map(e => ({
+                            description: e.transaction.description,
+                            error: e.error.message,
+                        })),
+                    },
+                    'Some transactions failed to update'
+                );
+            }
 
             return results;
         } catch (err) {

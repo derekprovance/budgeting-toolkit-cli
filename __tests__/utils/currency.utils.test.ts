@@ -135,25 +135,25 @@ describe('CurrencyUtils', () => {
 
     describe('formatWithSymbol', () => {
         it('should format with dollar symbol', () => {
-            const result = CurrencyUtils.formatWithSymbol(100.00, '$');
+            const result = CurrencyUtils.formatWithSymbol(100.0, '$');
 
             expect(result).toBe('$100.00');
         });
 
         it('should format with euro symbol', () => {
-            const result = CurrencyUtils.formatWithSymbol(100.00, '€');
+            const result = CurrencyUtils.formatWithSymbol(100.0, '€');
 
             expect(result).toBe('€100.00');
         });
 
         it('should format with pound symbol', () => {
-            const result = CurrencyUtils.formatWithSymbol(100.00, '£');
+            const result = CurrencyUtils.formatWithSymbol(100.0, '£');
 
             expect(result).toBe('£100.00');
         });
 
         it('should use absolute value for negative amounts', () => {
-            const result = CurrencyUtils.formatWithSymbol(-100.50, '$');
+            const result = CurrencyUtils.formatWithSymbol(-100.5, '$');
 
             expect(result).toBe('$100.50');
         });

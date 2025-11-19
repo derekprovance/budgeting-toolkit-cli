@@ -23,9 +23,7 @@ describe('TransactionUtils', () => {
         });
 
         it('should handle single transaction', () => {
-            const transactions: TransactionSplit[] = [
-                createMockTransaction({ amount: '123.45' }),
-            ];
+            const transactions: TransactionSplit[] = [createMockTransaction({ amount: '123.45' })];
 
             const total = TransactionUtils.calculateTotal(transactions);
 
@@ -161,6 +159,7 @@ describe('TransactionUtils', () => {
         });
 
         it('should handle many transactions', () => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const transactions: TransactionSplit[] = Array.from({ length: 1000 }, (_, i) =>
                 createMockTransaction({ amount: '1.00' })
             );

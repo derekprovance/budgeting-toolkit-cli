@@ -69,15 +69,10 @@ export class LLMAssignmentService {
             const functionSchema = getFunctionSchema(type, validOptions);
 
             // Call Claude (batching handled internally by ClaudeClient)
-            const result = await this.claudeClient.chat(
-                [
-                    { role: 'user', content: userPrompt },
-                ],
-                {
-                    systemPrompt,
-                    functions: [functionSchema],
-                }
-            );
+            const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
+                systemPrompt,
+                functions: [functionSchema],
+            });
 
             // Parse and validate response
             const assignments = parseAssignmentResponse(

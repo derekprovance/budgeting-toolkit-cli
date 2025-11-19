@@ -142,10 +142,11 @@ export class UnbudgetedExpenseService {
      * 4. Must be from a valid expense account
      */
     private async isRegularExpenseTransaction(transaction: TransactionSplit): Promise<boolean> {
-        const isExcludedTransaction = await this.transactionClassificationService.isExcludedTransaction(
-            transaction.description,
-            transaction.amount
-        );
+        const isExcludedTransaction =
+            await this.transactionClassificationService.isExcludedTransaction(
+                transaction.description,
+                transaction.amount
+            );
 
         const conditions = {
             hasNoBudget: !transaction.budget_id,

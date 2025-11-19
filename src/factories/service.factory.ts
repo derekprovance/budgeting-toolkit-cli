@@ -44,13 +44,20 @@ export class ServiceFactory {
             transactionService,
             transactionClassificationService
         );
-        const budgetReport = new BudgetReportService(budgetService, transactionClassificationService);
+        const budgetReport = new BudgetReportService(
+            budgetService,
+            transactionClassificationService
+        );
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
             transactionClassificationService
         );
-        const baseTransactionDisplayService = new BaseTransactionDisplayService(transactionClassificationService);
-        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(baseTransactionDisplayService);
+        const baseTransactionDisplayService = new BaseTransactionDisplayService(
+            transactionClassificationService
+        );
+        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(
+            baseTransactionDisplayService
+        );
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
         const billService = new BillService(apiClient);
         const billComparisonService = new BillComparisonService(billService, transactionService);
@@ -84,9 +91,7 @@ export class ServiceFactory {
         const claudeClient = LLMConfig.createClient();
 
         const llmAssignmentService = new LLMAssignmentService(claudeClient);
-        const llmProcessingService = new LLMTransactionProcessingService(
-            llmAssignmentService
-        );
+        const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
         const budgets: BudgetRead[] = await services.budgetService.getBudgets();
         const categories: CategoryProperties[] = await services.categoryService.getCategories();

@@ -18,7 +18,7 @@ export const wait = (ms: number): Promise<void> => {
  */
 export const expectToRejectWith = async (
     promise: Promise<unknown>,
-    expectedMessage: string | RegExp,
+    expectedMessage: string | RegExp
 ): Promise<void> => {
     await expect(promise).rejects.toThrow(expectedMessage);
 };
@@ -46,7 +46,7 @@ export const expectToHaveBeenCalledWithPartial = <T extends unknown[]>(
     if (!found) {
         throw new Error(
             `Expected mock to have been called with partial args ${JSON.stringify(partialArgs)}\n` +
-            `Actual calls: ${JSON.stringify(calls, null, 2)}`
+                `Actual calls: ${JSON.stringify(calls, null, 2)}`
         );
     }
 };
@@ -144,7 +144,7 @@ export const mockDate = (isoDate: string): { restore: () => void } => {
 export const expectArraysToHaveSameElements = <T>(
     actual: T[],
     expected: T[],
-    compareFn?: (a: T, b: T) => boolean,
+    compareFn?: (a: T, b: T) => boolean
 ): void => {
     expect(actual.length).toBe(expected.length);
 
@@ -155,7 +155,7 @@ export const expectArraysToHaveSameElements = <T>(
         if (!found) {
             throw new Error(
                 `Expected array to contain ${JSON.stringify(expectedItem)}\n` +
-                `Actual array: ${JSON.stringify(actual, null, 2)}`
+                    `Actual array: ${JSON.stringify(actual, null, 2)}`
             );
         }
     });
@@ -174,7 +174,7 @@ export const expectToBeWithinRange = (actual: number, min: number, max: number):
  */
 export const expectToMatchPartial = <T extends Record<string, unknown>>(
     actual: T,
-    partial: Partial<T>,
+    partial: Partial<T>
 ): void => {
     Object.keys(partial).forEach(key => {
         expect(actual[key]).toEqual(partial[key]);

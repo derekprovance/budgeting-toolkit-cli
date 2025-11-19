@@ -3,7 +3,6 @@ import {
     getSystemPrompt,
     getUserPrompt,
     parseAssignmentResponse,
-    AssignmentType,
 } from '../../../../src/services/ai/utils/prompt-templates';
 import { LLMTransactionData } from '../../../../src/services/ai/utils/transaction-mapper';
 
@@ -26,7 +25,8 @@ describe('prompt-templates', () => {
                                 type: 'string',
                                 enum: validCategories,
                             },
-                            description: 'Array of categories corresponding to each transaction in order',
+                            description:
+                                'Array of categories corresponding to each transaction in order',
                         },
                     },
                     required: ['categories'],
@@ -51,7 +51,8 @@ describe('prompt-templates', () => {
                                 type: 'string',
                                 enum: validBudgets,
                             },
-                            description: 'Array of budgets corresponding to each transaction in order',
+                            description:
+                                'Array of budgets corresponding to each transaction in order',
                         },
                     },
                     required: ['budgets'],
@@ -122,15 +123,21 @@ describe('prompt-templates', () => {
         it('should generate correct user prompt for category type', () => {
             const prompt = getUserPrompt('category', transactions, validCategories);
 
-            expect(prompt).toContain('Assign the most appropriate category to each transaction below.');
+            expect(prompt).toContain(
+                'Assign the most appropriate category to each transaction below.'
+            );
             expect(prompt).toContain('Available categories:');
             expect(prompt).toContain('- Groceries');
             expect(prompt).toContain('- Healthcare');
             expect(prompt).toContain('- Shopping');
             expect(prompt).toContain('- (no category)');
             expect(prompt).toContain('Transactions to categorize:');
-            expect(prompt).toContain('1. Walmart Supercenter - $150.00 - 2025-01-15 (Checking Account → Walmart)');
-            expect(prompt).toContain('2. Walmart Pharmacy - $25.00 - 2025-01-16 (Checking Account → Walmart Pharmacy)');
+            expect(prompt).toContain(
+                '1. Walmart Supercenter - $150.00 - 2025-01-15 (Checking Account → Walmart)'
+            );
+            expect(prompt).toContain(
+                '2. Walmart Pharmacy - $25.00 - 2025-01-16 (Checking Account → Walmart Pharmacy)'
+            );
             expect(prompt).toContain('Return the categories in the exact same order');
             expect(prompt).toContain('If no category is appropriate, use "(no category)"');
         });
@@ -138,7 +145,9 @@ describe('prompt-templates', () => {
         it('should generate correct user prompt for budget type', () => {
             const prompt = getUserPrompt('budget', transactions, validBudgets);
 
-            expect(prompt).toContain('Assign the most appropriate budget to each transaction below.');
+            expect(prompt).toContain(
+                'Assign the most appropriate budget to each transaction below.'
+            );
             expect(prompt).toContain('Available budgets:');
             expect(prompt).toContain('- Food');
             expect(prompt).toContain('- Medical');
@@ -169,7 +178,9 @@ describe('prompt-templates', () => {
 
             const prompt = getUserPrompt('category', txWithNulls, validCategories);
 
-            expect(prompt).toContain('1. Test Transaction - $100.00 - 2025-01-15 (null → undefined)');
+            expect(prompt).toContain(
+                '1. Test Transaction - $100.00 - 2025-01-15 (null → undefined)'
+            );
         });
 
         it('should format multiple transactions with correct numbering', () => {
@@ -272,9 +283,9 @@ describe('prompt-templates', () => {
                     categories: ['Food', 'Medical'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('budget', response, 2, validBudgets)
-                ).toThrow('Response does not contain a budgets array');
+                expect(() => parseAssignmentResponse('budget', response, 2, validBudgets)).toThrow(
+                    'Response does not contain a budgets array'
+                );
             });
 
             it('should throw error when field is not an array', () => {
@@ -322,9 +333,9 @@ describe('prompt-templates', () => {
                     budgets: ['Food', 'InvalidBudget', 'Shopping'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('budget', response, 3, validBudgets)
-                ).toThrow('Invalid budget: InvalidBudget');
+                expect(() => parseAssignmentResponse('budget', response, 3, validBudgets)).toThrow(
+                    'Invalid budget: InvalidBudget'
+                );
             });
 
             it('should throw error for null response', () => {

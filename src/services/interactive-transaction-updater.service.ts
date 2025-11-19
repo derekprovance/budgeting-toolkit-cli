@@ -11,6 +11,11 @@ import { logger } from '../logger';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum';
 
+export interface TransactionUpdateError {
+    transaction: TransactionSplit;
+    error: Error;
+}
+
 export class InteractiveTransactionUpdater {
     private readonly updateParameterMap = {
         [UpdateTransactionMode.Both]: (category?: CategoryProperties, budget?: BudgetRead) =>
@@ -23,6 +28,8 @@ export class InteractiveTransactionUpdater {
             _budget?: BudgetRead
         ) => [category?.name, undefined] as const,
     } as const;
+
+    private errors: TransactionUpdateError[] = [];
 
     constructor(
         private readonly transactionService: TransactionService,
@@ -92,15 +99,33 @@ export class InteractiveTransactionUpdater {
 
             return updatedTransaction;
         } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            this.errors.push({ transaction, error: err });
+
             logger.error(
                 {
                     description: transaction.description,
-                    error,
+                    error: err.message,
                 },
-                'Error processing transaction:'
+                'Error processing transaction'
             );
             return;
         }
+    }
+
+    /**
+     * Gets the list of errors that occurred during transaction updates
+     * @returns Array of transaction update errors
+     */
+    getErrors(): TransactionUpdateError[] {
+        return [...this.errors];
+    }
+
+    /**
+     * Clears the error list
+     */
+    clearErrors(): void {
+        this.errors = [];
     }
 
     private validateAICategory(

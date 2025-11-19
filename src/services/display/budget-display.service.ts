@@ -185,8 +185,7 @@ export class BudgetDisplayService {
         const varianceColor = comparison.variance > 0 ? chalk.red : chalk.green;
         const varianceLabel = comparison.variance > 0 ? 'Over' : 'Under';
         output.push(
-            chalk.gray(`Variance:              `) +
-                varianceColor(`${varianceLabel} ${variance}`)
+            chalk.gray(`Variance:              `) + varianceColor(`${varianceLabel} ${variance}`)
         );
 
         // Add individual bill details only if verbose flag is enabled

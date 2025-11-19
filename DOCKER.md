@@ -67,8 +67,8 @@ npm run start:dev -- report -m 1
 Use the Data Importer at http://localhost:8081:
 
 1. Configure connection:
-   - Firefly URL: `http://firefly:8080`
-   - Token: Your API token
+    - Firefly URL: `http://firefly:8080`
+    - Token: Your API token
 2. Upload CSV files
 3. Map columns and import
 
@@ -148,16 +148,19 @@ docker compose exec -T db psql -U firefly firefly < backup.sql
 ### Environment Variables (.env.dev)
 
 **Required:**
+
 - `FIREFLY_APP_KEY` - Exactly 32 characters for encryption
 - `FIREFLY_API_URL` - Set to `http://localhost:8080`
 - `FIREFLY_API_TOKEN` - Generate from Firefly UI
 
 **Optional:**
+
 - `ANTHROPIC_API_KEY` - For AI categorization
 - `LOG_LEVEL` - Set to `debug` for verbose logging
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` - Database credentials
 
 **Not Required:**
+
 - `CLIENT_CERT_*` - Skip for local Docker (no mTLS needed)
 
 ### Ports
@@ -250,10 +253,10 @@ Match configuration to your test data:
 ```yaml
 expectedMonthlyPaycheck: 3500
 validDestinationAccounts:
-    - '1'  # Main Checking
-    - '2'  # Savings
+    - '1' # Main Checking
+    - '2' # Savings
 validExpenseAccounts:
-    - '3'  # Credit Card
+    - '3' # Credit Card
 excludedAdditionalIncomePatterns:
     - PAYROLL
 ```
