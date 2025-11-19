@@ -90,11 +90,6 @@ export class TransactionUpdaterService {
                 budget
             );
 
-            logger.debug(
-                { description: transaction.description },
-                'Successfully updated transaction:'
-            );
-
             return updatedTransaction;
         } catch (error) {
             logger.error(

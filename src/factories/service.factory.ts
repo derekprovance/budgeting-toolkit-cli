@@ -10,8 +10,7 @@ import { ExcludedTransactionService } from '../services/excluded-transaction.ser
 import { TransactionPropertyService } from '../services/core/transaction-property.service';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service';
-import { LLMTransactionCategoryService } from '../services/ai/llm-transaction-category.service';
-import { LLMTransactionBudgetService } from '../services/ai/llm-transaction-budget.service';
+import { LLMAssignmentService } from '../services/ai/llm-assignment.service';
 import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service';
 import { UpdateTransactionService } from '../services/update-transaction.service';
 import { LLMConfig } from '../config/llm.config';
@@ -84,11 +83,9 @@ export class ServiceFactory {
         const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
-        const llmCategoryService = new LLMTransactionCategoryService(claudeClient);
-        const llmBudgetService = new LLMTransactionBudgetService(claudeClient);
+        const llmAssignmentService = new LLMAssignmentService(claudeClient);
         const llmProcessingService = new LLMTransactionProcessingService(
-            llmCategoryService,
-            llmBudgetService
+            llmAssignmentService
         );
 
         const budgets: BudgetRead[] = await services.budgetService.getBudgets();

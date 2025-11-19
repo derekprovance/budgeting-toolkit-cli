@@ -1,11 +1,7 @@
-import { LLMTransactionCategoryService } from '../../../src/services/ai/llm-transaction-category.service';
-import { LLMTransactionBudgetService } from '../../../src/services/ai/llm-transaction-budget.service';
+import { LLMAssignmentService } from '../../../src/services/ai/llm-assignment.service';
 
-export interface MockCategoryService
-    extends Pick<LLMTransactionCategoryService, 'categorizeTransactions'> {
-    categorizeTransactions: jest.Mock;
-}
-
-export interface MockBudgetService extends Pick<LLMTransactionBudgetService, 'assignBudgets'> {
+export interface MockAssignmentService
+    extends Pick<LLMAssignmentService, 'assignCategories' | 'assignBudgets'> {
+    assignCategories: jest.Mock;
     assignBudgets: jest.Mock;
 }
