@@ -188,7 +188,6 @@ export class ClaudeClient {
     getConfig(): Omit<RequiredClaudeConfig, 'apiKey'> {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { apiKey, ...safeConfig } = this.config;
-        console.log('foobar');
         return safeConfig;
     }
 
