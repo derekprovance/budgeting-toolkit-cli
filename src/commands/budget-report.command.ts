@@ -20,7 +20,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
      * Executes the budget report command
      * @param params The month and year to display budget report for
      */
-    async execute({ month, year }: BudgetDateParams): Promise<void> {
+    async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
         const budgetReports = await this.budgetReportService.getBudgetReport(month, year);
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
@@ -93,7 +93,9 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             month,
             year
         );
-        console.log(this.budgetDisplayService.formatBillComparisonSection(billComparison));
+        console.log(
+            this.budgetDisplayService.formatBillComparisonSection(billComparison, verbose)
+        );
 
         // Display warning if necessary
         if (isCurrentMonth) {

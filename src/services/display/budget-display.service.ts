@@ -151,8 +151,10 @@ export class BudgetDisplayService {
 
     /**
      * Formats the bill comparison section
+     * @param comparison The bill comparison data
+     * @param verbose If true, shows individual bill details
      */
-    formatBillComparisonSection(comparison: BillComparisonDto): string {
+    formatBillComparisonSection(comparison: BillComparisonDto, verbose?: boolean): string {
         if (comparison.bills.length === 0) {
             return chalk.gray('\n=== Bill Comparison ===\nNo bills configured.');
         }
@@ -186,24 +188,26 @@ export class BudgetDisplayService {
                 varianceColor(`${varianceLabel} ${variance}`)
         );
 
-        // Add individual bill details if there are any with actual amounts
-        const billsWithActuals = comparison.bills.filter(b => b.actual > 0);
-        if (billsWithActuals.length > 0) {
-            output.push('\n' + chalk.gray('Bill Details:'));
-            for (const bill of billsWithActuals) {
-                const billPredicted = this.formatCurrencyWithSymbol(
-                    bill.predicted,
-                    comparison.currencySymbol
-                );
-                const billActual = this.formatCurrencyWithSymbol(
-                    bill.actual,
-                    comparison.currencySymbol
-                );
-                output.push(
-                    chalk.gray(`  ${bill.name}: `) +
-                        chalk.white(`${billActual}`) +
-                        chalk.gray(` (predicted: ${billPredicted})`)
-                );
+        // Add individual bill details only if verbose flag is enabled
+        if (verbose) {
+            const billsWithActuals = comparison.bills.filter(b => b.actual > 0);
+            if (billsWithActuals.length > 0) {
+                output.push('\n' + chalk.gray('Bill Details:'));
+                for (const bill of billsWithActuals) {
+                    const billPredicted = this.formatCurrencyWithSymbol(
+                        bill.predicted,
+                        comparison.currencySymbol
+                    );
+                    const billActual = this.formatCurrencyWithSymbol(
+                        bill.actual,
+                        comparison.currencySymbol
+                    );
+                    output.push(
+                        chalk.gray(`  ${bill.name}: `) +
+                            chalk.white(`${billActual}`) +
+                            chalk.gray(` (predicted: ${billPredicted})`)
+                    );
+                }
             }
         }
 
