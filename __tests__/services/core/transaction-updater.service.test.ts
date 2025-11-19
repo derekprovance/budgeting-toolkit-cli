@@ -172,7 +172,7 @@ describe('TransactionUpdaterService', () => {
             mockValidator.shouldSetBudget.mockResolvedValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction.mockResolvedValue(
-                UpdateTransactionMode.Abort
+                UpdateTransactionMode.Skip
             );
 
             const result = await service.updateTransaction(

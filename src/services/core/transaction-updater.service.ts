@@ -195,7 +195,7 @@ export class TransactionUpdaterService {
                 }
             );
 
-            if (action === UpdateTransactionMode.Abort) {
+            if (action === UpdateTransactionMode.Skip) {
                 logger.debug(
                     { description: transaction.description },
                     'User skipped transaction update'

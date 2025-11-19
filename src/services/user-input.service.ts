@@ -39,7 +39,7 @@ export class UserInputService {
 
         const changes = this.getChangeList(transaction, options);
         if (changes.length === 0) {
-            return UpdateTransactionMode.Abort;
+            return UpdateTransactionMode.Skip;
         }
 
         const message = this.formatUpdateMessage(transaction, transactionId, changes);
@@ -185,7 +185,7 @@ export class UserInputService {
         message: string,
         options: TransactionUpdateOptions
     ): Promise<UpdateTransactionMode> {
-        type InquirerKey = 'a' | 'b' | 'c' | 'e' | 'x';
+        type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
             key: InquirerKey;
@@ -222,9 +222,9 @@ export class UserInputService {
         });
 
         choices.push({
-            key: 'x',
-            name: 'Abort',
-            value: UpdateTransactionMode.Abort,
+            key: 's',
+            name: 'Skip',
+            value: UpdateTransactionMode.Skip,
         });
 
         const answer = await expand({

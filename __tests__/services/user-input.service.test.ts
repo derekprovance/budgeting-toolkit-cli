@@ -53,7 +53,7 @@ describe('UserInputService', () => {
             ).rejects.toThrow('Transaction cannot be null or undefined');
         });
 
-        it('should return Abort when no changes are proposed', async () => {
+        it('should return Skip when no changes are proposed', async () => {
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
                 mockTransactionId,
@@ -63,7 +63,7 @@ describe('UserInputService', () => {
                 }
             );
 
-            expect(result).toBe(UpdateTransactionMode.Abort);
+            expect(result).toBe(UpdateTransactionMode.Skip);
             expect(expandMock).not.toHaveBeenCalled();
         });
 
@@ -94,9 +94,9 @@ describe('UserInputService', () => {
                             value: UpdateTransactionMode.Category,
                         }),
                         expect.objectContaining({
-                            key: 'x',
-                            name: 'Abort',
-                            value: UpdateTransactionMode.Abort,
+                            key: 's',
+                            name: 'Skip',
+                            value: UpdateTransactionMode.Skip,
                         }),
                     ]),
                 })
@@ -130,9 +130,9 @@ describe('UserInputService', () => {
                             value: UpdateTransactionMode.Budget,
                         }),
                         expect.objectContaining({
-                            key: 'x',
-                            name: 'Abort',
-                            value: UpdateTransactionMode.Abort,
+                            key: 's',
+                            name: 'Skip',
+                            value: UpdateTransactionMode.Skip,
                         }),
                     ]),
                 })
@@ -172,9 +172,9 @@ describe('UserInputService', () => {
                             value: UpdateTransactionMode.Category,
                         }),
                         expect.objectContaining({
-                            key: 'x',
-                            name: 'Abort',
-                            value: UpdateTransactionMode.Abort,
+                            key: 's',
+                            name: 'Skip',
+                            value: UpdateTransactionMode.Skip,
                         }),
                     ]),
                 })
@@ -229,9 +229,9 @@ describe('UserInputService', () => {
             );
         });
 
-        it('should return Abort when user selects abort option', async () => {
+        it('should return Skip when user selects abort option', async () => {
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Abort);
+            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Skip);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -239,10 +239,10 @@ describe('UserInputService', () => {
                 { category: newCategory }
             );
 
-            expect(result).toBe(UpdateTransactionMode.Abort);
+            expect(result).toBe(UpdateTransactionMode.Skip);
         });
 
-        it('should show only Update all and Abort choices when only category is proposed but matches budget', async () => {
+        it('should show only Update all and Skip choices when only category is proposed but matches budget', async () => {
             const mockTransactionNoBudget: Partial<TransactionSplit> = {
                 description: 'Test Transaction',
                 category_name: 'Old Category',
@@ -271,9 +271,9 @@ describe('UserInputService', () => {
                             value: UpdateTransactionMode.Category,
                         }),
                         expect.objectContaining({
-                            key: 'x',
-                            name: 'Abort',
-                            value: UpdateTransactionMode.Abort,
+                            key: 's',
+                            name: 'Skip',
+                            value: UpdateTransactionMode.Skip,
                         }),
                     ]),
                 })
