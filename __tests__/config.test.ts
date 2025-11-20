@@ -1,17 +1,30 @@
-import { existsSync } from 'fs';
-import { validateCertificateConfig } from '../src/config';
-import { FireflyClientWithCertsConfig } from '../src/api/firefly-client-with-certs';
+import { jest } from '@jest/globals';
 
-jest.mock('fs');
-jest.mock('../src/utils/config-loader', () => ({
-    getConfigValue: jest.fn().mockReturnValue(undefined),
+// Create mock functions
+const mockExistsSync = jest.fn();
+const mockGetConfigValue = jest.fn().mockReturnValue(undefined);
+
+// Use unstable_mockModule for ESM mocking
+jest.unstable_mockModule('../src/utils/config-loader', () => ({
+    getConfigValue: mockGetConfigValue,
 }));
 
-describe('validateCertificateConfig', () => {
-    const mockExistsSync = existsSync as jest.MockedFunction<typeof existsSync>;
+jest.unstable_mockModule('fs', () => ({
+    existsSync: mockExistsSync,
+    readFileSync: jest.fn(),
+}));
 
+// Dynamic imports after mocks
+const { validateCertificateConfig } = await import('../src/config.js');
+const { FireflyClientWithCertsConfig } = await import('../src/api/firefly-client-with-certs.js');
+
+describe('validateCertificateConfig', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        mockExistsSync.mockReset();
+    });
+
+    afterEach(() => {
+        mockExistsSync.mockReset();
     });
 
     it('should not throw when no certificate path is provided', () => {
@@ -24,7 +37,7 @@ describe('validateCertificateConfig', () => {
     });
 
     it('should not throw when certificate paths exist', () => {
-        mockExistsSync.mockReturnValue(true);
+        (mockExistsSync as jest.Mock).mockReturnValue(true);
 
         const config: FireflyClientWithCertsConfig = {
             BASE: 'https://firefly.example.com/api',
@@ -39,7 +52,7 @@ describe('validateCertificateConfig', () => {
     });
 
     it('should throw when client certificate does not exist', () => {
-        mockExistsSync.mockReturnValue(false);
+        (mockExistsSync as jest.Mock).mockReturnValue(false);
 
         const config: FireflyClientWithCertsConfig = {
             BASE: 'https://firefly.example.com/api',
@@ -53,7 +66,7 @@ describe('validateCertificateConfig', () => {
     });
 
     it('should throw when CA certificate does not exist', () => {
-        mockExistsSync.mockImplementation(path => {
+        (mockExistsSync as jest.Mock).mockImplementation(path => {
             // Client cert exists, CA cert does not
             return path === '/path/to/client.p12';
         });
@@ -71,7 +84,7 @@ describe('validateCertificateConfig', () => {
     });
 
     it('should throw with multiple errors when both certificates are missing', () => {
-        mockExistsSync.mockReturnValue(false);
+        (mockExistsSync as jest.Mock).mockReturnValue(false);
 
         const config: FireflyClientWithCertsConfig = {
             BASE: 'https://firefly.example.com/api',
@@ -80,13 +93,19 @@ describe('validateCertificateConfig', () => {
             caCertPath: '/path/to/nonexistent-ca.pem',
         };
 
-        expect(() => validateCertificateConfig(config)).toThrow(/Certificate configuration error/);
-        expect(() => validateCertificateConfig(config)).toThrow(/Client certificate not found/);
-        expect(() => validateCertificateConfig(config)).toThrow(/CA certificate not found/);
+        expect(() => validateCertificateConfig(config)).toThrow(
+            /Certificate configuration error/
+        );
+        expect(() => validateCertificateConfig(config)).toThrow(
+            /Client certificate not found/
+        );
+        expect(() => validateCertificateConfig(config)).toThrow(
+            /CA certificate not found/
+        );
     });
 
     it('should not check CA cert if not provided', () => {
-        mockExistsSync.mockReturnValue(true);
+        (mockExistsSync as jest.Mock).mockReturnValue(true);
 
         const config: FireflyClientWithCertsConfig = {
             BASE: 'https://firefly.example.com/api',

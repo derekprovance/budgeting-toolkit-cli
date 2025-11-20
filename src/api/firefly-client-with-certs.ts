@@ -2,15 +2,20 @@
 
 import { FireflyClient, BaseHttpRequest, CancelablePromise } from '@derekprovance/firefly-iii-sdk';
 import type { OpenAPIConfig } from '@derekprovance/firefly-iii-sdk';
-import type { ApiRequestOptions } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/ApiRequestOptions';
-import { createCustomAxiosInstance, CertificateConfig } from '../utils/custom-fetch';
-import { request as __request } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/request';
+import type { ApiRequestOptions } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/ApiRequestOptions.js';
+import { createCustomAxiosInstance, CertificateConfig } from '../utils/custom-fetch.js';
+import { request as __request } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/request.js';
 import type { AxiosInstance } from 'axios';
 
 export interface FireflyClientWithCertsConfig extends CertificateConfig {
     BASE: string;
     TOKEN: string;
 }
+
+/**
+ * Factory function type for creating custom axios instances
+ */
+export type CustomAxiosFactory = (config: CertificateConfig) => AxiosInstance;
 
 /**
  * Custom HTTP Request implementation that uses a custom axios instance
@@ -50,10 +55,13 @@ class CustomAxiosHttpRequest extends BaseHttpRequest {
  * ```
  */
 export class FireflyClientWithCerts extends FireflyClient {
-    constructor(config: FireflyClientWithCertsConfig) {
+    constructor(
+        config: FireflyClientWithCertsConfig,
+        customAxiosFactory: CustomAxiosFactory = createCustomAxiosInstance
+    ) {
         // Create custom axios instance with client certificates if provided
         const axiosInstance = config.clientCertPath
-            ? createCustomAxiosInstance({
+            ? customAxiosFactory({
                   caCertPath: config.caCertPath,
                   clientCertPath: config.clientCertPath,
                   clientCertPassword: config.clientCertPassword,

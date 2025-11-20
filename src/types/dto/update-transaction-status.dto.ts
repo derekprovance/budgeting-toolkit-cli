@@ -1,4 +1,4 @@
-import { UpdateTransactionStatus } from '../enum/update-transaction-status.enum';
+import { UpdateTransactionStatus } from '../enum/update-transaction-status.enum.js';
 
 export interface UpdateTransactionStatusDto {
     status: UpdateTransactionStatus;

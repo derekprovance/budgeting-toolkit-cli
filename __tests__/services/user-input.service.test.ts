@@ -1,37 +1,52 @@
-import { UserInputService } from '../../src/services/user-input.service';
+import { jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
+import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
 
-// Mock @inquirer/prompts
-jest.mock('@inquirer/prompts', () => ({
-    expand: jest.fn(),
-}));
+// Create mock functions first
+const mockExpand = jest.fn();
+const mockCheckbox = jest.fn();
+const mockSelect = jest.fn();
 
 // Mock chalk to return the input string (disable styling for tests)
-jest.mock('chalk', () => ({
-    redBright: (str: string) => str,
-    cyan: (str: string) => str,
-    yellow: (str: string) => str,
-    gray: (str: string) => str,
-    bold: (str: string) => str,
+jest.unstable_mockModule('chalk', () => ({
+    default: {
+        redBright: (str: string) => str,
+        cyan: (str: string) => str,
+        yellow: (str: string) => str,
+        gray: (str: string) => str,
+        bold: (str: string) => str,
+    },
 }));
+
+// Mock @inquirer/prompts
+jest.unstable_mockModule('@inquirer/prompts', () => ({
+    expand: mockExpand,
+    checkbox: mockCheckbox,
+    select: mockSelect,
+}));
+
+// Dynamic imports after mocks
+const { UserInputService } = await import('../../src/services/user-input.service.js');
 
 describe('UserInputService', () => {
     let service: UserInputService;
-    let expandMock: jest.Mock;
 
     const mockBaseUrl = 'http://derek.pro';
 
     beforeEach(() => {
-        const { expand } = require('@inquirer/prompts');
-        expandMock = expand as jest.Mock;
-        expandMock.mockReset();
-
         service = new UserInputService(mockBaseUrl);
+
+        // Reset mocks
+        mockExpand.mockReset();
+        mockCheckbox.mockReset();
+        mockSelect.mockReset();
     });
 
     afterEach(() => {
-        jest.clearAllMocks();
+        // Don't use jest.clearAllMocks() as it clears implementations
+        mockExpand.mockReset();
+        mockCheckbox.mockReset();
+        mockSelect.mockReset();
     });
 
     describe('askToUpdateTransaction', () => {
@@ -64,12 +79,12 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(UpdateTransactionMode.Skip);
-            expect(expandMock).not.toHaveBeenCalled();
+            expect(mockExpand).not.toHaveBeenCalled();
         });
 
         it('should prompt for category change only', async () => {
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Category);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Category);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -78,7 +93,7 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(UpdateTransactionMode.Category);
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
                     default: 'a',
@@ -105,7 +120,7 @@ describe('UserInputService', () => {
 
         it('should prompt for budget change only', async () => {
             const newBudget = 'New Budget';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Budget);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Budget);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -114,7 +129,7 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(UpdateTransactionMode.Budget);
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
                     default: 'a',
@@ -142,7 +157,7 @@ describe('UserInputService', () => {
         it('should prompt for both category and budget changes', async () => {
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -151,7 +166,7 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(UpdateTransactionMode.Both);
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
                     default: 'a',
@@ -188,7 +203,7 @@ describe('UserInputService', () => {
 
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             const result = await service.askToUpdateTransaction(
                 mockTransactionWithoutValues as TransactionSplit,
@@ -197,7 +212,7 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(UpdateTransactionMode.Both);
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
                     default: 'a',
@@ -213,7 +228,7 @@ describe('UserInputService', () => {
                 budget_name: 'Old Budget',
             };
 
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             const result = await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
@@ -222,7 +237,7 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(UpdateTransactionMode.Both);
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('...'),
                 })
@@ -231,7 +246,7 @@ describe('UserInputService', () => {
 
         it('should return Skip when user selects abort option', async () => {
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Skip);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Skip);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -249,7 +264,7 @@ describe('UserInputService', () => {
                 budget_name: undefined,
             };
 
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await service.askToUpdateTransaction(
                 mockTransactionNoBudget as TransactionSplit,
@@ -257,7 +272,7 @@ describe('UserInputService', () => {
                 { category: 'New Category' }
             );
 
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     choices: expect.arrayContaining([
                         expect.objectContaining({
@@ -279,7 +294,7 @@ describe('UserInputService', () => {
                 })
             );
             // Should not have budget option
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     choices: expect.not.arrayContaining([
                         expect.objectContaining({
@@ -302,7 +317,7 @@ describe('UserInputService', () => {
         it('should include hyperlink in description when transaction ID is provided', async () => {
             const transactionId = '123';
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -313,7 +328,7 @@ describe('UserInputService', () => {
             const expectedLink = `${mockBaseUrl}/transactions/show/${transactionId}`;
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${mockTransaction.description}\x1B]8;;\x1B\\`;
 
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(expectedHyperlink),
                 })
@@ -322,21 +337,21 @@ describe('UserInputService', () => {
 
         it('should not include hyperlink when transaction ID is undefined', async () => {
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await service.askToUpdateTransaction(mockTransaction as TransactionSplit, undefined, {
                 category: newCategory,
             });
 
             // Should not contain ANSI escape sequences for hyperlinks
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.not.stringContaining('\x1B]8;;'),
                 })
             );
 
             // Should contain the plain description
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(mockTransaction.description as string),
                 })
@@ -351,7 +366,7 @@ describe('UserInputService', () => {
             };
             const transactionId = '456';
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
@@ -363,7 +378,7 @@ describe('UserInputService', () => {
             const truncatedDescription = longDescription.substring(0, 47) + '...';
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${truncatedDescription}\x1B]8;;\x1B\\`;
 
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(expectedHyperlink),
                 })
@@ -375,7 +390,7 @@ describe('UserInputService', () => {
             const customService = new UserInputService(customBaseUrl);
             const transactionId = '789';
             const newBudget = 'New Budget';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            mockExpand.mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await customService.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -386,7 +401,7 @@ describe('UserInputService', () => {
             const expectedLink = `${customBaseUrl}/transactions/show/${transactionId}`;
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${mockTransaction.description}\x1B]8;;\x1B\\`;
 
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(expectedHyperlink),
                 })
@@ -395,21 +410,21 @@ describe('UserInputService', () => {
 
         it('should handle empty transaction ID as no hyperlink', async () => {
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await service.askToUpdateTransaction(mockTransaction as TransactionSplit, '', {
                 category: newCategory,
             });
 
             // Empty string is falsy, so should not generate hyperlink
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.not.stringContaining('\x1B]8;;'),
                 })
             );
 
             // Should contain the plain description
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(mockTransaction.description as string),
                 })
@@ -423,7 +438,7 @@ describe('UserInputService', () => {
             };
             const transactionId = '999';
             const newCategory = 'New Category';
-            expandMock.mockResolvedValueOnce(UpdateTransactionMode.Both);
+            (mockExpand as jest.Mock).mockResolvedValueOnce(UpdateTransactionMode.Both);
 
             await service.askToUpdateTransaction(
                 specialDescTransaction as TransactionSplit,
@@ -434,7 +449,7 @@ describe('UserInputService', () => {
             const expectedLink = `${mockBaseUrl}/transactions/show/${transactionId}`;
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${specialDescTransaction.description}\x1B]8;;\x1B\\`;
 
-            expect(expandMock).toHaveBeenCalledWith(
+            expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(expectedHyperlink),
                 })

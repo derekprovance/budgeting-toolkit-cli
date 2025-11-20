@@ -1,8 +1,14 @@
 import path from 'path';
-import { existsSync } from 'fs';
+import * as fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import dotenv from 'dotenv';
-import { getConfigValue } from './utils/config-loader';
-import { FireflyClientWithCertsConfig } from './api/firefly-client-with-certs';
+import { getConfigValue } from './utils/config-loader.js';
+import { FireflyClientWithCertsConfig } from './api/firefly-client-with-certs.js';
+
+// ESM compatibility
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load environment variables from custom file or default .env
 const envFile = process.env.ENV_FILE || '.env';
@@ -52,11 +58,11 @@ export function validateCertificateConfig(config: FireflyClientWithCertsConfig):
 
     const errors: string[] = [];
 
-    if (!existsSync(config.clientCertPath)) {
+    if (!fs.existsSync(config.clientCertPath)) {
         errors.push(`Client certificate not found: ${config.clientCertPath}`);
     }
 
-    if (config.caCertPath && !existsSync(config.caCertPath)) {
+    if (config.caCertPath && !fs.existsSync(config.caCertPath)) {
         errors.push(`CA certificate not found: ${config.caCertPath}`);
     }
 

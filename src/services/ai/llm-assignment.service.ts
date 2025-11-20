@@ -1,14 +1,56 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ClaudeClient } from '../../api/claude.client';
-import { logger } from '../../logger';
+import { ClaudeClient } from '../../api/claude.client.js';
+import { logger as defaultLogger } from '../../logger.js';
 import {
     AssignmentType,
     getFunctionSchema,
     getSystemPrompt,
     getUserPrompt,
     parseAssignmentResponse,
-} from './utils/prompt-templates';
-import { mapTransactionForLLM } from './utils/transaction-mapper';
+} from './utils/prompt-templates.js';
+import { mapTransactionForLLM, LLMTransactionData } from './utils/transaction-mapper.js';
+import { ILogger } from '../../types/interface/logger.interface.js';
+
+/**
+ * Function schema for Claude's function calling API
+ */
+export interface FunctionSchema {
+    name: string;
+    description: string;
+    parameters: {
+        type: string;
+        properties: Record<
+            string,
+            {
+                type: string;
+                description?: string;
+                enum?: string[];
+            }
+        >;
+        required: string[];
+    };
+}
+
+/**
+ * Dependencies for LLMAssignmentService (for testing)
+ */
+export interface LLMAssignmentDependencies {
+    mapTransactionForLLM: (tx: TransactionSplit) => LLMTransactionData;
+    getSystemPrompt: (type: AssignmentType) => string;
+    getUserPrompt: (
+        type: AssignmentType,
+        transactions: LLMTransactionData[],
+        validOptions: string[]
+    ) => string;
+    getFunctionSchema: (type: AssignmentType, validOptions: string[]) => FunctionSchema;
+    parseAssignmentResponse: (
+        type: AssignmentType,
+        responseText: string,
+        expectedCount: number,
+        validOptions: string[]
+    ) => string[];
+    logger: ILogger;
+}
 
 /**
  * Unified service for LLM-powered transaction assignments.
@@ -21,7 +63,22 @@ import { mapTransactionForLLM } from './utils/transaction-mapper';
  * - DRY: Shared logic for both categories and budgets
  */
 export class LLMAssignmentService {
-    constructor(private readonly claudeClient: ClaudeClient) {}
+    private readonly deps: LLMAssignmentDependencies;
+
+    constructor(
+        private readonly claudeClient: ClaudeClient,
+        deps?: Partial<LLMAssignmentDependencies>
+    ) {
+        this.deps = {
+            mapTransactionForLLM,
+            getSystemPrompt,
+            getUserPrompt,
+            getFunctionSchema,
+            parseAssignmentResponse,
+            logger: defaultLogger,
+            ...deps,
+        };
+    }
 
     /**
      * Assigns categories or budgets to transactions using Claude AI.
@@ -42,7 +99,7 @@ export class LLMAssignmentService {
     ): Promise<string[]> {
         // Validation
         if (!transactions || transactions.length === 0) {
-            logger.warn(`No transactions provided for ${type} assignment`);
+            this.deps.logger.warn(`No transactions provided for ${type} assignment`);
             return [];
         }
 
@@ -50,7 +107,7 @@ export class LLMAssignmentService {
             throw new Error(`No valid ${type} options provided`);
         }
 
-        logger.info(
+        this.deps.logger.info(
             {
                 type,
                 transactionCount: transactions.length,
@@ -61,12 +118,12 @@ export class LLMAssignmentService {
 
         try {
             // Map transactions to LLM format
-            const transactionData = transactions.map(mapTransactionForLLM);
+            const transactionData = transactions.map(this.deps.mapTransactionForLLM);
 
             // Generate prompts
-            const systemPrompt = getSystemPrompt(type);
-            const userPrompt = getUserPrompt(type, transactionData, validOptions);
-            const functionSchema = getFunctionSchema(type, validOptions);
+            const systemPrompt = this.deps.getSystemPrompt(type);
+            const userPrompt = this.deps.getUserPrompt(type, transactionData, validOptions);
+            const functionSchema = this.deps.getFunctionSchema(type, validOptions);
 
             // Call Claude (batching handled internally by ClaudeClient)
             const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
@@ -75,14 +132,14 @@ export class LLMAssignmentService {
             });
 
             // Parse and validate response
-            const assignments = parseAssignmentResponse(
+            const assignments = this.deps.parseAssignmentResponse(
                 type,
                 result,
                 transactions.length,
                 validOptions
             );
 
-            logger.info(
+            this.deps.logger.info(
                 {
                     type,
                     assignedCount: assignments.length,
@@ -93,7 +150,7 @@ export class LLMAssignmentService {
 
             return assignments;
         } catch (error) {
-            logger.error(
+            this.deps.logger.error(
                 {
                     error: error instanceof Error ? error.message : String(error),
                     type,

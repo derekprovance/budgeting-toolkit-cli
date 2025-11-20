@@ -1,12 +1,17 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { TransactionClassificationService } from '../core/transaction-classification.service';
-import { TransactionUtils } from '../../utils/transaction.utils';
+import { TransactionClassificationService } from '../core/transaction-classification.service.js';
+import { TransactionUtils } from '../../utils/transaction.utils.js';
 
 export class BaseTransactionDisplayService {
+    private readonly transactionUtils: TransactionUtils;
+
     constructor(
-        private readonly transactionClassificationService: TransactionClassificationService
-    ) {}
+        private readonly transactionClassificationService: TransactionClassificationService,
+        transactionUtils: TransactionUtils = new TransactionUtils()
+    ) {
+        this.transactionUtils = transactionUtils;
+    }
 
     listTransactionsWithHeader(transactions: TransactionSplit[], description: string) {
         const lines = [chalk.bold(`\n${description}\n`)];
@@ -14,7 +19,7 @@ export class BaseTransactionDisplayService {
         if (transactions.length === 0) {
             lines.push(chalk.dim('No transactions found'));
         } else {
-            const totalExpenses = TransactionUtils.calculateTotal(transactions);
+            const totalExpenses = this.transactionUtils.calculateTotal(transactions);
             transactions.forEach(transaction => {
                 lines.push(this.formatTransaction(transaction));
             });

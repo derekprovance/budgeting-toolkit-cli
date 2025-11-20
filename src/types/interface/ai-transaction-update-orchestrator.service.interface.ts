@@ -1,5 +1,5 @@
-import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum';
-import { UpdateTransactionStatusDto } from '../dto/update-transaction-status.dto';
+import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum.js';
+import { UpdateTransactionStatusDto } from '../dto/update-transaction-status.dto.js';
 
 export interface IAITransactionUpdateOrchestrator {
     /**

@@ -1,10 +1,10 @@
-import { BudgetReportDto } from '../types/dto/budget-report.dto';
-import { BudgetService } from './core/budget.service';
-import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface';
-import { DateUtils } from '../utils/date.utils';
-import { logger } from '../logger';
+import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
+import { BudgetService } from './core/budget.service.js';
+import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface.js';
+import { DateUtils } from '../utils/date.utils.js';
+import { logger } from '../logger.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionClassificationService } from './core/transaction-classification.service';
+import { TransactionClassificationService } from './core/transaction-classification.service.js';
 
 export class BudgetReportService implements IBudgetReportService {
     constructor(

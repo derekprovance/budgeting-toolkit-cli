@@ -1,7 +1,8 @@
-import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
-import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
+import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { Tag } from '../../../src/config';
+import { Tag } from '../../../src/config.js';
+import { jest } from '@jest/globals';
 
 jest.mock('../../../src/utils/config-loader', () => ({
     loadYamlConfig: jest.fn(() => ({
@@ -18,7 +19,8 @@ describe('TransactionClassificationService', () => {
 
     beforeEach(() => {
         mockExcludedTransactionService = {
-            isExcludedTransaction: jest.fn(),
+            isExcludedTransaction:
+                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
         } as any;
         service = new TransactionClassificationService(mockExcludedTransactionService);
     });

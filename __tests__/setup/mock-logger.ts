@@ -6,12 +6,14 @@
  *    import '../setup/mock-logger';
  *
  * 2. Or use the setupMockLogger function for more control:
- *    import { setupMockLogger, mockLogger } from '../setup/mock-logger';
+ *    import { setupMockLogger, mockLogger } from '../setup/mock-logger.js';
  *
  *    beforeEach(() => {
  *      setupMockLogger();
  *    });
  */
+
+import { jest } from '@jest/globals';
 
 // Create the mock logger instance
 export const mockLogger = {

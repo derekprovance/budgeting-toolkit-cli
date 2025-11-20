@@ -1,19 +1,23 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "5.4.0",
-    "main": "index.js",
+    "version": "5.4.1",
+    "type": "module",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": "./dist/index.js"
+    },
     "scripts": {
-        "start": "ts-node src/index.ts",
+        "start": "tsx src/index.ts",
         "start:dev": "ENV_FILE=.env.dev npm start",
         "compile": "rm -Rf ./dist && tsc",
-        "test": "jest",
-        "test:coverage": "jest --coverage",
-        "test:watch": "jest --watch",
+        "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+        "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+        "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
         "linter": "eslint . && prettier . --write"
     },
     "keywords": [],
     "author": "Derek Provance",
-    "license": "ISC",
+    "license": "GPL",
     "description": "Budgeting toolkit with AI-powered transaction categorization",
     "engines": {
         "node": "24.x"
@@ -41,7 +45,7 @@
         "jiti": "^2.6.1",
         "prettier": "^3.6.2",
         "ts-jest": "^29.4.5",
-        "ts-node": "^10.9.2",
+        "tsx": "^4.20.6",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.46.3"
     }

@@ -1,4 +1,4 @@
-import { BillComparison, BillDetail } from '../interface/bill-comparison.interface';
+import { BillComparison, BillDetail } from '../interface/bill-comparison.interface.js';
 
 /**
  * Data Transfer Object for bill comparison results

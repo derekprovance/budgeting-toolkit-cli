@@ -1,4 +1,4 @@
-import { TransactionSplit, TransactionTypeProperty } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 export const createMockTransaction = (
     overrides: Partial<TransactionSplit> = {}
@@ -6,7 +6,7 @@ export const createMockTransaction = (
     transaction_journal_id: '1',
     description: 'Walmart Supercenter',
     amount: '150.00',
-    type: 'withdrawal' as TransactionTypeProperty,
+    type: 'withdrawal' as const,
     date: new Date().toISOString(),
     source_id: 'source1',
     destination_id: 'dest1',

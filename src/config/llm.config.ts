@@ -1,11 +1,17 @@
-import { ClaudeClient } from '../api/claude.client';
-import { claudeAPIKey } from '../config';
-import { loadYamlConfig } from '../utils/config-loader';
+import { ClaudeClient } from '../api/claude.client.js';
+import { claudeAPIKey as defaultClaudeAPIKey } from '../config.js';
+import { loadYamlConfig as defaultLoadYamlConfig } from '../utils/config-loader.js';
 import chalk from 'chalk';
 
 export class LLMConfig {
-    static createClient(): ClaudeClient {
-        if (!claudeAPIKey) {
+    static createClient(
+        claudeAPIKey?: string,
+        loadYamlConfig: typeof defaultLoadYamlConfig = defaultLoadYamlConfig
+    ): ClaudeClient {
+        // Use provided key or fall back to default from environment
+        const apiKey = claudeAPIKey ?? defaultClaudeAPIKey;
+
+        if (!apiKey) {
             throw new Error(
                 `${chalk.redBright(
                     '!!!'
@@ -32,7 +38,7 @@ export class LLMConfig {
 
         return new ClaudeClient({
             // Authentication from environment (secure)
-            apiKey: claudeAPIKey,
+            apiKey: apiKey,
 
             // All other settings from YAML (user-configurable)
             model: llmConfig.model,

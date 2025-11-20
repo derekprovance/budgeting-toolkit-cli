@@ -1,6 +1,7 @@
-import { LLMTransactionProcessingService } from '../../../src/services/ai/llm-transaction-processing.service';
+import { LLMTransactionProcessingService } from '../../../src/services/ai/llm-transaction-processing.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { LLMAssignmentService } from '../../../src/services/ai/llm-assignment.service';
+import { LLMAssignmentService } from '../../../src/services/ai/llm-assignment.service.js';
+import { jest } from '@jest/globals';
 
 const mockAssignmentService = {
     assignCategories: jest.fn(),

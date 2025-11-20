@@ -1,8 +1,8 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { BaseTransactionDisplayService } from './base-transaction-display.service';
-import { TransactionUtils } from '../../utils/transaction.utils';
-import { CurrencyUtils } from '../../utils/currency.utils';
+import { BaseTransactionDisplayService } from './base-transaction-display.service.js';
+import { TransactionUtils } from '../../utils/transaction.utils.js';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
 
 /**
  * Interface for transaction counts
@@ -18,7 +18,14 @@ export interface TransactionCounts {
  * Service for formatting and displaying finalize budget information
  */
 export class FinalizeBudgetDisplayService {
-    constructor(private baseTransactionDisplayService: BaseTransactionDisplayService) {}
+    private readonly transactionUtils: TransactionUtils;
+
+    constructor(
+        private baseTransactionDisplayService: BaseTransactionDisplayService,
+        transactionUtils: TransactionUtils = new TransactionUtils()
+    ) {
+        this.transactionUtils = transactionUtils;
+    }
 
     /**
      * Formats the header box
@@ -77,8 +84,8 @@ export class FinalizeBudgetDisplayService {
         const currencySymbol =
             additionalIncome[0]?.currency_symbol || unbudgetedExpenses[0]?.currency_symbol || '$';
 
-        const totalIncome = TransactionUtils.calculateTotal(additionalIncome);
-        const totalExpenses = TransactionUtils.calculateTotal(unbudgetedExpenses);
+        const totalIncome = this.transactionUtils.calculateTotal(additionalIncome);
+        const totalExpenses = this.transactionUtils.calculateTotal(unbudgetedExpenses);
 
         const lines = [
             chalk.bold('\n=== Transaction Summary ==='),

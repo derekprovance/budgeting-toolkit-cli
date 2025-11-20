@@ -1,46 +1,47 @@
-import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
-import { logger } from '../../src/logger';
-import { ExcludedTransactionDto } from '../../src/types/dto/excluded-transaction.dto';
+import { jest } from '@jest/globals';
 
-// Mock the logger to prevent console output during tests
-jest.mock('../../src/logger', () => ({
-    logger: {
-        debug: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
-    },
+// Mock fs/promises with actual jest mock functions
+const mockReadFile = jest.fn();
+const mockAccess = jest.fn();
+
+jest.unstable_mockModule('fs/promises', () => ({
+    readFile: mockReadFile,
+    access: mockAccess,
 }));
 
-// Mock fs/promises
-jest.mock('fs/promises', () => ({
-    access: jest.fn(),
-    readFile: jest.fn(),
-    constants: { F_OK: 0 },
-}));
+// Dynamic imports after mocks
+const { ExcludedTransactionService } = await import('../../src/services/excluded-transaction.service.js');
+const { ILogger } = await import('../../src/types/interface/logger.interface.js');
 
 describe('ExcludedTransactionService', () => {
     let service: ExcludedTransactionService;
-    let mockAccess: jest.Mock;
-    let mockReadFile: jest.Mock;
+    let mockLogger: ILogger;
 
     beforeEach(() => {
-        jest.clearAllMocks();
-        service = new ExcludedTransactionService();
-        mockAccess = jest.fn();
-        mockReadFile = jest.fn();
-        jest.requireMock('fs/promises').access = mockAccess;
-        jest.requireMock('fs/promises').readFile = mockReadFile;
+        // Reset mocks
+        mockReadFile.mockReset();
+        mockAccess.mockReset();
+
+        // Create mock logger
+        mockLogger = {
+            debug: jest.fn<(obj: unknown, msg: string) => void>(),
+            info: jest.fn<(obj: unknown, msg: string) => void>(),
+            warn: jest.fn<(obj: unknown, msg: string) => void>(),
+            error: jest.fn<(obj: unknown, msg: string) => void>(),
+            trace: jest.fn<(obj: unknown, msg: string) => void>(),
+        };
+
+        service = new ExcludedTransactionService('/test/path/excluded_transactions.csv', mockLogger);
     });
 
     describe('getExcludedTransactions', () => {
         it('should return empty array when file does not exist', async () => {
-            mockAccess.mockRejectedValueOnce(new Error('File not found'));
+            (mockAccess as jest.Mock).mockRejectedValueOnce(new Error('File not found'));
 
             const result = await service.getExcludedTransactions();
 
             expect(result).toEqual([]);
-            expect(logger.debug).toHaveBeenCalledWith(
+            expect(mockLogger.debug).toHaveBeenCalledWith(
                 'No excluded transactions file found, returning empty array'
             );
         });
@@ -49,8 +50,8 @@ describe('ExcludedTransactionService', () => {
             const csvContent = `VANGUARD BUY INVESTMENT,4400
 CRT Management,1047.66`;
 
-            mockAccess.mockResolvedValueOnce(undefined);
-            mockReadFile.mockResolvedValueOnce(csvContent);
+            (mockAccess as jest.Mock).mockResolvedValueOnce(undefined);
+            (mockReadFile as jest.Mock).mockResolvedValueOnce(csvContent);
 
             const result = await service.getExcludedTransactions();
 
@@ -66,7 +67,7 @@ CRT Management,1047.66`;
                     reason: 'Excluded from processing',
                 },
             ]);
-            expect(logger.trace).toHaveBeenCalledWith(
+            expect(mockLogger.trace).toHaveBeenCalledWith(
                 { records: result },
                 'Excluded transactions parsed successfully'
             );
@@ -76,8 +77,8 @@ CRT Management,1047.66`;
             const csvContent = `,4400
 VANGUARD BUY INVESTMENT,4400`;
 
-            mockAccess.mockResolvedValueOnce(undefined);
-            mockReadFile.mockResolvedValueOnce(csvContent);
+            (mockAccess as jest.Mock).mockResolvedValueOnce(undefined);
+            (mockReadFile as jest.Mock).mockResolvedValueOnce(csvContent);
 
             const result = await service.getExcludedTransactions();
 
@@ -88,19 +89,21 @@ VANGUARD BUY INVESTMENT,4400`;
                     reason: 'Excluded from processing',
                 },
             ]);
-            expect(logger.warn).toHaveBeenCalledWith(
+            expect(mockLogger.warn).toHaveBeenCalledWith(
                 `Invalid excluded transaction record: ${JSON.stringify({ description: '', amount: '4400' })}`
             );
         });
 
         it('should handle CSV parsing errors', async () => {
-            mockAccess.mockResolvedValueOnce(undefined);
-            mockReadFile.mockRejectedValueOnce(new Error('File read error'));
+            (mockAccess as jest.Mock).mockResolvedValueOnce(undefined);
+            (mockReadFile as jest.Mock).mockRejectedValueOnce(
+                new Error('File read error')
+            );
 
             await expect(service.getExcludedTransactions()).rejects.toThrow(
                 'Failed to parse excluded transactions file'
             );
-            expect(logger.error).toHaveBeenCalled();
+            expect(mockLogger.error).toHaveBeenCalled();
         });
     });
 

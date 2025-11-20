@@ -1,12 +1,12 @@
-import { Command } from '../types/interface/command.interface';
-import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
-import { AdditionalIncomeService } from '../services/additional-income.service';
-import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service';
-import { TransactionClassificationService } from '../services/core/transaction-classification.service';
-import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service';
-import { PaycheckSurplusService } from '../services/paycheck-surplus.service';
+import { Command } from '../types/interface/command.interface.js';
+import { BudgetDateParams } from '../types/interface/budget-date-params.interface.js';
+import { AdditionalIncomeService } from '../services/additional-income.service.js';
+import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
+import { TransactionClassificationService } from '../services/core/transaction-classification.service.js';
+import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service.js';
+import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionCounts } from '../services/display/finalize-budget-display.service';
+import { TransactionCounts } from '../services/display/finalize-budget-display.service.js';
 import chalk from 'chalk';
 
 /**

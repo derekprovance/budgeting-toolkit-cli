@@ -42,8 +42,9 @@ const createChalkMock = () => {
 
 jest.mock('chalk', () => createChalkMock());
 
-import { UpdateTransactionDisplayService } from '../../../src/services/display/update-transaction-display.service';
-import { UpdateTransactionMode } from '../../../src/types/enum/update-transaction-mode.enum';
+import { UpdateTransactionDisplayService } from '../../../src/services/display/update-transaction-display.service.js';
+import { UpdateTransactionMode } from '../../../src/types/enum/update-transaction-mode.enum.js';
+import { jest } from '@jest/globals';
 
 describe('UpdateTransactionDisplayService', () => {
     let service: UpdateTransactionDisplayService;

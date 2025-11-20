@@ -1,20 +1,26 @@
-import { readFile, access, constants } from 'fs/promises';
-import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto';
+import { constants } from 'fs';
+import { readFile, access } from 'fs/promises';
+import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto.js';
 import { join } from 'path';
-import { logger } from '../logger';
+import { logger as defaultLogger } from '../logger.js';
+import { IExcludedTransactionService } from './excluded-transaction.service.interface.js';
+import { ILogger } from '../types/interface/logger.interface.js';
 
-export class ExcludedTransactionService {
+export class ExcludedTransactionService implements IExcludedTransactionService {
     private readonly excludedTransactionsPath: string;
+    private readonly logger: ILogger;
 
-    constructor() {
-        this.excludedTransactionsPath = join(process.cwd(), 'excluded_transactions.csv');
+    constructor(excludedTransactionsPath?: string, logger: ILogger = defaultLogger) {
+        this.excludedTransactionsPath =
+            excludedTransactionsPath ?? join(process.cwd(), 'excluded_transactions.csv');
+        this.logger = logger;
     }
 
     async getExcludedTransactions(): Promise<ExcludedTransactionDto[]> {
         try {
             await access(this.excludedTransactionsPath, constants.F_OK);
         } catch {
-            logger.debug('No excluded transactions file found, returning empty array');
+            this.logger.debug('No excluded transactions file found, returning empty array');
             return [];
         }
 
@@ -35,15 +41,17 @@ export class ExcludedTransactionService {
                         reason: 'Excluded from processing',
                     });
                 } else {
-                    logger.warn(`Invalid excluded transaction record: ${JSON.stringify(record)}`);
+                    this.logger.warn(
+                        `Invalid excluded transaction record: ${JSON.stringify(record)}`
+                    );
                 }
             }
         } catch (error) {
-            logger.error({ error }, 'Error parsing excluded transactions file:');
+            this.logger.error({ error }, 'Error parsing excluded transactions file:');
             throw new Error('Failed to parse excluded transactions file');
         }
 
-        logger.trace({ records }, 'Excluded transactions parsed successfully');
+        this.logger.trace({ records }, 'Excluded transactions parsed successfully');
         return records;
     }
 

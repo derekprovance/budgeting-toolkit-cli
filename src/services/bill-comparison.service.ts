@@ -1,10 +1,10 @@
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { logger } from '../logger';
-import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto';
-import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface';
-import { DateUtils } from '../utils/date.utils';
-import { BillService } from './core/bill.service';
-import { TransactionService } from './core/transaction.service';
+import { logger } from '../logger.js';
+import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
+import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
+import { DateUtils } from '../utils/date.utils.js';
+import { BillService } from './core/bill.service.js';
+import { TransactionService } from './core/transaction.service.js';
 
 export class BillComparisonService implements IBillComparisonService {
     constructor(

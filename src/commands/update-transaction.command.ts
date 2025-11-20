@@ -1,8 +1,8 @@
-import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
-import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum';
-import { Command } from '../types/interface/command.interface';
-import { UpdateTransactionDisplayService } from '../services/display/update-transaction-display.service';
+import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
+import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
+import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum.js';
+import { Command } from '../types/interface/command.interface.js';
+import { UpdateTransactionDisplayService } from '../services/display/update-transaction-display.service.js';
 
 interface UpdateTransactionsParams {
     tag: string;

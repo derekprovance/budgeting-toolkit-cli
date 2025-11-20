@@ -16,20 +16,21 @@ jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/core/transaction-validator.service');
 jest.mock('../../src/services/interactive-transaction-updater.service');
 
-import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service';
-import { TransactionService } from '../../src/services/core/transaction.service';
-import { CategoryService } from '../../src/services/core/category.service';
-import { BudgetService } from '../../src/services/core/budget.service';
-import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service';
-import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
-import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
-import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service';
-import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
-import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
+import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { CategoryService } from '../../src/services/core/category.service.js';
+import { BudgetService } from '../../src/services/core/budget.service.js';
+import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service.js';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
+import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
+import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
+import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
+import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum.js';
+import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
-import { createMockTransaction } from '../shared/test-data';
+import { createMockTransaction } from '../shared/test-data.js';
+import { jest } from '@jest/globals';
 
 describe('AITransactionUpdateOrchestrator', () => {
     let service: AITransactionUpdateOrchestrator;
@@ -92,25 +93,40 @@ describe('AITransactionUpdateOrchestrator', () => {
         };
 
         mockTransactionService = {
-            tagExists: jest.fn(),
+            tagExists: jest.fn<(tag: string) => Promise<boolean>>(),
             getTransactionsByTag: jest
                 .fn()
                 .mockResolvedValue(mockTransactions as TransactionSplit[]),
-            updateTransaction: jest.fn(),
+            updateTransaction:
+                jest.fn<
+                    (
+                        transaction: TransactionSplit,
+                        category?: string,
+                        budgetId?: string
+                    ) => Promise<TransactionRead | undefined>
+                >(),
         } as unknown as jest.Mocked<TransactionService>;
 
         mockInteractiveTransactionUpdater = {
-            updateTransaction: jest.fn().mockImplementation(async (transaction, aiResults) => {
-                // Return the transaction with updated category and budget
-                const journalId = transaction.transaction_journal_id!;
-                const aiResult = aiResults[journalId];
-                const result = {
-                    ...transaction,
-                    category_name: aiResult?.category || transaction.category_name,
-                    budget_name: aiResult?.budget || transaction.budget_name,
-                };
-                return Promise.resolve(result);
-            }),
+            updateTransaction: jest
+                .fn<
+                    (
+                        transaction: TransactionSplit,
+                        category?: string,
+                        budgetId?: string
+                    ) => Promise<TransactionRead | undefined>
+                >()
+                .mockImplementation(async (transaction, aiResults) => {
+                    // Return the transaction with updated category and budget
+                    const journalId = transaction.transaction_journal_id!;
+                    const aiResult = aiResults[journalId];
+                    const result = {
+                        ...transaction,
+                        category_name: aiResult?.category || transaction.category_name,
+                        budget_name: aiResult?.budget || transaction.budget_name,
+                    };
+                    return Promise.resolve(result);
+                }),
             getErrors: jest.fn().mockReturnValue([]),
             clearErrors: jest.fn(),
         } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
@@ -128,9 +144,9 @@ describe('AITransactionUpdateOrchestrator', () => {
         } as unknown as jest.Mocked<LLMTransactionProcessingService>;
 
         mockPropertyService = {
-            isBill: jest.fn(),
-            isTransfer: jest.fn(),
-            isDeposit: jest.fn(),
+            isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isTransfer: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
         mockValidator = {

@@ -1,6 +1,7 @@
-import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
-import { ServiceFactory } from '../../src/factories/service.factory';
-import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service';
+import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
+import { ServiceFactory } from '../../src/factories/service.factory.js';
+import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
+import { jest } from '@jest/globals';
 
 // Mock all dependencies
 jest.mock('../../src/services/core/transaction.service');
@@ -23,17 +24,17 @@ jest.mock('../../src/services/interactive-transaction-updater.service');
 // Mock the logger
 jest.mock('../../src/logger', () => ({
     logger: {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
+        debug: jest.fn<(obj: unknown, msg: string) => void>(),
+        info: jest.fn<(obj: unknown, msg: string) => void>(),
+        warn: jest.fn<(obj: unknown, msg: string) => void>(),
+        error: jest.fn<(obj: unknown, msg: string) => void>(),
+        trace: jest.fn<(obj: unknown, msg: string) => void>(),
     },
 }));
 
 // Mock budget and category services to return empty arrays
-import { BudgetService } from '../../src/services/core/budget.service';
-import { CategoryService } from '../../src/services/core/category.service';
+import { BudgetService } from '../../src/services/core/budget.service.js';
+import { CategoryService } from '../../src/services/core/category.service.js';
 
 (BudgetService as jest.MockedClass<typeof BudgetService>).prototype.getBudgets = jest
     .fn()

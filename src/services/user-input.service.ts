@@ -1,8 +1,8 @@
 import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, select } from '@inquirer/prompts';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
-import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum';
+import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
+import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
 
 /**
  * Interface for transaction update options
@@ -110,7 +110,7 @@ export class UserInputService {
 
         return await select({
             message,
-            choices: values,
+            choices: choices,
         });
     }
 

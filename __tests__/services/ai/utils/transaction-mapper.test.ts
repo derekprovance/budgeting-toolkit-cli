@@ -1,8 +1,8 @@
 import {
     mapTransactionForLLM,
     LLMTransactionData,
-} from '../../../../src/services/ai/utils/transaction-mapper';
-import { createMockTransaction } from '../../../shared/test-data';
+} from '../../../../src/services/ai/utils/transaction-mapper.js';
+import { createMockTransaction } from '../../../shared/test-data.js';
 
 describe('transaction-mapper', () => {
     describe('mapTransactionForLLM', () => {

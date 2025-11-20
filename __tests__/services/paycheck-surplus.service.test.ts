@@ -1,50 +1,57 @@
-import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service';
-import { TransactionService } from '../../src/services/core/transaction.service';
-import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { logger } from '../../src/logger';
-import { DateUtils } from '../../src/utils/date.utils';
-import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
-import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
-
-jest.mock('../../src/services/core/transaction.service');
-jest.mock('../../src/services/core/transaction-classification.service');
-jest.mock('../../src/logger', () => {
-    const mockLogger = {
-        debug: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
-    };
-    return {
-        logger: mockLogger,
-    };
-});
-jest.mock('../../src/utils/date.utils');
-jest.mock('../../src/config', () => ({
-    expectedMonthlyPaycheck: '5000.00',
-}));
+import '../setup/mock-logger.js'; // Must be first to mock logger module
+import { mockLogger, resetMockLogger } from '../setup/mock-logger.js';
+import { jest } from '@jest/globals';
+import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
+import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
+import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
+import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 
 describe('PaycheckSurplusService', () => {
     let service: PaycheckSurplusService;
-    let mockTransactionService: jest.Mocked<TransactionService>;
-    let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
-    let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
-    let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
+    let mockTransactionService: jest.Mocked<ITransactionService>;
+    let mockTransactionClassificationService: jest.Mocked<ITransactionClassificationService>;
 
     beforeEach(() => {
+        resetMockLogger();
         jest.clearAllMocks();
-        mockApiClient = {} as jest.Mocked<FireflyClientWithCerts>;
-        mockExcludedTransactionService = {} as jest.Mocked<ExcludedTransactionService>;
-        mockTransactionService = new TransactionService(
-            mockApiClient
-        ) as jest.Mocked<TransactionService>;
-        mockTransactionClassificationService = new TransactionClassificationService(
-            mockExcludedTransactionService
-        ) as jest.Mocked<TransactionClassificationService>;
+
+        // Create mock service objects
+        mockTransactionService = {
+            getTransactionsForMonth:
+                jest.fn<(month: number, year: number) => Promise<TransactionSplit[]>>(),
+            getMostRecentTransactionDate: jest.fn<() => Promise<Date | null>>(),
+            getTransactionsByTag: jest.fn<(tag: string) => Promise<TransactionSplit[]>>(),
+            tagExists: jest.fn<(tag: string) => Promise<boolean>>(),
+            updateTransaction:
+                jest.fn<
+                    (
+                        transaction: TransactionSplit,
+                        category?: string,
+                        budgetId?: string
+                    ) => Promise<TransactionRead | undefined>
+                >(),
+            getTransactionReadBySplit:
+                jest.fn<(splitTransaction: TransactionSplit) => TransactionRead | undefined>(),
+            clearCache: jest.fn<() => void>(),
+        } as unknown as jest.Mocked<ITransactionService>;
+
+        mockTransactionClassificationService = {
+            isTransfer: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
+            isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
+            isExcludedTransaction:
+                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
+            isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
+        } as unknown as jest.Mocked<ITransactionClassificationService>;
+
         service = new PaycheckSurplusService(
             mockTransactionService,
-            mockTransactionClassificationService
+            mockTransactionClassificationService,
+            5000, // Expected monthly paycheck for tests
+            mockLogger
         );
     });
 
@@ -67,7 +74,7 @@ describe('PaycheckSurplusService', () => {
 
             // Assert
             expect(result).toBe(1000.0);
-            expect(logger.debug).toHaveBeenCalledWith(
+            expect(mockLogger.debug).toHaveBeenCalledWith(
                 expect.objectContaining({
                     month: 1,
                     year: 2024,
@@ -111,34 +118,20 @@ describe('PaycheckSurplusService', () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
             mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
-            // Mock logger and config modules
-            const mockLogger = {
-                debug: jest.fn(),
-                warn: jest.fn(),
-                error: jest.fn(),
-                trace: jest.fn(),
+            // Create local logger mock for this test
+            const testMockLogger = {
+                debug: jest.fn<(obj: unknown, msg: string) => void>(),
+                warn: jest.fn<(obj: unknown, msg: string) => void>(),
+                error: jest.fn<(obj: unknown, msg: string) => void>(),
+                trace: jest.fn<(obj: unknown, msg: string) => void>(),
+                info: jest.fn<(obj: unknown, msg: string) => void>(),
             };
 
-            jest.unmock('../../src/logger');
-            jest.mock('../../src/logger', () => ({
-                logger: mockLogger,
-            }));
-
-            jest.unmock('../../src/config');
-            jest.mock('../../src/config', () => ({
-                expectedMonthlyPaycheck: undefined,
-            }));
-
-            // Clear module cache to ensure new mocks are used
-            jest.resetModules();
-
-            // Import service with mocked modules
-            const { PaycheckSurplusService } = await import(
-                '../../src/services/paycheck-surplus.service'
-            );
             const testService = new PaycheckSurplusService(
                 mockTransactionService,
-                mockTransactionClassificationService
+                mockTransactionClassificationService,
+                null as any, // Testing with null expected paycheck
+                testMockLogger
             );
 
             // Act
@@ -146,8 +139,8 @@ describe('PaycheckSurplusService', () => {
 
             // Assert
             expect(result).toBe(3000.0);
-            expect(mockLogger.warn).toHaveBeenCalledWith(
-                { expectedMonthlyPaycheck: undefined },
+            expect(testMockLogger.warn).toHaveBeenCalledWith(
+                { expectedMonthlyPaycheck: null },
                 'Expected monthly paycheck amount not configured'
             );
         });
@@ -158,34 +151,20 @@ describe('PaycheckSurplusService', () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
             mockTransactionClassificationService.isDeposit.mockReturnValue(true);
 
-            // Mock logger and config modules
-            const mockLogger = {
-                debug: jest.fn(),
-                warn: jest.fn(),
-                error: jest.fn(),
-                trace: jest.fn(),
+            // Create local logger mock for this test
+            const testMockLogger = {
+                debug: jest.fn<(obj: unknown, msg: string) => void>(),
+                warn: jest.fn<(obj: unknown, msg: string) => void>(),
+                error: jest.fn<(obj: unknown, msg: string) => void>(),
+                trace: jest.fn<(obj: unknown, msg: string) => void>(),
+                info: jest.fn<(obj: unknown, msg: string) => void>(),
             };
 
-            jest.unmock('../../src/logger');
-            jest.mock('../../src/logger', () => ({
-                logger: mockLogger,
-            }));
-
-            jest.unmock('../../src/config');
-            jest.mock('../../src/config', () => ({
-                expectedMonthlyPaycheck: 'invalid',
-            }));
-
-            // Clear module cache to ensure new mocks are used
-            jest.resetModules();
-
-            // Import service with mocked modules
-            const { PaycheckSurplusService } = await import(
-                '../../src/services/paycheck-surplus.service'
-            );
             const testService = new PaycheckSurplusService(
                 mockTransactionService,
-                mockTransactionClassificationService
+                mockTransactionClassificationService,
+                'invalid', // Testing with invalid expected paycheck
+                testMockLogger
             );
 
             // Act
@@ -193,7 +172,7 @@ describe('PaycheckSurplusService', () => {
 
             // Assert
             expect(result).toBe(3000.0);
-            expect(mockLogger.error).toHaveBeenCalledWith(
+            expect(testMockLogger.error).toHaveBeenCalledWith(
                 { expectedMonthlyPaycheck: 'invalid' },
                 'Invalid expected monthly paycheck amount'
             );
@@ -210,7 +189,7 @@ describe('PaycheckSurplusService', () => {
 
             // Assert
             expect(result).toBe(-2000.0);
-            expect(logger.warn).toHaveBeenCalledWith(
+            expect(mockLogger.warn).toHaveBeenCalledWith(
                 {
                     paycheck: {
                         amount: 'invalid',
@@ -232,7 +211,7 @@ describe('PaycheckSurplusService', () => {
             await expect(service.calculatePaycheckSurplus(1, 2024)).rejects.toThrow(
                 'Failed to find paychecks for month 1'
             );
-            expect(logger.error).toHaveBeenCalledWith(
+            expect(mockLogger.error).toHaveBeenCalledWith(
                 {
                     error: 'API Error',
                     type: 'Error',
@@ -244,12 +223,7 @@ describe('PaycheckSurplusService', () => {
         });
 
         it('should handle invalid month/year', async () => {
-            // Arrange
-            (DateUtils.validateMonthYear as jest.Mock).mockImplementation(() => {
-                throw new Error('Invalid month/year');
-            });
-
-            // Act & Assert
+            // Act & Assert - DateUtils.validateMonthYear will throw for invalid month
             await expect(service.calculatePaycheckSurplus(13, 2024)).rejects.toThrow(
                 'Failed to find paychecks for month 13'
             );

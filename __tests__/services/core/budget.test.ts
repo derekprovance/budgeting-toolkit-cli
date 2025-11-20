@@ -1,6 +1,7 @@
-import { BudgetService } from '../../../src/services/core/budget.service';
+import { BudgetService } from '../../../src/services/core/budget.service.js';
 import { BudgetArray, BudgetLimitArray, InsightGroup } from '@derekprovance/firefly-iii-sdk';
-import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs';
+import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
+import { jest } from '@jest/globals';
 
 describe('BudgetService', () => {
     let budgetService: BudgetService;

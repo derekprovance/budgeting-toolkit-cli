@@ -2,12 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Module System
+
+This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module standard.
+
+**Key ESM Requirements:**
+
+- All relative imports must include `.js` extensions (e.g., `import { foo } from './bar.js'`)
+- Package type is set to `"module"` in package.json
+- TypeScript compiles to ESM format (`module: "nodenext"`)
+- Jest uses ESM configuration with `@jest/globals` imports
+
+**When adding new files:**
+
+- Always use `.js` extensions for relative imports in TypeScript files
+- Import `jest` from `@jest/globals` in test files: `import { jest } from '@jest/globals'`
+- Use `import.meta.url` for file/directory paths (not `__dirname`/`__filename`)
+
 ## Development Commands
 
 ### Building and Running
 
-- `npm run compile` - Compile TypeScript to JavaScript in `/dist`
-- `npm start -- [command] [options]` - Run in development mode with ts-node
+- `npm run compile` - Compile TypeScript to ESM JavaScript in `/dist`
+- `npm start -- [command] [options]` - Run in development mode with tsx
 - `./budget.sh [command] [options]` - Run compiled CLI (production mode)
 
 ### Docker Development
@@ -19,15 +36,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Testing
 
-- `npm test` - Run all tests
+- `npm test` - Run all tests with ESM configuration
 - `npm run test:coverage` - Run tests with coverage report
 - `npm run test:watch` - Run tests in watch mode
-- Jest config: Tests are in `__tests__/` directories, pattern `**/*.test.ts`
+- Jest config: `jest.config.mjs` with ESM support via experimental VM modules
+- Test files require: `import { jest } from '@jest/globals'` for mocking
 
 ### Code Quality
 
 - `npm run linter` - Run ESLint and Prettier (lint + format)
-- ESLint config: `eslint.config.mts` with TypeScript, Node.js globals, and Prettier integration
+- ESLint config: `eslint.config.mts` (already ESM) with TypeScript, Node.js globals, and Prettier integration
 - Prettier integration for consistent code formatting
 
 ## Configuration System

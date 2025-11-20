@@ -1,6 +1,7 @@
-import { CategoryService } from '../../../src/services/core/category.service';
+import { CategoryService } from '../../../src/services/core/category.service.js';
 import { CategoryArray, CategoryRead } from '@derekprovance/firefly-iii-sdk';
-import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs';
+import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
+import { jest } from '@jest/globals';
 
 jest.mock('../../../src/api/firefly-client-with-certs');
 

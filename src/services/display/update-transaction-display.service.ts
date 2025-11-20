@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { UpdateTransactionMode } from '../../types/enum/update-transaction-mode.enum';
+import { UpdateTransactionMode } from '../../types/enum/update-transaction-mode.enum.js';
 
 export class UpdateTransactionDisplayService {
     /**
