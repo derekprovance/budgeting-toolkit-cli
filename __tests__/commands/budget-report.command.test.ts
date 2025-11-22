@@ -33,11 +33,11 @@ describe('BudgetReportCommand', () => {
         // Reset mocks
         jest.clearAllMocks();
 
-        // Setup service mocks
+        // Setup service mocks - now returning Result types
         budgetReportService = {
             getBudgetReport: jest
-                .fn<() => Promise<BudgetReport[]>>()
-                .mockResolvedValue(mockBudgetReports),
+                .fn<() => Promise<any>>()
+                .mockResolvedValue({ ok: true, value: mockBudgetReports }),
             getUntrackedTransactions: jest
                 .fn<() => Promise<TransactionSplit[]>>()
                 .mockResolvedValue([]),
@@ -71,8 +71,8 @@ describe('BudgetReportCommand', () => {
 
         billComparisonService = {
             calculateBillComparison: jest
-                .fn<(month: number, year: number) => Promise<BillComparisonDto>>()
-                .mockResolvedValue(mockBillComparison),
+                .fn<(month: number, year: number) => Promise<any>>()
+                .mockResolvedValue({ ok: true, value: mockBillComparison }),
         } as unknown as jest.Mocked<BillComparisonService>;
 
         // Create command instance

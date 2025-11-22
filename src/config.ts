@@ -6,11 +6,9 @@ import dotenv from 'dotenv';
 import { getConfigValue } from './utils/config-loader.js';
 import { FireflyClientWithCertsConfig } from './api/firefly-client-with-certs.js';
 
-// ESM compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables from custom file or default .env
 const envFile = process.env.ENV_FILE || '.env';
 dotenv.config({
     path: envFile,
@@ -27,12 +25,10 @@ function resolveCertPath(envPath: string | undefined): string | undefined {
         return undefined;
     }
 
-    // If absolute path, use as-is
     if (path.isAbsolute(envPath)) {
         return envPath;
     }
 
-    // Relative paths resolve from project root (parent of dist/)
     const projectRoot = path.resolve(__dirname, '..');
     return path.resolve(projectRoot, envPath);
 }

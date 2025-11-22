@@ -4,6 +4,7 @@ import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/interface/budget-date-params.interface.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
+import chalk from 'chalk';
 
 /**
  * Command for displaying budget report
@@ -21,7 +22,18 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
      * @param params The month and year to display budget report for
      */
     async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
-        const budgetReports = await this.budgetReportService.getBudgetReport(month, year);
+        // Fetch budget report using Result pattern
+        const budgetReportsResult = await this.budgetReportService.getBudgetReport(month, year);
+
+        if (!budgetReportsResult.ok) {
+            console.error(
+                chalk.red('Error fetching budget report:'),
+                chalk.red.bold(budgetReportsResult.error.userMessage)
+            );
+            throw new Error(budgetReportsResult.error.message);
+        }
+
+        const budgetReports = budgetReportsResult.value;
         const lastUpdatedOn =
             (await this.transactionService.getMostRecentTransactionDate()) || new Date();
         const isCurrentMonth =
@@ -88,12 +100,27 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         // Display list of unbudgeted transactions
         console.log(this.budgetDisplayService.listUnbudgetedTransactions(unbudgetedTransactions));
 
-        // Display bill comparison
-        const billComparison = await this.billComparisonService.calculateBillComparison(
+        // Display bill comparison using Result pattern
+        const billComparisonResult = await this.billComparisonService.calculateBillComparison(
             month,
             year
         );
-        console.log(this.budgetDisplayService.formatBillComparisonSection(billComparison, verbose));
+
+        if (!billComparisonResult.ok) {
+            console.error(
+                chalk.red('Error fetching bill comparison:'),
+                chalk.red.bold(billComparisonResult.error.userMessage)
+            );
+            // Don't throw - bill comparison is supplemental, show what we can
+            console.log(chalk.yellow('\n⚠️  Bill comparison data unavailable\n'));
+        } else {
+            console.log(
+                this.budgetDisplayService.formatBillComparisonSection(
+                    billComparisonResult.value,
+                    verbose
+                )
+            );
+        }
 
         // Display warning if necessary
         if (isCurrentMonth) {

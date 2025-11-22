@@ -5,6 +5,8 @@ import { BillComparisonService as IBillComparisonService } from '../types/interf
 import { DateUtils } from '../utils/date.utils.js';
 import { BillService } from './core/bill.service.js';
 import { TransactionService } from './core/transaction.service.js';
+import { Result } from '../types/result.type.js';
+import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
 
 export class BillComparisonService implements IBillComparisonService {
     constructor(
@@ -12,16 +14,40 @@ export class BillComparisonService implements IBillComparisonService {
         private readonly transactionService: TransactionService
     ) {}
 
-    async calculateBillComparison(month: number, year: number): Promise<BillComparisonDto> {
+    /**
+     * Calculates bill comparison for a given month and year.
+     * Returns Result type for explicit error handling.
+     *
+     * @param month - Month to calculate (1-12)
+     * @param year - Year to calculate
+     * @returns Result containing bill comparison or error
+     */
+    async calculateBillComparison(
+        month: number,
+        year: number
+    ): Promise<Result<BillComparisonDto, BillError>> {
+        const operation = 'calculateBillComparison';
+
+        // Validate date
         try {
             DateUtils.validateMonthYear(month, year);
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
 
+            return Result.err(
+                BillErrorFactory.create(BillErrorType.INVALID_DATE, month, year, operation, err)
+            );
+        }
+
+        try {
             // Get active bills
             const activeBills = await this.billService.getActiveBills();
 
             if (activeBills.length === 0) {
                 logger.info('No active bills found for year ' + year);
-                return BillComparisonDto.create(0, 0, [], 'USD', '$');
+                // Not an error - just return empty result
+                return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
             }
 
             // Calculate predicted monthly average from all active bills
@@ -49,21 +75,48 @@ export class BillComparisonService implements IBillComparisonService {
                 activeBills[0]?.attributes.primary_currency_symbol ??
                 '$';
 
-            return BillComparisonDto.create(
+            const result = BillComparisonDto.create(
                 predictedMonthlyAverage,
                 actualMonthlyTotal,
                 billDetails,
                 currencyCode,
                 currencySymbol
             );
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            logger.error(
-                { error, month, year },
-                `Failed to calculate bill comparison: ${errorMessage}`
+
+            logger.debug(
+                {
+                    month,
+                    year,
+                    billCount: activeBills.length,
+                    predictedMonthlyAverage,
+                    actualMonthlyTotal,
+                },
+                'Bill comparison calculated successfully'
             );
-            throw new Error(
-                `Failed to calculate bill comparison for month ${month}: ${errorMessage}`
+
+            return Result.ok(result);
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+
+            logger.error(
+                {
+                    month,
+                    year,
+                    operation,
+                    error: err.message,
+                    errorType: err.constructor.name,
+                },
+                'Failed to calculate bill comparison'
+            );
+
+            return Result.err(
+                BillErrorFactory.create(
+                    BillErrorType.CALCULATION_FAILED,
+                    month,
+                    year,
+                    operation,
+                    err
+                )
             );
         }
     }

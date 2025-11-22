@@ -16,7 +16,6 @@ import { logger } from './logger.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// ESM compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -55,12 +54,10 @@ const handleError = (error: unknown, operation: string): never => {
 export const createCli = (): Command => {
     const program = new Command();
 
-    // Initialize API client with error handling
     let apiClient: FireflyClientWithCerts;
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
     try {
-        // Validate certificate configuration before attempting to create client
         validateCertificateConfig(config);
 
         apiClient = new FireflyClientWithCerts(config);

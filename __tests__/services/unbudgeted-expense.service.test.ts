@@ -102,40 +102,52 @@ describe('UnbudgetedExpenseService', () => {
     });
 
     describe('input validation', () => {
-        it('should throw error for invalid month (less than 1)', async () => {
-            await expect(service.calculateUnbudgetedExpenses(0, 2024)).rejects.toThrow(
-                'Month must be an integer between 1 and 12'
-            );
+        it('should return error for invalid month (less than 1)', async () => {
+            const result = await service.calculateUnbudgetedExpenses(0, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Month must be an integer between 1 and 12');
+            }
         });
 
-        it('should throw error for invalid month (greater than 12)', async () => {
-            await expect(service.calculateUnbudgetedExpenses(13, 2024)).rejects.toThrow(
-                'Month must be an integer between 1 and 12'
-            );
+        it('should return error for invalid month (greater than 12)', async () => {
+            const result = await service.calculateUnbudgetedExpenses(13, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Month must be an integer between 1 and 12');
+            }
         });
 
-        it('should throw error for non-integer month', async () => {
-            await expect(service.calculateUnbudgetedExpenses(1.5, 2024)).rejects.toThrow(
-                'Month must be an integer between 1 and 12'
-            );
+        it('should return error for non-integer month', async () => {
+            const result = await service.calculateUnbudgetedExpenses(1.5, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Month must be an integer between 1 and 12');
+            }
         });
 
-        it('should throw error for invalid year (less than 1900)', async () => {
-            await expect(service.calculateUnbudgetedExpenses(1, 1899)).rejects.toThrow(
-                'Year must be a valid 4-digit year'
-            );
+        it('should return error for invalid year (less than 1900)', async () => {
+            const result = await service.calculateUnbudgetedExpenses(1, 1899);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Year must be a valid 4-digit year');
+            }
         });
 
-        it('should throw error for invalid year (greater than 9999)', async () => {
-            await expect(service.calculateUnbudgetedExpenses(1, 10000)).rejects.toThrow(
-                'Year must be a valid 4-digit year'
-            );
+        it('should return error for invalid year (greater than 9999)', async () => {
+            const result = await service.calculateUnbudgetedExpenses(1, 10000);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Year must be a valid 4-digit year');
+            }
         });
 
-        it('should throw error for non-integer year', async () => {
-            await expect(service.calculateUnbudgetedExpenses(1, 2024.5)).rejects.toThrow(
-                'Year must be a valid 4-digit year'
-            );
+        it('should return error for non-integer year', async () => {
+            const result = await service.calculateUnbudgetedExpenses(1, 2024.5);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Year must be a valid 4-digit year');
+            }
         });
     });
 
@@ -143,7 +155,10 @@ describe('UnbudgetedExpenseService', () => {
         it('should handle empty transaction list', async () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
-            expect(result).toEqual([]);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual([]);
+            }
         });
 
         it('should handle null transaction list', async () => {
@@ -151,7 +166,10 @@ describe('UnbudgetedExpenseService', () => {
                 [] as TransactionSplit[]
             );
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
-            expect(result).toEqual([]);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual([]);
+            }
         });
 
         it('should filter out transactions with budgets', async () => {
@@ -180,8 +198,11 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Unbudgeted Expense');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Unbudgeted Expense');
+            }
         });
 
         it('should filter out excluded transactions', async () => {
@@ -208,8 +229,11 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Valid Expense');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Valid Expense');
+            }
         });
 
         it('should filter out disposable income supplemented transactions', async () => {
@@ -236,8 +260,11 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Regular Expense');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Regular Expense');
+            }
         });
 
         it('should handle transfers from PRIMARY to MONEY_MARKET', async () => {
@@ -266,8 +293,11 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Valid Transfer');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Valid Transfer');
+            }
         });
 
         it('should filter out non-expense account transactions', async () => {
@@ -294,8 +324,11 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Expense TestAccount');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Expense TestAccount');
+            }
         });
 
         it('should include bills regardless of other criteria', async () => {
@@ -325,9 +358,12 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(2);
-            expect(result[0].description).toBe('Regular Bill');
-            expect(result[1].description).toBe('Regular Expense');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(2);
+                expect(result.value[0].description).toBe('Regular Bill');
+                expect(result.value[1].description).toBe('Regular Expense');
+            }
         });
 
         it('should include bills even if they have a budget', async () => {
@@ -358,9 +394,12 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(2);
-            expect(result[0].description).toBe('Budgeted Bill');
-            expect(result[1].description).toBe('Regular Expense');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(2);
+                expect(result.value[0].description).toBe('Budgeted Bill');
+                expect(result.value[1].description).toBe('Regular Expense');
+            }
         });
 
         it('should include bills even if they are excluded', async () => {
@@ -391,12 +430,15 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(2);
-            expect(result[0].description).toBe('Excluded Bill');
-            expect(result[1].description).toBe('Regular Expense');
-            expect(
-                mockTransactionClassificationService.isExcludedTransaction
-            ).toHaveBeenCalledTimes(1);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(2);
+                expect(result.value[0].description).toBe('Excluded Bill');
+                expect(result.value[1].description).toBe('Regular Expense');
+                expect(
+                    mockTransactionClassificationService.isExcludedTransaction
+                ).toHaveBeenCalledTimes(1);
+            }
         });
 
         it('should include expenses from all valid expense accounts', async () => {
@@ -435,13 +477,16 @@ describe('UnbudgetedExpenseService', () => {
 
             const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-            expect(result).toHaveLength(4);
-            expect(result.map(t => t.description)).toEqual([
-                'Chase Amazon Expense',
-                'Chase Sapphire Expense',
-                'Citi Double Cash Expense',
-                'Primary TestAccount Expense',
-            ]);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(4);
+                expect(result.value.map(t => t.description)).toEqual([
+                    'Chase Amazon Expense',
+                    'Chase Sapphire Expense',
+                    'Citi Double Cash Expense',
+                    'Primary TestAccount Expense',
+                ]);
+            }
         });
 
         describe('error handling', () => {
@@ -449,28 +494,37 @@ describe('UnbudgetedExpenseService', () => {
                 const error = new Error('API Error');
                 mockTransactionService.getTransactionsForMonth.mockRejectedValue(error);
 
-                await expect(service.calculateUnbudgetedExpenses(4, 2024)).rejects.toThrow(
-                    'Failed to calculate unbudgeted expenses for month 4: API Error'
-                );
+                const result = await service.calculateUnbudgetedExpenses(4, 2024);
+                expect(result.ok).toBe(false);
+                if (!result.ok) {
+                    expect(result.error.message).toContain(
+                        'Failed to fetch transactions for month 4'
+                    );
+                    expect(result.error.message).toContain('API Error');
+                }
             });
 
             it('should handle unknown errors gracefully', async () => {
                 mockTransactionService.getTransactionsForMonth.mockRejectedValue('Unknown error');
 
-                await expect(service.calculateUnbudgetedExpenses(4, 2024)).rejects.toThrow(
-                    'Failed to calculate unbudgeted expenses for month 4'
-                );
+                const result = await service.calculateUnbudgetedExpenses(4, 2024);
+                expect(result.ok).toBe(false);
+                if (!result.ok) {
+                    expect(result.error.message).toContain(
+                        'Failed to fetch transactions for month 4'
+                    );
+                    expect(result.error.message).toContain('Unknown error');
+                }
             });
 
             it('should include month and year in error context', async () => {
                 const error = new Error('API Error');
                 mockTransactionService.getTransactionsForMonth.mockRejectedValue(error);
 
-                try {
-                    await service.calculateUnbudgetedExpenses(4, 2024);
-                } catch (e) {
-                    expect(e).toBeInstanceOf(Error);
-                    expect((e as Error).message).toContain('month 4');
+                const result = await service.calculateUnbudgetedExpenses(4, 2024);
+                expect(result.ok).toBe(false);
+                if (!result.ok) {
+                    expect(result.error.message).toContain('month 4');
                 }
             });
         });
@@ -497,8 +551,11 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Bill with Disposable');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Bill with Disposable');
+                }
             });
 
             it('should include bills from non-expense accounts', async () => {
@@ -522,8 +579,11 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Bill from Non-Expense');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Bill from Non-Expense');
+                }
             });
 
             it('should include bills even if they are excluded transactions', async () => {
@@ -547,8 +607,11 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Excluded Bill');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Excluded Bill');
+                }
             });
         });
 
@@ -574,7 +637,10 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle transfers with no destination account', async () => {
@@ -598,8 +664,11 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('No Destination Transfer');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('No Destination Transfer');
+                }
             });
 
             it('should exclude transfers between invalid accounts', async () => {
@@ -623,7 +692,10 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
         });
 
@@ -655,10 +727,13 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(validAccounts.length);
-                result.forEach((transaction, index) => {
-                    expect(transaction.source_id).toBe(validAccounts[index]);
-                });
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(validAccounts.length);
+                    result.value.forEach((transaction, index) => {
+                        expect(transaction.source_id).toBe(validAccounts[index]);
+                    });
+                }
             });
 
             it('should exclude transactions from invalid accounts', async () => {
@@ -683,7 +758,10 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle transactions with null source accounts', async () => {
@@ -706,7 +784,10 @@ describe('UnbudgetedExpenseService', () => {
 
                 const result = await service.calculateUnbudgetedExpenses(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
         });
     });
