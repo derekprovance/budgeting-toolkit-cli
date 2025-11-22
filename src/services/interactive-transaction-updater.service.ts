@@ -6,212 +6,228 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service.js';
 import { TransactionValidatorService } from './core/transaction-validator.service.js';
+import { TransactionAIResultValidator } from './core/transaction-ai-result-validator.service.js';
 import { UserInputService } from './user-input.service.js';
+import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
 
-export interface TransactionUpdateError {
-    transaction: TransactionSplit;
-    error: Error;
+export interface AIResults {
+    category?: string;
+    budget?: string;
 }
 
+/**
+ * Service for managing interactive transaction updates with AI-suggested categories and budgets.
+ * Handles user workflow, validation, and dry-run mode.
+ */
 export class InteractiveTransactionUpdater {
-    private readonly updateParameterMap = {
-        [UpdateTransactionMode.Both]: (category?: CategoryProperties, budget?: BudgetRead) =>
-            [category?.name, budget?.id] as const,
-        [UpdateTransactionMode.Budget]: (_category?: CategoryProperties, budget?: BudgetRead) =>
-            [undefined, budget?.id] as const,
-        [UpdateTransactionMode.Category]: (
-            category?: CategoryProperties,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _budget?: BudgetRead
-        ) => [category?.name, undefined] as const,
-    } as const;
-
-    private errors: TransactionUpdateError[] = [];
-
     constructor(
         private readonly transactionService: TransactionService,
         private readonly validator: TransactionValidatorService,
+        private readonly aiValidator: TransactionAIResultValidator,
         private readonly userInputService: UserInputService,
-        private readonly dryRun: boolean = false,
-        private readonly categories: CategoryProperties[],
-        private readonly budgets: BudgetRead[]
+        private readonly dryRun: boolean = false
     ) {}
 
     /**
-     * Updates a transaction with new category and budget
+     * Updates a transaction with AI-suggested category and budget.
+     * Returns Result type for explicit error handling.
+     *
      * @param transaction The transaction to update
-     * @param aiResults The AI results for the transaction
-     * @param categories Available categories
-     * @param budgets Available budgets
-     * @returns A promise that resolves to the updated transaction or undefined if not updated
+     * @param aiResults The AI-suggested category and budget
+     * @returns Result containing updated transaction or validation error
      */
     async updateTransaction(
         transaction: TransactionSplit,
-        aiResults: Record<string, { category?: string; budget?: string }>
-    ): Promise<TransactionRead | undefined> {
+        aiResults: Record<string, AIResults>
+    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        // Validate transaction data
         if (!this.validator.validateTransactionData(transaction, aiResults)) {
-            return;
+            return Result.err({
+                field: 'transaction',
+                message: 'Invalid transaction data',
+                userMessage: 'Transaction data is incomplete or invalid',
+                transactionId: transaction.transaction_journal_id || 'unknown',
+                transactionDescription: transaction.description || 'No description',
+            });
+        }
+
+        const journalId = transaction.transaction_journal_id;
+        if (!journalId) {
+            logger.warn(
+                { description: transaction.description },
+                'Transaction missing journal ID, skipping'
+            );
+            return Result.err({
+                field: 'journalId',
+                message: 'Transaction missing journal ID',
+                userMessage: 'Cannot update transaction without journal ID',
+                transactionId: 'unknown',
+                transactionDescription: transaction.description || 'No description',
+            });
         }
 
         try {
-            const journalId = transaction.transaction_journal_id;
-
-            if (!journalId) {
-                logger.warn(
-                    {
-                        description: transaction.description,
-                    },
-                    'Transaction missing journal ID, skipping'
-                );
-                return;
-            }
-
-            const category = this.validateAICategory(aiResults[journalId]?.category, transaction);
-            const budget = await this.validateAIBudget(aiResults[journalId]?.budget, transaction);
-
-            if (!this.validator.categoryOrBudgetChanged(transaction, category, budget)) {
-                return;
-            }
-
-            const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
-            if (this.dryRun) {
-                logger.debug(
-                    {
-                        transactionId: journalId,
-                        description: transaction.description,
-                        proposedCategory: category?.name,
-                        proposedBudget: budget?.attributes.name,
-                    },
-                    'Dry run - showing proposed changes'
-                );
-                return transactionRead;
-            }
-
-            const updatedTransaction = await this.handleUpdateWorkflow(
+            // Validate and prepare update
+            const prepareResult = await this.validateAndPrepareUpdate(
                 transaction,
-                transactionRead,
-                category,
-                budget
+                aiResults[journalId]
             );
+            if (!prepareResult.ok) {
+                return Result.err(prepareResult.error);
+            }
 
-            return updatedTransaction;
+            const { category, budget, hasChanges } = prepareResult.value;
+
+            // Skip if no changes detected
+            if (!hasChanges) {
+                logger.debug(
+                    { transactionId: journalId, description: transaction.description },
+                    'No changes detected for transaction'
+                );
+                return Result.ok(undefined);
+            }
+
+            // Handle dry-run mode
+            if (this.dryRun) {
+                return this.executeDryRun(transaction, journalId, category, budget);
+            }
+
+            // Execute interactive workflow
+            return await this.executeInteractiveUpdate(transaction, category, budget);
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            this.errors.push({ transaction, error: err });
-
             logger.error(
-                {
-                    description: transaction.description,
-                    error: err.message,
-                },
+                { description: transaction.description, error: err.message },
                 'Error processing transaction'
             );
-            return;
+
+            return Result.err({
+                field: 'unknown',
+                message: err.message,
+                userMessage: `Failed to update transaction: ${err.message}`,
+                transactionId: journalId,
+                transactionDescription: transaction.description || 'No description',
+                details: { error: err },
+            });
         }
     }
 
     /**
-     * Gets the list of errors that occurred during transaction updates
-     * @returns Array of transaction update errors
+     * Validates AI results and prepares update data
      */
-    getErrors(): TransactionUpdateError[] {
-        return [...this.errors];
+    private async validateAndPrepareUpdate(
+        transaction: TransactionSplit,
+        aiResult?: AIResults
+    ): Promise<
+        Result<
+            { category?: CategoryProperties; budget?: BudgetRead; hasChanges: boolean },
+            TransactionValidationError
+        >
+    > {
+        const validationResult = await this.aiValidator.validateAIResults(
+            transaction,
+            aiResult?.category,
+            aiResult?.budget
+        );
+
+        if (!validationResult.ok) {
+            return Result.err(validationResult.error);
+        }
+
+        const { category, budget } = validationResult.value;
+
+        // Check if changes actually exist
+        const hasChanges = this.validator.categoryOrBudgetChanged(transaction, category, budget);
+
+        return Result.ok({ category, budget, hasChanges });
     }
 
     /**
-     * Clears the error list
+     * Executes dry-run mode - displays proposed changes without applying
      */
-    clearErrors(): void {
-        this.errors = [];
-    }
+    private executeDryRun(
+        transaction: TransactionSplit,
+        journalId: string,
+        category?: CategoryProperties,
+        budget?: BudgetRead
+    ): Result<TransactionRead | undefined, TransactionValidationError> {
+        logger.debug(
+            {
+                transactionId: journalId,
+                description: transaction.description,
+                proposedCategory: category?.name,
+                proposedBudget: budget?.attributes.name,
+            },
+            'Dry run - showing proposed changes'
+        );
 
-    private validateAICategory(
-        aiCategory: string | undefined,
-        transaction: TransactionSplit
-    ): CategoryProperties | undefined {
-        let category;
-        if (aiCategory && aiCategory !== '') {
-            category = this.getValidCategory(aiCategory);
-            if (!category) {
-                logger.warn(
-                    {
-                        transactionId: transaction.transaction_journal_id,
-                        description: transaction.description,
-                        attemptedCategory: aiCategory,
-                        validCategories: this.categories?.map(c => c.name),
-                    },
-                    'Invalid or unrecognized category from AI, skipping transaction'
-                );
-                return;
-            }
-        } else if (aiCategory === '') {
+        const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
+        if (!transactionRead) {
             logger.warn(
-                {
-                    transactionId: transaction.transaction_journal_id,
-                    description: transaction.description,
-                    attemptedCategory: aiCategory,
-                },
-                'Empty category from AI, skipping transaction'
+                { transactionId: journalId, description: transaction.description },
+                'Could not retrieve TransactionRead for dry-run display'
             );
-            return;
         }
 
-        return category;
+        return Result.ok(transactionRead);
     }
 
-    private async validateAIBudget(
-        aiBudget: string | undefined,
-        transaction: TransactionSplit
-    ): Promise<BudgetRead | undefined> {
-        const shouldUpdateBudget = await this.validator.shouldSetBudget(transaction);
-
-        let budget;
-        if (shouldUpdateBudget && aiBudget && aiBudget !== '') {
-            budget = this.getValidBudget(aiBudget);
-            if (!budget) {
-                logger.warn(
-                    {
-                        transactionId: transaction.transaction_journal_id,
-                        description: transaction.description,
-                        attemptedBudget: aiBudget,
-                        validBudgets: this.budgets?.map(b => b.attributes.name),
-                    },
-                    'Invalid or unrecognized budget from AI, skipping transaction'
-                );
-                return;
-            }
-        } else if (shouldUpdateBudget && aiBudget === '') {
-            logger.warn(
-                {
-                    transactionId: transaction.transaction_journal_id,
-                    description: transaction.description,
-                    attemptedBudget: aiBudget,
-                },
-                'Empty budget from AI, skipping transaction'
-            );
-            return;
+    /**
+     * Executes interactive workflow with user prompts
+     */
+    private async executeInteractiveUpdate(
+        transaction: TransactionSplit,
+        category?: CategoryProperties,
+        budget?: BudgetRead
+    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
+        if (!transactionRead) {
+            return Result.err({
+                field: 'transactionRead',
+                message: 'Could not retrieve transaction details',
+                userMessage: 'Unable to load transaction details for update',
+                transactionId: transaction.transaction_journal_id || 'unknown',
+                transactionDescription: transaction.description || 'No description',
+            });
         }
 
-        return budget;
+        const workflowResult = await this.handleUpdateWorkflow(
+            transaction,
+            transactionRead,
+            category,
+            budget
+        );
+
+        if (!workflowResult.ok) {
+            return Result.err(workflowResult.error);
+        }
+
+        return Result.ok(workflowResult.value);
     }
 
+    /**
+     * Handles the interactive update workflow with user prompts
+     */
     private async handleUpdateWorkflow(
         transaction: TransactionSplit,
-        transactionRead: TransactionRead | undefined,
-        category: CategoryProperties | undefined,
-        budget: BudgetRead | undefined
-    ): Promise<TransactionRead | undefined> {
-        let action;
+        transactionRead: TransactionRead,
+        category?: CategoryProperties,
+        budget?: BudgetRead
+    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        let currentCategory = category;
+        let currentBudget = budget;
+        let action: UpdateTransactionMode;
+
         do {
             action = await this.userInputService.askToUpdateTransaction(
                 transaction,
-                transactionRead?.id,
+                transactionRead.id,
                 {
-                    category: category?.name,
-                    budget: budget?.attributes.name,
+                    category: currentCategory?.name,
+                    budget: currentBudget?.attributes.name,
                 }
             );
 
@@ -220,19 +236,28 @@ export class InteractiveTransactionUpdater {
                     { description: transaction.description },
                     'User skipped transaction update'
                 );
-                return;
+                return Result.ok(undefined);
             }
 
             if (action === UpdateTransactionMode.Edit) {
-                [category, budget] = await this.processEditCommand(transaction);
+                [currentCategory, currentBudget] = await this.processEditCommand(transaction);
             }
         } while (action === UpdateTransactionMode.Edit);
 
-        const [categoryName, budgetId] = this.updateParameterMap[action](category, budget);
+        // Apply the final update
+        const updatedTransaction = await this.applyTransactionUpdate(
+            transaction,
+            action,
+            currentCategory,
+            currentBudget
+        );
 
-        return await this.transactionService.updateTransaction(transaction, categoryName, budgetId);
+        return Result.ok(updatedTransaction);
     }
 
+    /**
+     * Handles edit mode workflow
+     */
     private async processEditCommand(
         transaction: TransactionSplit
     ): Promise<[CategoryProperties | undefined, BudgetRead | undefined]> {
@@ -240,13 +265,16 @@ export class InteractiveTransactionUpdater {
 
         const answers = await this.userInputService.shouldEditCategoryBudget();
 
-        let newCategory;
-        let newBudget;
+        let newCategory: CategoryProperties | undefined;
+        let newBudget: BudgetRead | undefined;
+
         for (const answer of answers) {
             if (answer === EditTransactionAttribute.Category) {
-                newCategory = await this.userInputService.getNewCategory(this.categories);
+                const categoryNames = this.aiValidator.getAvailableCategoryNames();
+                newCategory = await this.userInputService.getNewCategory(categoryNames);
             } else if (answer === EditTransactionAttribute.Budget) {
-                newBudget = await this.userInputService.getNewBudget(this.budgets);
+                const budgetNames = this.aiValidator.getAvailableBudgetNames();
+                newBudget = await this.userInputService.getNewBudget(budgetNames);
             }
         }
 
@@ -254,30 +282,35 @@ export class InteractiveTransactionUpdater {
     }
 
     /**
-     * Gets a valid budget from the available budgets
-     * @param budgets Available budgets
-     * @param value Budget name to find
-     * @returns The matching budget or undefined
+     * Applies the final transaction update based on user selection
      */
-    private getValidBudget(value: string | undefined): BudgetRead | undefined {
-        if (!value) {
-            return;
-        }
-
-        return this.budgets?.find(b => b.attributes.name === value);
+    private async applyTransactionUpdate(
+        transaction: TransactionSplit,
+        mode: UpdateTransactionMode,
+        category?: CategoryProperties,
+        budget?: BudgetRead
+    ): Promise<TransactionRead | undefined> {
+        const { categoryName, budgetId } = this.getUpdateParameters(mode, category, budget);
+        return await this.transactionService.updateTransaction(transaction, categoryName, budgetId);
     }
 
     /**
-     * Gets a valid category from the available categories
-     * @param categories Available categories
-     * @param value Category name to find
-     * @returns The matching category or undefined
+     * Determines which parameters to update based on mode
      */
-    private getValidCategory(value: string | undefined): CategoryProperties | undefined {
-        if (!value) {
-            return;
+    private getUpdateParameters(
+        mode: UpdateTransactionMode,
+        category?: CategoryProperties,
+        budget?: BudgetRead
+    ): { categoryName?: string; budgetId?: string } {
+        switch (mode) {
+            case UpdateTransactionMode.Both:
+                return { categoryName: category?.name, budgetId: budget?.id };
+            case UpdateTransactionMode.Budget:
+                return { budgetId: budget?.id };
+            case UpdateTransactionMode.Category:
+                return { categoryName: category?.name };
+            default:
+                return {};
         }
-
-        return this.categories?.find(c => c?.name === value);
     }
 }

@@ -67,32 +67,31 @@ export class UserInputService {
         return answer;
     }
 
-    async getNewCategory(
-        categories: CategoryProperties[]
-    ): Promise<CategoryProperties | undefined> {
-        const answer = await this.createSelectDropdown(
-            categories.map(category => category.name),
-            'Select a new Category'
-        );
+    async getNewCategory(categoryNames: string[]): Promise<CategoryProperties | undefined> {
+        const answer = await this.createSelectDropdown(categoryNames, 'Select a new Category');
 
-        return categories.find(category => {
-            if (category.name === answer) {
-                return category;
-            }
-        });
+        if (!answer) {
+            return undefined;
+        }
+
+        // Return a minimal CategoryProperties object with just the name
+        // The validator service will resolve this to the full object
+        return { name: answer } as CategoryProperties;
     }
 
-    async getNewBudget(budgets: BudgetRead[]): Promise<BudgetRead | undefined> {
-        const answer = await this.createSelectDropdown(
-            budgets.map(budget => budget.attributes.name),
-            'Select a new Budget'
-        );
+    async getNewBudget(budgetNames: string[]): Promise<BudgetRead | undefined> {
+        const answer = await this.createSelectDropdown(budgetNames, 'Select a new Budget');
 
-        return budgets.find(budget => {
-            if (budget.attributes.name === answer) {
-                return budget;
-            }
-        });
+        if (!answer) {
+            return undefined;
+        }
+
+        // Return a minimal BudgetRead object with just the name
+        // The validator service will resolve this to the full object
+        return {
+            id: '',
+            attributes: { name: answer },
+        } as BudgetRead;
     }
 
     private async createSelectDropdown(

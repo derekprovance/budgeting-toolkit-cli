@@ -14,6 +14,7 @@ jest.mock('../../src/services/core/budget.service');
 jest.mock('../../src/services/ai/llm-transaction-processing.service');
 jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/core/transaction-validator.service');
+jest.mock('../../src/services/core/transaction-ai-result-validator.service');
 jest.mock('../../src/services/interactive-transaction-updater.service');
 
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
@@ -23,6 +24,7 @@ import { BudgetService } from '../../src/services/core/budget.service.js';
 import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
+import { TransactionAIResultValidator } from '../../src/services/core/transaction-ai-result-validator.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
 import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
 import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum.js';
@@ -38,6 +40,7 @@ describe('AITransactionUpdateOrchestrator', () => {
     let mockInteractiveTransactionUpdater: jest.Mocked<InteractiveTransactionUpdater>;
     let mockCategoryService: jest.Mocked<CategoryService>;
     let mockBudgetService: jest.Mocked<BudgetService>;
+    let mockAIValidator: jest.Mocked<TransactionAIResultValidator>;
     let mockLLMService: jest.Mocked<LLMTransactionProcessingService>;
     let mockPropertyService: jest.Mocked<TransactionClassificationService>;
     let mockValidator: jest.Mocked<TransactionValidatorService>;
@@ -108,27 +111,29 @@ describe('AITransactionUpdateOrchestrator', () => {
         } as unknown as jest.Mocked<TransactionService>;
 
         mockInteractiveTransactionUpdater = {
-            updateTransaction: jest
-                .fn<
-                    (
-                        transaction: TransactionSplit,
-                        category?: string,
-                        budgetId?: string
-                    ) => Promise<TransactionRead | undefined>
-                >()
-                .mockImplementation(async (transaction, aiResults) => {
-                    // Return the transaction with updated category and budget
-                    const journalId = transaction.transaction_journal_id!;
-                    const aiResult = aiResults[journalId];
-                    const result = {
-                        ...transaction,
-                        category_name: aiResult?.category || transaction.category_name,
-                        budget_name: aiResult?.budget || transaction.budget_name,
+            updateTransaction: jest.fn().mockImplementation(async (transaction, aiResults) => {
+                // Return Result with discriminated union pattern
+                const journalId = transaction.transaction_journal_id;
+                if (!journalId) {
+                    return {
+                        ok: false,
+                        error: {
+                            field: 'journalId',
+                            message: 'Missing journal ID',
+                            userMessage: 'Transaction missing journal ID',
+                            transactionId: 'unknown',
+                            transactionDescription: transaction.description || 'No description',
+                        },
                     };
-                    return Promise.resolve(result);
-                }),
-            getErrors: jest.fn().mockReturnValue([]),
-            clearErrors: jest.fn(),
+                }
+                const aiResult = aiResults[journalId];
+                const result = {
+                    ...transaction,
+                    category_name: aiResult?.category || transaction.category_name,
+                    budget_name: aiResult?.budget || transaction.budget_name,
+                };
+                return { ok: true, value: result };
+            }),
         } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
 
         mockCategoryService = {
@@ -138,6 +143,16 @@ describe('AITransactionUpdateOrchestrator', () => {
         mockBudgetService = {
             getBudgets: jest.fn(),
         } as unknown as jest.Mocked<BudgetService>;
+
+        mockAIValidator = {
+            initialize: jest.fn().mockResolvedValue(undefined),
+            validateAIResults: jest.fn(),
+            getCategoryByName: jest.fn(),
+            getBudgetByName: jest.fn(),
+            getAvailableCategoryNames: jest.fn().mockReturnValue([]),
+            getAvailableBudgetNames: jest.fn().mockReturnValue([]),
+            refresh: jest.fn(),
+        } as unknown as jest.Mocked<TransactionAIResultValidator>;
 
         mockLLMService = {
             processTransactions: jest.fn(),
@@ -179,6 +194,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockInteractiveTransactionUpdater,
             mockCategoryService,
             mockBudgetService,
+            mockAIValidator,
             mockLLMService,
             mockValidator
         );
@@ -307,9 +323,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
-                mockTransactions[0] as any
-            );
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
+                ok: true,
+                value: mockTransactions[0] as any,
+            });
 
             const result = await service.updateTransactionsByTag(
                 'test',
@@ -334,9 +351,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
-                mockTransactions[0] as any
-            );
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
+                ok: true,
+                value: mockTransactions[0] as any,
+            });
 
             const result = await service.updateTransactionsByTag(
                 'test',
@@ -370,6 +388,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
+                mockAIValidator,
                 mockLLMService,
                 mockValidator,
                 false
@@ -404,6 +423,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
+                mockAIValidator,
                 mockLLMService,
                 mockValidator,
                 false
@@ -435,6 +455,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
+                mockAIValidator,
                 mockLLMService,
                 mockValidator,
                 false
@@ -490,9 +511,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockLLMService.processTransactions.mockResolvedValue({
                 '1': { category: 'New Category', budget: 'New Budget' },
             });
-            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
-                mockTransaction as any
-            );
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
+                ok: true,
+                value: mockTransaction as any,
+            });
 
             const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
@@ -559,9 +581,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockLLMService.processTransactions.mockResolvedValue({
                 '1': { category: 'New Category', budget: 'New Budget' },
             });
-            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue(
-                mockTransaction as any
-            );
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
+                ok: true,
+                value: mockTransaction as any,
+            });
 
             const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
