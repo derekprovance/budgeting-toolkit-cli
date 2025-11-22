@@ -1,4 +1,4 @@
-import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum';
+import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum.js';
 
 export interface BudgetDateOptions {
     month?: number;

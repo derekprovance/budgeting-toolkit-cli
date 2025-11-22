@@ -3,8 +3,8 @@ import {
     getSystemPrompt,
     getUserPrompt,
     parseAssignmentResponse,
-} from '../../../../src/services/ai/utils/prompt-templates';
-import { LLMTransactionData } from '../../../../src/services/ai/utils/transaction-mapper';
+} from '../../../../src/services/ai/utils/prompt-templates.js';
+import { LLMTransactionData } from '../../../../src/services/ai/utils/transaction-mapper.js';
 
 describe('prompt-templates', () => {
     describe('getFunctionSchema', () => {

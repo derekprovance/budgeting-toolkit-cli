@@ -1,7 +1,7 @@
-import * as fs from 'fs';
 import * as https from 'https';
+import * as fs from 'fs';
 import { Agent } from 'https';
-import { logger } from '../logger';
+import { logger } from '../logger.js';
 import axios, { AxiosInstance } from 'axios';
 
 export interface CertificateConfig {

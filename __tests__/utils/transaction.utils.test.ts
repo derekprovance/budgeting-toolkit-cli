@@ -1,8 +1,14 @@
-import { TransactionUtils } from '../../src/utils/transaction.utils';
-import { createMockTransaction } from '../shared/test-data';
+import { TransactionUtils } from '../../src/utils/transaction.utils.js';
+import { createMockTransaction } from '../shared/test-data.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 describe('TransactionUtils', () => {
+    let transactionUtils: TransactionUtils;
+
+    beforeEach(() => {
+        transactionUtils = new TransactionUtils();
+    });
+
     describe('calculateTotal', () => {
         it('should calculate total for multiple transactions', () => {
             const transactions: TransactionSplit[] = [
@@ -11,13 +17,13 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '25.50' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(175.5);
         });
 
         it('should return 0 for empty array', () => {
-            const total = TransactionUtils.calculateTotal([]);
+            const total = transactionUtils.calculateTotal([]);
 
             expect(total).toBe(0);
         });
@@ -25,7 +31,7 @@ describe('TransactionUtils', () => {
         it('should handle single transaction', () => {
             const transactions: TransactionSplit[] = [createMockTransaction({ amount: '123.45' })];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(123.45);
         });
@@ -37,7 +43,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '50.00' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(125);
         });
@@ -48,7 +54,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '-50.00' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(-150);
         });
@@ -60,7 +66,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '100.00' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(100);
         });
@@ -72,7 +78,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '30.03' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBeCloseTo(60.06, 2);
         });
@@ -83,7 +89,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '1.01' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBeCloseTo(10000001, 2);
         });
@@ -95,7 +101,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '0.03' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBeCloseTo(0.06, 2);
         });
@@ -106,7 +112,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '20.987654' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBeCloseTo(31.11111, 2);
         });
@@ -117,7 +123,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '200' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(300);
         });
@@ -129,7 +135,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '25' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(175.5);
         });
@@ -140,7 +146,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '5e1' }), // 50
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(150);
         });
@@ -152,7 +158,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '0.2' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             // 0.1 + 0.2 = 0.30000000000000004 in JavaScript
             expect(total).toBeCloseTo(0.3, 10);
@@ -164,7 +170,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '1.00' })
             );
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(1000);
         });
@@ -177,7 +183,7 @@ describe('TransactionUtils', () => {
                 createMockTransaction({ amount: '-25.00' }),
             ];
 
-            const total = TransactionUtils.calculateTotal(transactions);
+            const total = transactionUtils.calculateTotal(transactions);
 
             expect(total).toBe(100);
         });

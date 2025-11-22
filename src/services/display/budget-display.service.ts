@@ -1,9 +1,9 @@
-import chalk from 'chalk';
-import { BudgetReport } from '../../types/interface/budget-report.interface';
-import { BaseTransactionDisplayService } from './base-transaction-display.service';
+import chalk, { ChalkInstance } from 'chalk';
+import { BudgetReport } from '../../types/interface/budget-report.interface.js';
+import { BaseTransactionDisplayService } from './base-transaction-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { BillComparisonDto } from '../../types/dto/bill-comparison.dto';
-import { CurrencyUtils } from '../../utils/currency.utils';
+import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
 
 /**
  * Service for formatting and displaying budget information
@@ -260,7 +260,7 @@ export class BudgetDisplayService {
         return percentage ? percentage * 100 : 0;
     }
 
-    private getColorForPercentage(percentage: number, daysLeftPercentage?: number): chalk.Chalk {
+    private getColorForPercentage(percentage: number, daysLeftPercentage?: number): ChalkInstance {
         if (daysLeftPercentage !== undefined) {
             if (percentage > daysLeftPercentage) {
                 return percentage > 100 ? chalk.red : chalk.yellow;

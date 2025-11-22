@@ -1,9 +1,9 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionService } from './core/transaction.service';
-import { TransactionClassificationService } from './core/transaction-classification.service';
-import { logger } from '../logger';
-import { DateUtils } from '../utils/date.utils';
-import { getConfigValue } from '../utils/config-loader';
+import { ITransactionService } from './core/transaction.service.interface.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
+import { logger } from '../logger.js';
+import { DateUtils } from '../utils/date.utils.js';
+import { getConfigValue } from '../utils/config-loader.js';
 
 /**
  * Configuration for filtering additional income transactions.
@@ -43,8 +43,8 @@ export class AdditionalIncomeService {
     private readonly config: AdditionalIncomeConfig;
 
     constructor(
-        private readonly transactionService: TransactionService,
-        private readonly transactionClassificationService: TransactionClassificationService,
+        private readonly transactionService: ITransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService,
         config: Partial<AdditionalIncomeConfig> = {}
     ) {
         const yamlConfig = this.loadConfigFromYaml();

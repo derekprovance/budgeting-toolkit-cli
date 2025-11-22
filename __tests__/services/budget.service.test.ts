@@ -1,13 +1,13 @@
-import { BudgetService } from '../../src/services/core/budget.service';
+import { BudgetService } from '../../src/services/core/budget.service.js';
 import { BudgetLimitRead, BudgetRead, InsightGroup } from '@derekprovance/firefly-iii-sdk';
-import { DateRangeService } from '../../src/types/interface/date-range.service.interface';
-import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
-
-jest.mock('../../src/types/interface/date-range.service.interface');
+import { IDateRangeService } from '../../src/types/interface/date-range.service.interface.js';
+import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
+import { jest } from '@jest/globals';
 
 describe('BudgetService', () => {
     let budgetService: BudgetService;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
+    let mockDateRangeService: IDateRangeService;
 
     beforeEach(() => {
         mockApiClient = {
@@ -20,7 +20,12 @@ describe('BudgetService', () => {
                 insightExpenseBudget: jest.fn(),
             },
         } as unknown as jest.Mocked<FireflyClientWithCerts>;
-        budgetService = new BudgetService(mockApiClient);
+
+        mockDateRangeService = {
+            getDateRange: jest.fn(),
+        };
+
+        budgetService = new BudgetService(mockApiClient, mockDateRangeService);
     });
 
     describe('getBudgets', () => {
@@ -62,7 +67,7 @@ describe('BudgetService', () => {
             const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
             const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
 
-            (DateRangeService.getDateRange as jest.Mock).mockReturnValue({
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
                 startDate: mockStartDate,
                 endDate: mockEndDate,
             });
@@ -93,7 +98,7 @@ describe('BudgetService', () => {
             const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
             const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
 
-            (DateRangeService.getDateRange as jest.Mock).mockReturnValue({
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
                 startDate: mockStartDate,
                 endDate: mockEndDate,
             });
@@ -128,6 +133,14 @@ describe('BudgetService', () => {
 
     describe('getBudgetLimits', () => {
         it('should return budget limits', async () => {
+            const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
+            const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
+
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
+                startDate: mockStartDate,
+                endDate: mockEndDate,
+            });
+
             const mockLimits: BudgetLimitRead[] = [
                 {
                     id: '1',
@@ -149,7 +162,7 @@ describe('BudgetService', () => {
             const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
             const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
 
-            (DateRangeService.getDateRange as jest.Mock).mockReturnValue({
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
                 startDate: mockStartDate,
                 endDate: mockEndDate,
             });

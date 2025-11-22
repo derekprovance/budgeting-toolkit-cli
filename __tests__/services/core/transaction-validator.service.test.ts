@@ -1,14 +1,15 @@
-import { TransactionValidatorService } from '../../../src/services/core/transaction-validator.service';
-import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
+import { TransactionValidatorService } from '../../../src/services/core/transaction-validator.service.js';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { jest } from '@jest/globals';
 
 // Mock the logger to prevent console output during tests
 jest.mock('../../../src/logger', () => ({
     logger: {
-        debug: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
+        debug: jest.fn<(obj: unknown, msg: string) => void>(),
+        warn: jest.fn<(obj: unknown, msg: string) => void>(),
+        error: jest.fn<(obj: unknown, msg: string) => void>(),
+        trace: jest.fn<(obj: unknown, msg: string) => void>(),
     },
 }));
 
@@ -29,12 +30,13 @@ describe('TransactionValidatorService', () => {
 
     beforeEach(() => {
         mockPropertyService = {
-            isTransfer: jest.fn(),
-            hasACategory: jest.fn(),
-            isBill: jest.fn(),
-            isDisposableIncome: jest.fn(),
-            isExcludedTransaction: jest.fn(),
-            isDeposit: jest.fn(),
+            isTransfer: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isExcludedTransaction:
+                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
+            isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
         service = new TransactionValidatorService(mockPropertyService);

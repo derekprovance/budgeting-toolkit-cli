@@ -1,4 +1,4 @@
-import { BillComparisonDto } from '../dto/bill-comparison.dto';
+import { BillComparisonDto } from '../dto/bill-comparison.dto.js';
 
 export interface BillComparisonService {
     /**

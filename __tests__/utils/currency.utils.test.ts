@@ -1,4 +1,4 @@
-import { CurrencyUtils } from '../../src/utils/currency.utils';
+import { CurrencyUtils } from '../../src/utils/currency.utils.js';
 
 describe('CurrencyUtils', () => {
     describe('format', () => {

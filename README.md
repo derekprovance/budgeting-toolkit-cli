@@ -82,7 +82,7 @@ firefly:
 
 # AI settings
 llm:
-    model: 'claude-sonnet-4-5-20250929'
+    model: 'claude-sonnet-4-5'
     maxTokens: 2000
     temperature: 0.1
     batchSize: 5

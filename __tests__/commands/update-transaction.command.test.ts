@@ -1,8 +1,9 @@
-import { UpdateTransactionsCommand } from '../../src/commands/update-transaction.command';
-import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service';
-import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
-import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum';
-import { UpdateTransactionDisplayService } from '../../src/services/display/update-transaction-display.service';
+import { UpdateTransactionsCommand } from '../../src/commands/update-transaction.command.js';
+import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
+import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
+import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum.js';
+import { UpdateTransactionDisplayService } from '../../src/services/display/update-transaction-display.service.js';
+import { jest } from '@jest/globals';
 
 jest.mock('../../src/services/ai-transaction-update-orchestrator.service');
 jest.mock('../../src/services/display/update-transaction-display.service');

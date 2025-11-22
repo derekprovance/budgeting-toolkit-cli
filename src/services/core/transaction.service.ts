@@ -3,9 +3,11 @@ import {
     TransactionSplit,
     TransactionUpdate,
 } from '@derekprovance/firefly-iii-sdk';
-import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs';
-import { logger } from '../../logger';
-import { DateRangeService } from '../../types/interface/date-range.service.interface';
+import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
+import { logger as defaultLogger } from '../../logger.js';
+import { DateRangeService } from '../../types/interface/date-range.service.interface.js';
+import { ITransactionService } from './transaction.service.interface.js';
+import { ILogger } from '../../types/interface/logger.interface.js';
 
 class TransactionError extends Error {
     constructor(
@@ -19,16 +21,19 @@ class TransactionError extends Error {
 
 type TransactionCache = Map<string, TransactionRead[]>;
 type TransactionSplitIndex = Map<string, TransactionRead>;
-export class TransactionService {
+export class TransactionService implements ITransactionService {
     private readonly cache: TransactionCache;
     private readonly splitTransactionIdx: TransactionSplitIndex;
+    private readonly logger: ILogger;
 
     constructor(
         private readonly client: FireflyClientWithCerts,
-        cacheImplementation: TransactionCache = new Map()
+        cacheImplementation: TransactionCache = new Map(),
+        logger: ILogger = defaultLogger
     ) {
         this.cache = cacheImplementation;
         this.splitTransactionIdx = new Map();
+        this.logger = logger;
     }
 
     /**
@@ -105,7 +110,7 @@ export class TransactionService {
             );
         }
 
-        logger.debug(
+        this.logger.debug(
             {
                 transactionId: transaction.transaction_journal_id,
                 type: transaction.type,
@@ -118,7 +123,7 @@ export class TransactionService {
         try {
             const transactionRead = await this.getTransactionReadBySplit(transaction);
             if (!transactionRead?.id) {
-                logger.error(
+                this.logger.error(
                     {
                         transactionId: transaction.transaction_journal_id,
                         description: transaction.description,
@@ -144,7 +149,7 @@ export class TransactionService {
                 transactionRead.id,
                 updatePayload
             );
-            logger.debug(
+            this.logger.debug(
                 {
                     transactionId: transaction.transaction_journal_id,
                     updatedFields: Object.keys(updatePayload.transactions?.[0] ?? {}),
@@ -156,7 +161,7 @@ export class TransactionService {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-            logger.error(
+            this.logger.error(
                 {
                     error: errorMessage,
                     transactionId: transaction.transaction_journal_id,
@@ -205,7 +210,7 @@ export class TransactionService {
                 const indexKey = this.generateSplitTransactionKey(txSp);
 
                 if (this.splitTransactionIdx.has(indexKey)) {
-                    logger.debug(
+                    this.logger.debug(
                         {
                             transactionId: txSp.transaction_journal_id,
                             description: txSp.description,
@@ -231,7 +236,8 @@ export class TransactionService {
         month: number,
         year: number
     ): Promise<TransactionRead[]> {
-        const range = DateRangeService.getDateRange(month, year);
+        const dateRangeService = new DateRangeService();
+        const range = dateRangeService.getDateRange(month, year);
         const response = await this.client.transactions.listTransaction(
             undefined, // xTraceId
             undefined, // limit
@@ -259,7 +265,7 @@ export class TransactionService {
         error: unknown
     ): TransactionError {
         const message = `Failed to ${action} ${identifier}`;
-        logger.error(
+        this.logger.error(
             {
                 action,
                 identifier,

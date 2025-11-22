@@ -9,7 +9,7 @@ export class TransactionUtils {
      * @param transactions Array of transaction splits
      * @returns Total amount as a number
      */
-    static calculateTotal(transactions: TransactionSplit[]): number {
+    calculateTotal(transactions: TransactionSplit[]): number {
         return transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
     }
 }

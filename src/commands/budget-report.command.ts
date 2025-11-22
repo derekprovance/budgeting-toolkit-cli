@@ -1,9 +1,9 @@
-import { BudgetReportService } from '../services/budget-report.service';
-import { TransactionService } from '../services/core/transaction.service';
-import { Command } from '../types/interface/command.interface';
-import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
-import { BudgetDisplayService } from '../services/display/budget-display.service';
-import { BillComparisonService } from '../services/bill-comparison.service';
+import { BudgetReportService } from '../services/budget-report.service.js';
+import { TransactionService } from '../services/core/transaction.service.js';
+import { Command } from '../types/interface/command.interface.js';
+import { BudgetDateParams } from '../types/interface/budget-date-params.interface.js';
+import { BudgetDisplayService } from '../services/display/budget-display.service.js';
+import { BillComparisonService } from '../services/bill-comparison.service.js';
 
 /**
  * Command for displaying budget report

@@ -4,20 +4,20 @@ import {
     TransactionRead,
     TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
-import { logger } from '../logger';
-import { CategoryService } from './core/category.service';
-import { TransactionService } from './core/transaction.service';
-import { BudgetService } from './core/budget.service';
+import { logger } from '../logger.js';
+import { CategoryService } from './core/category.service.js';
+import { TransactionService } from './core/transaction.service.js';
+import { BudgetService } from './core/budget.service.js';
 import {
     AIResponse,
     LLMTransactionProcessingService,
-} from './ai/llm-transaction-processing.service';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum';
-import { UpdateTransactionStatusDto } from '../types/dto/update-transaction-status.dto';
-import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum';
-import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface';
-import { TransactionValidatorService } from './core/transaction-validator.service';
-import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service';
+} from './ai/llm-transaction-processing.service.js';
+import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
+import { UpdateTransactionStatusDto } from '../types/dto/update-transaction-status.dto.js';
+import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum.js';
+import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
+import { TransactionValidatorService } from './core/transaction-validator.service.js';
+import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';
 
 export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrchestrator {
     constructor(

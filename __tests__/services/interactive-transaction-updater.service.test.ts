@@ -1,18 +1,24 @@
-import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service';
-import { TransactionService } from '../../src/services/core/transaction.service';
-import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
-import { UserInputService } from '../../src/services/user-input.service';
-import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum';
-import { EditTransactionAttribute } from '../../src/types/enum/edit-transaction-attribute.enum';
-import { TransactionSplit, CategoryProperties, BudgetRead } from '@derekprovance/firefly-iii-sdk';
+import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
+import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
+import { UserInputService } from '../../src/services/user-input.service.js';
+import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
+import { EditTransactionAttribute } from '../../src/types/enum/edit-transaction-attribute.enum.js';
+import {
+    TransactionSplit,
+    CategoryProperties,
+    BudgetRead,
+    TransactionRead,
+} from '@derekprovance/firefly-iii-sdk';
+import { jest } from '@jest/globals';
 
 // Mock the logger to prevent console output during tests
 jest.mock('../../src/logger', () => ({
     logger: {
-        debug: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
+        debug: jest.fn<(obj: unknown, msg: string) => void>(),
+        warn: jest.fn<(obj: unknown, msg: string) => void>(),
+        error: jest.fn<(obj: unknown, msg: string) => void>(),
+        trace: jest.fn<(obj: unknown, msg: string) => void>(),
     },
 }));
 
@@ -47,8 +53,16 @@ describe('InteractiveTransactionUpdater', () => {
 
     beforeEach(() => {
         mockTransactionService = {
-            updateTransaction: jest.fn(),
-            getTransactionReadBySplit: jest.fn(),
+            updateTransaction:
+                jest.fn<
+                    (
+                        transaction: TransactionSplit,
+                        category?: string,
+                        budgetId?: string
+                    ) => Promise<TransactionRead | undefined>
+                >(),
+            getTransactionReadBySplit:
+                jest.fn<(splitTransaction: TransactionSplit) => TransactionRead | undefined>(),
         } as unknown as jest.Mocked<TransactionService>;
 
         mockValidator = {

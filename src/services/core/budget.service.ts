@@ -5,13 +5,23 @@ import {
     TransactionRead,
     TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
-import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs';
-import { DateRangeService } from '../../types/interface/date-range.service.interface';
-import { DateUtils } from '../../utils/date.utils';
-import { BudgetService as IBudgetService } from '../../types/interface/budget.service.interface';
+import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
+import {
+    DateRangeService,
+    IDateRangeService,
+} from '../../types/interface/date-range.service.interface.js';
+import { DateUtils } from '../../utils/date.utils.js';
+import { BudgetService as IBudgetService } from '../../types/interface/budget.service.interface.js';
 
 export class BudgetService implements IBudgetService {
-    constructor(private readonly client: FireflyClientWithCerts) {}
+    private readonly dateRangeService: IDateRangeService;
+
+    constructor(
+        private readonly client: FireflyClientWithCerts,
+        dateRangeService: IDateRangeService = new DateRangeService()
+    ) {
+        this.dateRangeService = dateRangeService;
+    }
 
     async getBudgets(): Promise<BudgetRead[]> {
         const budgets = await this.fetchBudgets();
@@ -21,7 +31,7 @@ export class BudgetService implements IBudgetService {
     async getBudgetExpenseInsights(month: number, year: number): Promise<InsightGroup> {
         try {
             DateUtils.validateMonthYear(month, year);
-            const range = DateRangeService.getDateRange(month, year);
+            const range = this.dateRangeService.getDateRange(month, year);
 
             const results = await this.client.insight.insightExpenseBudget(
                 range.startDate.toISOString().split('T')[0],
@@ -44,7 +54,7 @@ export class BudgetService implements IBudgetService {
     async getBudgetLimits(month: number, year: number): Promise<BudgetLimitRead[]> {
         try {
             DateUtils.validateMonthYear(month, year);
-            const range = DateRangeService.getDateRange(month, year);
+            const range = this.dateRangeService.getDateRange(month, year);
 
             const results = await this.client.budgets.listBudgetLimit(
                 range.startDate.toISOString().split('T')[0],
@@ -63,7 +73,7 @@ export class BudgetService implements IBudgetService {
     }
 
     async getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]> {
-        const range = DateRangeService.getDateRange(month, year);
+        const range = this.dateRangeService.getDateRange(month, year);
         const response = await this.client.budgets.listTransactionWithoutBudget(
             undefined, // xTraceId
             undefined, // limit

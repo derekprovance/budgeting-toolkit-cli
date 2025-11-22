@@ -1,5 +1,5 @@
-import { BudgetDateParams } from '../types/interface/budget-date-params.interface';
-import { DateRangeDto } from '../types/dto/date-range.dto';
+import { BudgetDateParams } from '../types/interface/budget-date-params.interface.js';
+import { DateRangeDto } from '../types/dto/date-range.dto.js';
 
 export class DateUtils {
     static validateMonthYear(month: number, year: number): void {

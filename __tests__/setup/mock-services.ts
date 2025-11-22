@@ -5,16 +5,31 @@
  * This reduces duplication and makes tests more maintainable.
  */
 
-import { TransactionService } from '../../src/services/core/transaction.service';
-import { CategoryService } from '../../src/services/core/category.service';
-import { BudgetService } from '../../src/services/core/budget.service';
-import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service';
-import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service';
-import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service';
-import { UserInputService } from '../../src/services/user-input.service';
-import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service';
-import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service';
-import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs';
+import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { CategoryService } from '../../src/services/core/category.service.js';
+import { BudgetService } from '../../src/services/core/budget.service.js';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
+import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
+import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service.js';
+import { UserInputService } from '../../src/services/user-input.service.js';
+import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
+import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
+import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
+import { ILogger } from '../../src/types/interface/logger.interface.js';
+import { jest } from '@jest/globals';
+
+/**
+ * Creates a mocked Logger with common logging methods
+ */
+export const createMockLogger = (): jest.Mocked<ILogger> => {
+    return {
+        debug: jest.fn<(obj: unknown, msg?: string) => void>(),
+        info: jest.fn<(obj: unknown, msg?: string) => void>(),
+        warn: jest.fn<(obj: unknown, msg?: string) => void>(),
+        error: jest.fn<(obj: unknown, msg?: string) => void>(),
+        trace: jest.fn<(obj: unknown, msg?: string) => void>(),
+    } as jest.Mocked<ILogger>;
+};
 
 /**
  * Creates a mocked TransactionService with common methods

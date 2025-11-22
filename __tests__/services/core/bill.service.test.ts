@@ -1,5 +1,6 @@
-import { BillService } from '../../../src/services/core/bill.service';
+import { BillService } from '../../../src/services/core/bill.service.js';
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
+import { jest } from '@jest/globals';
 
 describe('BillService', () => {
     let billService: BillService;

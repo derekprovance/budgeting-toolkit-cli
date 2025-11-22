@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { LLMAssignmentService } from './llm-assignment.service';
-import { logger } from '../../logger';
+import { LLMAssignmentService } from './llm-assignment.service.js';
+import { logger } from '../../logger.js';
 
 interface ITransactionProcessor {
     processTransactions(

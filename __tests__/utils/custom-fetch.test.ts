@@ -1,46 +1,66 @@
-import * as fs from 'fs';
-import axios from 'axios';
 import { Agent } from 'https';
+import { jest } from '@jest/globals';
 
-jest.mock('fs');
-jest.mock('axios');
-jest.mock('../../src/logger', () => ({
+// Mock fs with actual jest mock functions
+const mockExistsSync = jest.fn();
+const mockReadFileSync = jest.fn();
+const mockAxiosCreate = jest.fn().mockReturnValue({} as any);
+
+jest.unstable_mockModule('../../src/logger', () => ({
     logger: {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
+        debug: jest.fn<(obj: unknown, msg: string) => void>(),
+        info: jest.fn<(obj: unknown, msg: string) => void>(),
+        warn: jest.fn<(obj: unknown, msg: string) => void>(),
+        error: jest.fn<(obj: unknown, msg: string) => void>(),
     },
 }));
 
-import { createCustomAxiosInstance } from '../../src/utils/custom-fetch';
+jest.unstable_mockModule('axios', () => ({
+    default: {
+        create: mockAxiosCreate,
+    },
+}));
+
+jest.unstable_mockModule('fs', () => ({
+    existsSync: mockExistsSync,
+    readFileSync: mockReadFileSync,
+}));
+
+// Dynamic imports after mocks
+const { createCustomAxiosInstance } = await import('../../src/utils/custom-fetch.js');
 
 describe('createCustomAxiosInstance', () => {
-    const mockFs = fs as jest.Mocked<typeof fs>;
-    const mockAxios = axios as jest.Mocked<typeof axios>;
-
     beforeEach(() => {
-        jest.clearAllMocks();
-        mockAxios.create.mockReturnValue({} as any);
+        // Reset mocks
+        mockExistsSync.mockReset();
+        mockReadFileSync.mockReset();
+        mockAxiosCreate.mockReset().mockReturnValue({} as any);
+    });
+
+    afterEach(() => {
+        mockExistsSync.mockReset();
+        mockReadFileSync.mockReset();
+        mockAxiosCreate.mockReset();
+        delete process.env.STRICT_TLS;
     });
 
     describe('no certificate path provided', () => {
         it('should return default axios instance when no clientCertPath', () => {
             const axiosInstance = createCustomAxiosInstance({});
-            expect(mockAxios.create).toHaveBeenCalledWith();
+            expect(mockAxiosCreate).toHaveBeenCalledWith();
             expect(axiosInstance).toBeDefined();
         });
 
         it('should return default axios instance when clientCertPath is empty string', () => {
             const axiosInstance = createCustomAxiosInstance({ clientCertPath: '' });
-            expect(mockAxios.create).toHaveBeenCalledWith();
+            expect(mockAxiosCreate).toHaveBeenCalledWith();
             expect(axiosInstance).toBeDefined();
         });
     });
 
     describe('certificate file validation', () => {
         it('should fallback to default axios when CA cert file does not exist', () => {
-            mockFs.existsSync.mockImplementation(path => {
+            (mockExistsSync as jest.Mock).mockImplementation(path => {
                 if (typeof path === 'string') {
                     return path.includes('client.p12');
                 }
@@ -54,36 +74,42 @@ describe('createCustomAxiosInstance', () => {
 
             // Error is caught and default axios is returned
             expect(axiosInstance).toBeDefined();
-            expect(mockAxios.create).toHaveBeenCalled();
+            expect(mockAxiosCreate).toHaveBeenCalled();
         });
 
         it('should fallback to default axios when client cert file does not exist', () => {
-            mockFs.existsSync.mockReturnValue(false);
+            (mockExistsSync as jest.Mock).mockReturnValue(false);
 
-            const axiosInstance = createCustomAxiosInstance({
-                clientCertPath: '/path/to/nonexistent/client.p12',
-            });
+            const axiosInstance = createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/nonexistent/client.p12',
+                },
+                mockAxiosCreate
+            );
 
             // Error is caught and default axios is returned
             expect(axiosInstance).toBeDefined();
-            expect(mockAxios.create).toHaveBeenCalled();
+            expect(mockAxiosCreate).toHaveBeenCalled();
         });
     });
 
     describe('P12/PFX certificate loading', () => {
         beforeEach(() => {
-            mockFs.existsSync.mockReturnValue(true);
-            mockFs.readFileSync.mockReturnValue(Buffer.from('mock-cert-data'));
+            (mockExistsSync as jest.Mock).mockReturnValue(true);
+            (mockReadFileSync as jest.Mock).mockReturnValue(Buffer.from('mock-cert-data'));
         });
 
         it('should create axios instance with P12 certificate and password', () => {
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.p12',
-                clientCertPassword: 'secret',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.p12',
+                    clientCertPassword: 'secret',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.p12');
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.p12');
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                     timeout: 30000,
@@ -92,13 +118,16 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should create axios instance with PFX certificate and password', () => {
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.pfx',
-                clientCertPassword: 'secret',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.pfx',
+                    clientCertPassword: 'secret',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.pfx');
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.pfx');
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                     timeout: 30000,
@@ -107,12 +136,15 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should create axios instance with P12 certificate without password', () => {
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.p12',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.p12');
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.p12');
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                 })
@@ -120,74 +152,89 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should load CA certificate if provided', () => {
-            createCustomAxiosInstance({
-                caCertPath: '/path/to/ca.pem',
-                clientCertPath: '/path/to/client.p12',
-            });
+            createCustomAxiosInstance(
+                {
+                    caCertPath: '/path/to/ca.pem',
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/ca.pem');
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.p12');
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/ca.pem');
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.p12');
         });
     });
 
     describe('PEM certificate loading', () => {
         beforeEach(() => {
-            mockFs.existsSync.mockReturnValue(true);
-            mockFs.readFileSync.mockReturnValue(Buffer.from('mock-cert-data'));
+            (mockExistsSync as jest.Mock).mockReturnValue(true);
+            (mockReadFileSync as jest.Mock).mockReturnValue(Buffer.from('mock-cert-data'));
         });
 
         it('should load PEM certificate and key file', () => {
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.pem',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.pem',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockFs.existsSync).toHaveBeenCalledWith('/path/to/client.pem');
-            expect(mockFs.existsSync).toHaveBeenCalledWith('/path/to/client.key');
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.pem');
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.key');
+            expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.pem');
+            expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.key');
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.pem');
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.key');
         });
 
         it('should load CRT certificate and key file', () => {
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.crt',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.crt',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockFs.existsSync).toHaveBeenCalledWith('/path/to/client.crt');
-            expect(mockFs.existsSync).toHaveBeenCalledWith('/path/to/client.key');
+            expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.crt');
+            expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.key');
         });
 
         it('should handle missing key file gracefully', () => {
-            mockFs.existsSync.mockImplementation(path => {
+            (mockExistsSync as jest.Mock).mockImplementation(path => {
                 if (typeof path === 'string') {
                     return !path.endsWith('.key');
                 }
                 return false;
             });
 
-            const axiosInstance = createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.pem',
-            });
+            const axiosInstance = createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.pem',
+                },
+                mockAxiosCreate
+            );
 
             expect(axiosInstance).toBeDefined();
-            expect(mockFs.readFileSync).toHaveBeenCalledWith('/path/to/client.pem');
-            expect(mockFs.readFileSync).not.toHaveBeenCalledWith('/path/to/client.key');
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.pem');
+            expect(mockReadFileSync).not.toHaveBeenCalledWith('/path/to/client.key');
         });
     });
 
     describe('TLS validation strategy', () => {
         beforeEach(() => {
-            mockFs.existsSync.mockReturnValue(true);
-            mockFs.readFileSync.mockReturnValue(Buffer.from('mock-cert-data'));
+            (mockExistsSync as jest.Mock).mockReturnValue(true);
+            (mockReadFileSync as jest.Mock).mockReturnValue(Buffer.from('mock-cert-data'));
             delete process.env.STRICT_TLS;
         });
 
         it('should enable TLS validation when CA cert is provided', () => {
-            createCustomAxiosInstance({
-                caCertPath: '/path/to/ca.pem',
-                clientCertPath: '/path/to/client.p12',
-            });
+            createCustomAxiosInstance(
+                {
+                    caCertPath: '/path/to/ca.pem',
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                 })
@@ -195,11 +242,14 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should disable TLS validation when no CA cert is provided', () => {
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.p12',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                 })
@@ -209,51 +259,56 @@ describe('createCustomAxiosInstance', () => {
         it('should respect STRICT_TLS=false environment variable', () => {
             process.env.STRICT_TLS = 'false';
 
-            createCustomAxiosInstance({
-                caCertPath: '/path/to/ca.pem',
-                clientCertPath: '/path/to/client.p12',
-            });
+            createCustomAxiosInstance(
+                {
+                    caCertPath: '/path/to/ca.pem',
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                 })
             );
-
-            delete process.env.STRICT_TLS;
         });
 
         it('should respect STRICT_TLS=true environment variable', () => {
             process.env.STRICT_TLS = 'true';
 
-            createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.p12',
-            });
+            createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
-            expect(mockAxios.create).toHaveBeenCalledWith(
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     httpsAgent: expect.any(Agent),
                 })
             );
-
-            delete process.env.STRICT_TLS;
         });
     });
 
     describe('error handling', () => {
         it('should return default axios instance on file read error', () => {
-            mockFs.existsSync.mockReturnValue(true);
-            mockFs.readFileSync.mockImplementation(() => {
+            (mockExistsSync as jest.Mock).mockReturnValue(true);
+            (mockReadFileSync as jest.Mock).mockImplementation(() => {
                 throw new Error('File read error');
             });
 
-            const axiosInstance = createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.p12',
-            });
+            const axiosInstance = createCustomAxiosInstance(
+                {
+                    clientCertPath: '/path/to/client.p12',
+                },
+                mockAxiosCreate
+            );
 
             expect(axiosInstance).toBeDefined();
             // Should have been called twice - once for error case, once for fallback
-            expect(mockAxios.create).toHaveBeenCalled();
+            expect(mockAxiosCreate).toHaveBeenCalled();
         });
     });
 });

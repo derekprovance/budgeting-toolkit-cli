@@ -1,10 +1,10 @@
-import { TransactionService } from './core/transaction.service';
+import { ITransactionService } from './core/transaction.service.interface.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionClassificationService } from './core/transaction-classification.service';
-import { logger } from '../logger';
-import { DateUtils } from '../utils/date.utils';
-import { getConfigValue } from '../utils/config-loader';
-import { ValidTransfer } from '../types/interface/valid-transfer.interface';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
+import { logger } from '../logger.js';
+import { DateUtils } from '../utils/date.utils.js';
+import { getConfigValue } from '../utils/config-loader.js';
+import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
 
 /**
  * Service for calculating unbudgeted expenses.
@@ -21,17 +21,25 @@ import { ValidTransfer } from '../types/interface/valid-transfer.interface';
  *
  * 3. Transfers are ignored unless specified in yaml config
  */
+export interface UnbudgetedExpenseConfig {
+    validExpenseAccounts?: string[];
+    validTransfers?: ValidTransfer[];
+}
+
 export class UnbudgetedExpenseService {
     private readonly validExpenseAccounts: string[];
     private readonly validTransfers: ValidTransfer[];
 
     constructor(
-        private readonly transactionService: TransactionService,
-        private readonly transactionClassificationService: TransactionClassificationService
+        private readonly transactionService: ITransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService,
+        config?: UnbudgetedExpenseConfig
     ) {
-        // Load valid expense accounts from YAML config with fallback to defaults
-        this.validExpenseAccounts = getConfigValue<string[]>('validExpenseAccounts') ?? [];
-        this.validTransfers = getConfigValue<ValidTransfer[]>('validTransfers') ?? [];
+        // Load valid expense accounts from config parameter or YAML config with fallback to defaults
+        this.validExpenseAccounts =
+            config?.validExpenseAccounts ?? getConfigValue<string[]>('validExpenseAccounts') ?? [];
+        this.validTransfers =
+            config?.validTransfers ?? getConfigValue<ValidTransfer[]>('validTransfers') ?? [];
     }
 
     /**

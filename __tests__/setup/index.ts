@@ -6,9 +6,9 @@
  *   mockLogger,
  *   createMockTransactionService,
  *   expectToRejectWith
- * } from '../setup';
+ * } from '../setup.js';
  */
 
-export * from './mock-logger';
-export * from './mock-services';
-export * from './test-helpers';
+export * from './mock-logger.js';
+export * from './mock-services.js';
+export * from './test-helpers.js';

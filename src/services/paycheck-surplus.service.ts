@@ -1,18 +1,32 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionService } from './core/transaction.service';
-import { TransactionClassificationService } from './core/transaction-classification.service';
-import { logger } from '../logger';
-import { DateUtils } from '../utils/date.utils';
-import { expectedMonthlyPaycheck } from '../config';
+import { ITransactionService } from './core/transaction.service.interface.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
+import { logger as defaultLogger } from '../logger.js';
+import { DateUtils } from '../utils/date.utils.js';
+import { expectedMonthlyPaycheck as defaultExpectedPaycheck } from '../config.js';
+import { ILogger } from '../types/interface/logger.interface.js';
 
 /**
  * Service for calculating paycheck surplus (difference between actual and expected paychecks).
  */
 export class PaycheckSurplusService {
+    private readonly expectedMonthlyPaycheck: number | string | undefined | null;
+    private readonly logger: ILogger;
+
     constructor(
-        private readonly transactionService: TransactionService,
-        private readonly transactionClassificationService: TransactionClassificationService
-    ) {}
+        private readonly transactionService: ITransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService,
+        expectedMonthlyPaycheck?: number | string | null,
+        logger: ILogger = defaultLogger
+    ) {
+        // Explicitly handle null to allow testing missing config scenario
+        if (expectedMonthlyPaycheck === null) {
+            this.expectedMonthlyPaycheck = null;
+        } else {
+            this.expectedMonthlyPaycheck = expectedMonthlyPaycheck ?? defaultExpectedPaycheck;
+        }
+        this.logger = logger;
+    }
 
     /**
      * Calculates the difference between actual and expected paycheck amounts for a given month.
@@ -30,7 +44,7 @@ export class PaycheckSurplusService {
 
             const surplus = totalPaycheckAmount - expectedPaycheckAmount;
 
-            logger.debug(
+            this.logger.debug(
                 {
                     month,
                     year,
@@ -44,7 +58,7 @@ export class PaycheckSurplusService {
 
             return surplus;
         } catch (error) {
-            logger.error(
+            this.logger.error(
                 {
                     month,
                     year,
@@ -58,10 +72,10 @@ export class PaycheckSurplusService {
     }
 
     private getExpectedPaycheckAmount(): number {
-        if (expectedMonthlyPaycheck === undefined || expectedMonthlyPaycheck === null) {
-            logger.warn(
+        if (this.expectedMonthlyPaycheck === undefined || this.expectedMonthlyPaycheck === null) {
+            this.logger.warn(
                 {
-                    expectedMonthlyPaycheck,
+                    expectedMonthlyPaycheck: this.expectedMonthlyPaycheck,
                 },
                 'Expected monthly paycheck amount not configured'
             );
@@ -69,14 +83,14 @@ export class PaycheckSurplusService {
         }
 
         const amount =
-            typeof expectedMonthlyPaycheck === 'number'
-                ? expectedMonthlyPaycheck
-                : parseFloat(expectedMonthlyPaycheck);
+            typeof this.expectedMonthlyPaycheck === 'number'
+                ? this.expectedMonthlyPaycheck
+                : parseFloat(this.expectedMonthlyPaycheck);
 
         if (isNaN(amount)) {
-            logger.error(
+            this.logger.error(
                 {
-                    expectedMonthlyPaycheck,
+                    expectedMonthlyPaycheck: this.expectedMonthlyPaycheck,
                 },
                 'Invalid expected monthly paycheck amount'
             );
@@ -90,7 +104,7 @@ export class PaycheckSurplusService {
         return paychecks.reduce((sum, paycheck) => {
             const amount = parseFloat(paycheck.amount);
             if (isNaN(amount)) {
-                logger.warn({ paycheck }, 'Invalid paycheck amount found');
+                this.logger.warn({ paycheck }, 'Invalid paycheck amount found');
                 return sum;
             }
             return sum + amount;
@@ -111,7 +125,7 @@ export class PaycheckSurplusService {
                     return amountB - amountA;
                 });
 
-            logger.debug(
+            this.logger.debug(
                 {
                     month,
                     year,
@@ -123,7 +137,7 @@ export class PaycheckSurplusService {
 
             return paycheckCandidates;
         } catch (error) {
-            logger.error(
+            this.logger.error(
                 {
                     month,
                     year,

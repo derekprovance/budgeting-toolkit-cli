@@ -1,18 +1,24 @@
 import { Command, Option } from 'commander';
-import { FireflyClientWithCerts } from './api/firefly-client-with-certs';
-import { config, validateCertificateConfig } from './config';
-import { FinalizeBudgetCommand } from './commands/finalize-budget.command';
-import { BudgetReportCommand } from './commands/budget-report.command';
-import { UpdateTransactionsCommand } from './commands/update-transaction.command';
-import { ServiceFactory } from './factories/service.factory';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
+import { config, validateCertificateConfig } from './config.js';
+import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
+import { BudgetReportCommand } from './commands/budget-report.command.js';
+import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
+import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
     UpdateTransactionOptions,
-} from './types/interface/command-options.interface';
-import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum';
-import { logger } from './logger';
+} from './types/interface/command-options.interface.js';
+import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum.js';
+import { logger } from './logger.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+
+// ESM compatibility
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
 

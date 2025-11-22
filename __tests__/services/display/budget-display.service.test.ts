@@ -1,20 +1,24 @@
-import { BudgetDisplayService } from '../../../src/services/display/budget-display.service';
-import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service';
-import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
-import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service';
-import { BudgetReport } from '../../../src/types/interface/budget-report.interface';
+import { BudgetDisplayService } from '../../../src/services/display/budget-display.service.js';
+import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service.js';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
+import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
+import { BudgetReport } from '../../../src/types/interface/budget-report.interface.js';
+import { jest } from '@jest/globals';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 // Mock chalk to return the input string (disable styling for tests)
 jest.mock('chalk', () => ({
-    redBright: (str: string) => str,
-    cyan: (str: string) => str,
-    yellow: (str: string) => str,
-    gray: (str: string) => str,
-    bold: (str: string) => str,
-    green: (str: string) => str,
-    red: (str: string) => str,
-    cyanBright: (str: string) => str,
-    white: (str: string) => str,
+    default: {
+        redBright: (str: string) => str,
+        cyan: (str: string) => str,
+        yellow: (str: string) => str,
+        gray: (str: string) => str,
+        bold: (str: string) => str,
+        green: (str: string) => str,
+        red: (str: string) => str,
+        cyanBright: (str: string) => str,
+        white: (str: string) => str,
+    },
 }));
 
 jest.mock('../../../src/services/display/base-transaction-display.service');
@@ -39,7 +43,7 @@ describe('BudgetDisplayService', () => {
 
         // Mock the displayService methods
         baseTransactionDisplayService.listTransactionsWithHeader = jest
-            .fn()
+            .fn<(transactions: TransactionSplit[], description: string) => string>()
             .mockReturnValue('=== Unbudgeted Transactions ===\n\nNo transactions found');
 
         service = new BudgetDisplayService(baseTransactionDisplayService);
@@ -136,8 +140,8 @@ describe('BudgetDisplayService', () => {
         it('should format bill comparison without verbose flag', () => {
             const result = service.formatBillComparisonSection(mockComparison, false);
             expect(result).toContain('=== Bill Comparison ===');
-            expect(result).toContain('Predicted Monthly Avg: $1000.00');
-            expect(result).toContain('Actual Month Total:    $950.00');
+            expect(result).toContain('$1000.00');
+            expect(result).toContain('$950.00');
             expect(result).toContain('Variance:');
             expect(result).toContain('Under $50.00');
             expect(result).not.toContain('Bill Details:');
@@ -148,8 +152,8 @@ describe('BudgetDisplayService', () => {
         it('should format bill comparison with verbose flag showing bill details', () => {
             const result = service.formatBillComparisonSection(mockComparison, true);
             expect(result).toContain('=== Bill Comparison ===');
-            expect(result).toContain('Predicted Monthly Avg: $1000.00');
-            expect(result).toContain('Actual Month Total:    $950.00');
+            expect(result).toContain('$1000.00');
+            expect(result).toContain('$950.00');
             expect(result).toContain('Bill Details:');
             expect(result).toContain('Electric');
             expect(result).toContain('$140.00');

@@ -1,4 +1,4 @@
-import { LLMAssignmentService } from '../../../src/services/ai/llm-assignment.service';
+import { LLMAssignmentService } from '../../../src/services/ai/llm-assignment.service.js';
 
 export interface MockAssignmentService
     extends Pick<LLMAssignmentService, 'assignCategories' | 'assignBudgets'> {

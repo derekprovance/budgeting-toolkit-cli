@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { logger } from '../logger';
-import { loadYamlConfig } from '../utils/config-loader';
+import { logger } from '../logger.js';
+import { loadYamlConfig } from '../utils/config-loader.js';
 
 export interface ChatMessage {
     role: 'user' | 'assistant';
@@ -133,14 +133,16 @@ export class ClaudeClient {
         maxRetryDelayMs: 32000,
     };
 
-    constructor(config: Partial<ClaudeConfig> = {}) {
+    constructor(config: Partial<ClaudeConfig> = {}, client?: Anthropic) {
         this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...this.clearUndefined(config) };
-        this.client = new Anthropic({
-            apiKey: this.config.apiKey,
-            baseURL: this.config.baseURL,
-            maxRetries: this.config.maxRetries,
-            timeout: this.config.timeout,
-        });
+        this.client =
+            client ||
+            new Anthropic({
+                apiKey: this.config.apiKey,
+                baseURL: this.config.baseURL,
+                maxRetries: this.config.maxRetries,
+                timeout: this.config.timeout,
+            });
         logger.debug(`Initializing AI Client with model: ${this.config.model}`);
     }
 

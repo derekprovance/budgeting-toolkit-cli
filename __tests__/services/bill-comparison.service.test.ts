@@ -1,7 +1,8 @@
-import { BillComparisonService } from '../../src/services/bill-comparison.service';
-import { BillService } from '../../src/services/core/bill.service';
-import { TransactionService } from '../../src/services/core/transaction.service';
+import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
+import { BillService } from '../../src/services/core/bill.service.js';
+import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { jest } from '@jest/globals';
 
 // Mock services
 jest.mock('../../src/services/core/bill.service');
@@ -58,7 +59,8 @@ describe('BillComparisonService', () => {
         } as unknown as jest.Mocked<BillService>;
 
         mockTransactionService = {
-            getTransactionsForMonth: jest.fn(),
+            getTransactionsForMonth:
+                jest.fn<(month: number, year: number) => Promise<TransactionSplit[]>>(),
         } as unknown as jest.Mocked<TransactionService>;
 
         billComparisonService = new BillComparisonService(mockBillService, mockTransactionService);

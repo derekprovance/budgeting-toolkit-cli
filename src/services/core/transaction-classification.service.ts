@@ -1,12 +1,13 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { Tag } from '../../config';
-import { ExcludedTransactionService } from '../excluded-transaction.service';
-import { loadYamlConfig } from '../../utils/config-loader';
+import { Tag } from '../../config.js';
+import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
+import { loadYamlConfig } from '../../utils/config-loader.js';
+import { ITransactionClassificationService } from './transaction-classification.service.interface.js';
 
-export class TransactionClassificationService {
+export class TransactionClassificationService implements ITransactionClassificationService {
     private fireflyConfig;
 
-    constructor(private readonly excludedTransactionService: ExcludedTransactionService) {
+    constructor(private readonly excludedTransactionService: IExcludedTransactionService) {
         const yamlConfig = loadYamlConfig();
         this.fireflyConfig = yamlConfig.firefly;
     }

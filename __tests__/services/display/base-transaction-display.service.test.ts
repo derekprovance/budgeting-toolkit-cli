@@ -1,36 +1,35 @@
 import '../../../__tests__/setup/mock-logger';
-import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service';
-import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service';
-import { createMockTransaction } from '../../shared/test-data';
+import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service.js';
+import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
+import { createMockTransaction } from '../../shared/test-data.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-
-// Mock TransactionUtils
-jest.mock('../../../src/utils/transaction.utils', () => ({
-    TransactionUtils: {
-        calculateTotal: jest.fn(),
-    },
-}));
-
-import { TransactionUtils } from '../../../src/utils/transaction.utils';
+import { ITransactionUtils } from '../../../src/utils/transaction.utils.interface.js';
+import { jest } from '@jest/globals';
 
 describe('BaseTransactionDisplayService', () => {
     let service: BaseTransactionDisplayService;
     let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
+    let mockTransactionUtils: ITransactionUtils;
 
     beforeEach(() => {
+        jest.clearAllMocks();
+
         mockTransactionClassificationService = {
-            isBill: jest.fn(),
-            isTransfer: jest.fn(),
-            isDeposit: jest.fn(),
+            isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isTransfer: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
             isPaycheck: jest.fn(),
-            isDisposableIncome: jest.fn(),
+            isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
-        service = new BaseTransactionDisplayService(mockTransactionClassificationService);
+        mockTransactionUtils = {
+            calculateTotal: jest.fn().mockReturnValue(0),
+        };
 
-        // Reset mocks
-        jest.clearAllMocks();
-        (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(0);
+        service = new BaseTransactionDisplayService(
+            mockTransactionClassificationService,
+            mockTransactionUtils
+        );
     });
 
     describe('listTransactionsWithHeader', () => {
@@ -52,10 +51,10 @@ describe('BaseTransactionDisplayService', () => {
                 }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'My Transactions');
 
@@ -81,10 +80,10 @@ describe('BaseTransactionDisplayService', () => {
                 }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(150);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(150);
 
             const result = service.listTransactionsWithHeader(
                 transactions,
@@ -102,14 +101,14 @@ describe('BaseTransactionDisplayService', () => {
                 createMockTransaction({ amount: '50.00', currency_symbol: '$' }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(150);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(150);
 
             service.listTransactionsWithHeader(transactions, 'Test');
 
-            expect(TransactionUtils.calculateTotal).toHaveBeenCalledWith(transactions);
+            expect(mockTransactionUtils.calculateTotal).toHaveBeenCalledWith(transactions);
         });
 
         it('should use currency symbol from first transaction', () => {
@@ -117,10 +116,10 @@ describe('BaseTransactionDisplayService', () => {
                 createMockTransaction({ amount: '100.00', currency_symbol: '€' }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -137,10 +136,10 @@ describe('BaseTransactionDisplayService', () => {
                 }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -159,10 +158,10 @@ describe('BaseTransactionDisplayService', () => {
                 }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -180,10 +179,10 @@ describe('BaseTransactionDisplayService', () => {
                 }),
             ];
 
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -201,13 +200,13 @@ describe('BaseTransactionDisplayService', () => {
                 currency_symbol: '$',
                 date: '2025-01-15',
             });
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
         });
 
         it('should display [BILL] indicator for bill transactions', () => {
-            mockTransactionClassificationService.isBill.mockReturnValue(true);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(true);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
 
             const result = service.listTransactionsWithHeader([transaction], 'Test');
 
@@ -215,9 +214,9 @@ describe('BaseTransactionDisplayService', () => {
         });
 
         it('should display [TRANSFER] indicator for transfer transactions', () => {
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(true);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
 
             const result = service.listTransactionsWithHeader([transaction], 'Test');
 
@@ -225,9 +224,9 @@ describe('BaseTransactionDisplayService', () => {
         });
 
         it('should display [DEPOSIT] indicator for deposit transactions', () => {
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(true);
 
             const result = service.listTransactionsWithHeader([transaction], 'Test');
 
@@ -235,9 +234,9 @@ describe('BaseTransactionDisplayService', () => {
         });
 
         it('should display [OTHER] indicator for other transactions', () => {
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
 
             const result = service.listTransactionsWithHeader([transaction], 'Test');
 
@@ -246,9 +245,9 @@ describe('BaseTransactionDisplayService', () => {
 
         it('should prioritize [BILL] over other types', () => {
             // Bill should be checked first
-            mockTransactionClassificationService.isBill.mockReturnValue(true);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(true);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(true);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(true);
 
             const result = service.listTransactionsWithHeader([transaction], 'Test');
 
@@ -258,9 +257,9 @@ describe('BaseTransactionDisplayService', () => {
         });
 
         it('should prioritize [TRANSFER] over [DEPOSIT]', () => {
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(true);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(true);
 
             const result = service.listTransactionsWithHeader([transaction], 'Test');
 
@@ -271,9 +270,9 @@ describe('BaseTransactionDisplayService', () => {
 
     describe('amount formatting', () => {
         beforeEach(() => {
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
         });
 
         it('should handle negative amounts (use absolute value)', () => {
@@ -285,7 +284,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(-50);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(-50);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -302,7 +301,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(123.456);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(123.456);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -318,7 +317,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(0);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(0);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -334,7 +333,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(9999999.99);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(9999999.99);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -344,9 +343,9 @@ describe('BaseTransactionDisplayService', () => {
 
     describe('edge cases', () => {
         beforeEach(() => {
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(false);
+            (mockTransactionClassificationService.isBill as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isTransfer as jest.Mock).mockReturnValue(false);
+            (mockTransactionClassificationService.isDeposit as jest.Mock).mockReturnValue(false);
         });
 
         it('should handle transactions with special characters in description', () => {
@@ -358,7 +357,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(25);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(25);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -375,7 +374,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -391,7 +390,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
@@ -408,7 +407,7 @@ describe('BaseTransactionDisplayService', () => {
                     date: '2025-01-15',
                 }),
             ];
-            (TransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
+            (mockTransactionUtils.calculateTotal as jest.Mock).mockReturnValue(100);
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 

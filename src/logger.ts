@@ -1,4 +1,4 @@
-import { logLevel } from './config';
+import { logLevel } from './config.js';
 
 import pino from 'pino';
 

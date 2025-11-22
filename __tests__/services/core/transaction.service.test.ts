@@ -1,38 +1,39 @@
-import { TransactionService } from '../../../src/services/core/transaction.service';
+import '../../setup/mock-logger.js'; // Must be first to mock logger module
+import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
+import { jest } from '@jest/globals';
+import { TransactionService } from '../../../src/services/core/transaction.service.js';
 import {
     TransactionArray,
     TransactionRead,
     TransactionSplit,
     TransactionTypeProperty,
 } from '@derekprovance/firefly-iii-sdk';
-import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs';
-import { logger } from '../../../src/logger';
-
-jest.mock('../../../src/logger', () => ({
-    logger: {
-        debug: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
-    },
-}));
+import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 
 describe('TransactionService', () => {
     let service: TransactionService;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
+        resetMockLogger();
         mockApiClient = {
             transactions: {
                 listTransaction: jest.fn(),
-                updateTransaction: jest.fn(),
+                updateTransaction:
+                    jest.fn<
+                        (
+                            transaction: TransactionSplit,
+                            category?: string,
+                            budgetId?: string
+                        ) => Promise<TransactionRead | undefined>
+                    >(),
             },
             tags: {
                 getTag: jest.fn(),
                 listTransactionByTag: jest.fn(),
             },
         } as unknown as jest.Mocked<FireflyClientWithCerts>;
-        service = new TransactionService(mockApiClient);
+        service = new TransactionService(mockApiClient, new Map(), mockLogger);
     });
 
     afterEach(() => {
@@ -169,7 +170,7 @@ describe('TransactionService', () => {
 
             await service.updateTransaction(mockTransaction, 'New Category');
 
-            expect(logger.error).toHaveBeenCalledWith(
+            expect(mockLogger.error).toHaveBeenCalledWith(
                 {
                     transactionId: '1',
                     description: 'Test Transaction',

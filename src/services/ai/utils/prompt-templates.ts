@@ -1,4 +1,4 @@
-import { LLMTransactionData } from './transaction-mapper';
+import { LLMTransactionData } from './transaction-mapper.js';
 
 export type AssignmentType = 'category' | 'budget';
 
