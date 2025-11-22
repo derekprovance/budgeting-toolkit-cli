@@ -23,21 +23,21 @@
         "node": "24.x"
     },
     "dependencies": {
-        "@anthropic-ai/sdk": "^0.68.0",
+        "@anthropic-ai/sdk": "^0.70.1",
         "@derekprovance/firefly-iii-sdk": "6.4.4",
-        "@inquirer/prompts": "^7.9.0",
-        "axios": "^1.7.9",
-        "chalk": "^4.x.x",
+        "@inquirer/prompts": "^8.0.1",
+        "axios": "^1.13.2",
+        "chalk": "^5.x.x",
         "commander": "^14.0.2",
         "dotenv": "^17.2.3",
-        "js-yaml": "^4.1.0",
+        "js-yaml": "^4.1.1",
         "pino": "^10.1.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.1",
         "@types/jest": "^30.0.0",
         "@types/js-yaml": "^4.0.9",
-        "@types/node": "^24.10.0",
+        "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
         "eslint-config-prettier": "^10.1.8",
         "globals": "^16.5.0",
@@ -47,6 +47,6 @@
         "ts-jest": "^29.4.5",
         "tsx": "^4.20.6",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.46.3"
+        "typescript-eslint": "^8.47.0"
     }
 }

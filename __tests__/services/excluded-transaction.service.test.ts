@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { ILogger } from '../../src/types/interface/logger.interface.js';
 
 // Mock fs/promises with actual jest mock functions
 const mockReadFile = jest.fn();
@@ -10,8 +11,9 @@ jest.unstable_mockModule('fs/promises', () => ({
 }));
 
 // Dynamic imports after mocks
-const { ExcludedTransactionService } = await import('../../src/services/excluded-transaction.service.js');
-const { ILogger } = await import('../../src/types/interface/logger.interface.js');
+const { ExcludedTransactionService } = await import(
+    '../../src/services/excluded-transaction.service.js'
+);
 
 describe('ExcludedTransactionService', () => {
     let service: ExcludedTransactionService;
@@ -31,7 +33,10 @@ describe('ExcludedTransactionService', () => {
             trace: jest.fn<(obj: unknown, msg: string) => void>(),
         };
 
-        service = new ExcludedTransactionService('/test/path/excluded_transactions.csv', mockLogger);
+        service = new ExcludedTransactionService(
+            '/test/path/excluded_transactions.csv',
+            mockLogger
+        );
     });
 
     describe('getExcludedTransactions', () => {
@@ -96,9 +101,7 @@ VANGUARD BUY INVESTMENT,4400`;
 
         it('should handle CSV parsing errors', async () => {
             (mockAccess as jest.Mock).mockResolvedValueOnce(undefined);
-            (mockReadFile as jest.Mock).mockRejectedValueOnce(
-                new Error('File read error')
-            );
+            (mockReadFile as jest.Mock).mockRejectedValueOnce(new Error('File read error'));
 
             await expect(service.getExcludedTransactions()).rejects.toThrow(
                 'Failed to parse excluded transactions file'

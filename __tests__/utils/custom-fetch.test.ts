@@ -31,7 +31,6 @@ const { createCustomAxiosInstance } = await import('../../src/utils/custom-fetch
 
 describe('createCustomAxiosInstance', () => {
     beforeEach(() => {
-
         // Reset mocks
         mockExistsSync.mockReset();
         mockReadFileSync.mockReset();
@@ -68,12 +67,10 @@ describe('createCustomAxiosInstance', () => {
                 return false;
             });
 
-            const axiosInstance = createCustomAxiosInstance(
-                {
-                    caCertPath: '/path/to/nonexistent/ca.pem',
-                    clientCertPath: '/path/to/client.p12',
-                },
-            );
+            const axiosInstance = createCustomAxiosInstance({
+                caCertPath: '/path/to/nonexistent/ca.pem',
+                clientCertPath: '/path/to/client.p12',
+            });
 
             // Error is caught and default axios is returned
             expect(axiosInstance).toBeDefined();
@@ -99,9 +96,7 @@ describe('createCustomAxiosInstance', () => {
     describe('P12/PFX certificate loading', () => {
         beforeEach(() => {
             (mockExistsSync as jest.Mock).mockReturnValue(true);
-            (mockReadFileSync as jest.Mock).mockReturnValue(
-                Buffer.from('mock-cert-data')
-            );
+            (mockReadFileSync as jest.Mock).mockReturnValue(Buffer.from('mock-cert-data'));
         });
 
         it('should create axios instance with P12 certificate and password', () => {
@@ -173,9 +168,7 @@ describe('createCustomAxiosInstance', () => {
     describe('PEM certificate loading', () => {
         beforeEach(() => {
             (mockExistsSync as jest.Mock).mockReturnValue(true);
-            (mockReadFileSync as jest.Mock).mockReturnValue(
-                Buffer.from('mock-cert-data')
-            );
+            (mockReadFileSync as jest.Mock).mockReturnValue(Buffer.from('mock-cert-data'));
         });
 
         it('should load PEM certificate and key file', () => {
@@ -228,9 +221,7 @@ describe('createCustomAxiosInstance', () => {
     describe('TLS validation strategy', () => {
         beforeEach(() => {
             (mockExistsSync as jest.Mock).mockReturnValue(true);
-            (mockReadFileSync as jest.Mock).mockReturnValue(
-                Buffer.from('mock-cert-data')
-            );
+            (mockReadFileSync as jest.Mock).mockReturnValue(Buffer.from('mock-cert-data'));
             delete process.env.STRICT_TLS;
         });
 

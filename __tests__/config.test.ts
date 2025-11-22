@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { FireflyClientWithCertsConfig } from '../src/api/firefly-client-with-certs.js';
 
 // Create mock functions
 const mockExistsSync = jest.fn();
@@ -16,7 +17,6 @@ jest.unstable_mockModule('fs', () => ({
 
 // Dynamic imports after mocks
 const { validateCertificateConfig } = await import('../src/config.js');
-const { FireflyClientWithCertsConfig } = await import('../src/api/firefly-client-with-certs.js');
 
 describe('validateCertificateConfig', () => {
     beforeEach(() => {
@@ -93,15 +93,9 @@ describe('validateCertificateConfig', () => {
             caCertPath: '/path/to/nonexistent-ca.pem',
         };
 
-        expect(() => validateCertificateConfig(config)).toThrow(
-            /Certificate configuration error/
-        );
-        expect(() => validateCertificateConfig(config)).toThrow(
-            /Client certificate not found/
-        );
-        expect(() => validateCertificateConfig(config)).toThrow(
-            /CA certificate not found/
-        );
+        expect(() => validateCertificateConfig(config)).toThrow(/Certificate configuration error/);
+        expect(() => validateCertificateConfig(config)).toThrow(/Client certificate not found/);
+        expect(() => validateCertificateConfig(config)).toThrow(/CA certificate not found/);
     });
 
     it('should not check CA cert if not provided', () => {
