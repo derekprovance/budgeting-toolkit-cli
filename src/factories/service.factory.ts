@@ -1,4 +1,3 @@
-import { BudgetRead, CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../api/firefly-client-with-certs.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { BudgetService } from '../services/core/budget.service.js';
@@ -10,6 +9,7 @@ import { ExcludedTransactionService } from '../services/excluded-transaction.ser
 import { TransactionClassificationService } from '../services/core/transaction-classification.service.js';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
+import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
 import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service.js';
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
@@ -93,16 +93,20 @@ export class ServiceFactory {
         const llmAssignmentService = new LLMAssignmentService(claudeClient);
         const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
-        const budgets: BudgetRead[] = await services.budgetService.getBudgets();
-        const categories: CategoryProperties[] = await services.categoryService.getCategories();
+        // Create AI validator service (will be initialized by orchestrator)
+        const aiValidator = new TransactionAIResultValidator(
+            services.categoryService,
+            services.budgetService,
+            services.transactionValidatorService
+        );
 
+        // Create interactive transaction updater with service dependencies
         const interactiveTransactionUpdater = new InteractiveTransactionUpdater(
             services.transactionService,
             services.transactionValidatorService,
+            aiValidator,
             services.userInputService,
-            dryRun,
-            categories,
-            budgets
+            dryRun
         );
 
         return new AITransactionUpdateOrchestrator(
@@ -110,6 +114,7 @@ export class ServiceFactory {
             interactiveTransactionUpdater,
             services.categoryService,
             services.budgetService,
+            aiValidator,
             llmProcessingService,
             services.transactionValidatorService,
             includeClassified

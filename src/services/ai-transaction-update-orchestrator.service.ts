@@ -8,6 +8,7 @@ import { logger } from '../logger.js';
 import { CategoryService } from './core/category.service.js';
 import { TransactionService } from './core/transaction.service.js';
 import { BudgetService } from './core/budget.service.js';
+import { TransactionAIResultValidator } from './core/transaction-ai-result-validator.service.js';
 import {
     AIResponse,
     LLMTransactionProcessingService,
@@ -18,6 +19,12 @@ import { UpdateTransactionStatus } from '../types/enum/update-transaction-status
 import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { TransactionValidatorService } from './core/transaction-validator.service.js';
 import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';
+import { TransactionValidationError } from '../types/result.type.js';
+
+interface TransactionError {
+    transaction: TransactionSplit;
+    error: TransactionValidationError;
+}
 
 export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrchestrator {
     constructor(
@@ -25,6 +32,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
         private readonly categoryService: CategoryService,
         private readonly budgetService: BudgetService,
+        private readonly aiValidator: TransactionAIResultValidator,
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: TransactionValidatorService,
         private readonly processTransactionsWithCategories: boolean = false
@@ -84,6 +92,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 'Processing transactions'
             );
 
+            // Initialize validator with fresh data
+            await this.aiValidator.initialize();
+
             let categories: CategoryProperties[] | undefined;
             if (updateMode !== UpdateTransactionMode.Budget) {
                 categories = await this.categoryService.getCategories();
@@ -101,13 +112,16 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 budgets
             );
 
-            const updatedTransactions = await this.updateTransactionsWithAIResults(
+            const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
                 transactions,
                 aiResults,
                 dryRun
             );
 
-            const errorCount = this.interactiveTransactionUpdater.getErrors().length;
+            // Display validation errors to user
+            if (errors.length > 0) {
+                this.displayValidationErrors(errors);
+            }
 
             logger.debug(
                 {
@@ -116,7 +130,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     dryRun,
                     totalTransactions: transactions.length,
                     updatedTransactions: updatedTransactions.length,
-                    errors: errorCount,
+                    validationErrors: errors.length,
                     categories: categories?.length,
                     budgets: budgets?.length,
                 },
@@ -126,7 +140,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             return {
                 status: UpdateTransactionStatus.HAS_RESULTS,
                 transactionsUpdated: updatedTransactions.length,
-                transactionErrors: errorCount,
+                transactionErrors: errors.length,
             };
         } catch (ex) {
             logger.error(
@@ -198,9 +212,10 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         transactions: TransactionSplit[],
         aiResults: Record<string, { category?: string; budget?: string }>,
         dryRun?: boolean
-    ): Promise<TransactionRead[]> {
+    ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
         const results: TransactionRead[] = [];
+        const errors: TransactionError[] = [];
 
         try {
             for (const transaction of transactions) {
@@ -221,20 +236,37 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     continue;
                 }
 
-                const updatedTransaction =
-                    await this.interactiveTransactionUpdater.updateTransaction(
-                        transaction,
-                        aiResults
-                    );
+                const updateResult = await this.interactiveTransactionUpdater.updateTransaction(
+                    transaction,
+                    aiResults
+                );
 
-                if (updatedTransaction) {
-                    results.push(updatedTransaction);
+                if (updateResult.ok) {
+                    if (updateResult.value) {
+                        results.push(updateResult.value);
+                    }
+                } else {
+                    // TypeScript should guarantee error exists, but add defensive check
+                    if (updateResult.error) {
+                        errors.push({
+                            transaction,
+                            error: updateResult.error,
+                        });
+                    } else {
+                        // This should never happen with proper discriminated union
+                        logger.error(
+                            {
+                                transactionId: transaction.transaction_journal_id,
+                                description: transaction.description,
+                            },
+                            'Result is not ok but error is undefined - this indicates a type error'
+                        );
+                    }
                 }
             }
 
             const totalTransactions = transactions.length;
             const updatedCount = results.length;
-            const errors = this.interactiveTransactionUpdater.getErrors();
             const errorCount = errors.length;
             const skippedCount = totalTransactions - updatedCount - errorCount;
 
@@ -243,7 +275,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     totalTransactions,
                     updated: updatedCount,
                     skipped: skippedCount,
-                    errors: errorCount,
+                    validationErrors: errorCount,
                 },
                 `${dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
             );
@@ -255,14 +287,15 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                         errorCount,
                         errors: errors.map(e => ({
                             description: e.transaction.description,
-                            error: e.error.message,
+                            field: e.error?.field,
+                            message: e.error?.message,
                         })),
                     },
-                    'Some transactions failed to update'
+                    'Some transactions failed validation'
                 );
             }
 
-            return results;
+            return { updatedTransactions: results, errors };
         } catch (err) {
             logger.error(
                 { error: err instanceof Error ? err.message : err },
@@ -270,5 +303,26 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             );
             throw err;
         }
+    }
+
+    /**
+     * Displays user-friendly validation error messages
+     */
+    private displayValidationErrors(errors: TransactionError[]): void {
+        if (errors.length === 0) return;
+
+        console.error(`\n⚠️  ${errors.length} transaction(s) failed validation:\n`);
+
+        for (const { transaction, error } of errors) {
+            console.error(`  • ${transaction.description || 'Unknown transaction'}`);
+            console.error(`    ${error.userMessage}`);
+            if (error.details?.suggestedCategory || error.details?.suggestedBudget) {
+                const suggested = error.details.suggestedCategory || error.details.suggestedBudget;
+                console.error(`    Suggested: "${suggested}"`);
+            }
+            console.error('');
+        }
+
+        console.error('Please check your categories and budgets in Firefly III.\n');
     }
 }
