@@ -240,7 +240,11 @@ export class InteractiveTransactionUpdater {
             }
 
             if (action === UpdateTransactionMode.Edit) {
-                [currentCategory, currentBudget] = await this.processEditCommand(transaction);
+                [currentCategory, currentBudget] = await this.processEditCommand(
+                    transaction,
+                    currentCategory,
+                    currentBudget
+                );
             }
         } while (action === UpdateTransactionMode.Edit);
 
@@ -257,16 +261,20 @@ export class InteractiveTransactionUpdater {
 
     /**
      * Handles edit mode workflow
+     * Preserves current values for attributes not being edited
      */
     private async processEditCommand(
-        transaction: TransactionSplit
+        transaction: TransactionSplit,
+        currentCategory?: CategoryProperties,
+        currentBudget?: BudgetRead
     ): Promise<[CategoryProperties | undefined, BudgetRead | undefined]> {
         logger.debug({ description: transaction.description }, 'User chose the edit option');
 
         const answers = await this.userInputService.shouldEditCategoryBudget();
 
-        let newCategory: CategoryProperties | undefined;
-        let newBudget: BudgetRead | undefined;
+        // Initialize with current values to preserve unedited attributes
+        let newCategory: CategoryProperties | undefined = currentCategory;
+        let newBudget: BudgetRead | undefined = currentBudget;
 
         for (const answer of answers) {
             if (answer === EditTransactionAttribute.Category) {

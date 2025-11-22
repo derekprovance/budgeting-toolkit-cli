@@ -542,7 +542,7 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
                 .mockResolvedValueOnce(UpdateTransactionMode.Edit)
-                .mockResolvedValueOnce(UpdateTransactionMode.Category);
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
@@ -569,10 +569,11 @@ describe('InteractiveTransactionUpdater', () => {
                 mockCategories.map(c => c.name)
             );
             expect(mockUserInputService.getNewBudget).not.toHaveBeenCalled();
+            // Budget should be preserved from LLM recommendation (mockBudgets[0].id = '2')
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
                 'New Category',
-                undefined
+                '2'
             );
         });
 
@@ -582,7 +583,7 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
                 .mockResolvedValueOnce(UpdateTransactionMode.Edit)
-                .mockResolvedValueOnce(UpdateTransactionMode.Budget);
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Budget,
             ]);
@@ -607,9 +608,10 @@ describe('InteractiveTransactionUpdater', () => {
             expect(mockUserInputService.getNewBudget).toHaveBeenCalledWith(
                 mockBudgets.map(b => b.attributes.name)
             );
+            // Category should be preserved from LLM recommendation (mockCategories[0].name = 'New Category')
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
-                undefined,
+                'New Category',
                 '2'
             );
         });
