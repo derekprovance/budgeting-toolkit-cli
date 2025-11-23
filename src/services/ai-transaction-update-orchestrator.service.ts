@@ -245,22 +245,15 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     if (updateResult.value) {
                         results.push(updateResult.value);
                     }
-                } else {
-                    // TypeScript should guarantee error exists, but add defensive check
-                    if (updateResult.error) {
-                        errors.push({
-                            transaction,
-                            error: updateResult.error,
-                        });
-                    } else {
-                        // This should never happen with proper discriminated union
-                        logger.error(
-                            {
-                                transactionId: transaction.transaction_journal_id,
-                                description: transaction.description,
-                            },
-                            'Result is not ok but error is undefined - this indicates a type error'
-                        );
+                } else if (updateResult.error) {
+                    errors.push({
+                        transaction,
+                        error: updateResult.error,
+                    });
+
+                    if (updateResult.error.message.includes('SIGINT')) {
+                        logger.debug(transaction, 'Transaction update(s) terminated with SIGINT');
+                        break;
                     }
                 }
             }
@@ -280,7 +273,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 `${dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
             );
 
-            // Log error details if any occurred
             if (errorCount > 0) {
                 logger.warn(
                     {
@@ -323,6 +315,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             console.error('');
         }
 
-        console.error('Please check your categories and budgets in Firefly III.\n');
+        console.error('Please check your categories and budgets in Firefly III.');
     }
 }

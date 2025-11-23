@@ -637,5 +637,296 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
             expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
         });
+
+        it('should handle SIGINT interruption and stop processing transactions', async () => {
+            const tag = 'test-tag';
+            const updateMode = UpdateTransactionMode.Both;
+
+            const mockTransaction1 = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Test Transaction 1',
+                amount: '100.00',
+            });
+
+            const mockTransaction2 = createMockTransaction({
+                transaction_journal_id: '2',
+                description: 'Test Transaction 2',
+                amount: '200.00',
+            });
+
+            const mockCategory: CategoryProperties = {
+                name: 'Test Category',
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
+            };
+
+            const mockBudget: BudgetRead = {
+                id: '1',
+                type: 'budget',
+                attributes: {
+                    name: 'Test Budget',
+                    active: true,
+                    order: 0,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                    spent: [],
+                    auto_budget_type: null,
+                    auto_budget_amount: null,
+                    auto_budget_period: null,
+                },
+            };
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([
+                mockTransaction1,
+                mockTransaction2,
+            ]);
+            mockValidator.shouldProcessTransaction.mockReturnValue(true);
+            mockCategoryService.getCategories.mockResolvedValue([mockCategory]);
+            mockBudgetService.getBudgets.mockResolvedValue([mockBudget]);
+            mockLLMService.processTransactions.mockResolvedValue({
+                '1': { category: 'New Category', budget: 'New Budget' },
+                '2': { category: 'Another Category', budget: 'Another Budget' },
+            });
+
+            // First transaction succeeds, second fails with SIGINT
+            mockInteractiveTransactionUpdater.updateTransaction
+                .mockResolvedValueOnce({
+                    ok: true,
+                    value: mockTransaction1 as any,
+                })
+                .mockResolvedValueOnce({
+                    ok: false,
+                    error: {
+                        field: 'user-interrupt',
+                        message: 'User interrupted with SIGINT',
+                        userMessage: 'Operation cancelled by user',
+                        transactionId: '2',
+                        transactionDescription: 'Test Transaction 2',
+                    },
+                });
+
+            const result = await service.updateTransactionsByTag(tag, updateMode);
+
+            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.transactionsUpdated).toBe(1); // Only first transaction updated
+            expect(result.transactionErrors).toBe(1); // Second transaction errored
+            expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledTimes(2);
+        });
+
+        it('should handle validation errors and collect them properly', async () => {
+            const tag = 'test-tag';
+            const updateMode = UpdateTransactionMode.Both;
+
+            const mockTransaction1 = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Test Transaction 1',
+                amount: '100.00',
+            });
+
+            const mockTransaction2 = createMockTransaction({
+                transaction_journal_id: '2',
+                description: 'Test Transaction 2',
+                amount: '200.00',
+            });
+
+            const mockCategory: CategoryProperties = {
+                name: 'Test Category',
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
+            };
+
+            const mockBudget: BudgetRead = {
+                id: '1',
+                type: 'budget',
+                attributes: {
+                    name: 'Test Budget',
+                    active: true,
+                    order: 0,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                    spent: [],
+                    auto_budget_type: null,
+                    auto_budget_amount: null,
+                    auto_budget_period: null,
+                },
+            };
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([
+                mockTransaction1,
+                mockTransaction2,
+            ]);
+            mockValidator.shouldProcessTransaction.mockReturnValue(true);
+            mockCategoryService.getCategories.mockResolvedValue([mockCategory]);
+            mockBudgetService.getBudgets.mockResolvedValue([mockBudget]);
+            mockLLMService.processTransactions.mockResolvedValue({
+                '1': { category: 'Invalid Category', budget: 'Test Budget' },
+                '2': { category: 'Test Category', budget: 'Invalid Budget' },
+            });
+
+            // First transaction succeeds, second fails validation
+            mockInteractiveTransactionUpdater.updateTransaction
+                .mockResolvedValueOnce({
+                    ok: true,
+                    value: mockTransaction1 as any,
+                })
+                .mockResolvedValueOnce({
+                    ok: false,
+                    error: {
+                        field: 'budget',
+                        message: 'Invalid budget name',
+                        userMessage: 'Budget "Invalid Budget" not found in Firefly III',
+                        transactionId: '2',
+                        transactionDescription: 'Test Transaction 2',
+                        details: {
+                            suggestedBudget: 'Invalid Budget',
+                        },
+                    },
+                });
+
+            // Spy on console.error to verify error display
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+            const result = await service.updateTransactionsByTag(tag, updateMode);
+
+            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.transactionsUpdated).toBe(1);
+            expect(result.transactionErrors).toBe(1);
+
+            // Verify displayValidationErrors was called (console.error invocations)
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('1 transaction(s) failed validation')
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Test Transaction 2')
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Budget "Invalid Budget" not found in Firefly III')
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Suggested: "Invalid Budget"')
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                'Please check your categories and budgets in Firefly III.'
+            );
+
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('should handle multiple validation errors and display all of them', async () => {
+            const tag = 'test-tag';
+            const updateMode = UpdateTransactionMode.Both;
+
+            const mockTransaction1 = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Transaction One',
+                amount: '100.00',
+            });
+
+            const mockTransaction2 = createMockTransaction({
+                transaction_journal_id: '2',
+                description: 'Transaction Two',
+                amount: '200.00',
+            });
+
+            const mockTransaction3 = createMockTransaction({
+                transaction_journal_id: '3',
+                description: 'Transaction Three',
+                amount: '300.00',
+            });
+
+            const mockCategory: CategoryProperties = {
+                name: 'Test Category',
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
+            };
+
+            const mockBudget: BudgetRead = {
+                id: '1',
+                type: 'budget',
+                attributes: {
+                    name: 'Test Budget',
+                    active: true,
+                    order: 0,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                    spent: [],
+                    auto_budget_type: null,
+                    auto_budget_amount: null,
+                    auto_budget_period: null,
+                },
+            };
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([
+                mockTransaction1,
+                mockTransaction2,
+                mockTransaction3,
+            ]);
+            mockValidator.shouldProcessTransaction.mockReturnValue(true);
+            mockCategoryService.getCategories.mockResolvedValue([mockCategory]);
+            mockBudgetService.getBudgets.mockResolvedValue([mockBudget]);
+            mockLLMService.processTransactions.mockResolvedValue({
+                '1': { category: 'Invalid Category 1', budget: 'Test Budget' },
+                '2': { category: 'Test Category', budget: 'Invalid Budget 2' },
+                '3': { category: 'Test Category', budget: 'Test Budget' },
+            });
+
+            // First fails, second fails, third succeeds
+            mockInteractiveTransactionUpdater.updateTransaction
+                .mockResolvedValueOnce({
+                    ok: false,
+                    error: {
+                        field: 'category',
+                        message: 'Invalid category name',
+                        userMessage: 'Category "Invalid Category 1" not found in Firefly III',
+                        transactionId: '1',
+                        transactionDescription: 'Transaction One',
+                        details: {
+                            suggestedCategory: 'Invalid Category 1',
+                        },
+                    },
+                })
+                .mockResolvedValueOnce({
+                    ok: false,
+                    error: {
+                        field: 'budget',
+                        message: 'Invalid budget name',
+                        userMessage: 'Budget "Invalid Budget 2" not found in Firefly III',
+                        transactionId: '2',
+                        transactionDescription: 'Transaction Two',
+                        details: {
+                            suggestedBudget: 'Invalid Budget 2',
+                        },
+                    },
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    value: mockTransaction3 as any,
+                });
+
+            // Spy on console.error to verify error display
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+            const result = await service.updateTransactionsByTag(tag, updateMode);
+
+            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.transactionsUpdated).toBe(1);
+            expect(result.transactionErrors).toBe(2);
+
+            // Verify both errors are displayed
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('2 transaction(s) failed validation')
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Transaction One')
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Transaction Two')
+            );
+
+            consoleErrorSpy.mockRestore();
+        });
     });
 });
