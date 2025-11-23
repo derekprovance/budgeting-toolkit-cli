@@ -38,6 +38,7 @@ export const DEFAULT_CONFIG: AppConfig = {
         expectedMonthlyPaycheck: undefined,
         excludedAdditionalIncomePatterns: [],
         excludeDisposableIncome: true,
+        excludedTransactions: [],
         tags: {
             disposableIncome: 'Disposable Income',
             bills: 'Bills',

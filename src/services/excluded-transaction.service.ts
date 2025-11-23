@@ -1,69 +1,43 @@
-import { constants } from 'fs';
-import { readFile, access } from 'fs/promises';
 import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto.js';
-import { join } from 'path';
 import { logger as defaultLogger } from '../logger.js';
 import { IExcludedTransactionService } from './excluded-transaction.service.interface.js';
 import { ILogger } from '../types/interface/logger.interface.js';
+import { ExcludedTransaction } from '../config/config.types.js';
 
+/**
+ * Service for managing excluded transactions.
+ *
+ * Excluded transactions are configured in the YAML file and injected via constructor.
+ * This allows certain transactions to be filtered out from processing based on
+ * description and/or amount.
+ */
 export class ExcludedTransactionService implements IExcludedTransactionService {
-    private readonly excludedTransactionsPath: string;
+    private readonly excludedTransactions: ExcludedTransaction[];
     private readonly logger: ILogger;
 
-    constructor(excludedTransactionsPath?: string, logger: ILogger = defaultLogger) {
-        this.excludedTransactionsPath =
-            excludedTransactionsPath ?? join(process.cwd(), 'excluded_transactions.csv');
+    constructor(excludedTransactions: ExcludedTransaction[], logger: ILogger = defaultLogger) {
+        this.excludedTransactions = excludedTransactions;
         this.logger = logger;
     }
 
     async getExcludedTransactions(): Promise<ExcludedTransactionDto[]> {
-        try {
-            await access(this.excludedTransactionsPath, constants.F_OK);
-        } catch {
-            this.logger.debug('No excluded transactions file found, returning empty array');
-            return [];
-        }
+        this.logger.trace(
+            { count: this.excludedTransactions.length },
+            'Returning excluded transactions from configuration'
+        );
 
-        const records: ExcludedTransactionDto[] = [];
-
-        try {
-            const csvContent = await readFile(this.excludedTransactionsPath, 'utf-8');
-            const lines = csvContent.split('\n').filter(line => line.trim());
-
-            for (const line of lines) {
-                const [description, amount] = line.split(',').map(s => s.trim());
-                const record = { description, amount };
-
-                if (this.isValidExcludedTransaction(record)) {
-                    records.push({
-                        description: record.description,
-                        amount: this.convertCurrencyToFloat(record.amount),
-                        reason: 'Excluded from processing',
-                    });
-                } else {
-                    this.logger.warn(
-                        `Invalid excluded transaction record: ${JSON.stringify(record)}`
-                    );
-                }
-            }
-        } catch (error) {
-            this.logger.error({ error }, 'Error parsing excluded transactions file:');
-            throw new Error('Failed to parse excluded transactions file');
-        }
-
-        this.logger.trace({ records }, 'Excluded transactions parsed successfully');
-        return records;
+        return this.excludedTransactions.map(transaction => ({
+            description: transaction.description,
+            amount: transaction.amount,
+            reason: transaction.reason || 'Excluded from processing',
+        }));
     }
 
     async isExcludedTransaction(description: string, amount: string): Promise<boolean> {
-        const excludedTransactions = await this.getExcludedTransactions();
         const convertedAmount = this.convertCurrencyToFloat(amount);
 
-        return excludedTransactions.some(transaction => {
-            if (!transaction.description && !transaction.amount) {
-                return false;
-            }
-
+        const isExcluded = this.excludedTransactions.some(transaction => {
+            // Both description and amount must match
             if (transaction.description && transaction.amount) {
                 return (
                     transaction.description === description &&
@@ -72,11 +46,13 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
                 );
             }
 
-            if (transaction.description) {
+            // Only description needs to match
+            if (transaction.description && !transaction.amount) {
                 return transaction.description === description;
             }
 
-            if (transaction.amount) {
+            // Only amount needs to match
+            if (!transaction.description && transaction.amount) {
                 return (
                     Math.abs(parseFloat(transaction.amount)) ===
                     Math.abs(parseFloat(convertedAmount))
@@ -85,22 +61,12 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
 
             return false;
         });
-    }
 
-    private isValidExcludedTransaction(
-        record: unknown
-    ): record is { description: string; amount: string } {
-        if (!record || typeof record !== 'object') {
-            return false;
+        if (isExcluded) {
+            this.logger.debug({ description, amount }, 'Transaction matched exclusion criteria');
         }
 
-        const dto = record as { description: string; amount: string };
-        return (
-            typeof dto.description === 'string' &&
-            typeof dto.amount === 'string' &&
-            dto.description.trim() !== '' &&
-            dto.amount.trim() !== ''
-        );
+        return isExcluded;
     }
 
     private convertCurrencyToFloat(amount: string): string {

@@ -50,30 +50,90 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 
 ## Configuration System
 
-This project uses a dual configuration system:
+This project uses a unified configuration system managed by `ConfigManager` singleton.
+
+### Configuration Loading Priority
+
+Configuration is loaded with clear precedence (high to low):
+
+1. **YAML Configuration** (`budgeting-toolkit.config.yaml`) - Highest priority
+2. **Environment Variables** (`.env`) - Overrides defaults
+3. **Code Defaults** (`src/config/config.defaults.ts`) - Lowest priority
+
+### Configuration Manager
+
+The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centralized configuration:
+
+- Loads configuration at startup
+- Validates all values with descriptive errors
+- Provides strongly-typed configuration access
+- Services receive configuration via dependency injection
 
 ### YAML Configuration (`budgeting-toolkit.config.yaml`)
 
-Primary configuration file loaded via `src/utils/config-loader.ts`:
+**Account Configuration:**
+
+- `validDestinationAccounts` - Array of account IDs for valid income destinations
+- `validExpenseAccounts` - Array of account IDs for expense filtering
+- `validTransfers` - Array of valid transfer configurations (source/destination pairs)
+
+**Transaction Configuration:**
 
 - `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations
-- `validDestinationAccounts` / `validExpenseAccounts` - Account IDs for filtering transactions
 - `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude (e.g., "PAYROLL")
-- `excludedTransactionsCsv` - Path to CSV file with globally excluded transactions
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
+- `excludedTransactions` - Array of transactions to globally exclude:
+    ```yaml
+    excludedTransactions:
+        - description: 'VANGUARD BUY INVESTMENT'
+          amount: '4400.00'
+          reason: 'Investment purchase'
+        - description: 'Excluded Description Only' # Matches any amount
+        - amount: '999.99' # Matches any description
+          reason: 'Specific amount to exclude'
+    ```
+
+**Firefly Configuration:**
+
+- `firefly.noNameExpenseAccountId` - Account ID for transactions with no destination
+
+**LLM Configuration:**
+
+- `llm.model` - Claude model name
+- `llm.temperature` - Temperature setting (0-1)
+- `llm.maxTokens` - Max tokens per request
+- `llm.batchSize` - Batch processing size
+- `llm.maxConcurrent` - Max concurrent requests
+- `llm.retryDelayMs` / `llm.maxRetryDelayMs` - Retry configuration
+- `llm.rateLimit.*` - Rate limiting settings
+- `llm.circuitBreaker.*` - Circuit breaker configuration
 
 ### Environment Variables (`.env`)
 
-Fallback configuration loaded via `src/config.ts`:
+**Required:**
 
 - `FIREFLY_API_URL` - Firefly III API endpoint
 - `FIREFLY_API_TOKEN` - API authentication token
 - `ANTHROPIC_API_KEY` - Claude AI API key
-- `LLM_MODEL` - Claude model version
-- `LOG_LEVEL` - Logging level (trace, debug, info, warn, error, silent)
-- Certificate paths: `CLIENT_CERT_CA_PATH`, `CLIENT_CERT_PATH`, `CLIENT_CERT_PASSWORD`
 
-**Important**: The YAML config takes precedence over environment variables via `getConfigValue()` function.
+**Optional:**
+
+- `LOG_LEVEL` - Logging level (trace, debug, info, warn, error, silent)
+- `CLIENT_CERT_CA_PATH` - CA certificate path for mTLS
+- `CLIENT_CERT_PATH` - Client certificate path for mTLS
+- `CLIENT_CERT_PASSWORD` - Certificate password
+- `EXPECTED_MONTHLY_PAYCHECK` - Fallback for paycheck amount
+
+### Configuration Files Structure
+
+```
+src/config/
+├── config-manager.ts         # Singleton configuration manager
+├── config.types.ts           # TypeScript type definitions
+├── config.defaults.ts        # Default values
+├── config.validator.ts       # Validation logic
+└── llm.config.ts            # LLM client configuration helper
+```
 
 ## Architecture Overview
 
@@ -105,7 +165,7 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 - `AdditionalIncomeService` - Finds additional income (non-payroll deposits)
 - `UnbudgetedExpenseService` - Finds expenses not covered by budget
 - `PaycheckSurplusService` - Calculates paycheck surplus/deficit
-- `ExcludedTransactionService` - Manages transaction exclusions via CSV
+- `ExcludedTransactionService` - Manages transaction exclusions via YAML configuration
 - `AITransactionUpdateOrchestrator` - Orchestrates AI-powered transaction updates
 - `InteractiveTransactionUpdater` - Handles transaction updates with interactive user workflow
 - `UserInputService` - Handles user interactions, prompts, and multiple-choice inputs
@@ -127,7 +187,12 @@ The CLI uses a command pattern with three main commands defined in `src/cli.ts`:
 
 ### Dependency Injection
 
-Services are created and wired together in `ServiceFactory.createServices()`. The factory pattern ensures consistent service instantiation and dependency injection.
+Services are created and wired together in `ServiceFactory.createServices()`. The factory:
+
+- Retrieves configuration from `ConfigManager.getInstance().getConfig()`
+- Injects configuration values into service constructors
+- Services never load configuration themselves
+- Clear dependency graph visible in constructor signatures
 
 ### Transaction Classification System
 
@@ -170,9 +235,19 @@ Enhanced user experience with `@inquirer/prompts`:
 
 ### Configuration Loading
 
-- `src/utils/config-loader.ts` - YAML config loader with caching
-- `src/config.ts` - Environment variable config with YAML fallbacks
-- Always use `getConfigValue()` for new config options
+- `src/config/config-manager.ts` - Unified configuration manager (singleton)
+- `src/config/config.types.ts` - Complete type definitions
+- `src/config/config.defaults.ts` - Default values
+- `src/config/config.validator.ts` - Startup validation
+- `src/config.ts` - Re-exports for convenience
+
+**Adding new configuration:**
+
+1. Add type to `config.types.ts`
+2. Add default to `config.defaults.ts`
+3. Add YAML mapping in `config-manager.ts` (if YAML supported)
+4. Add validation in `config.validator.ts` (if needed)
+5. Inject value in `ServiceFactory` to services that need it
 
 ### Service Creation
 

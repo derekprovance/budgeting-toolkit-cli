@@ -29,7 +29,9 @@ export class ServiceFactory {
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
         const userInputService = new UserInputService(baseUrl);
-        const excludedTransactionService = new ExcludedTransactionService();
+        const excludedTransactionService = new ExcludedTransactionService(
+            config.transactions.excludedTransactions
+        );
         const transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService,
             config.api.firefly.noNameExpenseAccountId,

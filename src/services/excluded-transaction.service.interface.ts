@@ -6,7 +6,7 @@ import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto.js
  */
 export interface IExcludedTransactionService {
     /**
-     * Gets all excluded transactions from CSV file
+     * Gets all excluded transactions
      */
     getExcludedTransactions(): Promise<ExcludedTransactionDto[]>;
 

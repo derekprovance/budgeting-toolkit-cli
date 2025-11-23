@@ -2,7 +2,7 @@ import path from 'path';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import dotenv from 'dotenv';
-import { AppConfig } from './config.types.js';
+import { AppConfig, ExcludedTransaction } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
 import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
@@ -17,6 +17,7 @@ interface YamlConfig {
     excludedAdditionalIncomePatterns?: string[];
     excludeDisposableIncome?: boolean;
     expectedMonthlyPaycheck?: number;
+    excludedTransactions?: ExcludedTransaction[];
 
     firefly?: {
         noNameExpenseAccountId?: string;
@@ -201,6 +202,10 @@ export class ConfigManager {
 
         if (yamlConfig.expectedMonthlyPaycheck !== undefined) {
             config.transactions.expectedMonthlyPaycheck = yamlConfig.expectedMonthlyPaycheck;
+        }
+
+        if (yamlConfig.excludedTransactions) {
+            config.transactions.excludedTransactions = yamlConfig.excludedTransactions;
         }
 
         // Firefly Configuration

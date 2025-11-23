@@ -65,7 +65,17 @@ export interface TransactionsConfig {
     expectedMonthlyPaycheck?: number;
     excludedAdditionalIncomePatterns: string[];
     excludeDisposableIncome: boolean;
+    excludedTransactions: ExcludedTransaction[];
     tags: TagsConfig;
+}
+
+/**
+ * Excluded Transaction Configuration
+ */
+export interface ExcludedTransaction {
+    description: string;
+    amount?: string;
+    reason?: string;
 }
 
 /**
