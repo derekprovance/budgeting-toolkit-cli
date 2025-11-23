@@ -73,8 +73,17 @@ excludedAdditionalIncomePatterns:
     - PAYROLL
     - ATM FEE
 
-excludedTransactionsCsv: excluded_transactions.csv
 excludeDisposableIncome: false
+
+# Excluded transactions (globally exclude from all reports)
+excludedTransactions:
+    - description: 'STOCK INVESTMENT'
+      amount: '100.00'
+      reason: 'Investment purchase - not a regular expense'
+    - description: 'TRANSFER TO SAVINGS'
+      reason: 'Internal transfer, not an expense'
+    - amount: '999.99'
+      reason: 'Specific amount to exclude'
 
 # Firefly settings
 firefly:
@@ -93,16 +102,28 @@ See `budgeting-toolkit.config.yaml.example` for complete configuration options.
 
 ### Transaction Exclusions
 
-Create `excluded_transactions.csv` to exclude specific transactions:
+You can exclude specific transactions from all reports by adding them to the `excludedTransactions` section in your YAML config:
 
-```csv
-Description,Amount
-"Monthly Rent",1200.00
-"Coffee Shop",
-,50.00
+```yaml
+excludedTransactions:
+    # Match by description only (excludes any amount)
+    - description: 'STOCK INVESTMENT'
+      reason: 'Investment purchase'
+
+    # Match by description and amount (exact match)
+    - description: 'Monthly Rent'
+      amount: '1200.00'
+      reason: 'Rent payment'
+
+    # Match by amount only (excludes any description)
+    - amount: '999.99'
+      reason: 'Specific amount to filter'
 ```
 
-Match by description, amount, or both (at least one required).
+- At least one field (`description` or `amount`) is required
+- `reason` is optional but recommended for documentation
+- Description matching is case-insensitive and uses substring matching
+- Amount matching is exact
 
 ## Usage
 

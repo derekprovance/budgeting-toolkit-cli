@@ -6,6 +6,7 @@ import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-m
 const mockExpand = jest.fn();
 const mockCheckbox = jest.fn();
 const mockSelect = jest.fn();
+const mockSearch = jest.fn();
 
 // Mock chalk to return the input string (disable styling for tests)
 jest.unstable_mockModule('chalk', () => ({
@@ -23,6 +24,7 @@ jest.unstable_mockModule('@inquirer/prompts', () => ({
     expand: mockExpand,
     checkbox: mockCheckbox,
     select: mockSelect,
+    search: mockSearch,
 }));
 
 // Dynamic imports after mocks
@@ -40,6 +42,7 @@ describe('UserInputService', () => {
         mockExpand.mockReset();
         mockCheckbox.mockReset();
         mockSelect.mockReset();
+        mockSearch.mockReset();
     });
 
     afterEach(() => {
@@ -47,6 +50,7 @@ describe('UserInputService', () => {
         mockExpand.mockReset();
         mockCheckbox.mockReset();
         mockSelect.mockReset();
+        mockSearch.mockReset();
     });
 
     describe('askToUpdateTransaction', () => {

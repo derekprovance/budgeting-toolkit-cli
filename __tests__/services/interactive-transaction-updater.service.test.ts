@@ -524,10 +524,14 @@ describe('InteractiveTransactionUpdater', () => {
             expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(2);
             expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalled();
             expect(mockUserInputService.getNewCategory).toHaveBeenCalledWith(
-                mockCategories.map(c => c.name)
+                mockCategories.map(c => c.name),
+                'New Category', // Current value (initially AI suggestion)
+                'New Category' // AI suggestion
             );
             expect(mockUserInputService.getNewBudget).toHaveBeenCalledWith(
-                mockBudgets.map(b => b.attributes.name)
+                mockBudgets.map(b => b.attributes.name),
+                'New Budget', // Current value (initially AI suggestion)
+                'New Budget' // AI suggestion
             );
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
@@ -566,7 +570,9 @@ describe('InteractiveTransactionUpdater', () => {
             expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(2);
             expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalled();
             expect(mockUserInputService.getNewCategory).toHaveBeenCalledWith(
-                mockCategories.map(c => c.name)
+                mockCategories.map(c => c.name),
+                'New Category', // Current value (initially AI suggestion)
+                'New Category' // AI suggestion
             );
             expect(mockUserInputService.getNewBudget).not.toHaveBeenCalled();
             // Budget should be preserved from LLM recommendation (mockBudgets[0].id = '2')
@@ -606,7 +612,9 @@ describe('InteractiveTransactionUpdater', () => {
             expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalled();
             expect(mockUserInputService.getNewCategory).not.toHaveBeenCalled();
             expect(mockUserInputService.getNewBudget).toHaveBeenCalledWith(
-                mockBudgets.map(b => b.attributes.name)
+                mockBudgets.map(b => b.attributes.name),
+                'New Budget', // Current value (initially AI suggestion)
+                'New Budget' // AI suggestion
             );
             // Category should be preserved from LLM recommendation (mockCategories[0].name = 'New Category')
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
@@ -647,6 +655,69 @@ describe('InteractiveTransactionUpdater', () => {
             expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(3);
             expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalledTimes(2);
             expect(mockUserInputService.getNewCategory).toHaveBeenCalledTimes(2);
+        });
+
+        it('should preserve original AI suggestions through multiple edit cycles', async () => {
+            // Setup: AI suggests "New Category" and "New Budget"
+            const aiCategory = mockCategories[0] as CategoryProperties; // "New Category"
+            const aiBudget = mockBudgets[0]; // "New Budget"
+            const userSelectedCategory = { name: 'Groceries' } as CategoryProperties; // User's first edit
+
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+
+            // First prompt: user chooses to edit
+            // Second prompt: user edits again (this is where we verify AI suggestion is preserved)
+            // Third prompt: user confirms final selection
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
+
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Category,
+            ]);
+
+            // First edit: user selects "Groceries"
+            // Second edit: user selects something else
+            mockUserInputService.getNewCategory
+                .mockResolvedValueOnce(userSelectedCategory)
+                .mockResolvedValueOnce(aiCategory);
+
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            const result = await service.updateTransaction(mockTransaction as TransactionSplit, {
+                '1': {
+                    category: aiCategory.name,
+                    budget: aiBudget.attributes.name,
+                },
+            });
+
+            expect(result.ok).toBe(true);
+
+            // Verify getNewCategory was called twice
+            expect(mockUserInputService.getNewCategory).toHaveBeenCalledTimes(2);
+
+            // First call: current value is AI suggestion, AI suggestion is same
+            expect(mockUserInputService.getNewCategory).toHaveBeenNthCalledWith(
+                1,
+                expect.any(Array),
+                aiCategory.name, // current value (AI's original suggestion)
+                aiCategory.name // AI suggestion
+            );
+
+            // Second call: current value is user's selection from first edit,
+            // but AI suggestion should still be the original AI value
+            expect(mockUserInputService.getNewCategory).toHaveBeenNthCalledWith(
+                2,
+                expect.any(Array),
+                userSelectedCategory.name, // current value (user's first edit)
+                aiCategory.name // AI suggestion (preserved from original)
+            );
         });
 
         it('should handle undefined category from AI (no category provided)', async () => {

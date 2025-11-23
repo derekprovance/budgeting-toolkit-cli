@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "6.0.1",
+    "version": "6.1.0",
     "type": "module",
     "main": "./dist/index.js",
     "exports": {
@@ -31,6 +31,7 @@
         "commander": "^14.0.2",
         "dotenv": "^17.2.3",
         "js-yaml": "^4.1.1",
+        "ora": "^8.2.0",
         "pino": "^10.1.0"
     },
     "devDependencies": {

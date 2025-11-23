@@ -4,6 +4,7 @@ import {
     TransactionRead,
     TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
+import ora from 'ora';
 import { logger } from '../logger.js';
 import { CategoryService } from './core/category.service.js';
 import { TransactionService } from './core/transaction.service.js';
@@ -105,43 +106,57 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 budgets = await this.budgetService.getBudgets();
             }
 
-            const aiResults = await this.getAIResultsForTransactions(
-                transactions,
-                updateMode,
-                categories,
-                budgets
-            );
+            // Show spinner during AI processing
+            const spinner = ora(
+                `Processing ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''} with AI...`
+            ).start();
 
-            const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
-                transactions,
-                aiResults,
-                dryRun
-            );
-
-            // Display validation errors to user
-            if (errors.length > 0) {
-                this.displayValidationErrors(errors);
-            }
-
-            logger.debug(
-                {
-                    tag,
+            try {
+                const aiResults = await this.getAIResultsForTransactions(
+                    transactions,
                     updateMode,
-                    dryRun,
-                    totalTransactions: transactions.length,
-                    updatedTransactions: updatedTransactions.length,
-                    validationErrors: errors.length,
-                    categories: categories?.length,
-                    budgets: budgets?.length,
-                },
-                'Transaction update complete'
-            );
+                    categories,
+                    budgets
+                );
 
-            return {
-                status: UpdateTransactionStatus.HAS_RESULTS,
-                transactionsUpdated: updatedTransactions.length,
-                transactionErrors: errors.length,
-            };
+                spinner.succeed(
+                    `AI processing complete (${transactions.length} transaction${transactions.length !== 1 ? 's' : ''})`
+                );
+
+                const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
+                    transactions,
+                    aiResults,
+                    dryRun
+                );
+
+                // Display validation errors to user
+                if (errors.length > 0) {
+                    this.displayValidationErrors(errors);
+                }
+
+                logger.debug(
+                    {
+                        tag,
+                        updateMode,
+                        dryRun,
+                        totalTransactions: transactions.length,
+                        updatedTransactions: updatedTransactions.length,
+                        validationErrors: errors.length,
+                        categories: categories?.length,
+                        budgets: budgets?.length,
+                    },
+                    'Transaction update complete'
+                );
+
+                return {
+                    status: UpdateTransactionStatus.HAS_RESULTS,
+                    transactionsUpdated: updatedTransactions.length,
+                    transactionErrors: errors.length,
+                };
+            } catch (aiError) {
+                spinner.fail('AI processing failed');
+                throw aiError;
+            }
         } catch (ex) {
             logger.error(
                 {

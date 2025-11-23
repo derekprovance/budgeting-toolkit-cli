@@ -61,13 +61,16 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
         // Build response object mapping transaction IDs to assignments
         const result = transactions.reduce((acc, t, index) => {
+            const category = assignedCategories[index];
+            const budget = assignedBudgets[index];
+
+            // Filter out placeholder values
+            const hasValidCategory = category && category !== '(no category)';
+            const hasValidBudget = budget && budget !== '(no budget)';
+
             acc[t.transaction_journal_id || ''] = {
-                ...(assignedCategories[index] && {
-                    category: assignedCategories[index],
-                }),
-                ...(assignedBudgets[index] && {
-                    budget: assignedBudgets[index],
-                }),
+                ...(hasValidCategory && { category }),
+                ...(hasValidBudget && { budget }),
             };
             return acc;
         }, {} as AIResponse);

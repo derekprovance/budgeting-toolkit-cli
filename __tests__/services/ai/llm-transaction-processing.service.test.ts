@@ -73,4 +73,27 @@ describe('LLMTransactionProcessingService', () => {
         const result = await service.processTransactions(tx, categories, budgets);
         expect(result['1']).toEqual({ category: 'Coffee & Tea' });
     });
+
+    it('filters out "(no category)" placeholder values', async () => {
+        mockAssignmentService.assignCategories.mockResolvedValue(['(no category)']);
+        mockAssignmentService.assignBudgets.mockResolvedValue(['Groceries']);
+        const result = await service.processTransactions(tx, categories, budgets);
+        expect(result['1']).toEqual({ budget: 'Groceries' });
+        expect(result['1'].category).toBeUndefined();
+    });
+
+    it('filters out "(no budget)" placeholder values', async () => {
+        mockAssignmentService.assignCategories.mockResolvedValue(['Coffee & Tea']);
+        mockAssignmentService.assignBudgets.mockResolvedValue(['(no budget)']);
+        const result = await service.processTransactions(tx, categories, budgets);
+        expect(result['1']).toEqual({ category: 'Coffee & Tea' });
+        expect(result['1'].budget).toBeUndefined();
+    });
+
+    it('filters out both placeholder values when both are returned', async () => {
+        mockAssignmentService.assignCategories.mockResolvedValue(['(no category)']);
+        mockAssignmentService.assignBudgets.mockResolvedValue(['(no budget)']);
+        const result = await service.processTransactions(tx, categories, budgets);
+        expect(result['1']).toEqual({});
+    });
 });

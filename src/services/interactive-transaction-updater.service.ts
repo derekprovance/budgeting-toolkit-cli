@@ -217,6 +217,12 @@ export class InteractiveTransactionUpdater {
         category?: CategoryProperties,
         budget?: BudgetRead
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        // Store original AI suggestions (immutable)
+        const originalAISuggestion = {
+            category: category,
+            budget: budget,
+        };
+
         let currentCategory = category;
         let currentBudget = budget;
         let action: UpdateTransactionMode;
@@ -243,7 +249,8 @@ export class InteractiveTransactionUpdater {
                 [currentCategory, currentBudget] = await this.processEditCommand(
                     transaction,
                     currentCategory,
-                    currentBudget
+                    currentBudget,
+                    originalAISuggestion
                 );
             }
         } while (action === UpdateTransactionMode.Edit);
@@ -266,7 +273,11 @@ export class InteractiveTransactionUpdater {
     private async processEditCommand(
         transaction: TransactionSplit,
         currentCategory?: CategoryProperties,
-        currentBudget?: BudgetRead
+        currentBudget?: BudgetRead,
+        aiSuggestion?: {
+            category?: CategoryProperties;
+            budget?: BudgetRead;
+        }
     ): Promise<[CategoryProperties | undefined, BudgetRead | undefined]> {
         logger.debug({ description: transaction.description }, 'User chose the edit option');
 
@@ -279,10 +290,18 @@ export class InteractiveTransactionUpdater {
         for (const answer of answers) {
             if (answer === EditTransactionAttribute.Category) {
                 const categoryNames = this.aiValidator.getAvailableCategoryNames();
-                newCategory = await this.userInputService.getNewCategory(categoryNames);
+                newCategory = await this.userInputService.getNewCategory(
+                    categoryNames,
+                    currentCategory?.name,
+                    aiSuggestion?.category?.name
+                );
             } else if (answer === EditTransactionAttribute.Budget) {
                 const budgetNames = this.aiValidator.getAvailableBudgetNames();
-                newBudget = await this.userInputService.getNewBudget(budgetNames);
+                newBudget = await this.userInputService.getNewBudget(
+                    budgetNames,
+                    currentBudget?.attributes.name,
+                    aiSuggestion?.budget?.attributes.name
+                );
             }
         }
 

@@ -129,6 +129,7 @@ export class LLMAssignmentService {
             const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
                 systemPrompt,
                 functions: [functionSchema],
+                function_call: { name: functionSchema.name }, // Force Claude to use the tool
             });
 
             // Parse and validate response

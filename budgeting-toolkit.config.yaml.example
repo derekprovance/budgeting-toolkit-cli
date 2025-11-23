@@ -23,8 +23,25 @@ validTransfers:
 
 excludeDisposableIncome: false
 
-# Globally excluded transactions CSV
-excludedTransactionsCsv: 'excluded_transactions.csv'
+# Globally excluded transactions (removes transactions from all reports)
+# At least one field (description or amount) is required per entry
+excludedTransactions:
+    # Example 1: Exclude by description only (any amount)
+    - description: 'STOCK INVESTMENT'
+      reason: 'Investment purchase - not a regular expense'
+
+    # Example 2: Exclude by description and amount (exact match)
+    - description: 'Monthly Rent'
+      amount: '1200.00'
+      reason: 'Rent payment - already tracked elsewhere'
+
+    # Example 3: Exclude by amount only (any description)
+    - amount: '999.99'
+      reason: 'Specific amount to filter out'
+
+    # Example 4: Transfer to savings (description only)
+    - description: 'TRANSFER TO SAVINGS'
+      reason: 'Internal transfer, not an expense'
 
 # Firefly specific configurations
 firefly:

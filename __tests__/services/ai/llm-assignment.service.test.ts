@@ -184,6 +184,7 @@ describe('LLMAssignmentService', () => {
                                 parameters: {},
                             },
                         ],
+                        function_call: { name: 'assign_categories' },
                     }
                 );
             });

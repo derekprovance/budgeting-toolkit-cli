@@ -8,6 +8,7 @@ import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js'
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionCounts } from '../services/display/finalize-budget-display.service.js';
 import chalk from 'chalk';
+import ora from 'ora';
 
 /**
  * Command for finalizing budget and displaying the finalization report
@@ -29,70 +30,84 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
     async execute({ month, year }: BudgetDateParams): Promise<void> {
         console.log(this.finalizeBudgetDisplayService.formatHeader('Budget Finalization Report'));
 
-        // Fetch all data in parallel using Result pattern
-        const [additionalIncomeResult, unbudgetedExpenseResult, paycheckSurplusResult] =
-            await Promise.all([
-                this.additionalIncomeService.calculateAdditionalIncome(month, year),
-                this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
-                this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
-            ]);
+        const spinner = ora('Generating finalization report...').start();
 
-        // Handle additional income result
-        if (!additionalIncomeResult.ok) {
-            console.error(
-                chalk.red('Error fetching additional income:'),
-                chalk.red.bold(additionalIncomeResult.error.userMessage)
+        try {
+            // Fetch all data in parallel using Result pattern
+            const [additionalIncomeResult, unbudgetedExpenseResult, paycheckSurplusResult] =
+                await Promise.all([
+                    this.additionalIncomeService.calculateAdditionalIncome(month, year),
+                    this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
+                    this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
+                ]);
+
+            // Handle additional income result
+            if (!additionalIncomeResult.ok) {
+                spinner.fail('Failed to generate finalization report');
+                console.error(
+                    chalk.red('Error fetching additional income:'),
+                    chalk.red.bold(additionalIncomeResult.error.userMessage)
+                );
+                throw new Error(additionalIncomeResult.error.message);
+            }
+
+            // Handle unbudgeted expense result
+            if (!unbudgetedExpenseResult.ok) {
+                spinner.fail('Failed to generate finalization report');
+                console.error(
+                    chalk.red('Error fetching unbudgeted expenses:'),
+                    chalk.red.bold(unbudgetedExpenseResult.error.userMessage)
+                );
+                throw new Error(unbudgetedExpenseResult.error.message);
+            }
+
+            // Handle paycheck surplus result
+            if (!paycheckSurplusResult.ok) {
+                spinner.fail('Failed to generate finalization report');
+                console.error(
+                    chalk.red('Error calculating paycheck surplus:'),
+                    chalk.red.bold(paycheckSurplusResult.error.userMessage)
+                );
+                throw new Error(paycheckSurplusResult.error.message);
+            }
+
+            spinner.succeed('Finalization report generated');
+
+            const additionalIncomeResults = additionalIncomeResult.value;
+            const unbudgetedExpenseResults = unbudgetedExpenseResult.value;
+            const paycheckSurplus = paycheckSurplusResult.value;
+
+            console.log(this.finalizeBudgetDisplayService.formatMonthHeader(month, year));
+
+            // Display additional income section
+            console.log(
+                this.finalizeBudgetDisplayService.formatAdditionalIncomeSection(
+                    additionalIncomeResults
+                )
             );
-            throw new Error(additionalIncomeResult.error.message);
-        }
 
-        // Handle unbudgeted expense result
-        if (!unbudgetedExpenseResult.ok) {
-            console.error(
-                chalk.red('Error fetching unbudgeted expenses:'),
-                chalk.red.bold(unbudgetedExpenseResult.error.userMessage)
+            // Display unbudgeted expenses section
+            console.log(
+                this.finalizeBudgetDisplayService.formatUnbudgetedExpensesSection(
+                    unbudgetedExpenseResults
+                )
             );
-            throw new Error(unbudgetedExpenseResult.error.message);
-        }
 
-        // Handle paycheck surplus result
-        if (!paycheckSurplusResult.ok) {
-            console.error(
-                chalk.red('Error calculating paycheck surplus:'),
-                chalk.red.bold(paycheckSurplusResult.error.userMessage)
+            // Calculate and display enhanced summary
+            const allTransactions = [...additionalIncomeResults, ...unbudgetedExpenseResults];
+            const counts = this.getTransactionCounts(allTransactions);
+            console.log(
+                this.finalizeBudgetDisplayService.formatSummary(
+                    counts,
+                    additionalIncomeResults,
+                    unbudgetedExpenseResults,
+                    paycheckSurplus
+                )
             );
-            throw new Error(paycheckSurplusResult.error.message);
+        } catch (error) {
+            spinner.fail('Failed to generate finalization report');
+            throw error;
         }
-
-        const additionalIncomeResults = additionalIncomeResult.value;
-        const unbudgetedExpenseResults = unbudgetedExpenseResult.value;
-        const paycheckSurplus = paycheckSurplusResult.value;
-
-        console.log(this.finalizeBudgetDisplayService.formatMonthHeader(month, year));
-
-        // Display additional income section
-        console.log(
-            this.finalizeBudgetDisplayService.formatAdditionalIncomeSection(additionalIncomeResults)
-        );
-
-        // Display unbudgeted expenses section
-        console.log(
-            this.finalizeBudgetDisplayService.formatUnbudgetedExpensesSection(
-                unbudgetedExpenseResults
-            )
-        );
-
-        // Calculate and display enhanced summary
-        const allTransactions = [...additionalIncomeResults, ...unbudgetedExpenseResults];
-        const counts = this.getTransactionCounts(allTransactions);
-        console.log(
-            this.finalizeBudgetDisplayService.formatSummary(
-                counts,
-                additionalIncomeResults,
-                unbudgetedExpenseResults,
-                paycheckSurplus
-            )
-        );
     }
 
     private getTransactionCounts(transactions: TransactionSplit[]): TransactionCounts {

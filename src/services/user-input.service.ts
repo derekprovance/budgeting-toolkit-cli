@@ -1,6 +1,6 @@
 import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { expand, checkbox, select } from '@inquirer/prompts';
+import { expand, checkbox, search } from '@inquirer/prompts';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
 
@@ -67,8 +67,17 @@ export class UserInputService {
         return answer;
     }
 
-    async getNewCategory(categoryNames: string[]): Promise<CategoryProperties | undefined> {
-        const answer = await this.createSelectDropdown(categoryNames, 'Select a new Category');
+    async getNewCategory(
+        categoryNames: string[],
+        suggestedCategory?: string,
+        aiSuggestion?: string
+    ): Promise<CategoryProperties | undefined> {
+        const answer = await this.createSearchableDropdown(
+            categoryNames,
+            'Select a new Category (type to search)',
+            suggestedCategory,
+            aiSuggestion
+        );
 
         if (!answer) {
             return undefined;
@@ -79,8 +88,17 @@ export class UserInputService {
         return { name: answer } as CategoryProperties;
     }
 
-    async getNewBudget(budgetNames: string[]): Promise<BudgetRead | undefined> {
-        const answer = await this.createSelectDropdown(budgetNames, 'Select a new Budget');
+    async getNewBudget(
+        budgetNames: string[],
+        suggestedBudget?: string,
+        aiSuggestion?: string
+    ): Promise<BudgetRead | undefined> {
+        const answer = await this.createSearchableDropdown(
+            budgetNames,
+            'Select a new Budget (type to search)',
+            suggestedBudget,
+            aiSuggestion
+        );
 
         if (!answer) {
             return undefined;
@@ -94,22 +112,72 @@ export class UserInputService {
         } as BudgetRead;
     }
 
-    private async createSelectDropdown(
+    private async createSearchableDropdown(
         values: string[],
-        message: string
+        message: string,
+        currentValue?: string,
+        aiSuggestion?: string
     ): Promise<string | undefined> {
-        const choices = [];
-
-        for (const value of values) {
-            choices.push({
-                name: value,
-                value: value,
-            });
-        }
-
-        return await select({
+        return await search({
             message,
-            choices: choices,
+            source: async input => {
+                if (!input) {
+                    // Show all values with appropriate labels
+                    const choices = values.map(name => {
+                        const isAI = name === aiSuggestion;
+                        const isCurrent = name === currentValue;
+
+                        let label = name;
+                        if (isAI && isCurrent) {
+                            // Same value for both - only show AI label
+                            label = `${name} ${chalk.cyan('(AI suggested)')}`;
+                        } else if (isCurrent) {
+                            label = `${name} ${chalk.green('(current)')}`;
+                        } else if (isAI) {
+                            label = `${name} ${chalk.cyan('(AI suggested)')}`;
+                        }
+
+                        return {
+                            value: name,
+                            name: label,
+                        };
+                    });
+
+                    // Sort: current first, then AI suggestion, then alphabetical
+                    choices.sort((a, b) => {
+                        if (a.value === currentValue) return -1;
+                        if (b.value === currentValue) return 1;
+                        if (a.value === aiSuggestion) return -1;
+                        if (b.value === aiSuggestion) return 1;
+                        return a.value.localeCompare(b.value);
+                    });
+
+                    return choices;
+                }
+
+                // Filter based on user input (case-insensitive)
+                const searchLower = input.toLowerCase();
+                const filtered = values.filter(name => name.toLowerCase().includes(searchLower));
+
+                return filtered.map(name => {
+                    const isAI = name === aiSuggestion;
+                    const isCurrent = name === currentValue;
+
+                    let label = name;
+                    if (isAI && isCurrent) {
+                        label = `${name} ${chalk.cyan('(AI suggested)')}`;
+                    } else if (isCurrent) {
+                        label = `${name} ${chalk.green('(current)')}`;
+                    } else if (isAI) {
+                        label = `${name} ${chalk.cyan('(AI suggested)')}`;
+                    }
+
+                    return {
+                        value: name,
+                        name: label,
+                    };
+                });
+            },
         });
     }
 
