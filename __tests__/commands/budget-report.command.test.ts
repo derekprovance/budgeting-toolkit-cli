@@ -33,7 +33,7 @@ describe('BudgetReportCommand', () => {
         // Reset mocks
         jest.clearAllMocks();
 
-        // Setup service mocks - now returning Result types
+        // Setup service mocks
         budgetReportService = {
             getBudgetReport: jest
                 .fn<() => Promise<any>>()

@@ -6,6 +6,8 @@ import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.serv
 import { FinalizeBudgetDisplayService } from '../../src/services/display/finalize-budget-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
+import { Result } from '../../src/types/result.type.js';
+import { TransactionAnalysisError } from '../../src/types/error/transaction-analysis.error.js';
 
 // Mock services
 jest.mock('../../src/services/additional-income.service');
@@ -36,16 +38,16 @@ describe('FinalizeBudgetCommand', () => {
         // Reset mocks
         jest.clearAllMocks();
 
-        // Setup service mocks - now returning Result types
+        // Setup service mocks
         additionalIncomeService = {
             calculateAdditionalIncome: jest
-                .fn()
+                .fn<() => Promise<Result<TransactionSplit[], TransactionAnalysisError>>>()
                 .mockResolvedValue({ ok: true, value: [mockTransaction] }),
         } as unknown as jest.Mocked<AdditionalIncomeService>;
 
         unbudgetedExpenseService = {
             calculateUnbudgetedExpenses: jest
-                .fn()
+                .fn<() => Promise<Result<TransactionSplit[], TransactionAnalysisError>>>()
                 .mockResolvedValue({ ok: true, value: [mockTransaction] }),
         } as unknown as jest.Mocked<UnbudgetedExpenseService>;
 
@@ -58,7 +60,9 @@ describe('FinalizeBudgetCommand', () => {
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
         paycheckSurplusService = {
-            calculatePaycheckSurplus: jest.fn().mockResolvedValue({ ok: true, value: 500.0 }),
+            calculatePaycheckSurplus: jest
+                .fn<() => Promise<Result<number, TransactionAnalysisError>>>()
+                .mockResolvedValue({ ok: true, value: 500.0 }),
         } as unknown as jest.Mocked<PaycheckSurplusService>;
 
         finalizeBudgetDisplayService = {
