@@ -3,8 +3,8 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import {
     LLMAssignmentService,
     LLMAssignmentDependencies,
-    Logger,
 } from '../../../src/services/ai/llm-assignment.service.js';
+import { ILogger } from '../../../src/types/interface/logger.interface.js';
 import { ClaudeClient } from '../../../src/api/claude.client.js';
 import { createMockTransaction } from '../../shared/test-data.js';
 
@@ -12,7 +12,7 @@ describe('LLMAssignmentService', () => {
     let service: LLMAssignmentService;
     let mockClaudeClient: jest.Mocked<ClaudeClient>;
     let mockDeps: jest.Mocked<LLMAssignmentDependencies>;
-    let mockLogger: jest.Mocked<Logger>;
+    let mockLogger: jest.Mocked<ILogger>;
     let mockTransactions: TransactionSplit[];
     let validCategories: string[];
     let validBudgets: string[];
@@ -27,7 +27,7 @@ describe('LLMAssignmentService', () => {
             warn: jest.fn<(obj: unknown, msg: string) => void>(),
             error: jest.fn<(obj: unknown, msg: string) => void>(),
             debug: jest.fn<(obj: unknown, msg: string) => void>(),
-        } as jest.Mocked<Logger>;
+        } as jest.Mocked<ILogger>;
 
         // Create mock Claude client
         mockClaudeClient = {
@@ -284,9 +284,9 @@ describe('LLMAssignmentService', () => {
                 const result = await service.assign('category', mockTransactions, validCategories);
 
                 expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
-                expect(mockLogger.error).toHaveBeenCalledWith(
+                expect(mockLogger.warn).toHaveBeenCalledWith(
                     { error: 'API Error', type: 'category', transactionCount: 3 },
-                    'category assignment failed'
+                    'category assignment failed, returning defaults'
                 );
             });
 
@@ -349,6 +349,43 @@ describe('LLMAssignmentService', () => {
                 const result = await service.assign('category', mockTransactions, validCategories);
 
                 expect(result).toEqual(['(no category)', 'Healthcare', 'Groceries']);
+            });
+
+            it('should throw on API key error (critical error)', async () => {
+                mockClaudeClient.chat = jest
+                    .fn()
+                    .mockRejectedValue(new Error('Invalid API key provided'));
+
+                await expect(
+                    service.assign('category', mockTransactions, validCategories)
+                ).rejects.toThrow('Invalid API key provided');
+
+                expect(mockLogger.error).toHaveBeenCalledWith(
+                    {
+                        error: 'Invalid API key provided',
+                        type: 'category',
+                        transactionCount: 3,
+                    },
+                    'Critical authentication error in category assignment'
+                );
+            });
+
+            it('should throw on authentication error (critical error)', async () => {
+                mockClaudeClient.chat = jest
+                    .fn()
+                    .mockRejectedValue(new Error('authentication failed'));
+
+                await expect(
+                    service.assign('category', mockTransactions, validCategories)
+                ).rejects.toThrow('authentication failed');
+            });
+
+            it('should throw on unauthorized error (critical error)', async () => {
+                mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('unauthorized'));
+
+                await expect(
+                    service.assign('budget', mockTransactions, validBudgets)
+                ).rejects.toThrow('unauthorized');
             });
         });
 

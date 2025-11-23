@@ -125,11 +125,11 @@ export class LLMAssignmentService {
             const userPrompt = this.deps.getUserPrompt(type, transactionData, validOptions);
             const functionSchema = this.deps.getFunctionSchema(type, validOptions);
 
-            // Call Claude (batching handled internally by ClaudeClient)
+            // Call Claude
             const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
                 systemPrompt,
                 functions: [functionSchema],
-                function_call: { name: functionSchema.name }, // Force Claude to use the tool
+                function_call: { name: functionSchema.name },
             });
 
             // Parse and validate response
@@ -151,16 +151,36 @@ export class LLMAssignmentService {
 
             return assignments;
         } catch (error) {
-            this.deps.logger.error(
+            const errorMessage = error instanceof Error ? error.message : String(error);
+
+            // Critical errors that should propagate (authentication, configuration issues)
+            if (
+                errorMessage.includes('API key') ||
+                errorMessage.includes('authentication') ||
+                errorMessage.includes('unauthorized') ||
+                errorMessage.includes('forbidden')
+            ) {
+                this.deps.logger.error(
+                    {
+                        error: errorMessage,
+                        type,
+                        transactionCount: transactions.length,
+                    },
+                    `Critical authentication error in ${type} assignment`
+                );
+                throw error;
+            }
+
+            // Recoverable errors - log and return defaults
+            this.deps.logger.warn(
                 {
-                    error: error instanceof Error ? error.message : String(error),
+                    error: errorMessage,
                     type,
                     transactionCount: transactions.length,
                 },
-                `${type} assignment failed`
+                `${type} assignment failed, returning defaults`
             );
 
-            // Return default values for all transactions
             const defaultValue = type === 'category' ? '(no category)' : '(no budget)';
             return new Array(transactions.length).fill(defaultValue);
         }
@@ -192,6 +212,10 @@ export class LLMAssignmentService {
      * Calculates the success rate of assignments (non-default values)
      */
     private calculateSuccessRate(assignments: string[], type: AssignmentType): string {
+        if (assignments.length === 0) {
+            return '0.0%';
+        }
+
         const defaultValue = type === 'category' ? '(no category)' : '(no budget)';
         const successCount = assignments.filter(a => a !== defaultValue).length;
         const rate = (successCount / assignments.length) * 100;
