@@ -1,6 +1,6 @@
 import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { expand, checkbox, search } from '@inquirer/prompts';
+import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
 import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
 
@@ -308,5 +308,77 @@ export class UserInputService {
      */
     private getTransactionLink(transactionId: string | undefined) {
         return `${this.baseUrl}/transactions/show/${transactionId}`;
+    }
+
+    /**
+     * Prompts user to enter the amount for the first split
+     * @param originalAmount The original transaction amount
+     * @param currencySymbol The currency symbol
+     * @returns Promise<number> The amount entered by the user
+     */
+    async getSplitAmount(originalAmount: number, currencySymbol: string): Promise<number> {
+        const answer = await input({
+            message: `Enter amount for first split (original: ${currencySymbol}${originalAmount}):`,
+            validate: (value: string) => {
+                const amount = parseFloat(value);
+                if (isNaN(amount)) {
+                    return 'Please enter a valid number';
+                }
+                if (amount <= 0) {
+                    return 'Amount must be greater than zero';
+                }
+                if (amount >= originalAmount) {
+                    return `Amount must be less than the original amount (${currencySymbol}${originalAmount})`;
+                }
+
+                // Validate minimum second split amount (at least 1 cent)
+                const secondSplitAmount = parseFloat((originalAmount - amount).toFixed(2));
+                if (secondSplitAmount < 0.01) {
+                    return `Second split would be too small (${currencySymbol}${secondSplitAmount.toFixed(2)}). Please enter a smaller amount.`;
+                }
+
+                return true;
+            },
+        });
+
+        return parseFloat(answer);
+    }
+
+    /**
+     * Asks user if they want to customize category and budget for a split
+     * @param splitNumber The split number (1 or 2)
+     * @returns Promise<boolean> Whether the user wants to customize
+     */
+    async shouldCustomizeSplit(splitNumber: number): Promise<boolean> {
+        return await confirm({
+            message: `Customize category/budget for split ${splitNumber}?`,
+            default: false,
+        });
+    }
+
+    /**
+     * Prompts user to optionally add custom text to a split description
+     * @param splitNumber The split number (1 or 2) for display purposes
+     * @param originalDescription The original transaction description (for context)
+     * @returns Promise<string> The custom text to append (empty string if none)
+     */
+    async getCustomSplitText(splitNumber: number, originalDescription: string): Promise<string> {
+        const customText = await input({
+            message: `Custom text for split ${splitNumber} (press Enter to skip):`,
+            default: '',
+        });
+
+        return customText.trim();
+    }
+
+    /**
+     * Confirms the split operation with the user
+     * @returns Promise<boolean> Whether the user confirmed
+     */
+    async confirmSplit(): Promise<boolean> {
+        return await confirm({
+            message: chalk.bold('Proceed with split?'),
+            default: true,
+        });
     }
 }

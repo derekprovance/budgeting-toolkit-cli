@@ -7,6 +7,8 @@ const mockExpand = jest.fn();
 const mockCheckbox = jest.fn();
 const mockSelect = jest.fn();
 const mockSearch = jest.fn();
+const mockInput = jest.fn();
+const mockConfirm = jest.fn();
 
 // Mock chalk to return the input string (disable styling for tests)
 jest.unstable_mockModule('chalk', () => ({
@@ -25,6 +27,8 @@ jest.unstable_mockModule('@inquirer/prompts', () => ({
     checkbox: mockCheckbox,
     select: mockSelect,
     search: mockSearch,
+    input: mockInput,
+    confirm: mockConfirm,
 }));
 
 // Dynamic imports after mocks
@@ -43,6 +47,8 @@ describe('UserInputService', () => {
         mockCheckbox.mockReset();
         mockSelect.mockReset();
         mockSearch.mockReset();
+        mockInput.mockReset();
+        mockConfirm.mockReset();
     });
 
     afterEach(() => {
@@ -51,6 +57,8 @@ describe('UserInputService', () => {
         mockCheckbox.mockReset();
         mockSelect.mockReset();
         mockSearch.mockReset();
+        mockInput.mockReset();
+        mockConfirm.mockReset();
     });
 
     describe('askToUpdateTransaction', () => {

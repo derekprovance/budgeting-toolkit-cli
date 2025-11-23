@@ -6,6 +6,7 @@ import { ConfigManager } from './config.js';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
+import { SplitTransactionCommand } from './commands/split-transaction.command.js';
 import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
@@ -229,6 +230,52 @@ Examples:
                 });
             } catch (error) {
                 handleError(error, 'categorizing transactions');
+            }
+        });
+
+    program
+        .command('split <transaction-id>')
+        .alias('sp')
+        .description('Split a transaction into two parts with custom descriptions and categories')
+        .option('-i, --interactive', 'run in interactive mode (required)', true)
+        .addHelpText(
+            'after',
+            `
+Examples:
+  $ budgeting-toolkit split 4361 -i         # split transaction interactively
+  $ budgeting-toolkit sp 4361 -i            # using alias
+
+Interactive workflow:
+  1. Enter amount for first split
+  2. Add optional custom text for each split (e.g., "- Groceries", "- Hardware")
+  3. Optionally customize category/budget for each split
+  4. Review and confirm the split
+
+Result: Parent transaction with original description, two child splits with custom text appended`
+        )
+        .action(async (transactionId: string, opts: { interactive: boolean }) => {
+            if (!transactionId || transactionId.trim() === '') {
+                console.error('❌ Error: Transaction ID is required');
+                console.log('\nUsage: budgeting-toolkit split <transaction-id> [options]');
+                console.log('Example: budgeting-toolkit split 4361 -i');
+                process.exit(1);
+            }
+
+            try {
+                const command = new SplitTransactionCommand(
+                    services.transactionSplitService,
+                    services.splitTransactionDisplayService,
+                    services.userInputService,
+                    services.categoryService,
+                    services.budgetService
+                );
+
+                await command.execute({
+                    transactionId,
+                    interactive: opts.interactive,
+                });
+            } catch (error) {
+                handleError(error, 'splitting transaction');
             }
         });
 
