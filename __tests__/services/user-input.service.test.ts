@@ -468,4 +468,264 @@ describe('UserInputService', () => {
             );
         });
     });
+
+    describe('Split Transaction Methods', () => {
+        describe('getSplitAmount', () => {
+            it('should accept valid amount', async () => {
+                mockInput.mockResolvedValue('60.00');
+
+                const result = await service.getSplitAmount(100, '$');
+
+                expect(result).toBe(60);
+                expect(mockInput).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        message: 'Enter amount for first split (original: $100):',
+                    })
+                );
+            });
+
+            it('should reject empty input', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('')).toBe('Amount is required');
+                expect(validate('   ')).toBe('Amount is required');
+            });
+
+            it('should reject non-numeric input', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('abc')).toBe(
+                    'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
+                );
+                expect(validate('12.abc')).toBe(
+                    'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
+                );
+            });
+
+            it('should reject more than 2 decimal places', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('50.123')).toBe(
+                    'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
+                );
+            });
+
+            it('should reject negative amounts', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('-50.00')).toBe(
+                    'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
+                );
+            });
+
+            it('should reject zero', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('0')).toBe('Amount must be greater than zero');
+                expect(validate('0.00')).toBe('Amount must be greater than zero');
+            });
+
+            it('should reject amount less than 0.01', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('0.001')).toBe(
+                    'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
+                );
+            });
+
+            it('should reject amount >= original', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('100')).toBe('Amount must be less than the original amount ($100)');
+                expect(validate('100.01')).toBe('Amount must be less than the original amount ($100)');
+            });
+
+            it('should reject amount leaving < 0.01 for split 2', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                // 99.99 leaves exactly 0.01 which is the minimum, so it should be valid
+                expect(validate('99.99')).toBe(true);
+                // 99.991 would leave 0.009 which is < 0.01, but regex rejects it first
+                expect(validate('99.995')).toBe(
+                    'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
+                );
+            });
+
+            it('should handle floating-point precision edge cases', async () => {
+                mockInput.mockResolvedValue('3.37');
+
+                await service.getSplitAmount(10.10, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                // 10.10 - 3.37 = 6.73, should be valid
+                expect(validate('3.37')).toBe(true);
+            });
+
+            it('should accept valid amounts with proper decimal places', async () => {
+                mockInput.mockResolvedValue('50.00');
+
+                await service.getSplitAmount(100, '$');
+
+                const validate = mockInput.mock.calls[0][0].validate;
+                expect(validate('50')).toBe(true);
+                expect(validate('50.5')).toBe(true);
+                expect(validate('50.50')).toBe(true);
+            });
+
+            it('should trim whitespace from input', async () => {
+                mockInput.mockResolvedValue('  50.00  ');
+
+                const result = await service.getSplitAmount(100, '$');
+
+                expect(result).toBe(50);
+            });
+        });
+
+        describe('shouldCustomizeSplit', () => {
+            it('should return user confirmation for split 1', async () => {
+                mockConfirm.mockResolvedValue(true);
+
+                const result = await service.shouldCustomizeSplit(1);
+
+                expect(result).toBe(true);
+                expect(mockConfirm).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        message: 'Customize category/budget for split 1?',
+                        default: false,
+                    })
+                );
+            });
+
+            it('should return user confirmation for split 2', async () => {
+                mockConfirm.mockResolvedValue(false);
+
+                const result = await service.shouldCustomizeSplit(2);
+
+                expect(result).toBe(false);
+                expect(mockConfirm).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        message: 'Customize category/budget for split 2?',
+                        default: false,
+                    })
+                );
+            });
+
+            it('should default to false', async () => {
+                mockConfirm.mockResolvedValue(false);
+
+                await service.shouldCustomizeSplit(1);
+
+                expect(mockConfirm).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        default: false,
+                    })
+                );
+            });
+        });
+
+        describe('getCustomSplitText', () => {
+            it('should return custom text', async () => {
+                mockInput.mockResolvedValue('- Part 1');
+
+                const result = await service.getCustomSplitText(1, 'Original Description');
+
+                expect(result).toBe('- Part 1');
+                expect(mockInput).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        message: 'Custom text for split 1 (press Enter to skip):',
+                        default: '',
+                    })
+                );
+            });
+
+            it('should return empty string when skipped', async () => {
+                mockInput.mockResolvedValue('');
+
+                const result = await service.getCustomSplitText(2, 'Original');
+
+                expect(result).toBe('');
+            });
+
+            it('should use split number in prompt', async () => {
+                mockInput.mockResolvedValue('');
+
+                await service.getCustomSplitText(1, 'AMAZON PURCHASE');
+
+                expect(mockInput).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        message: 'Custom text for split 1 (press Enter to skip):',
+                    })
+                );
+            });
+
+            it('should trim whitespace from return value', async () => {
+                mockInput.mockResolvedValue('  - Part 1  ');
+
+                const result = await service.getCustomSplitText(1, 'Original');
+
+                // The implementation trims the result
+                expect(result).toBe('- Part 1');
+            });
+        });
+
+        describe('confirmSplit', () => {
+            it('should return user confirmation', async () => {
+                mockConfirm.mockResolvedValue(true);
+
+                const result = await service.confirmSplit();
+
+                expect(result).toBe(true);
+                expect(mockConfirm).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        message: 'Proceed with split?',
+                        default: true,
+                    })
+                );
+            });
+
+            it('should default to true', async () => {
+                mockConfirm.mockResolvedValue(true);
+
+                await service.confirmSplit();
+
+                expect(mockConfirm).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        default: true,
+                    })
+                );
+            });
+
+            it('should return false when user cancels', async () => {
+                mockConfirm.mockResolvedValue(false);
+
+                const result = await service.confirmSplit();
+
+                expect(result).toBe(false);
+            });
+        });
+    });
 });

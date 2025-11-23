@@ -7,6 +7,7 @@ A command-line interface for Firefly III Personal Finance Manager with AI-powere
 - AI-powered transaction categorization and budgeting
 - Budget finalization reports with surplus/deficit analysis
 - Monthly budget reporting
+- Interactive transaction splitting
 - Secure API authentication
 - Batch processing with rate limiting
 - Docker development environment
@@ -200,6 +201,82 @@ Automatically categorize and budget transactions using Claude:
 - `-n, --dry-run` - Preview changes without applying
 
 **Prerequisites:** Transactions must be tagged in Firefly III with the specified tag.
+
+#### Transaction Splitting
+
+Interactively split a transaction into two parts:
+
+```bash
+# Split transaction by ID
+./budget.sh split 123 -i
+
+# Development mode
+npm start -- split 123 -i
+```
+
+**Options:**
+- `-i, --interactive` - Required for split command (enables interactive mode)
+
+**How it works:**
+1. Displays original transaction details (amount, category, budget, tags)
+2. Prompts for the amount for the first split
+3. Auto-calculates remainder for second split
+4. Optionally add custom text to each split's description
+5. Optionally customize category/budget for each split
+6. Shows preview of both splits before confirmation
+7. Executes the split operation
+
+**Metadata Behavior:**
+- **First split**: Preserves category, budget, and tags from original transaction
+- **Second split**: Category, budget, and tags are left undefined for manual assignment
+- Both splits preserve: type, date, accounts, and currency
+
+**Example:**
+
+```bash
+$ ./budget.sh split 456 -i
+
+Original Transaction:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Description: AMAZON MARKETPLACE
+Amount: $198.48
+Category: Shopping
+Budget: Miscellaneous
+Link: https://firefly.example.com/transactions/show/456
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Enter amount for first split (original: $198.48): 80.00
+Remainder for second split: $118.48
+
+Custom text for split 1 (press Enter to skip): - Me
+Custom text for split 2 (press Enter to skip): - Family
+
+Split Preview:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Parent Transaction: "AMAZON MARKETPLACE"
+
+Split 1:
+  Description: AMAZON MARKETPLACE - Me
+  Amount: $80.00
+  Category: Shopping
+  Budget: Miscellaneous
+
+Split 2:
+  Description: AMAZON MARKETPLACE - Family
+  Amount: $118.48
+  Category: (not set)
+  Budget: (not set)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Proceed with split? Yes
+
+✓ Transaction split successfully!
+Created 2 splits from original transaction.
+View at: https://firefly.example.com/transactions/show/456
+```
+
+**Note:** The second split must be categorized and budgeted manually in Firefly III.
 
 ### Global Options
 

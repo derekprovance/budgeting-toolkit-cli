@@ -6,6 +6,7 @@ import { SplitTransactionDisplayService } from '../services/display/split-transa
 import { UserInputService } from '../services/user-input.service.js';
 import { CategoryService } from '../services/core/category.service.js';
 import { BudgetService } from '../services/core/budget.service.js';
+import { logger } from '../logger.js';
 
 /**
  * Parameters for split transaction command
@@ -218,8 +219,22 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         } catch (error) {
             spinner.fail('Failed to split transaction');
             const errorObject = error instanceof Error ? error : new Error('Unknown error');
+
+            // Diagnostic logging for troubleshooting
+            logger.error(
+                {
+                    error: errorObject.message,
+                    stack: errorObject.stack,
+                    transactionId,
+                },
+                'Split transaction command failed'
+            );
+
+            // User-facing output
             console.log(this.displayService.formatError(errorObject));
-            // Error already displayed to user, no need to re-throw
+
+            // Exit with error code for CLI
+            process.exit(1);
         }
     }
 

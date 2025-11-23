@@ -19,9 +19,8 @@ Services included:
 cp .env.example .env.dev
 
 # Edit .env.dev and set:
-# - FIREFLY_APP_KEY (generate: head /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c 32)
+# - FIREFLY_API_TOKEN (generate after setup)
 # - ANTHROPIC_API_KEY (if using AI features)
-# - Leave FIREFLY_API_TOKEN empty (generate after Firefly starts)
 ```
 
 The `.env.dev` file is gitignored and safe for local secrets.

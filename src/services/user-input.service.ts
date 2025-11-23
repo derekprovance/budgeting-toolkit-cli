@@ -320,13 +320,41 @@ export class UserInputService {
         const answer = await input({
             message: `Enter amount for first split (original: ${currencySymbol}${originalAmount}):`,
             validate: (value: string) => {
-                const amount = parseFloat(value);
+                // Check for empty or whitespace-only input
+                if (!value || value.trim() === '') {
+                    return 'Amount is required';
+                }
+
+                const trimmedValue = value.trim();
+
+                // Validate format: must be a valid decimal number with max 2 decimal places
+                if (!/^\d+(\.\d{1,2})?$/.test(trimmedValue)) {
+                    return 'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)';
+                }
+
+                const amount = parseFloat(trimmedValue);
+
+                // Check for NaN (shouldn't happen with regex, but defensive)
                 if (isNaN(amount)) {
                     return 'Please enter a valid number';
                 }
-                if (amount <= 0) {
+
+                // Check for negative (regex should prevent, but explicit check)
+                if (amount < 0) {
+                    return 'Amount cannot be negative';
+                }
+
+                // Check for zero
+                if (amount === 0) {
                     return 'Amount must be greater than zero';
                 }
+
+                // Check if amount is less than minimum (1 cent)
+                if (amount < 0.01) {
+                    return 'Amount must be at least 0.01';
+                }
+
+                // Check if amount would leave nothing for second split
                 if (amount >= originalAmount) {
                     return `Amount must be less than the original amount (${currencySymbol}${originalAmount})`;
                 }
