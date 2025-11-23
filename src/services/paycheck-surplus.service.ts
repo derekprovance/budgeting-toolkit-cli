@@ -2,8 +2,6 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
-import { logger as defaultLogger } from '../logger.js';
-import { expectedMonthlyPaycheck as defaultExpectedPaycheck } from '../config.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 
 /**
@@ -12,22 +10,13 @@ import { ILogger } from '../types/interface/logger.interface.js';
  * Extends BaseTransactionAnalysisService for consistent error handling and Result types.
  */
 export class PaycheckSurplusService extends BaseTransactionAnalysisService<number> {
-    private readonly expectedMonthlyPaycheck: number | string | undefined | null;
-
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
-        expectedMonthlyPaycheck?: number | string | null,
-        logger: ILogger = defaultLogger
+        private readonly expectedMonthlyPaycheck: number | undefined,
+        logger?: ILogger
     ) {
         super(transactionService, transactionClassificationService, logger);
-
-        // Explicitly handle null to allow testing missing config scenario
-        if (expectedMonthlyPaycheck === null) {
-            this.expectedMonthlyPaycheck = null;
-        } else {
-            this.expectedMonthlyPaycheck = expectedMonthlyPaycheck ?? defaultExpectedPaycheck;
-        }
     }
 
     /**
@@ -79,35 +68,15 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
     /**
      * Gets the expected monthly paycheck amount from configuration.
      *
-     * @returns Expected paycheck amount, or 0 if not configured or invalid
+     * @returns Expected paycheck amount, or 0 if not configured
      */
     private getExpectedPaycheckAmount(): number {
-        if (this.expectedMonthlyPaycheck === undefined || this.expectedMonthlyPaycheck === null) {
-            this.logger.warn(
-                {
-                    expectedMonthlyPaycheck: this.expectedMonthlyPaycheck,
-                },
-                'Expected monthly paycheck amount not configured'
-            );
+        if (this.expectedMonthlyPaycheck === undefined) {
+            this.logger.warn('Expected monthly paycheck amount not configured');
             return 0;
         }
 
-        const amount =
-            typeof this.expectedMonthlyPaycheck === 'number'
-                ? this.expectedMonthlyPaycheck
-                : parseFloat(this.expectedMonthlyPaycheck);
-
-        if (isNaN(amount)) {
-            this.logger.error(
-                {
-                    expectedMonthlyPaycheck: this.expectedMonthlyPaycheck,
-                },
-                'Invalid expected monthly paycheck amount'
-            );
-            return 0;
-        }
-
-        return amount;
+        return this.expectedMonthlyPaycheck;
     }
 
     /**

@@ -130,7 +130,7 @@ describe('PaycheckSurplusService', () => {
             // Create local logger mock for this test
             const testMockLogger = {
                 debug: jest.fn<(obj: unknown, msg: string) => void>(),
-                warn: jest.fn<(obj: unknown, msg: string) => void>(),
+                warn: jest.fn<(msg: string) => void>(),
                 error: jest.fn<(obj: unknown, msg: string) => void>(),
                 trace: jest.fn<(obj: unknown, msg: string) => void>(),
                 info: jest.fn<(obj: unknown, msg: string) => void>(),
@@ -139,7 +139,7 @@ describe('PaycheckSurplusService', () => {
             const testService = new PaycheckSurplusService(
                 mockTransactionService,
                 mockTransactionClassificationService,
-                null as any, // Testing with null expected paycheck
+                undefined, // Testing with undefined expected paycheck
                 testMockLogger
             );
 
@@ -151,44 +151,7 @@ describe('PaycheckSurplusService', () => {
             if (result.ok) {
                 expect(result.value).toBe(3000.0);
                 expect(testMockLogger.warn).toHaveBeenCalledWith(
-                    { expectedMonthlyPaycheck: null },
                     'Expected monthly paycheck amount not configured'
-                );
-            }
-        });
-
-        it('should handle invalid expected paycheck amount', async () => {
-            // Arrange
-            const paychecks = [mockPaycheck('3000.00')];
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
-
-            // Create local logger mock for this test
-            const testMockLogger = {
-                debug: jest.fn<(obj: unknown, msg: string) => void>(),
-                warn: jest.fn<(obj: unknown, msg: string) => void>(),
-                error: jest.fn<(obj: unknown, msg: string) => void>(),
-                trace: jest.fn<(obj: unknown, msg: string) => void>(),
-                info: jest.fn<(obj: unknown, msg: string) => void>(),
-            };
-
-            const testService = new PaycheckSurplusService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                'invalid', // Testing with invalid expected paycheck
-                testMockLogger
-            );
-
-            // Act
-            const result = await testService.calculatePaycheckSurplus(1, 2024);
-
-            // Assert
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                expect(result.value).toBe(3000.0);
-                expect(testMockLogger.error).toHaveBeenCalledWith(
-                    { expectedMonthlyPaycheck: 'invalid' },
-                    'Invalid expected monthly paycheck amount'
                 );
             }
         });

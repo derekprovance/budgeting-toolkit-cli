@@ -2,7 +2,7 @@ import { Command, Option } from 'commander';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
-import { config, validateCertificateConfig } from './config.js';
+import { ConfigManager } from './config.js';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
@@ -58,9 +58,17 @@ export const createCli = (): Command => {
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
     try {
-        validateCertificateConfig(config);
+        const config = ConfigManager.getInstance().getConfig();
 
-        apiClient = new FireflyClientWithCerts(config);
+        // Create Firefly client with properly formatted config
+        apiClient = new FireflyClientWithCerts({
+            BASE: config.api.firefly.url + '/api',
+            TOKEN: config.api.firefly.token,
+            caCertPath: config.api.firefly.certificates?.caCertPath,
+            clientCertPath: config.api.firefly.certificates?.clientCertPath,
+            clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
+        });
+
         services = ServiceFactory.createServices(apiClient);
     } catch (error) {
         console.error(

@@ -10,9 +10,6 @@ certs/
 *.cer
 *.pem
 
-# Excluded Transactions in Budget Reporting
-excluded_transactions.csv
-
 budgeting-toolkit.config.yaml
 
 # Database backups
@@ -21,6 +18,5 @@ budgeting-toolkit.config.yaml
 backup.sql
 
 #Mac Specific
-Icon?
 .DS_Store
 .claude

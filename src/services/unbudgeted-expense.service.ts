@@ -2,7 +2,6 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
-import { getConfigValue } from '../utils/config-loader.js';
 import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
 
 /**
@@ -18,30 +17,17 @@ import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
  *   - Not in excluded transactions list
  *   - From a valid expense account
  *
- * Valid expense accounts defined in yaml config
- * Transfers are ignored unless specified in yaml config
+ * Valid expense accounts defined in configuration
+ * Transfers are ignored unless specified in configuration
  */
-export interface UnbudgetedExpenseConfig {
-    validExpenseAccounts?: string[];
-    validTransfers?: ValidTransfer[];
-}
-
 export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<TransactionSplit[]> {
-    private readonly validExpenseAccounts: string[];
-    private readonly validTransfers: ValidTransfer[];
-
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
-        config?: UnbudgetedExpenseConfig
+        private readonly validExpenseAccounts: string[],
+        private readonly validTransfers: ValidTransfer[]
     ) {
         super(transactionService, transactionClassificationService);
-
-        // Load valid expense accounts from config parameter or YAML config with fallback to defaults
-        this.validExpenseAccounts =
-            config?.validExpenseAccounts ?? getConfigValue<string[]>('validExpenseAccounts') ?? [];
-        this.validTransfers =
-            config?.validTransfers ?? getConfigValue<ValidTransfer[]>('validTransfers') ?? [];
     }
 
     /**

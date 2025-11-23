@@ -80,15 +80,14 @@ describe('AdditionalIncomeService', () => {
         service = new AdditionalIncomeService(
             mockTransactionService,
             mockTransactionClassificationService,
-            {
-                validDestinationAccounts: [
-                    TestAccount.PRIMARY,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CITIBANK_DOUBLECASH,
-                ],
-                excludedAdditionalIncomePatterns: ['PAYROLL'],
-            }
+            [
+                TestAccount.PRIMARY,
+                TestAccount.CHASE_SAPPHIRE,
+                TestAccount.CHASE_AMAZON,
+                TestAccount.CITIBANK_DOUBLECASH,
+            ],
+            ['PAYROLL'],
+            true
         );
     });
 
@@ -99,7 +98,9 @@ describe('AdditionalIncomeService', () => {
                     new AdditionalIncomeService(
                         mockTransactionService,
                         mockTransactionClassificationService,
-                        { validDestinationAccounts: [] }
+                        [],
+                        ['PAYROLL'],
+                        true
                     )
             ).toThrow('At least one valid destination account must be specified');
         });
@@ -108,11 +109,9 @@ describe('AdditionalIncomeService', () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
                 mockTransactionClassificationService,
-                {
-                    validDestinationAccounts: [TestAccount.PRIMARY],
-                    excludedAdditionalIncomePatterns: ['PAYROLL'],
-                    excludeDisposableIncome: false,
-                }
+                [TestAccount.PRIMARY],
+                ['PAYROLL'],
+                false
             );
 
             const mockTransactions = [
@@ -192,15 +191,14 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    {
-                        validDestinationAccounts: [
-                            TestAccount.PRIMARY,
-                            TestAccount.CHASE_SAPPHIRE,
-                            TestAccount.CHASE_AMAZON,
-                            TestAccount.CITIBANK_DOUBLECASH,
-                        ],
-                        excludedAdditionalIncomePatterns: ['PAYROLL'],
-                    }
+                    [
+                        TestAccount.PRIMARY,
+                        TestAccount.CHASE_SAPPHIRE,
+                        TestAccount.CHASE_AMAZON,
+                        TestAccount.CITIBANK_DOUBLECASH,
+                    ],
+                    ['PAYROLL'],
+                    true
                 );
 
                 const mockTransactions = [
@@ -233,15 +231,14 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    {
-                        validDestinationAccounts: [
-                            TestAccount.PRIMARY,
-                            TestAccount.CHASE_SAPPHIRE,
-                            TestAccount.CHASE_AMAZON,
-                            TestAccount.CITIBANK_DOUBLECASH,
-                        ],
-                        excludedAdditionalIncomePatterns: ['PAYROLL'],
-                    }
+                    [
+                        TestAccount.PRIMARY,
+                        TestAccount.CHASE_SAPPHIRE,
+                        TestAccount.CHASE_AMAZON,
+                        TestAccount.CITIBANK_DOUBLECASH,
+                    ],
+                    ['PAYROLL'],
+                    true
                 );
 
                 const mockTransactions = [

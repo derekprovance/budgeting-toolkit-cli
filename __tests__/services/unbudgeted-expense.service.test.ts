@@ -84,20 +84,18 @@ describe('UnbudgetedExpenseService', () => {
         service = new UnbudgetedExpenseService(
             mockTransactionService,
             mockTransactionClassificationService,
-            {
-                validExpenseAccounts: [
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CITIBANK_DOUBLECASH,
-                    TestAccount.PRIMARY,
-                ],
-                validTransfers: [
-                    {
-                        source: TestAccount.PRIMARY,
-                        destination: TestAccount.MONEY_MARKET,
-                    },
-                ],
-            }
+            [
+                TestAccount.CHASE_AMAZON,
+                TestAccount.CHASE_SAPPHIRE,
+                TestAccount.CITIBANK_DOUBLECASH,
+                TestAccount.PRIMARY,
+            ],
+            [
+                {
+                    source: TestAccount.PRIMARY,
+                    destination: TestAccount.MONEY_MARKET,
+                },
+            ]
         );
     });
 

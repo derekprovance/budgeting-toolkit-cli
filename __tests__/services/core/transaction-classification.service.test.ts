@@ -4,15 +4,6 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { Tag } from '../../../src/config.js';
 import { jest } from '@jest/globals';
 
-jest.mock('../../../src/utils/config-loader', () => ({
-    loadYamlConfig: jest.fn(() => ({
-        firefly: {
-            noNameExpenseAccountId: '5',
-        },
-    })),
-    getConfigValue: jest.fn(),
-}));
-
 describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
@@ -22,7 +13,12 @@ describe('TransactionClassificationService', () => {
             isExcludedTransaction:
                 jest.fn<(description: string, amount: string) => Promise<boolean>>(),
         } as any;
-        service = new TransactionClassificationService(mockExcludedTransactionService);
+        service = new TransactionClassificationService(
+            mockExcludedTransactionService,
+            '5', // noNameExpenseAccountId
+            Tag.DISPOSABLE_INCOME,
+            Tag.BILLS
+        );
     });
 
     describe('isTransfer', () => {

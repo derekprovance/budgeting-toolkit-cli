@@ -2,21 +2,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
-import { getConfigValue } from '../utils/config-loader.js';
 import { StringUtils } from '../utils/string.utils.js';
-
-/**
- * Configuration for filtering additional income transactions.
- *
- * 1. validDestinationAccounts: Where the income can be deposited
- * 2. excludedAdditionalIncomePatterns: What descriptions to exclude (e.g., payroll)
- * 3. excludeDisposableIncome: Whether to exclude disposable income
- */
-interface AdditionalIncomeConfig {
-    validDestinationAccounts: string[];
-    excludedAdditionalIncomePatterns: readonly string[];
-    excludeDisposableIncome: boolean;
-}
 
 /**
  * Service for calculating additional income.
@@ -33,28 +19,14 @@ interface AdditionalIncomeConfig {
  * Description matching is normalized to handle variations (case insensitive, trimmed, etc.)
  */
 export class AdditionalIncomeService extends BaseTransactionAnalysisService<TransactionSplit[]> {
-    private static readonly DEFAULT_CONFIG: AdditionalIncomeConfig = {
-        validDestinationAccounts: [],
-        excludedAdditionalIncomePatterns: [],
-        excludeDisposableIncome: true,
-    };
-
-    private readonly config: AdditionalIncomeConfig;
-
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
-        config: Partial<AdditionalIncomeConfig> = {}
+        private readonly validDestinationAccounts: string[],
+        private readonly excludedAdditionalIncomePatterns: readonly string[],
+        private readonly excludeDisposableIncome: boolean
     ) {
         super(transactionService, transactionClassificationService);
-
-        const yamlConfig = this.loadConfigFromYaml();
-
-        this.config = {
-            ...AdditionalIncomeService.DEFAULT_CONFIG,
-            ...yamlConfig,
-            ...config,
-        };
         this.validateConfig();
     }
 
@@ -94,43 +66,16 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
     }
 
     /**
-     * Loads configuration values from the YAML file
-     */
-    private loadConfigFromYaml(): Partial<AdditionalIncomeConfig> {
-        const validDestinationAccounts = getConfigValue<string[]>('validDestinationAccounts');
-        const excludedAdditionalIncomePatterns = getConfigValue<string[]>(
-            'excludedAdditionalIncomePatterns'
-        );
-        const excludeDisposableIncome = getConfigValue<boolean>('excludeDisposableIncome');
-
-        const yamlConfig: Partial<AdditionalIncomeConfig> = {};
-
-        if (validDestinationAccounts) {
-            yamlConfig.validDestinationAccounts = validDestinationAccounts;
-        }
-
-        if (excludedAdditionalIncomePatterns) {
-            yamlConfig.excludedAdditionalIncomePatterns = excludedAdditionalIncomePatterns;
-        }
-
-        if (excludeDisposableIncome !== undefined) {
-            yamlConfig.excludeDisposableIncome = excludeDisposableIncome;
-        }
-
-        return yamlConfig;
-    }
-
-    /**
      * Validates the configuration to ensure it's valid.
      *
      * Must have at least one valid destination account
      */
     private validateConfig(): void {
-        if (!this.config.validDestinationAccounts.length) {
+        if (!this.validDestinationAccounts.length) {
             throw new Error('At least one valid destination account must be specified');
         }
 
-        if (!this.config.excludedAdditionalIncomePatterns.length) {
+        if (!this.excludedAdditionalIncomePatterns.length) {
             this.logger.warn(
                 'No excluded descriptions specified - all deposits will be considered additional income'
             );
@@ -154,7 +99,7 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
             .filter(t => Number(t.amount) > 0)
             .filter(
                 t =>
-                    !this.config.excludeDisposableIncome ||
+                    !this.excludeDisposableIncome ||
                     !this.transactionClassificationService.isDisposableIncome(t)
             );
     }
@@ -167,7 +112,7 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      */
     private hasValidDestinationAccount = (transaction: TransactionSplit): boolean =>
         transaction.destination_id != null &&
-        this.config.validDestinationAccounts.includes(transaction.destination_id);
+        this.validDestinationAccounts.includes(transaction.destination_id);
 
     /**
      * Checks if a transaction is not payroll.
@@ -184,7 +129,7 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
 
         return !StringUtils.matchesAnyPattern(
             transaction.description,
-            this.config.excludedAdditionalIncomePatterns
+            this.excludedAdditionalIncomePatterns
         );
     };
 }

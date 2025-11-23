@@ -16,7 +16,7 @@ import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-upda
 import { LLMConfig } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
-import { baseUrl } from '../config.js';
+import { config, baseUrl } from '../config.js';
 import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
 import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
@@ -31,18 +31,26 @@ export class ServiceFactory {
         const userInputService = new UserInputService(baseUrl);
         const excludedTransactionService = new ExcludedTransactionService();
         const transactionClassificationService = new TransactionClassificationService(
-            excludedTransactionService
+            excludedTransactionService,
+            config.api.firefly.noNameExpenseAccountId,
+            config.transactions.tags.disposableIncome,
+            config.transactions.tags.bills
         );
         const transactionValidatorService = new TransactionValidatorService(
             transactionClassificationService
         );
         const additionalIncomeService = new AdditionalIncomeService(
             transactionService,
-            transactionClassificationService
+            transactionClassificationService,
+            config.accounts.validDestinationAccounts,
+            config.transactions.excludedAdditionalIncomePatterns,
+            config.transactions.excludeDisposableIncome
         );
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
-            transactionClassificationService
+            transactionClassificationService,
+            config.accounts.validExpenseAccounts,
+            config.accounts.validTransfers
         );
         const budgetReport = new BudgetReportService(
             budgetService,
@@ -50,7 +58,8 @@ export class ServiceFactory {
         );
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
-            transactionClassificationService
+            transactionClassificationService,
+            config.transactions.expectedMonthlyPaycheck
         );
         const baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
