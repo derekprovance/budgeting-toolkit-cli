@@ -79,6 +79,7 @@ export class SplitTransactionDisplayService {
             `  ${chalk.bold('Amount:')} ${currencySymbol}${split1Amount}`,
         ];
 
+        // Split 1: Show category/budget if set
         if (split1Category) {
             lines.push(`  ${chalk.bold('Category:')} ${split1Category}`);
         }
@@ -93,13 +94,11 @@ export class SplitTransactionDisplayService {
             `  ${chalk.bold('Amount:')} ${currencySymbol}${split2Amount}`
         );
 
-        if (split2Category) {
-            lines.push(`  ${chalk.bold('Category:')} ${split2Category}`);
-        }
-
-        if (split2Budget) {
-            lines.push(`  ${chalk.bold('Budget:')} ${split2Budget}`);
-        }
+        // Split 2: Always show category/budget status (set or not set)
+        lines.push(
+            `  ${chalk.bold('Category:')} ${split2Category || chalk.dim('(not set)')}`,
+            `  ${chalk.bold('Budget:')} ${split2Budget || chalk.dim('(not set)')}`
+        );
 
         lines.push(chalk.dim('━'.repeat(60)));
 
@@ -114,8 +113,6 @@ export class SplitTransactionDisplayService {
      */
     formatSuccess(transactionId: string, splitCount: number): string {
         return [
-            chalk.green.bold('\n✓ Transaction split successfully!'),
-            ``,
             `Created ${splitCount} splits from original transaction.`,
             `View at: ${this.getTransactionLink(transactionId)}`,
         ].join('\n');

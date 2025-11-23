@@ -119,7 +119,7 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
 
             // Track budget names for display
             let firstBudgetName = originalSplit.budget_name || undefined;
-            let secondBudgetName = originalSplit.budget_name || undefined;
+            let secondBudgetName: string | undefined = undefined; // Split 2 starts with no budget
 
             // Ask if user wants to customize split 1 category/budget
             const customizeSplit1 = await this.userInputService.shouldCustomizeSplit(1);
@@ -163,15 +163,9 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
                     secondSplitData.budgetId = customizations.budgetId;
                     secondBudgetName = customizations.budgetName;
                 }
-            } else {
-                // Inherit from original
-                if (originalSplit.category_name) {
-                    secondSplitData.categoryName = originalSplit.category_name;
-                }
-                if (originalSplit.budget_id) {
-                    secondSplitData.budgetId = originalSplit.budget_id;
-                }
             }
+            // Note: Split 2 does not inherit category/budget from original by default
+            // These fields remain undefined unless explicitly set by user
 
             // Show preview with parent description
             console.log(

@@ -219,16 +219,15 @@ export class TransactionSplitService {
         firstData: SplitData,
         secondData: SplitData
     ): TransactionUpdate {
-        // First split: Update the original (has transaction_journal_id)
         const firstSplitUpdate: TransactionSplitUpdate = {
             transaction_journal_id: originalSplit.transaction_journal_id,
             amount: firstAmount,
             description: firstData.description || originalSplit.description,
             ...(firstData.categoryName && { category_name: firstData.categoryName }),
             ...(firstData.budgetId && { budget_id: firstData.budgetId }),
+            ...(originalSplit.tags && { tags: originalSplit.tags }),
         };
 
-        // Second split: Create new (no transaction_journal_id)
         const secondSplitUpdate: TransactionSplitUpdate = {
             type: originalSplit.type,
             date: originalSplit.date,
@@ -241,22 +240,15 @@ export class TransactionSplitService {
             destination_id: originalSplit.destination_id,
             destination_name: originalSplit.destination_name,
 
-            // Apply custom category/budget if provided
-            ...(secondData.categoryName && { category_name: secondData.categoryName }),
-            ...(secondData.budgetId && { budget_id: secondData.budgetId }),
-
             // Copy currency information
             ...(originalSplit.currency_id && { currency_id: originalSplit.currency_id }),
             ...(originalSplit.currency_code && { currency_code: originalSplit.currency_code }),
-
-            // Copy tags if present
-            ...(originalSplit.tags && { tags: originalSplit.tags }),
         };
 
         return {
             apply_rules: true,
             fire_webhooks: true,
-            group_title: originalSplit.description, // Set parent transaction title
+            group_title: originalSplit.description,
             transactions: [firstSplitUpdate, secondSplitUpdate],
         };
     }
