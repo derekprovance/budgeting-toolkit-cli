@@ -83,10 +83,13 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(2100);
-            expect(result.actualMonthlyTotal).toBe(2100);
-            expect(result.variance).toBe(0);
-            expect(result.bills).toHaveLength(2);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(2100);
+                expect(result.value.actualMonthlyTotal).toBe(2100);
+                expect(result.value.variance).toBe(0);
+                expect(result.value.bills).toHaveLength(2);
+            }
         });
 
         it('should handle empty bills gracefully', async () => {
@@ -95,15 +98,21 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(0);
-            expect(result.actualMonthlyTotal).toBe(0);
-            expect(result.variance).toBe(0);
-            expect(result.bills).toEqual([]);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(0);
+                expect(result.value.actualMonthlyTotal).toBe(0);
+                expect(result.value.variance).toBe(0);
+                expect(result.value.bills).toEqual([]);
+            }
         });
 
         it('should validate month and year', async () => {
-            await expect(billComparisonService.calculateBillComparison(0, 2024)).rejects.toThrow();
-            await expect(billComparisonService.calculateBillComparison(13, 2024)).rejects.toThrow();
+            const result1 = await billComparisonService.calculateBillComparison(0, 2024);
+            expect(result1.ok).toBe(false);
+
+            const result2 = await billComparisonService.calculateBillComparison(13, 2024);
+            expect(result2.ok).toBe(false);
         });
 
         it('should calculate variance correctly', async () => {
@@ -115,9 +124,12 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(50);
-            expect(result.actualMonthlyTotal).toBe(60);
-            expect(result.variance).toBe(10); // actual - predicted
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(50);
+                expect(result.value.actualMonthlyTotal).toBe(60);
+                expect(result.value.variance).toBe(10); // actual - predicted
+            }
         });
 
         it('should handle bills with different frequencies', async () => {
@@ -132,7 +144,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(300); // 100 + 100 + 100
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(300); // 100 + 100 + 100
+            }
         });
 
         it('should handle bills with skip values', async () => {
@@ -146,7 +161,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBeCloseTo(321.67, 2); // 281.67 + 40
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBeCloseTo(321.67, 2); // 281.67 + 40
+            }
         });
 
         it('should map transactions to bills correctly', async () => {
@@ -166,11 +184,14 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            const billA = result.bills.find(b => b.id === '1');
-            const billB = result.bills.find(b => b.id === '2');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                const billA = result.value.bills.find(b => b.id === '1');
+                const billB = result.value.bills.find(b => b.id === '2');
 
-            expect(billA?.actual).toBe(105);
-            expect(billB?.actual).toBe(200); // 100 + 100
+                expect(billA?.actual).toBe(105);
+                expect(billB?.actual).toBe(200); // 100 + 100
+            }
         });
 
         it('should handle transactions without bill_id', async () => {
@@ -185,7 +206,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.actualMonthlyTotal).toBe(0); // Unbilled transaction not counted
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.actualMonthlyTotal).toBe(0); // Unbilled transaction not counted
+            }
         });
 
         it('should handle currency fallbacks', async () => {
@@ -208,8 +232,11 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.currencyCode).toBe('USD');
-            expect(result.currencySymbol).toBe('$');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.currencyCode).toBe('USD');
+                expect(result.value.currencySymbol).toBe('$');
+            }
         });
 
         it('should handle bills with subscription_id instead of bill_id', async () => {
@@ -227,7 +254,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.actualMonthlyTotal).toBe(50);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.actualMonthlyTotal).toBe(50);
+            }
         });
 
         it('should handle invalid bill amounts gracefully', async () => {
@@ -249,7 +279,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(0); // Invalid amount defaults to 0
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(0); // Invalid amount defaults to 0
+            }
         });
 
         it('should handle negative bill amounts gracefully', async () => {
@@ -271,15 +304,22 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(0); // Negative amount defaults to 0
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(0); // Negative amount defaults to 0
+            }
         });
 
         it('should handle errors from bill service', async () => {
             mockBillService.getActiveBills.mockRejectedValue(new Error('API Error'));
 
-            await expect(billComparisonService.calculateBillComparison(10, 2024)).rejects.toThrow(
-                'Failed to calculate bill comparison for month 10'
-            );
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain(
+                    'Bill comparison calculation failed for calculateBillComparison on month 10'
+                );
+            }
         });
 
         it('should handle errors from transaction service', async () => {
@@ -289,9 +329,13 @@ describe('BillComparisonService', () => {
                 new Error('Transaction Error')
             );
 
-            await expect(billComparisonService.calculateBillComparison(10, 2024)).rejects.toThrow(
-                'Failed to calculate bill comparison for month 10'
-            );
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain(
+                    'Bill comparison calculation failed for calculateBillComparison on month 10'
+                );
+            }
         });
     });
 
@@ -303,8 +347,11 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            // 52 * 52 / 12 = 225.33...
-            expect(result.predictedMonthlyAverage).toBeCloseTo(225.33, 2);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // 52 * 52 / 12 = 225.33...
+                expect(result.value.predictedMonthlyAverage).toBeCloseTo(225.33, 2);
+            }
         });
 
         it('should prorate quarterly bills correctly', async () => {
@@ -314,7 +361,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(100); // 300 / 3
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(100); // 300 / 3
+            }
         });
 
         it('should prorate half-year bills correctly', async () => {
@@ -324,7 +374,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(100); // 600 / 6
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(100); // 600 / 6
+            }
         });
 
         it('should handle skip parameter with weekly bills', async () => {
@@ -334,8 +387,11 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            // 100 * 52 / 2 / 12 = 216.67
-            expect(result.predictedMonthlyAverage).toBeCloseTo(216.67, 2);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // 100 * 52 / 2 / 12 = 216.67
+                expect(result.value.predictedMonthlyAverage).toBeCloseTo(216.67, 2);
+            }
         });
 
         it('should handle skip parameter with monthly bills', async () => {
@@ -345,7 +401,10 @@ describe('BillComparisonService', () => {
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
-            expect(result.predictedMonthlyAverage).toBe(50); // 100 / 2
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedMonthlyAverage).toBe(50); // 100 / 2
+            }
         });
     });
 });

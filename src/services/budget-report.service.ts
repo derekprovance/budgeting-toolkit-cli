@@ -5,6 +5,8 @@ import { DateUtils } from '../utils/date.utils.js';
 import { logger } from '../logger.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionClassificationService } from './core/transaction-classification.service.js';
+import { Result } from '../types/result.type.js';
+import { BudgetError, BudgetErrorFactory, BudgetErrorType } from '../types/error/budget.error.js';
 
 export class BudgetReportService implements IBudgetReportService {
     constructor(
@@ -12,53 +14,88 @@ export class BudgetReportService implements IBudgetReportService {
         private readonly transactionClassificationService: TransactionClassificationService
     ) {}
 
-    async getBudgetReport(month: number, year: number): Promise<BudgetReportDto[]> {
+    /**
+     * Gets budget report for a given month and year.
+     * Returns Result type for explicit error handling.
+     *
+     * @param month - Month to get report for (1-12)
+     * @param year - Year to get report for
+     * @returns Result containing budget report or error
+     */
+    async getBudgetReport(
+        month: number,
+        year: number
+    ): Promise<Result<BudgetReportDto[], BudgetError>> {
+        const operation = 'getBudgetReport';
+
+        // Validate date
         try {
             DateUtils.validateMonthYear(month, year);
-            const budgetReports: BudgetReportDto[] = [];
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
 
-            logger.debug(
-                {
-                    month,
-                    year,
-                },
-                'Fetching budget report'
+            return Result.err(
+                BudgetErrorFactory.create(BudgetErrorType.INVALID_DATE, month, year, operation, err)
             );
+        }
 
-            const budgets = await this.budgetService.getBudgets();
-            const insights = await this.budgetService.getBudgetExpenseInsights(month, year);
-            const budgetLimits = await this.budgetService.getBudgetLimits(month, year);
+        logger.debug({ month, year }, 'Fetching budget report');
 
-            budgets.forEach(budget => {
+        try {
+            // Fetch all required data in parallel
+            const [budgets, insights, budgetLimits] = await Promise.all([
+                this.budgetService.getBudgets(),
+                this.budgetService.getBudgetExpenseInsights(month, year),
+                this.budgetService.getBudgetLimits(month, year),
+            ]);
+
+            // Build report from fetched data
+            const budgetReports: BudgetReportDto[] = budgets.map(budget => {
                 const budgetName = budget.attributes.name;
                 const budgetId = budget.id;
 
-                const budgetLimit = budgetLimits.filter(
-                    budgetLimit => budgetLimit.attributes.budget_id === budgetId
-                )[0];
+                const budgetLimit = budgetLimits.find(
+                    limit => limit.attributes.budget_id === budgetId
+                );
                 const insight = insights.find(insight => insight.id == budgetId);
 
-                budgetReports.push({
+                return {
                     name: budgetName,
                     amount: budgetLimit ? Number(budgetLimit.attributes.amount) : 0.0,
                     spent: insight ? insight.difference_float : 0.0,
-                } as BudgetReportDto);
+                } as BudgetReportDto;
             });
 
-            return budgetReports;
+            logger.debug(
+                { month, year, budgetCount: budgetReports.length },
+                'Budget report generated successfully'
+            );
+
+            return Result.ok(budgetReports);
         } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+
             logger.error(
                 {
                     month,
                     year,
-                    error: error instanceof Error ? error.message : 'Unknown error',
+                    operation,
+                    error: err.message,
+                    errorType: err.constructor.name,
                 },
                 'Failed to get budget report'
             );
-            if (error instanceof Error) {
-                throw new Error(`Failed to get budget report for month ${month}: ${error.message}`);
-            }
-            throw new Error(`Failed to get budget report for month ${month}`);
+
+            return Result.err(
+                BudgetErrorFactory.create(
+                    BudgetErrorType.CALCULATION_FAILED,
+                    month,
+                    year,
+                    operation,
+                    err
+                )
+            );
         }
     }
 

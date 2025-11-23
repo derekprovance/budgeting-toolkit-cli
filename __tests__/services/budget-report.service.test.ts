@@ -73,17 +73,20 @@ describe('BudgetReportService', () => {
 
             const result = await budgetReportService.getBudgetReport(1, 2024);
 
-            expect(result).toHaveLength(2);
-            expect(result[0]).toEqual({
-                name: 'Budget 1',
-                amount: 100.0,
-                spent: 50.0,
-            } as BudgetReportDto);
-            expect(result[1]).toEqual({
-                name: 'Budget 2',
-                amount: 200.0,
-                spent: 150.0,
-            } as BudgetReportDto);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(2);
+                expect(result.value[0]).toEqual({
+                    name: 'Budget 1',
+                    amount: 100.0,
+                    spent: 50.0,
+                } as BudgetReportDto);
+                expect(result.value[1]).toEqual({
+                    name: 'Budget 2',
+                    amount: 200.0,
+                    spent: 150.0,
+                } as BudgetReportDto);
+            }
         });
 
         it('should handle budgets with no limits or insights', async () => {
@@ -102,25 +105,35 @@ describe('BudgetReportService', () => {
 
             const result = await budgetReportService.getBudgetReport(1, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0]).toEqual({
-                name: 'Budget 1',
-                amount: 0.0,
-                spent: 0.0,
-            } as BudgetReportDto);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0]).toEqual({
+                    name: 'Budget 1',
+                    amount: 0.0,
+                    spent: 0.0,
+                } as BudgetReportDto);
+            }
         });
 
-        it('should throw error when API call fails', async () => {
+        it('should return error when API call fails', async () => {
             mockBudgetService.getBudgets.mockRejectedValueOnce(new Error('API Error'));
 
-            await expect(budgetReportService.getBudgetReport(1, 2024)).rejects.toThrow(
-                'Failed to get budget report for month 1'
-            );
+            const result = await budgetReportService.getBudgetReport(1, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain(
+                    'Budget calculation failed for getBudgetReport on month 1'
+                );
+            }
         });
 
         it('should validate month and year', async () => {
-            await expect(budgetReportService.getBudgetReport(0, 2024)).rejects.toThrow();
-            await expect(budgetReportService.getBudgetReport(13, 2024)).rejects.toThrow();
+            const result1 = await budgetReportService.getBudgetReport(0, 2024);
+            expect(result1.ok).toBe(false);
+
+            const result2 = await budgetReportService.getBudgetReport(13, 2024);
+            expect(result2.ok).toBe(false);
         });
     });
 });

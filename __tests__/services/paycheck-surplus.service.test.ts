@@ -73,18 +73,21 @@ describe('PaycheckSurplusService', () => {
             const result = await service.calculatePaycheckSurplus(1, 2024);
 
             // Assert
-            expect(result).toBe(1000.0);
-            expect(mockLogger.debug).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    month: 1,
-                    year: 2024,
-                    expectedPaycheckAmount: 5000.0,
-                    totalPaycheckAmount: 6000.0,
-                    surplus: 1000.0,
-                    paycheckCount: 2,
-                }),
-                'Calculated paycheck surplus'
-            );
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(1000.0);
+                expect(mockLogger.debug).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        month: 1,
+                        year: 2024,
+                        expectedPaycheckAmount: 5000.0,
+                        totalPaycheckAmount: 6000.0,
+                        surplus: 1000.0,
+                        paycheckCount: 2,
+                    }),
+                    'Calculated paycheck surplus'
+                );
+            }
         });
 
         it('should calculate deficit when actual paychecks are less than expected amount', async () => {
@@ -97,7 +100,10 @@ describe('PaycheckSurplusService', () => {
             const result = await service.calculatePaycheckSurplus(1, 2024);
 
             // Assert
-            expect(result).toBe(-3000.0);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-3000.0);
+            }
         });
 
         it('should handle no paychecks found', async () => {
@@ -109,7 +115,10 @@ describe('PaycheckSurplusService', () => {
             const result = await service.calculatePaycheckSurplus(1, 2024);
 
             // Assert
-            expect(result).toBe(-5000.0);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-5000.0);
+            }
         });
 
         it('should handle missing expected paycheck amount configuration', async () => {
@@ -121,7 +130,7 @@ describe('PaycheckSurplusService', () => {
             // Create local logger mock for this test
             const testMockLogger = {
                 debug: jest.fn<(obj: unknown, msg: string) => void>(),
-                warn: jest.fn<(obj: unknown, msg: string) => void>(),
+                warn: jest.fn<(msg: string) => void>(),
                 error: jest.fn<(obj: unknown, msg: string) => void>(),
                 trace: jest.fn<(obj: unknown, msg: string) => void>(),
                 info: jest.fn<(obj: unknown, msg: string) => void>(),
@@ -130,7 +139,7 @@ describe('PaycheckSurplusService', () => {
             const testService = new PaycheckSurplusService(
                 mockTransactionService,
                 mockTransactionClassificationService,
-                null as any, // Testing with null expected paycheck
+                undefined, // Testing with undefined expected paycheck
                 testMockLogger
             );
 
@@ -138,44 +147,13 @@ describe('PaycheckSurplusService', () => {
             const result = await testService.calculatePaycheckSurplus(1, 2024);
 
             // Assert
-            expect(result).toBe(3000.0);
-            expect(testMockLogger.warn).toHaveBeenCalledWith(
-                { expectedMonthlyPaycheck: null },
-                'Expected monthly paycheck amount not configured'
-            );
-        });
-
-        it('should handle invalid expected paycheck amount', async () => {
-            // Arrange
-            const paychecks = [mockPaycheck('3000.00')];
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
-
-            // Create local logger mock for this test
-            const testMockLogger = {
-                debug: jest.fn<(obj: unknown, msg: string) => void>(),
-                warn: jest.fn<(obj: unknown, msg: string) => void>(),
-                error: jest.fn<(obj: unknown, msg: string) => void>(),
-                trace: jest.fn<(obj: unknown, msg: string) => void>(),
-                info: jest.fn<(obj: unknown, msg: string) => void>(),
-            };
-
-            const testService = new PaycheckSurplusService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                'invalid', // Testing with invalid expected paycheck
-                testMockLogger
-            );
-
-            // Act
-            const result = await testService.calculatePaycheckSurplus(1, 2024);
-
-            // Assert
-            expect(result).toBe(3000.0);
-            expect(testMockLogger.error).toHaveBeenCalledWith(
-                { expectedMonthlyPaycheck: 'invalid' },
-                'Invalid expected monthly paycheck amount'
-            );
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(3000.0);
+                expect(testMockLogger.warn).toHaveBeenCalledWith(
+                    'Expected monthly paycheck amount not configured'
+                );
+            }
         });
 
         it('should handle invalid paycheck amounts', async () => {
@@ -188,17 +166,20 @@ describe('PaycheckSurplusService', () => {
             const result = await service.calculatePaycheckSurplus(1, 2024);
 
             // Assert
-            expect(result).toBe(-2000.0);
-            expect(mockLogger.warn).toHaveBeenCalledWith(
-                {
-                    paycheck: {
-                        amount: 'invalid',
-                        category_name: 'Paycheck',
-                        source_type: 'Revenue account',
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-2000.0);
+                expect(mockLogger.warn).toHaveBeenCalledWith(
+                    {
+                        paycheck: {
+                            amount: 'invalid',
+                            category_name: 'Paycheck',
+                            source_type: 'Revenue account',
+                        },
                     },
-                },
-                'Invalid paycheck amount found'
-            );
+                    'Invalid paycheck amount found'
+                );
+            }
         });
 
         it('should handle API errors', async () => {
@@ -207,26 +188,38 @@ describe('PaycheckSurplusService', () => {
                 new Error('API Error')
             );
 
-            // Act & Assert
-            await expect(service.calculatePaycheckSurplus(1, 2024)).rejects.toThrow(
-                'Failed to find paychecks for month 1'
-            );
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Failed to fetch transactions for month 1');
+                expect(result.error.message).toContain('API Error');
+            }
+            // New error handling logs with more specific context
             expect(mockLogger.error).toHaveBeenCalledWith(
-                {
+                expect.objectContaining({
                     error: 'API Error',
-                    type: 'Error',
                     month: 1,
                     year: 2024,
-                },
-                'Failed to find paychecks'
+                    operation: 'calculatePaycheckSurplus',
+                }),
+                'Failed to fetch transactions'
             );
         });
 
         it('should handle invalid month/year', async () => {
-            // Act & Assert - DateUtils.validateMonthYear will throw for invalid month
-            await expect(service.calculatePaycheckSurplus(13, 2024)).rejects.toThrow(
-                'Failed to find paychecks for month 13'
-            );
+            // Act
+            const result = await service.calculatePaycheckSurplus(13, 2024);
+
+            // Assert
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain(
+                    'Invalid date provided for calculatePaycheckSurplus'
+                );
+            }
         });
     });
 

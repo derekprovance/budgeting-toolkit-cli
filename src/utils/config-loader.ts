@@ -111,14 +111,6 @@ export class ConfigLoader {
 const defaultConfigLoader = new ConfigLoader();
 
 /**
- * Clears the cached configuration (for testing purposes)
- * @deprecated Use ConfigLoader instance instead
- */
-export function clearConfigCache(): void {
-    defaultConfigLoader.clearCache();
-}
-
-/**
  * Loads configuration from the budgeting-toolkit.config.yaml file
  * @deprecated Use ConfigLoader instance instead
  */

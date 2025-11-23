@@ -1,89 +1,69 @@
 import { ITransactionService } from './core/transaction.service.interface.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
-import { logger } from '../logger.js';
-import { DateUtils } from '../utils/date.utils.js';
-import { getConfigValue } from '../utils/config-loader.js';
+import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
 
 /**
  * Service for calculating unbudgeted expenses.
  *
- * 1. A transaction is considered an unbudgeted expense if:
- *    - It is a bill (has the "Bills" tag), OR
- *    - It meets all regular expense criteria:
- *      - Has no budget assigned
- *      - Not supplemented by disposable income
- *      - Not in excluded transactions list
- *      - From a valid expense account
+ * Extends BaseTransactionAnalysisService for consistent error handling and Result types.
  *
- * 2. Valid expense accounts defined in yaml config
+ * A transaction is considered an unbudgeted expense if:
+ * - It is a bill (has the "Bills" tag), OR
+ * - It meets all regular expense criteria:
+ *   - Has no budget assigned
+ *   - Not supplemented by disposable income
+ *   - Not in excluded transactions list
+ *   - From a valid expense account
  *
- * 3. Transfers are ignored unless specified in yaml config
+ * Valid expense accounts defined in configuration
+ * Transfers are ignored unless specified in configuration
  */
-export interface UnbudgetedExpenseConfig {
-    validExpenseAccounts?: string[];
-    validTransfers?: ValidTransfer[];
-}
-
-export class UnbudgetedExpenseService {
-    private readonly validExpenseAccounts: string[];
-    private readonly validTransfers: ValidTransfer[];
-
+export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<TransactionSplit[]> {
     constructor(
-        private readonly transactionService: ITransactionService,
-        private readonly transactionClassificationService: ITransactionClassificationService,
-        config?: UnbudgetedExpenseConfig
+        transactionService: ITransactionService,
+        transactionClassificationService: ITransactionClassificationService,
+        private readonly validExpenseAccounts: string[],
+        private readonly validTransfers: ValidTransfer[]
     ) {
-        // Load valid expense accounts from config parameter or YAML config with fallback to defaults
-        this.validExpenseAccounts =
-            config?.validExpenseAccounts ?? getConfigValue<string[]>('validExpenseAccounts') ?? [];
-        this.validTransfers =
-            config?.validTransfers ?? getConfigValue<ValidTransfer[]>('validTransfers') ?? [];
+        super(transactionService, transactionClassificationService);
     }
 
     /**
      * Calculates unbudgeted expenses for a given month and year.
+     * Returns Result type for explicit error handling.
      *
-     * 1. Get all transactions for the month
-     * 2. Filter transactions based on criteria:
-     *    - Bills are always included
-     *    - Regular expenses must meet all criteria
-     *    - Transfers must meet special criteria
+     * @param month - Month to calculate (1-12)
+     * @param year - Year to calculate
+     * @returns Result containing array of unbudgeted expense transactions or error
      */
-    async calculateUnbudgetedExpenses(month: number, year: number): Promise<TransactionSplit[]> {
-        try {
-            DateUtils.validateMonthYear(month, year);
-            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
-            const expenses = await this.filterExpenses(transactions);
+    async calculateUnbudgetedExpenses(month: number, year: number) {
+        return this.executeAnalysis(month, year);
+    }
 
-            logger.debug(
-                {
-                    month,
-                    year,
-                    totalTransactions: transactions.length,
-                    unbudgetedExpenses: expenses.length,
-                },
-                'Calculated unbudgeted expenses'
-            );
+    /**
+     * Analyzes transactions to identify unbudgeted expenses.
+     * Implements domain-specific filtering logic.
+     */
+    protected async analyzeTransactions(
+        transactions: TransactionSplit[]
+    ): Promise<TransactionSplit[]> {
+        const expenses = await this.filterExpenses(transactions);
 
-            return expenses;
-        } catch (error) {
-            logger.error(
-                {
-                    month,
-                    year,
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                },
-                'Failed to calculate unbudgeted expenses'
-            );
-            if (error instanceof Error) {
-                throw new Error(
-                    `Failed to calculate unbudgeted expenses for month ${month}: ${error.message}`
-                );
-            }
-            throw new Error(`Failed to calculate unbudgeted expenses for month ${month}`);
-        }
+        this.logger.debug(
+            {
+                totalTransactions: transactions.length,
+                unbudgetedExpenses: expenses.length,
+            },
+            'Calculated unbudgeted expenses'
+        );
+
+        return expenses;
+    }
+
+    protected getOperationName(): string {
+        return 'calculateUnbudgetedExpenses';
     }
 
     /**
@@ -164,7 +144,7 @@ export class UnbudgetedExpenseService {
             isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
         };
 
-        logger.debug(
+        this.logger.debug(
             {
                 transactionId: transaction.transaction_journal_id,
                 description: transaction.description,

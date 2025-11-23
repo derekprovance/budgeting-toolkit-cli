@@ -1,13 +1,9 @@
 import { ClaudeClient } from '../api/claude.client.js';
-import { claudeAPIKey as defaultClaudeAPIKey } from '../config.js';
-import { loadYamlConfig as defaultLoadYamlConfig } from '../utils/config-loader.js';
+import { config, claudeAPIKey as defaultClaudeAPIKey } from '../config.js';
 import chalk from 'chalk';
 
 export class LLMConfig {
-    static createClient(
-        claudeAPIKey?: string,
-        loadYamlConfig: typeof defaultLoadYamlConfig = defaultLoadYamlConfig
-    ): ClaudeClient {
+    static createClient(claudeAPIKey?: string): ClaudeClient {
         // Use provided key or fall back to default from environment
         const apiKey = claudeAPIKey ?? defaultClaudeAPIKey;
 
@@ -21,33 +17,25 @@ export class LLMConfig {
             );
         }
 
-        // Load all LLM configuration from YAML (user-configurable business logic)
-        const yamlConfig = loadYamlConfig();
-        const llmConfig = yamlConfig.llm;
+        // Get LLM configuration from ConfigManager
+        const llmConfig = config.llm;
 
-        // Validate that LLM config exists
-        if (!llmConfig) {
-            throw new Error(
-                `${chalk.redBright(
-                    '!!!'
-                )} LLM configuration missing from budgeting-toolkit.config.yaml. Please add llm section with model and other settings. ${chalk.redBright(
-                    '!!!'
-                )}`
-            );
-        }
+        return new ClaudeClient(
+            {
+                // Authentication from environment (secure)
+                apiKey: apiKey,
 
-        return new ClaudeClient({
-            // Authentication from environment (secure)
-            apiKey: apiKey,
-
-            // All other settings from YAML (user-configurable)
-            model: llmConfig.model,
-            maxTokens: llmConfig.maxTokens,
-            batchSize: llmConfig.batchSize,
-            maxConcurrent: llmConfig.maxConcurrent,
-            temperature: llmConfig.temperature,
-            retryDelayMs: llmConfig.retryDelayMs,
-            maxRetryDelayMs: llmConfig.maxRetryDelayMs,
-        });
+                // All other settings from configuration (user-configurable)
+                model: llmConfig.model,
+                maxTokens: llmConfig.maxTokens,
+                batchSize: llmConfig.batchSize,
+                maxConcurrent: llmConfig.maxConcurrent,
+                temperature: llmConfig.temperature,
+                retryDelayMs: llmConfig.retryDelayMs,
+                maxRetryDelayMs: llmConfig.maxRetryDelayMs,
+            },
+            undefined, // client
+            llmConfig // Pass full LLM config for rate limiting and circuit breaker
+        );
     }
 }

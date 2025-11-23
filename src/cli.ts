@@ -2,7 +2,7 @@ import { Command, Option } from 'commander';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
-import { config, validateCertificateConfig } from './config.js';
+import { ConfigManager } from './config.js';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
@@ -16,7 +16,6 @@ import { logger } from './logger.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// ESM compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -55,15 +54,21 @@ const handleError = (error: unknown, operation: string): never => {
 export const createCli = (): Command => {
     const program = new Command();
 
-    // Initialize API client with error handling
     let apiClient: FireflyClientWithCerts;
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
     try {
-        // Validate certificate configuration before attempting to create client
-        validateCertificateConfig(config);
+        const config = ConfigManager.getInstance().getConfig();
 
-        apiClient = new FireflyClientWithCerts(config);
+        // Create Firefly client with properly formatted config
+        apiClient = new FireflyClientWithCerts({
+            BASE: config.api.firefly.url + '/api',
+            TOKEN: config.api.firefly.token,
+            caCertPath: config.api.firefly.certificates?.caCertPath,
+            clientCertPath: config.api.firefly.certificates?.clientCertPath,
+            clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
+        });
+
         services = ServiceFactory.createServices(apiClient);
     } catch (error) {
         console.error(

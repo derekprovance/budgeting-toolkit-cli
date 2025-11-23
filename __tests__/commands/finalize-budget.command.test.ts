@@ -6,6 +6,8 @@ import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.serv
 import { FinalizeBudgetDisplayService } from '../../src/services/display/finalize-budget-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
+import { Result } from '../../src/types/result.type.js';
+import { TransactionAnalysisError } from '../../src/types/error/transaction-analysis.error.js';
 
 // Mock services
 jest.mock('../../src/services/additional-income.service');
@@ -38,11 +40,15 @@ describe('FinalizeBudgetCommand', () => {
 
         // Setup service mocks
         additionalIncomeService = {
-            calculateAdditionalIncome: jest.fn().mockResolvedValue([mockTransaction]),
+            calculateAdditionalIncome: jest
+                .fn<() => Promise<Result<TransactionSplit[], TransactionAnalysisError>>>()
+                .mockResolvedValue({ ok: true, value: [mockTransaction] }),
         } as unknown as jest.Mocked<AdditionalIncomeService>;
 
         unbudgetedExpenseService = {
-            calculateUnbudgetedExpenses: jest.fn().mockResolvedValue([mockTransaction]),
+            calculateUnbudgetedExpenses: jest
+                .fn<() => Promise<Result<TransactionSplit[], TransactionAnalysisError>>>()
+                .mockResolvedValue({ ok: true, value: [mockTransaction] }),
         } as unknown as jest.Mocked<UnbudgetedExpenseService>;
 
         transactionClassificationService = {
@@ -54,7 +60,9 @@ describe('FinalizeBudgetCommand', () => {
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
         paycheckSurplusService = {
-            calculatePaycheckSurplus: jest.fn().mockResolvedValue(500.0),
+            calculatePaycheckSurplus: jest
+                .fn<() => Promise<Result<number, TransactionAnalysisError>>>()
+                .mockResolvedValue({ ok: true, value: 500.0 }),
         } as unknown as jest.Mocked<PaycheckSurplusService>;
 
         finalizeBudgetDisplayService = {
@@ -99,9 +107,18 @@ describe('FinalizeBudgetCommand', () => {
         });
 
         it('should execute successfully with no data', async () => {
-            additionalIncomeService.calculateAdditionalIncome.mockResolvedValueOnce([]);
-            unbudgetedExpenseService.calculateUnbudgetedExpenses.mockResolvedValueOnce([]);
-            paycheckSurplusService.calculatePaycheckSurplus.mockResolvedValueOnce(0);
+            additionalIncomeService.calculateAdditionalIncome.mockResolvedValueOnce({
+                ok: true,
+                value: [],
+            });
+            unbudgetedExpenseService.calculateUnbudgetedExpenses.mockResolvedValueOnce({
+                ok: true,
+                value: [],
+            });
+            paycheckSurplusService.calculatePaycheckSurplus.mockResolvedValueOnce({
+                ok: true,
+                value: 0,
+            });
 
             await command.execute({ month: 5, year: 2024 });
 
@@ -116,38 +133,64 @@ describe('FinalizeBudgetCommand', () => {
         });
 
         it('should handle errors from additional income service', async () => {
-            const error = new Error('Additional income error');
-            additionalIncomeService.calculateAdditionalIncome.mockRejectedValueOnce(error);
+            const error = {
+                ok: false,
+                error: {
+                    message: 'Additional income error',
+                    userMessage: 'Failed to calculate additional income',
+                },
+            };
+            additionalIncomeService.calculateAdditionalIncome.mockResolvedValueOnce(error as any);
 
-            await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(error);
+            await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(
+                'Additional income error'
+            );
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('Error finalizing budget'),
-                expect.stringContaining('Additional income error')
+                expect.stringContaining('Error fetching additional income'),
+                expect.stringContaining('Failed to calculate additional income')
             );
         });
 
         it('should handle errors from unbudgeted expense service', async () => {
-            const error = new Error('Unbudgeted expense error');
-            unbudgetedExpenseService.calculateUnbudgetedExpenses.mockRejectedValueOnce(error);
+            const error = {
+                ok: false,
+                error: {
+                    message: 'Unbudgeted expense error',
+                    userMessage: 'Failed to calculate unbudgeted expenses',
+                },
+            };
+            unbudgetedExpenseService.calculateUnbudgetedExpenses.mockResolvedValueOnce(
+                error as any
+            );
 
-            await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(error);
+            await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(
+                'Unbudgeted expense error'
+            );
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('Error finalizing budget'),
-                expect.stringContaining('Unbudgeted expense error')
+                expect.stringContaining('Error fetching unbudgeted expenses'),
+                expect.stringContaining('Failed to calculate unbudgeted expenses')
             );
         });
 
         it('should handle errors from paycheck surplus service', async () => {
-            const error = new Error('Paycheck surplus error');
-            paycheckSurplusService.calculatePaycheckSurplus.mockRejectedValueOnce(error);
+            const error = {
+                ok: false,
+                error: {
+                    message: 'Paycheck surplus error',
+                    userMessage: 'Failed to calculate paycheck surplus',
+                },
+            };
+            paycheckSurplusService.calculatePaycheckSurplus.mockResolvedValueOnce(error as any);
 
-            await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(error);
+            await expect(command.execute({ month: 5, year: 2024 })).rejects.toThrow(
+                'Paycheck surplus error'
+            );
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('Error finalizing budget'),
-                expect.stringContaining('Paycheck surplus error')
+                expect.stringContaining('Error calculating paycheck surplus'),
+                expect.stringContaining('Failed to calculate paycheck surplus')
             );
         });
     });

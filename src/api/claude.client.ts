@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '../logger.js';
-import { loadYamlConfig } from '../utils/config-loader.js';
+import { LLMConfig as LLMConfigType } from '../config/config.types.js';
 
 export interface ChatMessage {
     role: 'user' | 'assistant';
@@ -106,10 +106,7 @@ export class ClaudeClient {
     private client: Anthropic;
     private config: RequiredClaudeConfig;
     private requestQueue: Promise<string>[] = [];
-    private rateLimitState: RateLimitState = {
-        tokens: 50,
-        lastRefill: Date.now(),
-    };
+    private rateLimitState: RateLimitState;
     private circuitBreaker: CircuitBreakerState = {
         failures: 0,
         lastFailureTime: 0,
@@ -133,7 +130,11 @@ export class ClaudeClient {
         maxRetryDelayMs: 32000,
     };
 
-    constructor(config: Partial<ClaudeConfig> = {}, client?: Anthropic) {
+    constructor(
+        config: Partial<ClaudeConfig> = {},
+        client?: Anthropic,
+        private readonly llmConfig?: LLMConfigType
+    ) {
         this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...this.clearUndefined(config) };
         this.client =
             client ||
@@ -143,6 +144,14 @@ export class ClaudeClient {
                 maxRetries: this.config.maxRetries,
                 timeout: this.config.timeout,
             });
+
+        // Initialize rate limit state from config
+        const maxTokens = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
+        this.rateLimitState = {
+            tokens: maxTokens,
+            lastRefill: Date.now(),
+        };
+
         logger.debug(`Initializing AI Client with model: ${this.config.model}`);
     }
 
@@ -323,11 +332,10 @@ export class ClaudeClient {
     }
 
     private async waitForRateLimit(): Promise<void> {
-        const yamlConfig = loadYamlConfig();
         const now = Date.now();
         const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
-        const REFILL_INTERVAL = yamlConfig.llm?.rateLimit?.refillInterval || 60000;
-        const MAX_TOKENS = yamlConfig.llm?.rateLimit?.maxTokensPerMinute || 50;
+        const REFILL_INTERVAL = this.llmConfig?.rateLimit?.refillInterval ?? 60000;
+        const MAX_TOKENS = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
         const REFILL_RATE = MAX_TOKENS;
 
         if (timeSinceLastRefill >= REFILL_INTERVAL) {
@@ -352,11 +360,10 @@ export class ClaudeClient {
     }
 
     private async checkCircuitBreaker(): Promise<void> {
-        const yamlConfig = loadYamlConfig();
         const now = Date.now();
-        const FAILURE_THRESHOLD = yamlConfig.llm?.circuitBreaker?.failureThreshold || 5;
-        const RESET_TIMEOUT = yamlConfig.llm?.circuitBreaker?.resetTimeout || 60000;
-        const HALF_OPEN_TIMEOUT = yamlConfig.llm?.circuitBreaker?.halfOpenTimeout || 30000;
+        const FAILURE_THRESHOLD = this.llmConfig?.circuitBreaker?.failureThreshold ?? 5;
+        const RESET_TIMEOUT = this.llmConfig?.circuitBreaker?.resetTimeout ?? 60000;
+        const HALF_OPEN_TIMEOUT = this.llmConfig?.circuitBreaker?.halfOpenTimeout ?? 30000;
 
         switch (this.circuitBreaker.state) {
             case 'OPEN':

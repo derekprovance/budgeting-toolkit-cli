@@ -80,15 +80,14 @@ describe('AdditionalIncomeService', () => {
         service = new AdditionalIncomeService(
             mockTransactionService,
             mockTransactionClassificationService,
-            {
-                validDestinationAccounts: [
-                    TestAccount.PRIMARY,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CITIBANK_DOUBLECASH,
-                ],
-                excludedAdditionalIncomePatterns: ['PAYROLL'],
-            }
+            [
+                TestAccount.PRIMARY,
+                TestAccount.CHASE_SAPPHIRE,
+                TestAccount.CHASE_AMAZON,
+                TestAccount.CITIBANK_DOUBLECASH,
+            ],
+            ['PAYROLL'],
+            true
         );
     });
 
@@ -99,7 +98,9 @@ describe('AdditionalIncomeService', () => {
                     new AdditionalIncomeService(
                         mockTransactionService,
                         mockTransactionClassificationService,
-                        { validDestinationAccounts: [] }
+                        [],
+                        ['PAYROLL'],
+                        true
                     )
             ).toThrow('At least one valid destination account must be specified');
         });
@@ -108,11 +109,9 @@ describe('AdditionalIncomeService', () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
                 mockTransactionClassificationService,
-                {
-                    validDestinationAccounts: [TestAccount.PRIMARY],
-                    excludedAdditionalIncomePatterns: ['PAYROLL'],
-                    excludeDisposableIncome: false,
-                }
+                [TestAccount.PRIMARY],
+                ['PAYROLL'],
+                false
             );
 
             const mockTransactions = [
@@ -132,28 +131,37 @@ describe('AdditionalIncomeService', () => {
 
             const result = await customService.calculateAdditionalIncome(4, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0].description).toBe('Valid Income');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Valid Income');
+            }
         });
     });
 
     describe('input validation', () => {
-        it('should throw error for invalid month', async () => {
-            await expect(service.calculateAdditionalIncome(13, 2024)).rejects.toThrow(
-                'Month must be an integer between 1 and 12'
-            );
+        it('should return error for invalid month', async () => {
+            const result = await service.calculateAdditionalIncome(13, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Month must be an integer between 1 and 12');
+            }
         });
 
-        it('should throw error for invalid year', async () => {
-            await expect(service.calculateAdditionalIncome(1, 1899)).rejects.toThrow(
-                'Year must be a valid 4-digit year'
-            );
+        it('should return error for invalid year', async () => {
+            const result = await service.calculateAdditionalIncome(1, 1899);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Year must be a valid 4-digit year');
+            }
         });
 
-        it('should throw error for non-integer month', async () => {
-            await expect(service.calculateAdditionalIncome(1.5, 2024)).rejects.toThrow(
-                'Month must be an integer between 1 and 12'
-            );
+        it('should return error for non-integer month', async () => {
+            const result = await service.calculateAdditionalIncome(1.5, 2024);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('Month must be an integer between 1 and 12');
+            }
         });
     });
 
@@ -161,7 +169,10 @@ describe('AdditionalIncomeService', () => {
         it('should handle empty transaction list', async () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
             const result = await service.calculateAdditionalIncome(4, 2024);
-            expect(result).toEqual([]);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual([]);
+            }
         });
 
         it('should handle null transaction list', async () => {
@@ -169,7 +180,10 @@ describe('AdditionalIncomeService', () => {
                 [] as TransactionSplit[]
             );
             const result = await service.calculateAdditionalIncome(4, 2024);
-            expect(result).toEqual([]);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual([]);
+            }
         });
 
         describe('transaction filtering', () => {
@@ -177,15 +191,14 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    {
-                        validDestinationAccounts: [
-                            TestAccount.PRIMARY,
-                            TestAccount.CHASE_SAPPHIRE,
-                            TestAccount.CHASE_AMAZON,
-                            TestAccount.CITIBANK_DOUBLECASH,
-                        ],
-                        excludedAdditionalIncomePatterns: ['PAYROLL'],
-                    }
+                    [
+                        TestAccount.PRIMARY,
+                        TestAccount.CHASE_SAPPHIRE,
+                        TestAccount.CHASE_AMAZON,
+                        TestAccount.CITIBANK_DOUBLECASH,
+                    ],
+                    ['PAYROLL'],
+                    true
                 );
 
                 const mockTransactions = [
@@ -207,23 +220,25 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await serviceWithMinAmount.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Large Amount');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Large Amount');
+                }
             });
 
             it('should handle invalid amount formats', async () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    {
-                        validDestinationAccounts: [
-                            TestAccount.PRIMARY,
-                            TestAccount.CHASE_SAPPHIRE,
-                            TestAccount.CHASE_AMAZON,
-                            TestAccount.CITIBANK_DOUBLECASH,
-                        ],
-                        excludedAdditionalIncomePatterns: ['PAYROLL'],
-                    }
+                    [
+                        TestAccount.PRIMARY,
+                        TestAccount.CHASE_SAPPHIRE,
+                        TestAccount.CHASE_AMAZON,
+                        TestAccount.CITIBANK_DOUBLECASH,
+                    ],
+                    ['PAYROLL'],
+                    true
                 );
 
                 const mockTransactions = [
@@ -241,7 +256,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await serviceWithMinAmount.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
         });
 
@@ -266,8 +284,11 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Freelance Work');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Freelance Work');
+                }
             });
 
             it('should handle transactions with no description', async () => {
@@ -290,7 +311,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(2);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(2);
+                }
             });
         });
 
@@ -299,17 +323,27 @@ describe('AdditionalIncomeService', () => {
                 const originalError = new Error('API Error');
                 mockTransactionService.getTransactionsForMonth.mockRejectedValue(originalError);
 
-                await expect(service.calculateAdditionalIncome(4, 2024)).rejects.toThrow(
-                    'Failed to calculate additional income for month 4: API Error'
-                );
+                const result = await service.calculateAdditionalIncome(4, 2024);
+                expect(result.ok).toBe(false);
+                if (!result.ok) {
+                    expect(result.error.message).toContain(
+                        'Failed to fetch transactions for month 4'
+                    );
+                    expect(result.error.message).toContain('API Error');
+                }
             });
 
             it('should handle unknown errors gracefully', async () => {
                 mockTransactionService.getTransactionsForMonth.mockRejectedValue('Unknown error');
 
-                await expect(service.calculateAdditionalIncome(4, 2024)).rejects.toThrow(
-                    'Failed to calculate additional income for month 4'
-                );
+                const result = await service.calculateAdditionalIncome(4, 2024);
+                expect(result.ok).toBe(false);
+                if (!result.ok) {
+                    expect(result.error.message).toContain(
+                        'Failed to fetch transactions for month 4'
+                    );
+                    expect(result.error.message).toContain('Unknown error');
+                }
             });
         });
 
@@ -338,7 +372,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle partial description matches', async () => {
@@ -361,7 +398,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle special characters in descriptions', async () => {
@@ -384,7 +424,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
         });
 
@@ -405,7 +448,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle negative amounts', async () => {
@@ -424,7 +470,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle very large amounts', async () => {
@@ -443,8 +492,11 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Large Amount');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Large Amount');
+                }
             });
 
             it('should handle decimal precision', async () => {
@@ -463,8 +515,11 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(1);
-                expect(result[0].description).toBe('Precise Amount');
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Precise Amount');
+                }
             });
         });
 
@@ -492,10 +547,13 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(validAccounts.length);
-                result.forEach((transaction, index) => {
-                    expect(transaction.destination_id).toBe(validAccounts[index]);
-                });
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(validAccounts.length);
+                    result.value.forEach((transaction, index) => {
+                        expect(transaction.destination_id).toBe(validAccounts[index]);
+                    });
+                }
             });
 
             it('should exclude transactions to invalid destination accounts', async () => {
@@ -516,7 +574,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
 
             it('should handle transactions with null destination accounts', async () => {
@@ -535,7 +596,10 @@ describe('AdditionalIncomeService', () => {
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
-                expect(result).toHaveLength(0);
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(0);
+                }
             });
         });
     });
