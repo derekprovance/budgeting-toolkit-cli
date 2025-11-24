@@ -49,12 +49,8 @@ export class SplitTransactionDisplayService {
      * @param parentDescription The parent transaction title (group_title)
      * @param split1Amount Amount for first split
      * @param split1Description Description for first split
-     * @param split1Category Category for first split (optional)
-     * @param split1Budget Budget for first split (optional)
      * @param split2Amount Amount for second split
      * @param split2Description Description for second split
-     * @param split2Category Category for second split (optional)
-     * @param split2Budget Budget for second split (optional)
      * @param currencySymbol Currency symbol to display
      * @returns Formatted preview showing parent and both child splits
      */
@@ -62,12 +58,8 @@ export class SplitTransactionDisplayService {
         parentDescription: string,
         split1Amount: string,
         split1Description: string,
-        split1Category: string | undefined,
-        split1Budget: string | undefined,
         split2Amount: string,
         split2Description: string,
-        split2Category: string | undefined,
-        split2Budget: string | undefined,
         currencySymbol: string
     ): string {
         const lines = [
@@ -77,30 +69,13 @@ export class SplitTransactionDisplayService {
             chalk.cyan.bold('\nSplit 1:'),
             `  ${chalk.bold('Description:')} ${split1Description}`,
             `  ${chalk.bold('Amount:')} ${currencySymbol}${split1Amount}`,
-        ];
-
-        // Split 1: Show category/budget if set
-        if (split1Category) {
-            lines.push(`  ${chalk.bold('Category:')} ${split1Category}`);
-        }
-
-        if (split1Budget) {
-            lines.push(`  ${chalk.bold('Budget:')} ${split1Budget}`);
-        }
-
-        lines.push(
+            `  ${chalk.dim('(preserves category, budget, and tags from original)')}`,
             chalk.cyan.bold('\nSplit 2:'),
             `  ${chalk.bold('Description:')} ${split2Description}`,
-            `  ${chalk.bold('Amount:')} ${currencySymbol}${split2Amount}`
-        );
-
-        // Split 2: Always show category/budget status (set or not set)
-        lines.push(
-            `  ${chalk.bold('Category:')} ${split2Category || chalk.dim('(not set)')}`,
-            `  ${chalk.bold('Budget:')} ${split2Budget || chalk.dim('(not set)')}`
-        );
-
-        lines.push(chalk.dim('━'.repeat(60)));
+            `  ${chalk.bold('Amount:')} ${currencySymbol}${split2Amount}`,
+            `  ${chalk.dim('(category and budget left unset for manual assignment)')}`,
+            chalk.dim('━'.repeat(60)),
+        ];
 
         return lines.join('\n');
     }

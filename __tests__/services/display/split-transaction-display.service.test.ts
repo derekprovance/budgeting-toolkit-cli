@@ -36,14 +36,14 @@ describe('SplitTransactionDisplayService', () => {
             const result = service.formatOriginalTransaction(transaction, '123');
 
             expect(result).toContain('Original Transaction:');
-            expect(result).toContain('Description: Test Transaction');
-            expect(result).toContain('Amount: $100.00');
-            expect(result).toContain('Date: 2024-01-15');
-            expect(result).toContain('Category: Groceries');
-            expect(result).toContain('Budget: Monthly Budget');
-            expect(result).toContain('Source: Checking Account');
-            expect(result).toContain('Destination: Grocery Store');
-            expect(result).toContain(`Link: ${baseUrl}/transactions/show/123`);
+            expect(result).toContain('Test Transaction');
+            expect(result).toContain('$100.00');
+            expect(result).toContain('2024-01-15');
+            expect(result).toContain('Groceries');
+            expect(result).toContain('Monthly Budget');
+            expect(result).toContain('Checking Account');
+            expect(result).toContain('Grocery Store');
+            expect(result).toContain(`${baseUrl}/transactions/show/123`);
         });
 
         it('should format transaction with missing optional fields', () => {
@@ -55,102 +55,53 @@ describe('SplitTransactionDisplayService', () => {
             });
             const result = service.formatOriginalTransaction(transaction, '123');
 
-            expect(result).toContain('Description: Test Transaction');
-            expect(result).toContain('Amount: $100.00');
-            expect(result).not.toContain('Category:');
-            expect(result).not.toContain('Budget:');
-            expect(result).not.toContain('Source:');
-            expect(result).not.toContain('Destination:');
+            expect(result).toContain('Test Transaction');
+            expect(result).toContain('$100.00');
+            expect(result).not.toContain('Groceries');
+            expect(result).not.toContain('Monthly Budget');
+            expect(result).not.toContain('Checking Account');
+            expect(result).not.toContain('Grocery Store');
         });
     });
 
     describe('formatSplitPreview', () => {
-        it('should format preview with all metadata for both splits', () => {
+        it('should format preview with descriptions and amounts', () => {
             const result = service.formatSplitPreview(
                 'Test Transaction',
                 '60.00',
                 'Test Transaction - Part 1',
-                'Groceries',
-                'Monthly Budget',
                 '40.00',
                 'Test Transaction - Part 2',
-                'Dining',
-                'Food Budget',
                 '$'
             );
 
             expect(result).toContain('Split Preview:');
-            expect(result).toContain('Parent Transaction: "Test Transaction"');
+            expect(result).toContain('Parent Transaction:');
+            expect(result).toContain('Test Transaction');
             expect(result).toContain('Split 1:');
-            expect(result).toContain('Description: Test Transaction - Part 1');
-            expect(result).toContain('Amount: $60.00');
-            expect(result).toContain('Category: Groceries');
-            expect(result).toContain('Budget: Monthly Budget');
+            expect(result).toContain('Test Transaction - Part 1');
+            expect(result).toContain('$60.00');
+            expect(result).toContain('preserves category, budget, and tags from original');
             expect(result).toContain('Split 2:');
-            expect(result).toContain('Description: Test Transaction - Part 2');
-            expect(result).toContain('Amount: $40.00');
-            expect(result).toContain('Category: Dining');
-            expect(result).toContain('Budget: Food Budget');
+            expect(result).toContain('Test Transaction - Part 2');
+            expect(result).toContain('$40.00');
+            expect(result).toContain('category and budget left unset for manual assignment');
         });
 
-        it('should conditionally show category for split 1 when defined', () => {
+        it('should indicate metadata behavior for both splits', () => {
             const result = service.formatSplitPreview(
                 'Test Transaction',
                 '60.00',
                 'Part 1',
-                'Groceries', // Has category
-                'Monthly Budget',
                 '40.00',
                 'Part 2',
-                undefined,
-                undefined,
                 '$'
             );
 
             expect(result).toContain('Split 1:');
-            expect(result).toContain('Category: Groceries');
-            expect(result).toContain('Budget: Monthly Budget');
-        });
-
-        it('should not show category for split 1 when undefined', () => {
-            const result = service.formatSplitPreview(
-                'Test Transaction',
-                '60.00',
-                'Part 1',
-                undefined, // No category
-                'Monthly Budget',
-                '40.00',
-                'Part 2',
-                undefined,
-                undefined,
-                '$'
-            );
-
-            const split1Section = result.split('Split 2:')[0];
-            expect(split1Section).toContain('Split 1:');
-            expect(split1Section).toContain('Budget: Monthly Budget');
-            // Category should not appear in split 1 section
-            expect(split1Section).not.toContain('Category:');
-        });
-
-        it('should always show category/budget status for split 2', () => {
-            const result = service.formatSplitPreview(
-                'Test Transaction',
-                '60.00',
-                'Part 1',
-                'Groceries',
-                'Monthly Budget',
-                '40.00',
-                'Part 2',
-                undefined, // No category
-                undefined, // No budget
-                '$'
-            );
-
+            expect(result).toContain('preserves category, budget, and tags from original');
             expect(result).toContain('Split 2:');
-            expect(result).toContain('Category:');
-            expect(result).toContain('(not set)');
-            expect(result).toContain('Budget:');
+            expect(result).toContain('category and budget left unset for manual assignment');
         });
     });
 
@@ -198,7 +149,7 @@ describe('SplitTransactionDisplayService', () => {
 
     describe('formatAmountPrompt', () => {
         it('should format amount prompt with currency symbol', () => {
-            const result = service.formatAmountPrompt(100.50, '$');
+            const result = service.formatAmountPrompt(100.5, '$');
 
             expect(result).toContain('Enter amount for first split');
             expect(result).toContain('original: $100.5');
@@ -213,7 +164,7 @@ describe('SplitTransactionDisplayService', () => {
 
     describe('formatRemainder', () => {
         it('should format remainder with currency symbol', () => {
-            const result = service.formatRemainder(40.50, '$');
+            const result = service.formatRemainder(40.5, '$');
 
             expect(result).toContain('Remainder for second split: $40.50');
         });

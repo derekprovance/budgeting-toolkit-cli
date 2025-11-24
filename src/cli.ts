@@ -236,48 +236,61 @@ Examples:
     program
         .command('split <transaction-id>')
         .alias('sp')
-        .description('Split a transaction into two parts with custom descriptions and categories')
-        .option('-i, --interactive', 'run in interactive mode (required)', true)
+        .description('Split a transaction into two parts')
+        .option('-a, --amount <amount>', 'amount for first split (remainder goes to second split)')
+        .option('-d1, --description1 <text>', 'custom text to append to first split description')
+        .option('-d2, --description2 <text>', 'custom text to append to second split description')
+        .option('-y, --yes', 'skip confirmation prompt')
         .addHelpText(
             'after',
             `
 Examples:
-  $ budgeting-toolkit split 4361 -i         # split transaction interactively
-  $ budgeting-toolkit sp 4361 -i            # using alias
+  $ budgeting-toolkit split 4361                             # fully interactive
+  $ budgeting-toolkit split 4361 -a 50.00                    # provide amount, prompt for rest
+  $ budgeting-toolkit split 4361 -a 50.00 -d1 "- Groceries" # with descriptions
+  $ budgeting-toolkit sp 4361 -a 50 -d1 "- Me" -d2 "- Family" -y  # skip confirmation
 
-Interactive workflow:
-  1. Enter amount for first split
-  2. Add optional custom text for each split (e.g., "- Groceries", "- Hardware")
-  3. Optionally customize category/budget for each split
-  4. Review and confirm the split
-
-Result: Parent transaction with original description, two child splits with custom text appended`
+Behavior:
+  - First split preserves category, budget, and tags from original
+  - Second split left uncategorized for manual assignment in Firefly III
+  - Omit parameters to use interactive prompts`
         )
-        .action(async (transactionId: string, opts: { interactive: boolean }) => {
-            if (!transactionId || transactionId.trim() === '') {
-                console.error('❌ Error: Transaction ID is required');
-                console.log('\nUsage: budgeting-toolkit split <transaction-id> [options]');
-                console.log('Example: budgeting-toolkit split 4361 -i');
-                process.exit(1);
-            }
+        .action(
+            async (
+                transactionId: string,
+                opts: {
+                    amount?: string;
+                    description1?: string;
+                    description2?: string;
+                    yes?: boolean;
+                }
+            ) => {
+                if (!transactionId || transactionId.trim() === '') {
+                    console.error('❌ Error: Transaction ID is required');
+                    console.log('\nUsage: budgeting-toolkit split <transaction-id> [options]');
+                    console.log('Example: budgeting-toolkit split 4361');
+                    process.exit(1);
+                }
 
-            try {
-                const command = new SplitTransactionCommand(
-                    services.transactionSplitService,
-                    services.splitTransactionDisplayService,
-                    services.userInputService,
-                    services.categoryService,
-                    services.budgetService
-                );
+                try {
+                    const command = new SplitTransactionCommand(
+                        services.transactionSplitService,
+                        services.splitTransactionDisplayService,
+                        services.userInputService
+                    );
 
-                await command.execute({
-                    transactionId,
-                    interactive: opts.interactive,
-                });
-            } catch (error) {
-                handleError(error, 'splitting transaction');
+                    await command.execute({
+                        transactionId,
+                        amount: opts.amount,
+                        description1: opts.description1,
+                        description2: opts.description2,
+                        yes: opts.yes,
+                    });
+                } catch (error) {
+                    handleError(error, 'splitting transaction');
+                }
             }
-        });
+        );
 
     return program;
 };

@@ -373,24 +373,11 @@ export class UserInputService {
     }
 
     /**
-     * Asks user if they want to customize category and budget for a split
-     * @param splitNumber The split number (1 or 2)
-     * @returns Promise<boolean> Whether the user wants to customize
-     */
-    async shouldCustomizeSplit(splitNumber: number): Promise<boolean> {
-        return await confirm({
-            message: `Customize category/budget for split ${splitNumber}?`,
-            default: false,
-        });
-    }
-
-    /**
      * Prompts user to optionally add custom text to a split description
      * @param splitNumber The split number (1 or 2) for display purposes
-     * @param originalDescription The original transaction description (for context)
      * @returns Promise<string> The custom text to append (empty string if none)
      */
-    async getCustomSplitText(splitNumber: number, originalDescription: string): Promise<string> {
+    async getCustomSplitText(splitNumber: number): Promise<string> {
         const customText = await input({
             message: `Custom text for split ${splitNumber} (press Enter to skip):`,
             default: '',

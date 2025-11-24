@@ -558,7 +558,9 @@ describe('UserInputService', () => {
 
                 const validate = mockInput.mock.calls[0][0].validate;
                 expect(validate('100')).toBe('Amount must be less than the original amount ($100)');
-                expect(validate('100.01')).toBe('Amount must be less than the original amount ($100)');
+                expect(validate('100.01')).toBe(
+                    'Amount must be less than the original amount ($100)'
+                );
             });
 
             it('should reject amount leaving < 0.01 for split 2', async () => {
@@ -578,7 +580,7 @@ describe('UserInputService', () => {
             it('should handle floating-point precision edge cases', async () => {
                 mockInput.mockResolvedValue('3.37');
 
-                await service.getSplitAmount(10.10, '$');
+                await service.getSplitAmount(10.1, '$');
 
                 const validate = mockInput.mock.calls[0][0].validate;
                 // 10.10 - 3.37 = 6.73, should be valid
@@ -605,53 +607,11 @@ describe('UserInputService', () => {
             });
         });
 
-        describe('shouldCustomizeSplit', () => {
-            it('should return user confirmation for split 1', async () => {
-                mockConfirm.mockResolvedValue(true);
-
-                const result = await service.shouldCustomizeSplit(1);
-
-                expect(result).toBe(true);
-                expect(mockConfirm).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        message: 'Customize category/budget for split 1?',
-                        default: false,
-                    })
-                );
-            });
-
-            it('should return user confirmation for split 2', async () => {
-                mockConfirm.mockResolvedValue(false);
-
-                const result = await service.shouldCustomizeSplit(2);
-
-                expect(result).toBe(false);
-                expect(mockConfirm).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        message: 'Customize category/budget for split 2?',
-                        default: false,
-                    })
-                );
-            });
-
-            it('should default to false', async () => {
-                mockConfirm.mockResolvedValue(false);
-
-                await service.shouldCustomizeSplit(1);
-
-                expect(mockConfirm).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        default: false,
-                    })
-                );
-            });
-        });
-
         describe('getCustomSplitText', () => {
             it('should return custom text', async () => {
                 mockInput.mockResolvedValue('- Part 1');
 
-                const result = await service.getCustomSplitText(1, 'Original Description');
+                const result = await service.getCustomSplitText(1);
 
                 expect(result).toBe('- Part 1');
                 expect(mockInput).toHaveBeenCalledWith(
@@ -665,7 +625,7 @@ describe('UserInputService', () => {
             it('should return empty string when skipped', async () => {
                 mockInput.mockResolvedValue('');
 
-                const result = await service.getCustomSplitText(2, 'Original');
+                const result = await service.getCustomSplitText(2);
 
                 expect(result).toBe('');
             });
@@ -673,7 +633,7 @@ describe('UserInputService', () => {
             it('should use split number in prompt', async () => {
                 mockInput.mockResolvedValue('');
 
-                await service.getCustomSplitText(1, 'AMAZON PURCHASE');
+                await service.getCustomSplitText(1);
 
                 expect(mockInput).toHaveBeenCalledWith(
                     expect.objectContaining({
@@ -685,7 +645,7 @@ describe('UserInputService', () => {
             it('should trim whitespace from return value', async () => {
                 mockInput.mockResolvedValue('  - Part 1  ');
 
-                const result = await service.getCustomSplitText(1, 'Original');
+                const result = await service.getCustomSplitText(1);
 
                 // The implementation trims the result
                 expect(result).toBe('- Part 1');

@@ -4,8 +4,6 @@ import { Command } from '../types/interface/command.interface.js';
 import { TransactionSplitService, SplitData } from '../services/transaction-split.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
-import { CategoryService } from '../services/core/category.service.js';
-import { BudgetService } from '../services/core/budget.service.js';
 import { logger } from '../logger.js';
 
 /**
@@ -13,7 +11,10 @@ import { logger } from '../logger.js';
  */
 interface SplitTransactionParams {
     transactionId: string;
-    interactive: boolean;
+    amount?: string;
+    description1?: string;
+    description2?: string;
+    yes?: boolean;
 }
 
 /**
@@ -26,12 +27,11 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
     constructor(
         private readonly splitService: TransactionSplitService,
         private readonly displayService: SplitTransactionDisplayService,
-        private readonly userInputService: UserInputService,
-        private readonly categoryService: CategoryService,
-        private readonly budgetService: BudgetService
+        private readonly userInputService: UserInputService
     ) {}
 
-    async execute({ transactionId, interactive }: SplitTransactionParams): Promise<void> {
+    async execute(params: SplitTransactionParams): Promise<void> {
+        const { transactionId, amount, description1, description2, yes } = params;
         console.log(this.displayService.formatHeader(transactionId));
 
         const spinner = ora('Fetching transaction...').start();
@@ -66,22 +66,17 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             spinner.succeed('Transaction fetched');
 
             // Display original transaction
-            console.log(this.displayService.formatOriginalTransaction(originalSplit, transactionId));
-
-            if (!interactive) {
-                console.log(chalk.yellow('\nInteractive mode is required for splitting transactions.'));
-                console.log(chalk.dim('Use the --interactive or -i flag.'));
-                return;
-            }
+            console.log(
+                this.displayService.formatOriginalTransaction(originalSplit, transactionId)
+            );
 
             const currencySymbol =
                 originalSplit.currency_symbol || SplitTransactionCommand.DEFAULT_CURRENCY_SYMBOL;
 
-            // Get split amount from user
-            const firstSplitAmount = await this.userInputService.getSplitAmount(
-                originalAmount,
-                currencySymbol
-            );
+            // Get split amount: use CLI parameter if provided, otherwise prompt
+            const firstSplitAmount = amount
+                ? this.validateAndParseSplitAmount(amount, originalAmount, currencySymbol)
+                : await this.userInputService.getSplitAmount(originalAmount, currencySymbol);
 
             // Use toFixed to avoid floating-point precision errors
             const secondSplitAmount = parseFloat((originalAmount - firstSplitAmount).toFixed(2));
@@ -89,20 +84,20 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             // Show remainder
             console.log(this.displayService.formatRemainder(secondSplitAmount, currencySymbol));
 
-            // Get custom text for split 1
-            const firstCustomText = await this.userInputService.getCustomSplitText(
-                1,
-                originalSplit.description
-            );
+            // Get custom text for split 1: use CLI parameter if provided, otherwise prompt
+            const firstCustomText =
+                description1 !== undefined
+                    ? description1
+                    : await this.userInputService.getCustomSplitText(1);
             const firstDescription = firstCustomText
                 ? `${originalSplit.description} ${firstCustomText}`
                 : originalSplit.description;
 
-            // Get custom text for split 2
-            const secondCustomText = await this.userInputService.getCustomSplitText(
-                2,
-                originalSplit.description
-            );
+            // Get custom text for split 2: use CLI parameter if provided, otherwise prompt
+            const secondCustomText =
+                description2 !== undefined
+                    ? description2
+                    : await this.userInputService.getCustomSplitText(2);
             const secondDescription = secondCustomText
                 ? `${originalSplit.description} ${secondCustomText}`
                 : originalSplit.description;
@@ -118,74 +113,20 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
                 description: secondDescription,
             };
 
-            // Track budget names for display
-            let firstBudgetName = originalSplit.budget_name || undefined;
-            let secondBudgetName: string | undefined = undefined; // Split 2 starts with no budget
-
-            // Ask if user wants to customize split 1 category/budget
-            const customizeSplit1 = await this.userInputService.shouldCustomizeSplit(1);
-
-            if (customizeSplit1) {
-                const customizations = await this.promptForCustomization(
-                    originalSplit.category_name || undefined,
-                    originalSplit.budget_name || undefined
-                );
-
-                if (customizations.categoryName) {
-                    firstSplitData.categoryName = customizations.categoryName;
-                }
-                if (customizations.budgetId) {
-                    firstSplitData.budgetId = customizations.budgetId;
-                    firstBudgetName = customizations.budgetName;
-                }
-            } else {
-                // Keep original category and budget
-                if (originalSplit.category_name) {
-                    firstSplitData.categoryName = originalSplit.category_name;
-                }
-                if (originalSplit.budget_id) {
-                    firstSplitData.budgetId = originalSplit.budget_id;
-                }
-            }
-
-            // Ask if user wants to customize split 2 category/budget
-            const customizeSplit2 = await this.userInputService.shouldCustomizeSplit(2);
-
-            if (customizeSplit2) {
-                const customizations = await this.promptForCustomization(
-                    originalSplit.category_name || undefined,
-                    originalSplit.budget_name || undefined
-                );
-
-                if (customizations.categoryName) {
-                    secondSplitData.categoryName = customizations.categoryName;
-                }
-                if (customizations.budgetId) {
-                    secondSplitData.budgetId = customizations.budgetId;
-                    secondBudgetName = customizations.budgetName;
-                }
-            }
-            // Note: Split 2 does not inherit category/budget from original by default
-            // These fields remain undefined unless explicitly set by user
-
             // Show preview with parent description
             console.log(
                 this.displayService.formatSplitPreview(
                     originalSplit.description, // Parent transaction title
                     firstSplitData.amount,
                     firstSplitData.description || originalSplit.description,
-                    firstSplitData.categoryName,
-                    firstBudgetName,
                     secondSplitData.amount,
                     secondSplitData.description || originalSplit.description,
-                    secondSplitData.categoryName,
-                    secondBudgetName,
                     currencySymbol
                 )
             );
 
-            // Confirm with user
-            const confirmed = await this.userInputService.confirmSplit();
+            // Confirm with user: skip if --yes flag provided
+            const confirmed = yes || (await this.userInputService.confirmSplit());
 
             if (!confirmed) {
                 console.log(chalk.yellow('\nSplit cancelled.'));
@@ -239,54 +180,62 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
     }
 
     /**
-     * Prompts user for category and budget customization
+     * Validates and parses split amount from CLI parameter
+     * @param amountStr Amount string from CLI parameter
+     * @param originalAmount Original transaction amount
+     * @param currencySymbol Currency symbol for error messages
+     * @returns Parsed amount as number
+     * @throws Error if validation fails
      */
-    private async promptForCustomization(
-        currentCategory?: string,
-        currentBudget?: string
-    ): Promise<{
-        categoryName?: string;
-        budgetId?: string;
-        budgetName?: string;
-    }> {
-        const result: {
-            categoryName?: string;
-            budgetId?: string;
-            budgetName?: string;
-        } = {};
-
-        // Fetch available categories and budgets
-        const categories = await this.categoryService.getCategories();
-        const budgets = await this.budgetService.getBudgets();
-
-        const categoryNames = categories.map(c => c.name);
-        const budgetMap = new Map(budgets.map(b => [b.attributes.name, b.id]));
-
-        // Ask what to customize
-        const toEdit = await this.userInputService.shouldEditCategoryBudget();
-
-        if (toEdit.includes('category')) {
-            const newCategory = await this.userInputService.getNewCategory(
-                categoryNames,
-                currentCategory
+    private validateAndParseSplitAmount(
+        amountStr: string,
+        originalAmount: number,
+        currencySymbol: string
+    ): number {
+        // Validate format: must be a valid decimal number with max 2 decimal places
+        if (!/^\d+(\.\d{1,2})?$/.test(amountStr.trim())) {
+            throw new Error(
+                'Amount must be a valid number with at most 2 decimal places (e.g., 10.50)'
             );
-            if (newCategory?.name) {
-                result.categoryName = newCategory.name;
-            }
         }
 
-        if (toEdit.includes('budget')) {
-            const budgetNames = Array.from(budgetMap.keys());
-            const newBudget = await this.userInputService.getNewBudget(
-                budgetNames,
-                currentBudget
-            );
-            if (newBudget?.attributes.name) {
-                result.budgetName = newBudget.attributes.name;
-                result.budgetId = budgetMap.get(newBudget.attributes.name);
-            }
+        const amount = parseFloat(amountStr.trim());
+
+        // Check for NaN (shouldn't happen with regex, but defensive)
+        if (isNaN(amount)) {
+            throw new Error('Amount must be a valid number');
         }
 
-        return result;
+        // Check for negative (regex should prevent, but explicit check)
+        if (amount < 0) {
+            throw new Error('Amount cannot be negative');
+        }
+
+        // Check for zero
+        if (amount === 0) {
+            throw new Error('Amount must be greater than zero');
+        }
+
+        // Check if amount is less than minimum (1 cent)
+        if (amount < 0.01) {
+            throw new Error('Amount must be at least 0.01');
+        }
+
+        // Check if amount would leave nothing for second split
+        if (amount >= originalAmount) {
+            throw new Error(
+                `Amount must be less than the original amount (${currencySymbol}${originalAmount})`
+            );
+        }
+
+        // Validate minimum second split amount (at least 1 cent)
+        const secondSplitAmount = parseFloat((originalAmount - amount).toFixed(2));
+        if (secondSplitAmount < 0.01) {
+            throw new Error(
+                `Second split would be too small (${currencySymbol}${secondSplitAmount.toFixed(2)}). Please enter a smaller amount.`
+            );
+        }
+
+        return amount;
     }
 }

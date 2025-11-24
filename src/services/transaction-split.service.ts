@@ -14,8 +14,6 @@ import { ILogger } from '../types/interface/logger.interface.js';
 export interface SplitData {
     amount: string;
     description?: string;
-    categoryName?: string;
-    budgetId?: string;
 }
 
 /**
@@ -220,31 +218,19 @@ export class TransactionSplitService {
         secondData: SplitData
     ): TransactionUpdate {
         // First split: Update original transaction (preserves journal ID)
-        // Category/budget: Use custom if provided, otherwise preserve from original
         const firstSplitUpdate: TransactionSplitUpdate = {
             transaction_journal_id: originalSplit.transaction_journal_id,
             amount: firstAmount,
             description: firstData.description || originalSplit.description,
             // Copy tags from original transaction
             ...(originalSplit.tags && { tags: originalSplit.tags }),
+            // Preserve category from original
+            ...(originalSplit.category_name && { category_name: originalSplit.category_name }),
+            // Preserve budget from original
+            ...(originalSplit.budget_id && { budget_id: originalSplit.budget_id }),
         };
 
-        // Add category: custom takes precedence, fallback to original
-        if (firstData.categoryName) {
-            firstSplitUpdate.category_name = firstData.categoryName;
-        } else if (originalSplit.category_name) {
-            firstSplitUpdate.category_name = originalSplit.category_name;
-        }
-
-        // Add budget: custom takes precedence, fallback to original
-        if (firstData.budgetId) {
-            firstSplitUpdate.budget_id = firstData.budgetId;
-        } else if (originalSplit.budget_id) {
-            firstSplitUpdate.budget_id = originalSplit.budget_id;
-        }
-
         // Second split: Create new transaction (no journal ID)
-        // Category/budget: Only include if explicitly set by user (not copied from original)
         const secondSplitUpdate: TransactionSplitUpdate = {
             type: originalSplit.type,
             date: originalSplit.date,
@@ -261,16 +247,6 @@ export class TransactionSplitService {
             ...(originalSplit.currency_id && { currency_id: originalSplit.currency_id }),
             ...(originalSplit.currency_code && { currency_code: originalSplit.currency_code }),
         };
-
-        // Add category only if explicitly provided by user
-        if (secondData.categoryName) {
-            secondSplitUpdate.category_name = secondData.categoryName;
-        }
-
-        // Add budget only if explicitly provided by user
-        if (secondData.budgetId) {
-            secondSplitUpdate.budget_id = secondData.budgetId;
-        }
 
         return {
             apply_rules: true,
