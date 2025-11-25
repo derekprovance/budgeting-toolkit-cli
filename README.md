@@ -122,10 +122,10 @@ Split a transaction into two parts, either interactively or via command-line par
 ./budget.sh split 123 --amount 50.00
 
 # Provide everything, skip confirmation
-./budget.sh split 123 -a 50.00 -d "- Groceries" "- Hardware" -y
+./budget.sh split 123 -a 50.00 -d "- Groceries" -d "- Hardware" -y
 
 # Development mode
-npm start -- split 123 -a 50.00 -d "- Me" "- Family"
+npm start:dev -- split 123 -a 50.00 -d "- Me" -d "- Family"
 ```
 
 **Options:**
@@ -144,7 +144,6 @@ Available for all commands:
 
 ```bash
 -v, --verbose    Detailed logging
--q, --quiet      Suppress non-error output
 -h, --help       Display help
 --version        Show version
 ```
@@ -154,7 +153,7 @@ Available for all commands:
 ```bash
 # Verbose logging
 ./budget.sh categorize Import-2025-06-23 --verbose
-LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
+LOG_LEVEL=trace npm start:dev -- categorize Import-2025-06-23
 
 # Test AI configuration
 ./budget.sh categorize Import-2025-06-23 --dry-run --verbose

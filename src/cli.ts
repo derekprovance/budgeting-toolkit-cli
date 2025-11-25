@@ -86,16 +86,7 @@ export const createCli = (): Command => {
         .name('budgeting-toolkit')
         .description(packageJson.description)
         .version(packageJson.version)
-        .option('-v, --verbose', 'enable verbose logging')
-        .option('-q, --quiet', 'suppress all output except errors')
-        .hook('preAction', thisCommand => {
-            const opts = thisCommand.opts();
-            if (opts.verbose) {
-                process.env.LOG_LEVEL = 'debug';
-            } else if (opts.quiet) {
-                process.env.LOG_LEVEL = 'error';
-            }
-        });
+        .option('-v, --verbose', 'enable verbose logging');
 
     program
         .command('finalize')
