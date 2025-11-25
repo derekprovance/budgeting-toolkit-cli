@@ -17,7 +17,7 @@
     },
     "keywords": [],
     "author": "Derek Provance",
-    "license": "GPL",
+    "license": "MIT",
     "description": "Budgeting toolkit with AI-powered transaction categorization",
     "engines": {
         "node": "24.x"
