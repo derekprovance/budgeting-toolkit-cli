@@ -83,8 +83,8 @@ export class UserInputService {
             return undefined;
         }
 
-        // Return a minimal CategoryProperties object with just the name
-        // The validator service will resolve this to the full object
+        // Return a minimal object with just the name
+        // Will be resolved to full object in processEditCommand()
         return { name: answer } as CategoryProperties;
     }
 
@@ -104,8 +104,8 @@ export class UserInputService {
             return undefined;
         }
 
-        // Return a minimal BudgetRead object with just the name
-        // The validator service will resolve this to the full object
+        // Return a minimal object with just the name
+        // Will be resolved to full object in processEditCommand()
         return {
             id: '',
             attributes: { name: answer },
