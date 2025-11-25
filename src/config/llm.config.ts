@@ -11,7 +11,7 @@ export class LLMConfig {
             throw new Error(
                 `${chalk.redBright(
                     '!!!'
-                )} Claude API Key is required to update transactions. Please check your .env file. ${chalk.redBright(
+                )} Claude API Key is required for commands with an LLM dependency. Please check your .env file. ${chalk.redBright(
                     '!!!'
                 )}`
             );

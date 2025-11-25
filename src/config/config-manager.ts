@@ -129,7 +129,8 @@ export class ConfigManager {
     private applyEnvironmentVariables(config: AppConfig): void {
         // Firefly API Configuration
         if (process.env.FIREFLY_API_URL) {
-            config.api.firefly.url = process.env.FIREFLY_API_URL;
+            // Remove trailing slashes to prevent double-slash issues when appending paths
+            config.api.firefly.url = process.env.FIREFLY_API_URL.replace(/\/+$/, '');
         }
 
         if (process.env.FIREFLY_API_TOKEN) {
