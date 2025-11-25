@@ -994,5 +994,149 @@ describe('InteractiveTransactionUpdater', () => {
                 '2'
             );
         });
+
+        it('should resolve user-selected budget to full object with valid ID', async () => {
+            // Setup: Mock user selecting a budget in edit mode
+            const minimalBudget = { id: '', attributes: { name: 'New Budget' } } as BudgetRead;
+            const fullBudget = { id: '2', attributes: { name: 'New Budget' } } as BudgetRead;
+
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Budget,
+            ]);
+            mockUserInputService.getNewBudget.mockResolvedValue(minimalBudget);
+            mockAIValidator.getBudgetByName.mockReturnValue(fullBudget);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            // Execute
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            // Verify: updateTransaction receives full budget with valid ID
+            expect(result.ok).toBe(true);
+            expect(mockAIValidator.getBudgetByName).toHaveBeenCalledWith('New Budget');
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.anything(),
+                '2' // ✅ Valid budget ID, not empty string
+            );
+        });
+
+        it('should use user-selected category name directly (no resolution needed)', async () => {
+            // Categories don't have IDs in CategoryProperties - they're identified by name only
+            const minimalCategory = { name: 'New Category' } as CategoryProperties;
+
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Both);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Category,
+            ]);
+            mockUserInputService.getNewCategory.mockResolvedValue(minimalCategory);
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            // Execute
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            // Verify: Categories use name, not ID, so no resolution needed
+            expect(result.ok).toBe(true);
+            expect(mockAIValidator.getCategoryByName).not.toHaveBeenCalled();
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                expect.anything(),
+                'New Category', // ✅ Category name is used directly
+                expect.anything()
+            );
+        });
+
+        it('should handle failed budget resolution gracefully', async () => {
+            const minimalBudget = {
+                id: '',
+                attributes: { name: 'Nonexistent Budget' },
+            } as BudgetRead;
+
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(UpdateTransactionMode.Edit)
+                .mockResolvedValueOnce(UpdateTransactionMode.Budget);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
+                EditTransactionAttribute.Budget,
+            ]);
+            mockUserInputService.getNewBudget.mockResolvedValue(minimalBudget);
+            mockAIValidator.getBudgetByName.mockReturnValue(undefined); // Lookup fails
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            // Execute
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            // Verify: Falls back to minimal object (empty ID)
+            expect(result.ok).toBe(true);
+            expect(mockAIValidator.getBudgetByName).toHaveBeenCalledWith('Nonexistent Budget');
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                expect.anything(),
+                undefined,
+                '' // Falls back to empty string
+            );
+        });
+
+        it('should not re-resolve budgets that already have valid IDs', async () => {
+            const validBudget = { id: '5', attributes: { name: 'Valid Budget' } } as BudgetRead;
+
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.shouldSetBudget.mockResolvedValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                UpdateTransactionMode.Budget
+            );
+            mockAIValidator.validateAIResults.mockResolvedValue({
+                ok: true,
+                value: { category: undefined, budget: validBudget },
+            });
+            mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            // Execute
+            const result = await service.updateTransaction(
+                mockTransaction as TransactionSplit,
+                mockAIResults
+            );
+
+            // Verify: getBudgetByName should NOT be called (budget already has ID)
+            expect(result.ok).toBe(true);
+            expect(mockAIValidator.getBudgetByName).not.toHaveBeenCalled();
+            expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
+                expect.anything(),
+                undefined,
+                '5' // Uses existing valid ID
+            );
+        });
     });
 });
