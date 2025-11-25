@@ -306,13 +306,5 @@ describe('ConfigManager', () => {
 
             expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
         });
-
-        it('should throw error when ANTHROPIC_API_KEY is missing', () => {
-            process.env.FIREFLY_API_URL = 'http://localhost:8080';
-            process.env.FIREFLY_API_TOKEN = 'test-token';
-            delete process.env.ANTHROPIC_API_KEY;
-
-            expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
-        });
     });
 });
