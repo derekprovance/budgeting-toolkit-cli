@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "6.1.0",
+    "version": "6.2.1",
     "type": "module",
     "main": "./dist/index.js",
     "exports": {
@@ -8,7 +8,7 @@
     },
     "scripts": {
         "start": "tsx src/index.ts",
-        "start:dev": "ENV_FILE=.env.dev npm start",
+        "start:dev": "ENV_FILE=.env.dev tsx src/index.ts",
         "compile": "rm -Rf ./dist && tsc",
         "test": "NODE_OPTIONS=--experimental-vm-modules jest",
         "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",

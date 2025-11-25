@@ -204,79 +204,31 @@ Automatically categorize and budget transactions using Claude:
 
 #### Transaction Splitting
 
-Interactively split a transaction into two parts:
+Split a transaction into two parts, either interactively or via command-line parameters:
 
 ```bash
-# Split transaction by ID
-./budget.sh split 123 -i
+# Fully interactive (prompts for amount and descriptions)
+./budget.sh split 123
+
+# Provide amount via CLI
+./budget.sh split 123 --amount 50.00
+
+# Provide everything, skip confirmation
+./budget.sh split 123 -a 50.00 -d "- Groceries" "- Hardware" -y
 
 # Development mode
-npm start -- split 123 -i
+npm start -- split 123 -a 50.00 -d "- Me" "- Family"
 ```
 
 **Options:**
-- `-i, --interactive` - Required for split command (enables interactive mode)
+- `-a, --amount <amount>` - Amount for first split (remainder goes to second)
+- `-d, --descriptions <text...>` - Custom text to append to split descriptions (space-separated: first to split 1, second to split 2)
+- `-y, --yes` - Skip confirmation prompt
 
-**How it works:**
-1. Displays original transaction details (amount, category, budget, tags)
-2. Prompts for the amount for the first split
-3. Auto-calculates remainder for second split
-4. Optionally add custom text to each split's description
-5. Optionally customize category/budget for each split
-6. Shows preview of both splits before confirmation
-7. Executes the split operation
-
-**Metadata Behavior:**
-- **First split**: Preserves category, budget, and tags from original transaction
-- **Second split**: Category, budget, and tags are left undefined for manual assignment
-- Both splits preserve: type, date, accounts, and currency
-
-**Example:**
-
-```bash
-$ ./budget.sh split 456 -i
-
-Original Transaction:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Description: AMAZON MARKETPLACE
-Amount: $198.48
-Category: Shopping
-Budget: Miscellaneous
-Link: https://firefly.example.com/transactions/show/456
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Enter amount for first split (original: $198.48): 80.00
-Remainder for second split: $118.48
-
-Custom text for split 1 (press Enter to skip): - Me
-Custom text for split 2 (press Enter to skip): - Family
-
-Split Preview:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Parent Transaction: "AMAZON MARKETPLACE"
-
-Split 1:
-  Description: AMAZON MARKETPLACE - Me
-  Amount: $80.00
-  Category: Shopping
-  Budget: Miscellaneous
-
-Split 2:
-  Description: AMAZON MARKETPLACE - Family
-  Amount: $118.48
-  Category: (not set)
-  Budget: (not set)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Proceed with split? Yes
-
-✓ Transaction split successfully!
-Created 2 splits from original transaction.
-View at: https://firefly.example.com/transactions/show/456
-```
-
-**Note:** The second split must be categorized and budgeted manually in Firefly III.
+**Behavior:**
+- First split preserves category, budget, and tags from original
+- Second split left uncategorized for manual assignment in Firefly III
+- Omit parameters to use interactive prompts
 
 ### Global Options
 
