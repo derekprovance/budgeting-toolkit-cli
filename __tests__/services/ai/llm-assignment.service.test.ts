@@ -146,7 +146,7 @@ describe('LLMAssignmentService', () => {
                 const result = await service.assign('category', mockTransactions, validCategories);
 
                 expect(result).toEqual(['Groceries', 'Healthcare', 'Groceries']);
-                expect(mockLogger.info).toHaveBeenCalledWith(
+                expect(mockLogger.debug).toHaveBeenCalledWith(
                     {
                         type: 'category',
                         transactionCount: 3,
@@ -247,7 +247,7 @@ describe('LLMAssignmentService', () => {
 
                 await service.assign('category', mockTransactions, validCategories);
 
-                expect(mockLogger.info).toHaveBeenCalledWith(
+                expect(mockLogger.debug).toHaveBeenCalledWith(
                     {
                         type: 'category',
                         assignedCount: 3,
@@ -266,7 +266,7 @@ describe('LLMAssignmentService', () => {
 
                 await service.assign('category', mockTransactions, validCategories);
 
-                expect(mockLogger.info).toHaveBeenCalledWith(
+                expect(mockLogger.debug).toHaveBeenCalledWith(
                     {
                         type: 'category',
                         assignedCount: 3,

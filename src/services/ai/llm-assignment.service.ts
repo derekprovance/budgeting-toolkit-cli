@@ -107,7 +107,7 @@ export class LLMAssignmentService {
             throw new Error(`No valid ${type} options provided`);
         }
 
-        this.deps.logger.info(
+        this.deps.logger.debug(
             {
                 type,
                 transactionCount: transactions.length,
@@ -140,7 +140,7 @@ export class LLMAssignmentService {
                 validOptions
             );
 
-            this.deps.logger.info(
+            this.deps.logger.debug(
                 {
                     type,
                     assignedCount: assignments.length,

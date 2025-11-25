@@ -23,6 +23,11 @@ validTransfers:
 
 excludeDisposableIncome: false
 
+# Custom tag names (optional - override if you use different tags in Firefly III)
+# tags:
+#     disposableIncome: 'Fun Money'
+#     bills: 'Bills'
+
 # Globally excluded transactions (removes transactions from all reports)
 # At least one field (description or amount) is required per entry
 excludedTransactions:
@@ -54,13 +59,13 @@ llm:
     batchSize: 10 # Transactions processed per batch
     maxConcurrent: 3 # Maximum concurrent API requests
     temperature: 0.2 # Response randomness (0-1, lower = more deterministic)
-    model: 'claude-sonnet-4-5-20250929' # Claude model version
-    retryDelayMs: 1000 # Initial retry delay in milliseconds
+    model: 'claude-sonnet-4-5' # Default model (user-friendly name)
+    retryDelayMs: 1500 # Initial retry delay (default)
     maxRetryDelayMs: 32000 # Maximum retry delay in milliseconds
 
     # Rate Limiting Configuration
     rateLimit:
-        maxTokensPerMinute: 50 # Rate limit threshold
+        maxTokensPerMinute: 50000 # Token budget per minute (default)
         refillInterval: 60000 # Token refill interval in milliseconds
 
     # Circuit Breaker Configuration

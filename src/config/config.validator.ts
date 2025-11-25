@@ -3,13 +3,15 @@ import { Result, ValidationError } from '../types/result.type.js';
 import * as fs from 'fs';
 
 /**
- * Validates application configuration at startup.
+ * Validates application configuration format at startup.
  *
- * Performs comprehensive validation including:
- * - Required fields presence
- * - Numeric range validation
- * - Enum value validation
+ * Performs format and type validation:
+ * - Valid URL formats
+ * - Numeric ranges (temperature 0-1, positive numbers)
+ * - Enum values (log levels)
  * - File path existence (for certificates)
+ *
+ * Business logic validation (e.g., required fields) is performed by commands.
  */
 export class ConfigValidator {
     /**
@@ -23,10 +25,6 @@ export class ConfigValidator {
 
         // API Configuration Validation
         this.validateFireflyApi(config, errors);
-        this.validateClaudeApi(config, errors);
-
-        // LLM Configuration Validation
-        this.validateLlmConfig(config, errors);
 
         // Logging Configuration Validation
         this.validateLoggingConfig(config, errors);
@@ -59,82 +57,6 @@ export class ConfigValidator {
 
         if (!config.api.firefly.token) {
             errors.push('FIREFLY_API_TOKEN is required');
-        }
-
-        if (!config.api.firefly.noNameExpenseAccountId) {
-            errors.push('firefly.noNameExpenseAccountId is required');
-        }
-    }
-
-    private validateClaudeApi(config: AppConfig, errors: string[]): void {
-        if (!config.api.claude.apiKey) {
-            errors.push('ANTHROPIC_API_KEY is required');
-        }
-
-        if (!config.api.claude.baseURL) {
-            errors.push('claude.baseURL is required');
-        } else if (!this.isValidUrl(config.api.claude.baseURL)) {
-            errors.push('claude.baseURL must be a valid URL');
-        }
-
-        if (config.api.claude.timeout < 1000) {
-            errors.push('claude.timeout must be at least 1000ms');
-        }
-
-        if (config.api.claude.maxRetries < 0) {
-            errors.push('claude.maxRetries must be non-negative');
-        }
-    }
-
-    private validateLlmConfig(config: AppConfig, errors: string[]): void {
-        // Temperature validation (0-1 range for Claude)
-        if (config.llm.temperature < 0 || config.llm.temperature > 1) {
-            errors.push('llm.temperature must be between 0 and 1');
-        }
-
-        // Token limits
-        if (config.llm.maxTokens < 1) {
-            errors.push('llm.maxTokens must be at least 1');
-        }
-
-        // Batch configuration
-        if (config.llm.batchSize < 1) {
-            errors.push('llm.batchSize must be at least 1');
-        }
-
-        if (config.llm.maxConcurrent < 1) {
-            errors.push('llm.maxConcurrent must be at least 1');
-        }
-
-        // Retry configuration
-        if (config.llm.retryDelayMs < 0) {
-            errors.push('llm.retryDelayMs must be non-negative');
-        }
-
-        if (config.llm.maxRetryDelayMs < config.llm.retryDelayMs) {
-            errors.push('llm.maxRetryDelayMs must be >= llm.retryDelayMs');
-        }
-
-        // Rate limit configuration
-        if (config.llm.rateLimit.maxTokensPerMinute < 1) {
-            errors.push('llm.rateLimit.maxTokensPerMinute must be at least 1');
-        }
-
-        if (config.llm.rateLimit.refillInterval < 1000) {
-            errors.push('llm.rateLimit.refillInterval must be at least 1000ms');
-        }
-
-        // Circuit breaker configuration
-        if (config.llm.circuitBreaker.failureThreshold < 1) {
-            errors.push('llm.circuitBreaker.failureThreshold must be at least 1');
-        }
-
-        if (config.llm.circuitBreaker.resetTimeout < 1000) {
-            errors.push('llm.circuitBreaker.resetTimeout must be at least 1000ms');
-        }
-
-        if (config.llm.circuitBreaker.halfOpenTimeout < 1000) {
-            errors.push('llm.circuitBreaker.halfOpenTimeout must be at least 1000ms');
         }
     }
 

@@ -16,7 +16,7 @@ import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-upda
 import { LLMConfig } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
-import { config, baseUrl } from '../config.js';
+import { ConfigManager } from '../config/config-manager.js';
 import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
 import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
@@ -27,10 +27,11 @@ import { TransactionSplitService } from '../services/transaction-split.service.j
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
+        const config = ConfigManager.getInstance().getConfig();
         const transactionService = new TransactionService(apiClient);
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
-        const userInputService = new UserInputService(baseUrl);
+        const userInputService = new UserInputService(config.api.firefly.url);
         const excludedTransactionService = new ExcludedTransactionService(
             config.transactions.excludedTransactions
         );
@@ -72,7 +73,9 @@ export class ServiceFactory {
             baseTransactionDisplayService
         );
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
-        const splitTransactionDisplayService = new SplitTransactionDisplayService(baseUrl);
+        const splitTransactionDisplayService = new SplitTransactionDisplayService(
+            config.api.firefly.url
+        );
         const billService = new BillService(apiClient);
         const billComparisonService = new BillComparisonService(billService, transactionService);
         const transactionSplitService = new TransactionSplitService(apiClient);

@@ -17,7 +17,7 @@ A command-line interface for Firefly III Personal Finance Manager with AI-powere
 - Node.js v24.x or later
 - npm v10.x or later
 - Firefly III instance with API access
-- Anthropic API key (for AI features)
+- Anthropic API key (optional - required only for `categorize` command)
 
 ## Installation
 
@@ -39,12 +39,15 @@ cp budgeting-toolkit.config.yaml.example budgeting-toolkit.config.yaml
 ### Development vs Production
 
 ```bash
-# Development (no compilation needed)
-npm start -- [command] [options]
-
 # Production (compile first)
 npm run compile
 ./budget.sh [command] [options]
+
+# Development (no compilation needed)
+npm start -- [command] [options]
+
+# Development with dev config (no compilation needed)
+npm start:dev -- [command] [options]
 ```
 
 ### Commands
@@ -64,6 +67,12 @@ View current budget status for a month:
 ./budget.sh report -m 8 --list
 ```
 
+**Configuration Requirements:**
+- `firefly.noNameExpenseAccountId` - ID of Firefly's "(no name)" expense account (default: '5')
+- `tags.*` - Custom tag names (optional, defaults: "Disposable Income", "Bills")
+
+See [CONFIG.md](CONFIG.md) for detailed configuration.
+
 **Options:**
 - `-m, --month <1-12>` - Target month (default: current)
 - `-y, --year <year>` - Target year (default: current)
@@ -79,6 +88,14 @@ Calculate surplus/deficit with additional income and unbudgeted expenses:
 # Specific month
 ./budget.sh finalize -m 6 -y 2024
 ```
+
+**Configuration Requirements:**
+- `expectedMonthlyPaycheck` - Required: Expected monthly paycheck amount
+- `validDestinationAccounts` - Required: Account IDs for income deposits
+- `validExpenseAccounts` - Required: Account IDs for expense tracking
+- `excludedAdditionalIncomePatterns` - Recommended: Patterns to exclude (e.g., "PAYROLL")
+
+See [CONFIG.md](CONFIG.md) for detailed configuration.
 
 **Options:**
 - `-m, --month <1-12>` - Target month (default: current)
@@ -102,6 +119,12 @@ Automatically categorize and budget transactions using Claude:
 ./budget.sh categorize Import-2025-06-23 --mode category
 ./budget.sh categorize Import-2025-06-23 --mode budget
 ```
+
+**Configuration Requirements:**
+- `ANTHROPIC_API_KEY` - Required: Environment variable in .env file
+- `llm.*` - Optional: AI model settings (temperature, batch size, etc.)
+
+See [CONFIG.md](CONFIG.md) for detailed AI configuration.
 
 **Options:**
 - `-m, --mode <type>` - Update `category`, `budget`, or `both` (default: both)
@@ -127,6 +150,9 @@ Split a transaction into two parts, either interactively or via command-line par
 # Development mode
 npm start:dev -- split 123 -a 50.00 -d "- Me" -d "- Family"
 ```
+
+**Configuration Requirements:**
+- Minimal - only Firefly III API credentials required
 
 **Options:**
 - `-a, --amount <amount>` - Amount for first split (remainder goes to second)
@@ -164,95 +190,54 @@ LOG_LEVEL=trace npm start:dev -- categorize Import-2025-06-23
 
 ## Configuration
 
-### Environment Variables (.env)
+The toolkit uses two configuration files:
+- **`.env`** - API credentials and secrets
+- **`budgeting-toolkit.config.yaml`** - Application settings
 
-Required for API access and secrets:
+### Quick Start
 
+**Minimum .env configuration:**
 ```bash
-# Firefly III
+# Required for all commands
 FIREFLY_API_URL=https://your-firefly-instance.com
 FIREFLY_API_TOKEN=your_api_token_here
 
-# AI (required for categorization)
+# Required only for categorize command
 ANTHROPIC_API_KEY=your_anthropic_key
 
 # Optional
 LOG_LEVEL=info
-CLIENT_CERT_CA_PATH=../certs/ca.pem
-CLIENT_CERT_PATH=../certs/client.p12
-CLIENT_CERT_PASSWORD=your_certificate_password
 ```
 
-### YAML Configuration (budgeting-toolkit.config.yaml)
-
-Application settings and preferences:
-
+**Minimum YAML configuration (budgeting-toolkit.config.yaml):**
 ```yaml
-# Budget settings
+# Optional: Budget Settings (report command)
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
-    - '1'  # Checking
-    - '2'  # Savings
-
+    - '1'  # Your checking account ID
 validExpenseAccounts:
-    - '4'  # Credit Card
-    - '1'  # Checking
+    - '3'  # Your credit card account ID
 
-excludedAdditionalIncomePatterns:
-    - PAYROLL
-    - ATM FEE
-
-excludeDisposableIncome: false
-
-# Excluded transactions (globally exclude from all reports)
-excludedTransactions:
-    - description: 'STOCK INVESTMENT'
-      amount: '100.00'
-      reason: 'Investment purchase - not a regular expense'
-    - description: 'TRANSFER TO SAVINGS'
-      reason: 'Internal transfer, not an expense'
-    - amount: '999.99'
-      reason: 'Specific amount to exclude'
-
-# Firefly settings
 firefly:
-    noNameExpenseAccountId: '5'
+    noNameExpenseAccountId: '5'  # Default Firefly "(no name)" account
 
-# AI settings
+# Optional: AI settings (categorize command)
 llm:
     model: 'claude-sonnet-4-5'
-    maxTokens: 2000
-    temperature: 0.1
-    batchSize: 5
-    maxConcurrent: 2
+    temperature: 0.2
+    batchSize: 10
 ```
 
-See `budgeting-toolkit.config.yaml.example` for complete configuration options.
+### Comprehensive Documentation
 
-### Transaction Exclusions
+For complete configuration options including:
+- Advanced LLM settings (rate limiting, circuit breaker)
+- Transaction exclusion rules
+- Certificate authentication (mTLS)
+- Custom tag names
+- Transfer validation rules
 
-You can exclude specific transactions from all reports by adding them to the `excludedTransactions` section in your YAML config:
-
-```yaml
-excludedTransactions:
-    # Match by description only (excludes any amount)
-    - description: 'STOCK INVESTMENT'
-      reason: 'Investment purchase'
-
-    # Match by description and amount (exact match)
-    - description: 'Monthly Rent'
-      amount: '1200.00'
-      reason: 'Rent payment'
-
-    # Match by amount only (excludes any description)
-    - amount: '999.99'
-      reason: 'Specific amount to filter'
-```
-
-- At least one field (`description` or `amount`) is required
-- `reason` is optional but recommended for documentation
-- Description matching is case-insensitive and uses substring matching
-- Amount matching is exact
+**See [CONFIG.md](CONFIG.md) for detailed documentation.**
 
 ## Docker Development
 

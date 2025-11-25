@@ -15,7 +15,9 @@ describe('LLMConfig', () => {
         });
 
         it('should throw error when Claude API key is missing', () => {
-            expect(() => LLMConfig.createClient('')).toThrow(/Claude API Key is required/);
+            expect(() => LLMConfig.createClient('')).toThrow(
+                /ANTHROPIC_API_KEY is required but not set/
+            );
         });
 
         it('should return ClaudeClient instance when called successfully', () => {

@@ -6,12 +6,6 @@ import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
 
-// Mock getConfigValue
-const mockGetConfigValue = jest.fn();
-jest.mock('../../src/utils/config-loader', () => ({
-    getConfigValue: mockGetConfigValue,
-}));
-
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
     PRIMARY: 'test-primary-account',
@@ -28,26 +22,6 @@ describe('UnbudgetedExpenseService', () => {
 
     beforeEach(() => {
         resetMockLogger();
-        // Set up valid expense accounts for tests
-        mockGetConfigValue.mockImplementation((key: string) => {
-            if (key === 'validExpenseAccounts') {
-                return [
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CITIBANK_DOUBLECASH,
-                    TestAccount.PRIMARY,
-                ];
-            }
-            if (key === 'validTransfers') {
-                return [
-                    {
-                        source: TestAccount.PRIMARY,
-                        destination: TestAccount.MONEY_MARKET,
-                    },
-                ];
-            }
-            return undefined;
-        });
 
         // Create mock service objects
         mockTransactionService = {
