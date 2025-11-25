@@ -305,6 +305,22 @@ export class InteractiveTransactionUpdater {
             }
         }
 
+        if (newBudget && (!newBudget.id || newBudget.id === '')) {
+            const resolvedBudget = this.aiValidator.getBudgetByName(newBudget.attributes.name);
+            if (resolvedBudget) {
+                newBudget = resolvedBudget;
+                logger.debug(
+                    { budgetName: newBudget.attributes.name, budgetId: resolvedBudget.id },
+                    'Resolved user-selected budget to full object'
+                );
+            } else {
+                logger.warn(
+                    { budgetName: newBudget.attributes.name },
+                    'Failed to resolve user-selected budget - budget may not exist'
+                );
+            }
+        }
+
         return [newCategory, newBudget];
     }
 
