@@ -214,16 +214,15 @@ Split a transaction into two parts, either interactively or via command-line par
 ./budget.sh split 123 --amount 50.00
 
 # Provide everything, skip confirmation
-./budget.sh split 123 -a 50.00 -d1 "- Groceries" -d2 "- Hardware" -y
+./budget.sh split 123 -a 50.00 -d "- Groceries" "- Hardware" -y
 
 # Development mode
-npm start -- split 123 -a 50.00 -d1 "- Me" -d2 "- Family"
+npm start -- split 123 -a 50.00 -d "- Me" "- Family"
 ```
 
 **Options:**
 - `-a, --amount <amount>` - Amount for first split (remainder goes to second)
-- `-d1, --description1 <text>` - Custom text to append to first split description
-- `-d2, --description2 <text>` - Custom text to append to second split description
+- `-d, --descriptions <text...>` - Custom text to append to split descriptions (space-separated: first to split 1, second to split 2)
 - `-y, --yes` - Skip confirmation prompt
 
 **Behavior:**
