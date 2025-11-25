@@ -4,22 +4,6 @@ import { ClaudeClient, ChatMessage } from '../../src/api/claude.client.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { jest } from '@jest/globals';
 
-jest.mock('../../src/utils/config-loader', () => ({
-    loadYamlConfig: jest.fn(() => ({
-        llm: {
-            rateLimit: {
-                maxTokensPerMinute: 50,
-                refillInterval: 60000,
-            },
-            circuitBreaker: {
-                failureThreshold: 5,
-                resetTimeout: 60000,
-                halfOpenTimeout: 30000,
-            },
-        },
-    })),
-}));
-
 describe('ClaudeClient', () => {
     let client: ClaudeClient;
     let mockAnthropicClient: jest.Mocked<Anthropic>;

@@ -6,12 +6,6 @@ import { AdditionalIncomeService } from '../../src/services/additional-income.se
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
 
-// Mock getConfigValue
-const mockGetConfigValue = jest.fn();
-jest.mock('../../src/utils/config-loader', () => ({
-    getConfigValue: mockGetConfigValue,
-}));
-
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
     PRIMARY: 'test-primary-account',
@@ -28,22 +22,6 @@ describe('AdditionalIncomeService', () => {
 
     beforeEach(() => {
         resetMockLogger();
-
-        // Set up valid destination accounts for tests
-        mockGetConfigValue.mockImplementation((key: string) => {
-            if (key === 'validDestinationAccounts') {
-                return [
-                    TestAccount.PRIMARY,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CITIBANK_DOUBLECASH,
-                ];
-            }
-            if (key === 'excludedAdditionalIncomePatterns') {
-                return ['PAYROLL'];
-            }
-            return undefined;
-        });
 
         // Create mock service objects
         mockTransactionService = {

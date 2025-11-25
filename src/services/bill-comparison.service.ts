@@ -45,7 +45,7 @@ export class BillComparisonService implements IBillComparisonService {
             const activeBills = await this.billService.getActiveBills();
 
             if (activeBills.length === 0) {
-                logger.info('No active bills found for year ' + year);
+                logger.debug('No active bills found for year ' + year);
                 // Not an error - just return empty result
                 return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
             }

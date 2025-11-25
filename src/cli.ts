@@ -2,7 +2,7 @@ import { Command, Option } from 'commander';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
-import { ConfigManager } from './config.js';
+import { ConfigManager } from './config/config-manager.js';
 import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
@@ -13,6 +13,7 @@ import {
     UpdateTransactionOptions,
 } from './types/interface/command-options.interface.js';
 import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum.js';
+import { CommandConfigValidator } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -206,6 +207,10 @@ Examples:
             }
 
             try {
+                // Validate command-specific configuration (including ANTHROPIC_API_KEY)
+                const config = ConfigManager.getInstance().getConfig();
+                CommandConfigValidator.validateCategorizeCommand(config);
+
                 const aiTransactionUpdateOrchestrator =
                     await ServiceFactory.createAITransactionUpdateOrchestrator(
                         apiClient,

@@ -369,7 +369,7 @@ export class ClaudeClient {
             case 'OPEN':
                 if (now - this.circuitBreaker.lastFailureTime > RESET_TIMEOUT) {
                     this.circuitBreaker.state = 'HALF_OPEN';
-                    logger.info('Circuit breaker moved to HALF_OPEN state');
+                    logger.debug('Circuit breaker moved to HALF_OPEN state');
                 } else {
                     throw new Error('Circuit breaker is OPEN - API requests are blocked');
                 }
@@ -379,7 +379,7 @@ export class ClaudeClient {
                 if (now - this.circuitBreaker.lastFailureTime > HALF_OPEN_TIMEOUT) {
                     this.circuitBreaker.state = 'CLOSED';
                     this.circuitBreaker.failures = 0;
-                    logger.info('Circuit breaker moved to CLOSED state');
+                    logger.debug('Circuit breaker moved to CLOSED state');
                 }
                 break;
 
@@ -398,7 +398,7 @@ export class ClaudeClient {
         if (this.circuitBreaker.state === 'HALF_OPEN') {
             this.circuitBreaker.state = 'CLOSED';
             this.circuitBreaker.failures = 0;
-            logger.info('Circuit breaker reset to CLOSED after successful request');
+            logger.debug('Circuit breaker reset to CLOSED after successful request');
         }
     }
 

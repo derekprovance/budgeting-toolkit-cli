@@ -7,6 +7,8 @@ import { FinalizeBudgetDisplayService } from '../services/display/finalize-budge
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionCounts } from '../services/display/finalize-budget-display.service.js';
+import { CommandConfigValidator } from '../utils/command-config-validator.js';
+import { ConfigManager } from '../config/config-manager.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -28,6 +30,10 @@ export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
      * @param params The month and year to finalize budget for
      */
     async execute({ month, year }: BudgetDateParams): Promise<void> {
+        // Validate command-specific configuration
+        const config = ConfigManager.getInstance().getConfig();
+        CommandConfigValidator.validateFinalizeCommand(config);
+
         console.log(this.finalizeBudgetDisplayService.formatHeader('Budget Finalization Report'));
 
         const spinner = ora('Generating finalization report...').start();

@@ -1,8 +1,10 @@
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { Tag } from '../../../src/config.js';
 import { jest } from '@jest/globals';
+
+const DISPOSABLE_INCOME_TAG = 'Disposable Income';
+const BILLS_TAG = 'Bills';
 
 describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
@@ -16,8 +18,8 @@ describe('TransactionClassificationService', () => {
         service = new TransactionClassificationService(
             mockExcludedTransactionService,
             '5', // noNameExpenseAccountId
-            Tag.DISPOSABLE_INCOME,
-            Tag.BILLS
+            DISPOSABLE_INCOME_TAG,
+            BILLS_TAG
         );
     });
 
@@ -36,7 +38,7 @@ describe('TransactionClassificationService', () => {
     describe('isBill', () => {
         it('should return true when transaction has Bills tag', () => {
             const transaction = {
-                tags: [Tag.BILLS, 'other'],
+                tags: [BILLS_TAG, 'other'],
             } as TransactionSplit;
             expect(service.isBill(transaction)).toBe(true);
         });
@@ -60,7 +62,7 @@ describe('TransactionClassificationService', () => {
     describe('isDisposableIncome', () => {
         it('should return true when transaction has Disposable Income tag', () => {
             const transaction = {
-                tags: [Tag.DISPOSABLE_INCOME],
+                tags: [DISPOSABLE_INCOME_TAG],
             } as TransactionSplit;
             expect(service.isDisposableIncome(transaction)).toBe(true);
         });
@@ -92,7 +94,7 @@ describe('TransactionClassificationService', () => {
 
     describe('isSupplementedByDisposable', () => {
         it('should return true when tags include Disposable Income', () => {
-            const tags = [Tag.DISPOSABLE_INCOME, 'other'];
+            const tags = [DISPOSABLE_INCOME_TAG, 'other'];
             expect(service.isSupplementedByDisposable(tags)).toBe(true);
         });
 
