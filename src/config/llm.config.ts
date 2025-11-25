@@ -1,15 +1,20 @@
 import { ClaudeClient } from '../api/claude.client.js';
-import { ConfigManager } from './config-manager.js';
+import { config, claudeAPIKey as defaultClaudeAPIKey } from '../config.js';
+import chalk from 'chalk';
 
 export class LLMConfig {
     static createClient(claudeAPIKey?: string): ClaudeClient {
-        const config = ConfigManager.getInstance().getConfig();
         // Use provided key or fall back to default from environment
-        const apiKey = claudeAPIKey ?? config.api.claude.apiKey;
+        const apiKey = claudeAPIKey ?? defaultClaudeAPIKey;
 
-        // API key validation now handled by CommandConfigValidator.validateCategorizeCommand()
         if (!apiKey) {
-            throw new Error('ANTHROPIC_API_KEY is required but not set');
+            throw new Error(
+                `${chalk.redBright(
+                    '!!!'
+                )} Claude API Key is required for commands with an LLM dependency. Please check your .env file. ${chalk.redBright(
+                    '!!!'
+                )}`
+            );
         }
 
         // Get LLM configuration from ConfigManager

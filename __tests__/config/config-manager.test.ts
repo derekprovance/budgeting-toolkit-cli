@@ -307,13 +307,12 @@ describe('ConfigManager', () => {
             expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
         });
 
-        it('should not throw error when ANTHROPIC_API_KEY is missing (validated by command)', () => {
+        it('should throw error when ANTHROPIC_API_KEY is missing', () => {
             process.env.FIREFLY_API_URL = 'http://localhost:8080';
             process.env.FIREFLY_API_TOKEN = 'test-token';
             delete process.env.ANTHROPIC_API_KEY;
 
-            // API key is now optional at startup - validated by categorize command
-            expect(() => ConfigManager.getInstance()).not.toThrow();
+            expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
         });
     });
 });
