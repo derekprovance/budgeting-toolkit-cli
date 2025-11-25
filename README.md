@@ -34,98 +34,6 @@ cp .env.example .env
 cp budgeting-toolkit.config.yaml.example budgeting-toolkit.config.yaml
 ```
 
-## Configuration
-
-### Environment Variables (.env)
-
-Required for API access and secrets:
-
-```bash
-# Firefly III
-FIREFLY_API_URL=https://your-firefly-instance.com
-FIREFLY_API_TOKEN=your_api_token_here
-
-# AI (required for categorization)
-ANTHROPIC_API_KEY=your_anthropic_key
-
-# Optional
-LOG_LEVEL=info
-CLIENT_CERT_CA_PATH=../certs/ca.pem
-CLIENT_CERT_PATH=../certs/client.p12
-CLIENT_CERT_PASSWORD=your_certificate_password
-```
-
-### YAML Configuration (budgeting-toolkit.config.yaml)
-
-Application settings and preferences:
-
-```yaml
-# Budget settings
-expectedMonthlyPaycheck: 5000.00
-validDestinationAccounts:
-    - '1'  # Checking
-    - '2'  # Savings
-
-validExpenseAccounts:
-    - '4'  # Credit Card
-    - '1'  # Checking
-
-excludedAdditionalIncomePatterns:
-    - PAYROLL
-    - ATM FEE
-
-excludeDisposableIncome: false
-
-# Excluded transactions (globally exclude from all reports)
-excludedTransactions:
-    - description: 'STOCK INVESTMENT'
-      amount: '100.00'
-      reason: 'Investment purchase - not a regular expense'
-    - description: 'TRANSFER TO SAVINGS'
-      reason: 'Internal transfer, not an expense'
-    - amount: '999.99'
-      reason: 'Specific amount to exclude'
-
-# Firefly settings
-firefly:
-    noNameExpenseAccountId: '5'
-
-# AI settings
-llm:
-    model: 'claude-sonnet-4-5'
-    maxTokens: 2000
-    temperature: 0.1
-    batchSize: 5
-    maxConcurrent: 2
-```
-
-See `budgeting-toolkit.config.yaml.example` for complete configuration options.
-
-### Transaction Exclusions
-
-You can exclude specific transactions from all reports by adding them to the `excludedTransactions` section in your YAML config:
-
-```yaml
-excludedTransactions:
-    # Match by description only (excludes any amount)
-    - description: 'STOCK INVESTMENT'
-      reason: 'Investment purchase'
-
-    # Match by description and amount (exact match)
-    - description: 'Monthly Rent'
-      amount: '1200.00'
-      reason: 'Rent payment'
-
-    # Match by amount only (excludes any description)
-    - amount: '999.99'
-      reason: 'Specific amount to filter'
-```
-
-- At least one field (`description` or `amount`) is required
-- `reason` is optional but recommended for documentation
-- Description matching is case-insensitive and uses substring matching
-- Amount matching is exact
-
 ## Usage
 
 ### Development vs Production
@@ -254,6 +162,98 @@ LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
 # Import workflow
 ./budget.sh categorize Import-$(date +%Y-%m-%d)
 ```
+
+## Configuration
+
+### Environment Variables (.env)
+
+Required for API access and secrets:
+
+```bash
+# Firefly III
+FIREFLY_API_URL=https://your-firefly-instance.com
+FIREFLY_API_TOKEN=your_api_token_here
+
+# AI (required for categorization)
+ANTHROPIC_API_KEY=your_anthropic_key
+
+# Optional
+LOG_LEVEL=info
+CLIENT_CERT_CA_PATH=../certs/ca.pem
+CLIENT_CERT_PATH=../certs/client.p12
+CLIENT_CERT_PASSWORD=your_certificate_password
+```
+
+### YAML Configuration (budgeting-toolkit.config.yaml)
+
+Application settings and preferences:
+
+```yaml
+# Budget settings
+expectedMonthlyPaycheck: 5000.00
+validDestinationAccounts:
+    - '1'  # Checking
+    - '2'  # Savings
+
+validExpenseAccounts:
+    - '4'  # Credit Card
+    - '1'  # Checking
+
+excludedAdditionalIncomePatterns:
+    - PAYROLL
+    - ATM FEE
+
+excludeDisposableIncome: false
+
+# Excluded transactions (globally exclude from all reports)
+excludedTransactions:
+    - description: 'STOCK INVESTMENT'
+      amount: '100.00'
+      reason: 'Investment purchase - not a regular expense'
+    - description: 'TRANSFER TO SAVINGS'
+      reason: 'Internal transfer, not an expense'
+    - amount: '999.99'
+      reason: 'Specific amount to exclude'
+
+# Firefly settings
+firefly:
+    noNameExpenseAccountId: '5'
+
+# AI settings
+llm:
+    model: 'claude-sonnet-4-5'
+    maxTokens: 2000
+    temperature: 0.1
+    batchSize: 5
+    maxConcurrent: 2
+```
+
+See `budgeting-toolkit.config.yaml.example` for complete configuration options.
+
+### Transaction Exclusions
+
+You can exclude specific transactions from all reports by adding them to the `excludedTransactions` section in your YAML config:
+
+```yaml
+excludedTransactions:
+    # Match by description only (excludes any amount)
+    - description: 'STOCK INVESTMENT'
+      reason: 'Investment purchase'
+
+    # Match by description and amount (exact match)
+    - description: 'Monthly Rent'
+      amount: '1200.00'
+      reason: 'Rent payment'
+
+    # Match by amount only (excludes any description)
+    - amount: '999.99'
+      reason: 'Specific amount to filter'
+```
+
+- At least one field (`description` or `amount`) is required
+- `reason` is optional but recommended for documentation
+- Description matching is case-insensitive and uses substring matching
+- Amount matching is exact
 
 ## Docker Development
 
