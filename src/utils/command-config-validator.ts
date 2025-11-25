@@ -70,15 +70,4 @@ export class CommandConfigValidator {
             process.exit(1);
         }
     }
-
-    /**
-     * Validates configuration for split command
-     *
-     * Split command has no special configuration requirements beyond basic Firefly API access,
-     * which is validated by ConfigValidator at startup.
-     */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    static validateSplitCommand(_config: AppConfig): void {
-        // No-op: split command requires no additional validation
-    }
 }
