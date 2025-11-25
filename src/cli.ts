@@ -237,22 +237,23 @@ Examples:
         .command('split <transaction-id>')
         .alias('sp')
         .description('Split a transaction into two parts')
-        .option('-a, --amount <amount>', 'amount for first split (remainder goes to second split)')
-        .option('-d1, --description1 <text>', 'custom text to append to first split description')
-        .option('-d2, --description2 <text>', 'custom text to append to second split description')
+        .option('-a, --amount <amount>', 'amount for first split')
+        .option('-d, --descriptions <text...>', 'custom text to append to split descriptions')
         .option('-y, --yes', 'skip confirmation prompt')
         .addHelpText(
             'after',
             `
 Examples:
-  $ budgeting-toolkit split 4361                             # fully interactive
-  $ budgeting-toolkit split 4361 -a 50.00                    # provide amount, prompt for rest
-  $ budgeting-toolkit split 4361 -a 50.00 -d1 "- Groceries" # with descriptions
-  $ budgeting-toolkit sp 4361 -a 50 -d1 "- Me" -d2 "- Family" -y  # skip confirmation
+  $ budgeting-toolkit split 4361                                    # fully interactive
+  $ budgeting-toolkit split 4361 -a 50.00                           # provide amount, prompt for rest
+  $ budgeting-toolkit split 4361 -a 50.00 -d "- Groceries"          # first split with description
+  $ budgeting-toolkit sp 4361 -a 50 -d "- Me" "- Family" -y         # both descriptions, skip confirmation
+  $ budgeting-toolkit sp 4361 -a 50 -d "- Split 1" "" -y            # first only (empty string for second)
 
 Behavior:
   - First split preserves category, budget, and tags from original
   - Second split left uncategorized for manual assignment in Firefly III
+  - Descriptions are applied in order: first to split 1, second to split 2, etc.
   - Omit parameters to use interactive prompts`
         )
         .action(
@@ -260,8 +261,7 @@ Behavior:
                 transactionId: string,
                 opts: {
                     amount?: string;
-                    description1?: string;
-                    description2?: string;
+                    descriptions?: string[];
                     yes?: boolean;
                 }
             ) => {
@@ -282,8 +282,7 @@ Behavior:
                     await command.execute({
                         transactionId,
                         amount: opts.amount,
-                        description1: opts.description1,
-                        description2: opts.description2,
+                        descriptions: opts.descriptions,
                         yes: opts.yes,
                     });
                 } catch (error) {

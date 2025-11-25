@@ -316,57 +316,71 @@ export class UserInputService {
      * @param currencySymbol The currency symbol
      * @returns Promise<number> The amount entered by the user
      */
+    /**
+     * Validates a split amount value
+     * @param value The amount string to validate
+     * @param originalAmount The original transaction amount
+     * @param currencySymbol Currency symbol for error messages
+     * @returns true if valid, error message string if invalid
+     */
+    validateSplitAmount(
+        value: string,
+        originalAmount: number,
+        currencySymbol: string
+    ): true | string {
+        // Check for empty or whitespace-only input
+        if (!value || value.trim() === '') {
+            return 'Amount is required';
+        }
+
+        const trimmedValue = value.trim();
+
+        // Validate format: must be a valid decimal number with max 2 decimal places
+        if (!/^\d+(\.\d{1,2})?$/.test(trimmedValue)) {
+            return 'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)';
+        }
+
+        const amount = parseFloat(trimmedValue);
+
+        // Check for NaN (shouldn't happen with regex, but defensive)
+        if (isNaN(amount)) {
+            return 'Please enter a valid number';
+        }
+
+        // Check for negative (regex should prevent, but explicit check)
+        if (amount < 0) {
+            return 'Amount cannot be negative';
+        }
+
+        // Check for zero
+        if (amount === 0) {
+            return 'Amount must be greater than zero';
+        }
+
+        // Check if amount is less than minimum (1 cent)
+        if (amount < 0.01) {
+            return 'Amount must be at least 0.01';
+        }
+
+        // Check if amount would leave nothing for second split
+        if (amount >= originalAmount) {
+            return `Amount must be less than the original amount (${currencySymbol}${originalAmount})`;
+        }
+
+        // Validate minimum second split amount (at least 1 cent)
+        const secondSplitAmount = parseFloat((originalAmount - amount).toFixed(2));
+        if (secondSplitAmount < 0.01) {
+            return `Second split would be too small (${currencySymbol}${secondSplitAmount.toFixed(2)}). Please enter a smaller amount.`;
+        }
+
+        return true;
+    }
+
     async getSplitAmount(originalAmount: number, currencySymbol: string): Promise<number> {
         const answer = await input({
             message: `Enter amount for first split (original: ${currencySymbol}${originalAmount}):`,
-            validate: (value: string) => {
-                // Check for empty or whitespace-only input
-                if (!value || value.trim() === '') {
-                    return 'Amount is required';
-                }
-
-                const trimmedValue = value.trim();
-
-                // Validate format: must be a valid decimal number with max 2 decimal places
-                if (!/^\d+(\.\d{1,2})?$/.test(trimmedValue)) {
-                    return 'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)';
-                }
-
-                const amount = parseFloat(trimmedValue);
-
-                // Check for NaN (shouldn't happen with regex, but defensive)
-                if (isNaN(amount)) {
-                    return 'Please enter a valid number';
-                }
-
-                // Check for negative (regex should prevent, but explicit check)
-                if (amount < 0) {
-                    return 'Amount cannot be negative';
-                }
-
-                // Check for zero
-                if (amount === 0) {
-                    return 'Amount must be greater than zero';
-                }
-
-                // Check if amount is less than minimum (1 cent)
-                if (amount < 0.01) {
-                    return 'Amount must be at least 0.01';
-                }
-
-                // Check if amount would leave nothing for second split
-                if (amount >= originalAmount) {
-                    return `Amount must be less than the original amount (${currencySymbol}${originalAmount})`;
-                }
-
-                // Validate minimum second split amount (at least 1 cent)
-                const secondSplitAmount = parseFloat((originalAmount - amount).toFixed(2));
-                if (secondSplitAmount < 0.01) {
-                    return `Second split would be too small (${currencySymbol}${secondSplitAmount.toFixed(2)}). Please enter a smaller amount.`;
-                }
-
-                return true;
-            },
+            validate: (value: string) =>
+                this.validateSplitAmount(value, originalAmount, currencySymbol),
         });
 
         return parseFloat(answer);

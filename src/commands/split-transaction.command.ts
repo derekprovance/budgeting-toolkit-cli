@@ -12,8 +12,7 @@ import { logger } from '../logger.js';
 interface SplitTransactionParams {
     transactionId: string;
     amount?: string;
-    description1?: string;
-    description2?: string;
+    descriptions?: string[];
     yes?: boolean;
 }
 
@@ -31,7 +30,12 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
     ) {}
 
     async execute(params: SplitTransactionParams): Promise<void> {
-        const { transactionId, amount, description1, description2, yes } = params;
+        const { transactionId, amount, descriptions, yes } = params;
+
+        // Extract individual descriptions from array (supports n-way splits in future)
+        const description1 = descriptions?.[0];
+        const description2 = descriptions?.[1];
+
         console.log(this.displayService.formatHeader(transactionId));
 
         const spinner = ora('Fetching transaction...').start();
@@ -42,13 +46,13 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
 
             if (!transaction) {
                 spinner.fail(chalk.red(`Transaction ${transactionId} not found`));
-                return;
+                throw new Error(`Transaction ${transactionId} not found`);
             }
             const splits = transaction.attributes.transactions;
 
             if (!splits || splits.length === 0) {
                 spinner.fail(chalk.red('Transaction has no splits'));
-                return;
+                throw new Error('Transaction has no splits');
             }
 
             if (splits.length > 1) {
@@ -57,7 +61,9 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
                         `Transaction already has ${splits.length} splits. Only single transactions can be split.`
                     )
                 );
-                return;
+                throw new Error(
+                    `Transaction already has ${splits.length} splits. Only single transactions can be split.`
+                );
             }
 
             const originalSplit = splits[0];
@@ -174,8 +180,8 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             // User-facing output
             console.log(this.displayService.formatError(errorObject));
 
-            // Exit with error code for CLI
-            process.exit(1);
+            // Re-throw error to let CLI framework handle exit
+            throw errorObject;
         }
     }
 
@@ -192,50 +198,16 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         originalAmount: number,
         currencySymbol: string
     ): number {
-        // Validate format: must be a valid decimal number with max 2 decimal places
-        if (!/^\d+(\.\d{1,2})?$/.test(amountStr.trim())) {
-            throw new Error(
-                'Amount must be a valid number with at most 2 decimal places (e.g., 10.50)'
-            );
+        const validationResult = this.userInputService.validateSplitAmount(
+            amountStr,
+            originalAmount,
+            currencySymbol
+        );
+
+        if (validationResult !== true) {
+            throw new Error(validationResult);
         }
 
-        const amount = parseFloat(amountStr.trim());
-
-        // Check for NaN (shouldn't happen with regex, but defensive)
-        if (isNaN(amount)) {
-            throw new Error('Amount must be a valid number');
-        }
-
-        // Check for negative (regex should prevent, but explicit check)
-        if (amount < 0) {
-            throw new Error('Amount cannot be negative');
-        }
-
-        // Check for zero
-        if (amount === 0) {
-            throw new Error('Amount must be greater than zero');
-        }
-
-        // Check if amount is less than minimum (1 cent)
-        if (amount < 0.01) {
-            throw new Error('Amount must be at least 0.01');
-        }
-
-        // Check if amount would leave nothing for second split
-        if (amount >= originalAmount) {
-            throw new Error(
-                `Amount must be less than the original amount (${currencySymbol}${originalAmount})`
-            );
-        }
-
-        // Validate minimum second split amount (at least 1 cent)
-        const secondSplitAmount = parseFloat((originalAmount - amount).toFixed(2));
-        if (secondSplitAmount < 0.01) {
-            throw new Error(
-                `Second split would be too small (${currencySymbol}${secondSplitAmount.toFixed(2)}). Please enter a smaller amount.`
-            );
-        }
-
-        return amount;
+        return parseFloat(amountStr.trim());
     }
 }
