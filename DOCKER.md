@@ -96,7 +96,7 @@ npm run compile
 ### Environment Separation
 
 - **Production**: `npm start` or `./budget.sh` (uses `.env`)
-- **Docker**: Same commands automatically use `.env.dev` when `.env` is symlinked
+- **Docker**: `npm start:dev` (uses `.env.dev`)
 
 ## Docker Commands
 
@@ -280,13 +280,13 @@ docker compose up -d
 # - Use Data Importer at http://localhost:8081
 
 # 5. Test commands
-npm start -- report -m 1
-npm start -- finalize -m 1
-npm start -- categorize Import-2024
+npm start:dev -- report -m 1
+npm start:dev -- finalize -m 1
+npm start:dev -- categorize Import-2024
 
 # 6. Make changes and test
 npm test
-npm start -- finalize -m 1
+npm start:dev -- finalize -m 1
 
 # 7. Stop when done
 docker compose stop

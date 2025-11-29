@@ -7,7 +7,7 @@ AI-powered command-line interface for Firefly III Personal Finance Manager with 
 - AI-powered transaction categorization and budgeting
 - Budget analysis with surplus/deficit tracking
 - Interactive transaction splitting
-- Docker development environment with Firefly III, PostgreSQL, and Adminer
+- Docker development environment with Firefly III, and PostgreSQL
 
 ## Quick Start
 
@@ -55,7 +55,7 @@ Edit `.env` with your credentials:
 | `FIREFLY_API_URL` | Firefly III API endpoint | All commands | - |
 | `FIREFLY_API_TOKEN` | API authentication token | All commands | - |
 | `ANTHROPIC_API_KEY` | Claude AI API key | `categorize` only | - |
-| `LOG_LEVEL` | Logging verbosity | Optional | `silent` |
+| `LOG_LEVEL` | Logging verbosity | Optional | `info` |
 
 ### Optional YAML Configuration
 
@@ -167,7 +167,7 @@ See [CLAUDE.md](CLAUDE.md) for architecture, patterns, and development guideline
 
 ## Docker
 
-Full Docker development environment with Firefly III, PostgreSQL, and Adminer included.
+Full Docker development environment with Firefly III, and PostgreSQL included.
 
 See [DOCKER.md](DOCKER.md) for complete setup instructions.
 
