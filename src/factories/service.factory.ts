@@ -69,7 +69,7 @@ export class ServiceFactory {
         const baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
         );
-        const finalizeBudgetDisplayService = new AnalyzeDisplayService(
+        const analyzeDisplayService = new AnalyzeDisplayService(
             baseTransactionDisplayService
         );
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
@@ -93,7 +93,7 @@ export class ServiceFactory {
             paycheckSurplusService,
             transactionValidatorService,
             baseTransactionDisplayService,
-            finalizeBudgetDisplayService,
+            analyzeDisplayService,
             budgetDisplayService,
             splitTransactionDisplayService,
             billService,

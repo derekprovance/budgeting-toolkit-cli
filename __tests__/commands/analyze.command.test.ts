@@ -22,7 +22,7 @@ describe('AnalyzeCommand', () => {
     let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
     let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let paycheckSurplusService: jest.Mocked<PaycheckSurplusService>;
-    let finalizeBudgetDisplayService: jest.Mocked<AnalyzeDisplayService>;
+    let analyzeDisplayService: jest.Mocked<AnalyzeDisplayService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
     let consoleErrorSpy: jest.Spied<typeof console.error>;
 
@@ -65,7 +65,7 @@ describe('AnalyzeCommand', () => {
                 .mockResolvedValue({ ok: true, value: 500.0 }),
         } as unknown as jest.Mocked<PaycheckSurplusService>;
 
-        finalizeBudgetDisplayService = {
+        analyzeDisplayService = {
             formatHeader: jest.fn().mockReturnValue('Mock Header'),
             formatMonthHeader: jest.fn().mockReturnValue('Mock Month Header'),
             formatAdditionalIncomeSection: jest.fn().mockReturnValue('Mock Additional Income'),
@@ -79,7 +79,7 @@ describe('AnalyzeCommand', () => {
             unbudgetedExpenseService,
             transactionClassificationService,
             paycheckSurplusService,
-            finalizeBudgetDisplayService
+            analyzeDisplayService
         );
 
         // Spy on console methods

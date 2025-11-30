@@ -92,7 +92,7 @@ export const createCli = (): Command => {
     program
         .command('analyze')
         .alias('an')
-        .description('Budget analysis with surplus/deficit varience')
+        .description('Budget analysis with surplus/deficit variance')
         .addOption(
             new Option('-m, --month <month>', 'target month (1-12)')
                 .argParser(validateMonth)
@@ -107,10 +107,10 @@ export const createCli = (): Command => {
             'after',
             `
 Examples:
-  $ budgeting-toolkit finalize                   # current month
-  $ budgeting-toolkit finalize -m 6              # June, current year
-  $ budgeting-toolkit finalize -m 12 -y 2024     # December 2024
-  $ budgeting-toolkit fin -m 3                   # March (using alias)`
+  $ budgeting-toolkit analyze                   # current month
+  $ budgeting-toolkit analyze -m 6              # June, current year
+  $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
+  $ budgeting-toolkit an -m 3                   # March (using alias)`
         )
         .action(async (opts: BudgetDateOptions) => {
             try {
@@ -119,11 +119,12 @@ Examples:
                     services.unbudgetedExpenseService,
                     services.transactionClassificationService,
                     services.paycheckSurplusService,
-                    services.finalizeBudgetDisplayService
+                    services.analyzeDisplayService
                 );
                 await command.execute({
                     month: opts.month!,
                     year: opts.year!,
+                    verbose: program?.opts().verbose || false,
                 });
             } catch (error) {
                 handleError(error, 'finalizing budget');

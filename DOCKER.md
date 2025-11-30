@@ -80,7 +80,7 @@ Best for active development with TypeScript:
 ```bash
 # Run without compilation
 npm run start:dev -- report -m 1
-npm run start:dev -- finalize -m 1
+npm run start:dev -- analyze -m 1
 npm run start:dev -- categorize Import-2024
 ```
 
@@ -281,12 +281,12 @@ docker compose up -d
 
 # 5. Test commands
 npm start:dev -- report -m 1
-npm start:dev -- finalize -m 1
+npm start:dev -- analyze -m 1
 npm start:dev -- categorize Import-2024
 
 # 6. Make changes and test
 npm test
-npm start:dev -- finalize -m 1
+npm start:dev -- analyze -m 1
 
 # 7. Stop when done
 docker compose stop

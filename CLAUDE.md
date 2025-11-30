@@ -189,7 +189,7 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
 - `BaseTransactionDisplayService` - Base service for formatting transaction lists with type indicators
 - `BudgetDisplayService` - Formats budget reports with spending visualizations
-- `FinalizeBudgetDisplayService` - Formats analyze budget output with recommendations
+- `AnalyzeDisplayService` - Formats analyze budget output with recommendations
 - `UpdateTransactionDisplayService` - Formats status messages for categorize command
 - `SplitTransactionDisplayService` - Formats split transaction previews and status messages
 

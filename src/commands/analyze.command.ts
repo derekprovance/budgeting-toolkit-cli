@@ -13,30 +13,39 @@ import chalk from 'chalk';
 import ora from 'ora';
 
 /**
- * Command for finalizing budget and displaying the finalization report
+ * Command for analyzing budget variance
  */
 
 export class AnalyzeCommand implements Command<void, BudgetDateParams> {
+    private readonly BUDGET_FAIL_MSG = 'Failed to generate variance analysis';
+
     constructor(
         private readonly additionalIncomeService: AdditionalIncomeService,
         private readonly unbudgetedExpenseService: UnbudgetedExpenseService,
         private readonly transactionClassificationService: TransactionClassificationService,
         private readonly paycheckSurplusService: PaycheckSurplusService,
-        private readonly finalizeBudgetDisplayService: AnalyzeDisplayService
+        private readonly analyzeDisplayService: AnalyzeDisplayService
     ) {}
 
     /**
-     * Executes the finalize budget command
-     * @param params The month and year to finalize budget for
+     * Executes the analyze command
+     * @param params The month and year to perform the analysis
      */
-    async execute({ month, year }: BudgetDateParams): Promise<void> {
+
+    //TODO - add verbose to command output for transactions that are expenses within the filter and additional income
+    //TODO - add a calculation to determine the difference between the expenses and the additional income
+    //TODO - calculate the budget surplus or deficit and add to the calculation
+    //TODO - calculate the actual bill cost over the average monthly bill cost and add to calculation
+    //TODO - show total of transactions with the disposable income tag somewhere in the report
+    //TODO - reformat the command output to something that's more readable and pleasing
+    async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
+        const spinner = ora(`Analyzing ${month}-${year}...`).start();
+
         // Validate command-specific configuration
         const config = ConfigManager.getInstance().getConfig();
-        CommandConfigValidator.validateFinalizeCommand(config);
+        CommandConfigValidator.validateAnalyzeCommand(config);
 
-        console.log(this.finalizeBudgetDisplayService.formatHeader('Budget Finalization Report'));
-
-        const spinner = ora('Generating finalization report...').start();
+        console.log(this.analyzeDisplayService.formatHeader('Budget Finalization Report'));
 
         try {
             // Fetch all data in parallel using Result pattern
@@ -49,7 +58,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
 
             // Handle additional income result
             if (!additionalIncomeResult.ok) {
-                spinner.fail('Failed to generate finalization report');
+                spinner.fail(this.BUDGET_FAIL_MSG);
                 console.error(
                     chalk.red('Error fetching additional income:'),
                     chalk.red.bold(additionalIncomeResult.error.userMessage)
@@ -59,7 +68,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
 
             // Handle unbudgeted expense result
             if (!unbudgetedExpenseResult.ok) {
-                spinner.fail('Failed to generate finalization report');
+                spinner.fail(this.BUDGET_FAIL_MSG);
                 console.error(
                     chalk.red('Error fetching unbudgeted expenses:'),
                     chalk.red.bold(unbudgetedExpenseResult.error.userMessage)
@@ -69,7 +78,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
 
             // Handle paycheck surplus result
             if (!paycheckSurplusResult.ok) {
-                spinner.fail('Failed to generate finalization report');
+                spinner.fail(this.BUDGET_FAIL_MSG);
                 console.error(
                     chalk.red('Error calculating paycheck surplus:'),
                     chalk.red.bold(paycheckSurplusResult.error.userMessage)
@@ -77,33 +86,29 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 throw new Error(paycheckSurplusResult.error.message);
             }
 
-            spinner.succeed('Finalization report generated');
+            spinner.succeed('Analysis generated');
 
             const additionalIncomeResults = additionalIncomeResult.value;
             const unbudgetedExpenseResults = unbudgetedExpenseResult.value;
             const paycheckSurplus = paycheckSurplusResult.value;
 
-            console.log(this.finalizeBudgetDisplayService.formatMonthHeader(month, year));
+            console.log(this.analyzeDisplayService.formatMonthHeader(month, year));
 
             // Display additional income section
             console.log(
-                this.finalizeBudgetDisplayService.formatAdditionalIncomeSection(
-                    additionalIncomeResults
-                )
+                this.analyzeDisplayService.formatAdditionalIncomeSection(additionalIncomeResults)
             );
 
             // Display unbudgeted expenses section
             console.log(
-                this.finalizeBudgetDisplayService.formatUnbudgetedExpensesSection(
-                    unbudgetedExpenseResults
-                )
+                this.analyzeDisplayService.formatUnbudgetedExpensesSection(unbudgetedExpenseResults)
             );
 
             // Calculate and display enhanced summary
             const allTransactions = [...additionalIncomeResults, ...unbudgetedExpenseResults];
             const counts = this.getTransactionCounts(allTransactions);
             console.log(
-                this.finalizeBudgetDisplayService.formatSummary(
+                this.analyzeDisplayService.formatSummary(
                     counts,
                     additionalIncomeResults,
                     unbudgetedExpenseResults,
@@ -111,7 +116,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 )
             );
         } catch (error) {
-            spinner.fail('Failed to generate finalization report');
+            spinner.fail(this.BUDGET_FAIL_MSG);
             throw error;
         }
     }

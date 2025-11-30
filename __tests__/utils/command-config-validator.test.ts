@@ -24,7 +24,7 @@ describe('CommandConfigValidator', () => {
         mockProcessExit.mockRestore();
     });
 
-    describe('validateFinalizeCommand', () => {
+    describe('validateAnalyzeCommand', () => {
         it('should not throw when all required config is present', () => {
             const config: AppConfig = {
                 api: {
@@ -70,7 +70,7 @@ describe('CommandConfigValidator', () => {
                 logging: { level: 'info' },
             };
 
-            expect(() => CommandConfigValidator.validateFinalizeCommand(config)).not.toThrow();
+            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).not.toThrow();
             expect(mockConsoleError).not.toHaveBeenCalled();
             expect(mockProcessExit).not.toHaveBeenCalled();
         });
@@ -120,7 +120,7 @@ describe('CommandConfigValidator', () => {
                 logging: { level: 'info' },
             };
 
-            expect(() => CommandConfigValidator.validateFinalizeCommand(config)).toThrow(
+            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
                 'process.exit(1)'
             );
             expect(mockConsoleError).toHaveBeenCalled();
@@ -174,7 +174,7 @@ describe('CommandConfigValidator', () => {
                 logging: { level: 'info' },
             };
 
-            expect(() => CommandConfigValidator.validateFinalizeCommand(config)).toThrow(
+            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
                 'process.exit(1)'
             );
             expect(mockConsoleError).toHaveBeenCalled();
@@ -227,7 +227,7 @@ describe('CommandConfigValidator', () => {
                 logging: { level: 'info' },
             };
 
-            expect(() => CommandConfigValidator.validateFinalizeCommand(config)).toThrow(
+            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
                 'process.exit(1)'
             );
             expect(mockConsoleError).toHaveBeenCalled();
@@ -280,7 +280,7 @@ describe('CommandConfigValidator', () => {
                 logging: { level: 'info' },
             };
 
-            expect(() => CommandConfigValidator.validateFinalizeCommand(config)).toThrow(
+            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
                 'process.exit(1)'
             );
             const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');

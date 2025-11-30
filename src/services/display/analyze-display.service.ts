@@ -15,7 +15,7 @@ export interface TransactionCounts {
 }
 
 /**
- * Service for formatting and displaying finalize budget information
+ * Service for formatting and displaying analysis information
  */
 export class AnalyzeDisplayService {
     private readonly transactionUtils: TransactionUtils;
@@ -49,7 +49,7 @@ export class AnalyzeDisplayService {
         const monthName = Intl.DateTimeFormat('en', { month: 'long' }).format(
             new Date(year, month - 1)
         );
-        return chalk.cyan(`\nBudget Report for ${monthName} ${year}`);
+        return chalk.cyan(`\nTransaction Types for ${monthName} ${year}`);
     }
 
     /**
@@ -63,12 +63,12 @@ export class AnalyzeDisplayService {
     }
 
     /**
-     * Formats the unbudgeted expenses section
+     * Formats the expenses section
      */
     formatUnbudgetedExpensesSection(transactions: TransactionSplit[]): string {
         return this.baseTransactionDisplayService.listTransactionsWithHeader(
             transactions,
-            '=== Unbudgeted Expenses ==='
+            '=== Expenses ==='
         );
     }
 
@@ -90,13 +90,7 @@ export class AnalyzeDisplayService {
         const lines = [
             chalk.bold('\n=== Transaction Summary ==='),
             '',
-            '📋 Transaction Types:',
-            `  ${chalk.redBright('💳 Bills:')}\t\t${counts.bills}`,
-            `  ${chalk.cyan('↔️  Transfers:')}\t${counts.transfers}`,
-            `  ${chalk.greenBright('💰 Deposits:')}\t${counts.deposits}`,
-            `  ${chalk.gray('❓ Other:')}\t\t${counts.other}`,
-            '',
-            '💵 Financial Totals:',
+            'Financial Totals:',
             `  Additional Income:     ${this.formatAmount(totalIncome, currencySymbol, 'positive')}`,
             `  Unbudgeted Expenses:   ${this.formatAmount(totalExpenses, currencySymbol, 'negative')}`,
             `  Paycheck Variance:     ${this.formatAmount(paycheckSurplus, currencySymbol, paycheckSurplus >= 0 ? 'positive' : 'negative')}`,
@@ -117,7 +111,7 @@ export class AnalyzeDisplayService {
         // Positive net impact recommendations
         if (netImpact > 500) {
             lines.push(
-                `✅ ${chalk.green('Strong Position:')} Consider allocating surplus to:`,
+                `${chalk.green('Strong Position:')} Consider allocating surplus to:`,
                 `   • Emergency fund or high-yield savings`,
                 `   • Investment contributions`,
                 `   • Debt reduction`,
@@ -127,7 +121,7 @@ export class AnalyzeDisplayService {
         // Negative net impact recommendations
         else if (netImpact < -200) {
             lines.push(
-                `🔴 ${chalk.red('Action Needed:')} Address spending gap by:`,
+                `${chalk.red('Action Needed:')} Address spending gap by:`,
                 `   • Reviewing and reducing unbudgeted expenses`,
                 `   • Adjusting monthly budget categories`,
                 `   • Identifying recurring expenses to budget for`,
@@ -137,7 +131,7 @@ export class AnalyzeDisplayService {
         // Neutral recommendations
         else {
             lines.push(
-                `📊 ${chalk.blue('Balanced Month:')} Maintain current approach:`,
+                `${chalk.blue('Balanced Month:')} Maintain current approach:`,
                 `   • Monitor recurring unbudgeted expenses`,
                 `   • Consider adding buffer to monthly budget`,
                 ''
@@ -155,7 +149,7 @@ export class AnalyzeDisplayService {
 
         if (subscriptionExpenses.length > 2) {
             lines.push(
-                `💡 ${chalk.yellow('Subscription Review:')} Found ${subscriptionExpenses.length} subscription charges`,
+                `${chalk.yellow('Subscription Review:')} Found ${subscriptionExpenses.length} subscription charges`,
                 `   • Review active subscriptions for unused services`,
                 `   • Add regular subscriptions to monthly budget`,
                 ''
