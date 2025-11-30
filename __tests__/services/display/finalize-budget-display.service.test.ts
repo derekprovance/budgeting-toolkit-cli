@@ -17,13 +17,13 @@ jest.mock('chalk', () => {
 });
 
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { FinalizeBudgetDisplayService } from '../../../src/services/display/finalize-budget-display.service.js';
+import { AnalyzeDisplayService } from '../../../src/services/display/analyze-display.service.js';
 import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service.js';
 import { ITransactionUtils } from '../../../src/utils/transaction.utils.interface.js';
 import { jest } from '@jest/globals';
 
-describe('FinalizeBudgetDisplayService', () => {
-    let service: FinalizeBudgetDisplayService;
+describe('AnalyzeDisplayService', () => {
+    let service: AnalyzeDisplayService;
     let baseTransactionDisplayService: jest.Mocked<BaseTransactionDisplayService>;
     let mockTransactionUtils: ITransactionUtils;
     let mockIsBill: jest.Mock;
@@ -84,7 +84,7 @@ describe('FinalizeBudgetDisplayService', () => {
             }
         );
 
-        service = new FinalizeBudgetDisplayService(
+        service = new AnalyzeDisplayService(
             baseTransactionDisplayService,
             mockTransactionUtils
         );

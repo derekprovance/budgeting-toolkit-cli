@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
 import { ConfigManager } from './config/config-manager.js';
-import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
+import { AnalyzeCommand } from './commands/analyze.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
@@ -90,9 +90,9 @@ export const createCli = (): Command => {
         .option('-v, --verbose', 'enable verbose logging');
 
     program
-        .command('finalize')
-        .alias('fin')
-        .description('Calculate budget finalization report with surplus/deficit analysis')
+        .command('analyze')
+        .alias('an')
+        .description('Budget analysis with surplus/deficit varience')
         .addOption(
             new Option('-m, --month <month>', 'target month (1-12)')
                 .argParser(validateMonth)
@@ -114,7 +114,7 @@ Examples:
         )
         .action(async (opts: BudgetDateOptions) => {
             try {
-                const command = new FinalizeBudgetCommand(
+                const command = new AnalyzeCommand(
                     services.additionalIncomeService,
                     services.unbudgetedExpenseService,
                     services.transactionClassificationService,

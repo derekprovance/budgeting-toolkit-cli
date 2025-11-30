@@ -1,7 +1,7 @@
 # Budgeting Toolkit Configuration Example
-# Copy this file to budgeting-toolkit.config.yaml and customize for your needs
+# Copy this file to config.yaml and customize for your needs
 
-# Budget Configuration
+# Budget and Analysis Configuration
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
     - '1' # Checking Account ID

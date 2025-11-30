@@ -7,7 +7,7 @@ This guide provides comprehensive documentation for all configuration options av
 The application uses two configuration files:
 
 1. **`.env`** - Environment variables for secrets and API credentials
-2. **`budgeting-toolkit.config.yaml`** - Application settings and preferences
+2. **`config.yaml`** - Application settings and preferences
 
 ## Environment Variables (.env)
 
@@ -40,13 +40,13 @@ CLIENT_CERT_PASSWORD=your_certificate_password
 - The URL will have `/api` automatically appended
 - Certificate paths can be absolute or relative to the project root
 
-## YAML Configuration (budgeting-toolkit.config.yaml)
+## YAML Configuration (config.yaml)
 
 ## Command-Specific Configuration Requirements
 
 Use this quick reference to see what each command needs:
 
-### `finalize` Command
+### `analyze` Command
 
 **Required:**
 
@@ -110,7 +110,7 @@ expectedMonthlyPaycheck: 5000.00
 
 **Type:** `number`
 **Default:** `undefined`
-**Used by:** Finalize command
+**Used by:** Analyze command
 
 #### validDestinationAccounts
 
@@ -380,7 +380,7 @@ llm:
 
 Settings are loaded with the following precedence (highest to lowest):
 
-1. **YAML Configuration** (`budgeting-toolkit.config.yaml`)
+1. **YAML Configuration** (`config.yaml`)
 2. **Environment Variables** (`.env`)
 3. **Code Defaults** (`src/config/config.defaults.ts`)
 
@@ -397,7 +397,7 @@ Configuration is validated at two levels:
 
 **Command-Level Validation:**
 
-- Business requirements: e.g., finalize needs expectedMonthlyPaycheck set
+- Business requirements: e.g., analyze needs expectedMonthlyPaycheck set
 - Command-specific fields: e.g., categorize needs ANTHROPIC_API_KEY
 - Runtime validation: Fails when command runs with helpful error messages
 - Actionable errors: Shows exactly what to add and where
@@ -414,7 +414,7 @@ If validation fails, you'll see:
 ### Minimal Configuration
 
 ```yaml
-# budgeting-toolkit.config.yaml (minimal)
+# config.yaml (minimal)
 expectedMonthlyPaycheck: 5000.00
 validDestinationAccounts:
     - '1'
@@ -428,7 +428,7 @@ firefly:
 ### Advanced Configuration
 
 ```yaml
-# budgeting-toolkit.config.yaml (advanced)
+# config.yaml (advanced)
 expectedMonthlyPaycheck: 5500.00
 
 validDestinationAccounts:
@@ -493,7 +493,7 @@ llm:
 
 **Solutions:**
 
-1. Verify file is named `budgeting-toolkit.config.yaml` exactly
+1. Verify file is named `config.yaml` exactly
 2. Check file is in project root directory
 3. Verify YAML syntax is valid (use YAML linter)
 4. Restart application after changes

@@ -1,9 +1,9 @@
-import { FinalizeBudgetCommand } from '../../src/commands/finalize-budget.command.js';
+import { AnalyzeCommand } from '../../src/commands/analyze.command.js';
 import { AdditionalIncomeService } from '../../src/services/additional-income.service.js';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
-import { FinalizeBudgetDisplayService } from '../../src/services/display/finalize-budget-display.service.js';
+import { AnalyzeDisplayService } from '../../src/services/display/analyze-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 import { Result } from '../../src/types/result.type.js';
@@ -13,16 +13,16 @@ import { TransactionAnalysisError } from '../../src/types/error/transaction-anal
 jest.mock('../../src/services/additional-income.service');
 jest.mock('../../src/services/unbudgeted-expense.service');
 jest.mock('../../src/services/core/transaction-classification.service');
-jest.mock('../../src/services/display/finalize-budget-display.service');
+jest.mock('../../src/services/display/analyze-display.service');
 jest.mock('../../src/services/paycheck-surplus.service');
 
-describe('FinalizeBudgetCommand', () => {
-    let command: FinalizeBudgetCommand;
+describe('AnalyzeCommand', () => {
+    let command: AnalyzeCommand;
     let additionalIncomeService: jest.Mocked<AdditionalIncomeService>;
     let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
     let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let paycheckSurplusService: jest.Mocked<PaycheckSurplusService>;
-    let finalizeBudgetDisplayService: jest.Mocked<FinalizeBudgetDisplayService>;
+    let finalizeBudgetDisplayService: jest.Mocked<AnalyzeDisplayService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
     let consoleErrorSpy: jest.Spied<typeof console.error>;
 
@@ -71,10 +71,10 @@ describe('FinalizeBudgetCommand', () => {
             formatAdditionalIncomeSection: jest.fn().mockReturnValue('Mock Additional Income'),
             formatUnbudgetedExpensesSection: jest.fn().mockReturnValue('Mock Unbudgeted Expenses'),
             formatSummary: jest.fn().mockReturnValue('Mock Summary'),
-        } as unknown as jest.Mocked<FinalizeBudgetDisplayService>;
+        } as unknown as jest.Mocked<AnalyzeDisplayService>;
 
         // Create command instance
-        command = new FinalizeBudgetCommand(
+        command = new AnalyzeCommand(
             additionalIncomeService,
             unbudgetedExpenseService,
             transactionClassificationService,

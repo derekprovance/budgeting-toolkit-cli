@@ -17,7 +17,7 @@ export interface TransactionCounts {
 /**
  * Service for formatting and displaying finalize budget information
  */
-export class FinalizeBudgetDisplayService {
+export class AnalyzeDisplayService {
     private readonly transactionUtils: TransactionUtils;
 
     constructor(

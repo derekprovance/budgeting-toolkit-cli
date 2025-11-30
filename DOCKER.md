@@ -245,7 +245,7 @@ docker compose down -v
 docker compose up -d
 ```
 
-### Update budgeting-toolkit.config.yaml
+### Update config.yaml
 
 Match configuration to your test data:
 

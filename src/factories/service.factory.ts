@@ -18,7 +18,7 @@ import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
 import { ConfigManager } from '../config/config-manager.js';
 import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
-import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service.js';
+import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { BillService } from '../services/core/bill.service.js';
@@ -69,7 +69,7 @@ export class ServiceFactory {
         const baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
         );
-        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(
+        const finalizeBudgetDisplayService = new AnalyzeDisplayService(
             baseTransactionDisplayService
         );
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);

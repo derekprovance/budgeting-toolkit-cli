@@ -3,10 +3,10 @@ import { BudgetDateParams } from '../types/interface/budget-date-params.interfac
 import { AdditionalIncomeService } from '../services/additional-income.service.js';
 import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
 import { TransactionClassificationService } from '../services/core/transaction-classification.service.js';
-import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service.js';
+import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionCounts } from '../services/display/finalize-budget-display.service.js';
+import { TransactionCounts } from '../services/display/analyze-display.service.js';
 import { CommandConfigValidator } from '../utils/command-config-validator.js';
 import { ConfigManager } from '../config/config-manager.js';
 import chalk from 'chalk';
@@ -16,13 +16,13 @@ import ora from 'ora';
  * Command for finalizing budget and displaying the finalization report
  */
 
-export class FinalizeBudgetCommand implements Command<void, BudgetDateParams> {
+export class AnalyzeCommand implements Command<void, BudgetDateParams> {
     constructor(
         private readonly additionalIncomeService: AdditionalIncomeService,
         private readonly unbudgetedExpenseService: UnbudgetedExpenseService,
         private readonly transactionClassificationService: TransactionClassificationService,
         private readonly paycheckSurplusService: PaycheckSurplusService,
-        private readonly finalizeBudgetDisplayService: FinalizeBudgetDisplayService
+        private readonly finalizeBudgetDisplayService: AnalyzeDisplayService
     ) {}
 
     /**

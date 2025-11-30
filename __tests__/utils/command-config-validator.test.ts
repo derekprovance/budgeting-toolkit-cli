@@ -126,7 +126,7 @@ describe('CommandConfigValidator', () => {
             expect(mockConsoleError).toHaveBeenCalled();
             const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
             expect(errorOutput).toContain('expectedMonthlyPaycheck is required');
-            expect(errorOutput).toContain('budgeting-toolkit.config.yaml');
+            expect(errorOutput).toContain('config.yaml');
         });
 
         it('should exit when validDestinationAccounts is empty', () => {

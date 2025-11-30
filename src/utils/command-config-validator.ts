@@ -17,7 +17,7 @@ export class CommandConfigValidator {
         if (config.transactions.expectedMonthlyPaycheck === undefined) {
             errors.push(
                 'expectedMonthlyPaycheck is required for finalize command.\n' +
-                    '  Add to budgeting-toolkit.config.yaml:\n' +
+                    '  Add to config.yaml:\n' +
                     '    expectedMonthlyPaycheck: 5000.00'
             );
         }
@@ -25,7 +25,7 @@ export class CommandConfigValidator {
         if (config.accounts.validDestinationAccounts.length === 0) {
             errors.push(
                 'validDestinationAccounts is required for finalize command.\n' +
-                    '  Add to budgeting-toolkit.config.yaml:\n' +
+                    '  Add to config.yaml:\n' +
                     '    validDestinationAccounts:\n' +
                     "      - '1'  # Your checking account ID from Firefly III"
             );
@@ -34,7 +34,7 @@ export class CommandConfigValidator {
         if (config.accounts.validExpenseAccounts.length === 0) {
             errors.push(
                 'validExpenseAccounts is required for finalize command.\n' +
-                    '  Add to budgeting-toolkit.config.yaml:\n' +
+                    '  Add to config.yaml:\n' +
                     '    validExpenseAccounts:\n' +
                     "      - '3'  # Your expense account ID from Firefly III"
             );
