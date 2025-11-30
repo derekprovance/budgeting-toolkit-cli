@@ -1,7 +1,7 @@
 import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
+import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
 
 /**
@@ -32,14 +32,14 @@ export class UserInputService {
         transaction: TransactionSplit,
         transactionId: string | undefined,
         options: TransactionUpdateOptions
-    ): Promise<UpdateTransactionMode> {
+    ): Promise<CategorizeMode> {
         if (!transaction) {
             throw new Error('Transaction cannot be null or undefined');
         }
 
         const changes = this.getChangeList(transaction, options);
         if (changes.length === 0) {
-            return UpdateTransactionMode.Skip;
+            return CategorizeMode.Skip;
         }
 
         const message = this.formatUpdateMessage(transaction, transactionId, changes);
@@ -251,18 +251,18 @@ export class UserInputService {
     private async promptUser(
         message: string,
         options: TransactionUpdateOptions
-    ): Promise<UpdateTransactionMode> {
+    ): Promise<CategorizeMode> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
             key: InquirerKey;
             name: string;
-            value: UpdateTransactionMode;
+            value: CategorizeMode;
         }> = [
             {
                 key: 'a',
                 name: 'Update all',
-                value: UpdateTransactionMode.Both,
+                value: CategorizeMode.Both,
             },
         ];
 
@@ -270,7 +270,7 @@ export class UserInputService {
             choices.push({
                 key: 'b',
                 name: 'Update only the budget',
-                value: UpdateTransactionMode.Budget,
+                value: CategorizeMode.Budget,
             });
         }
 
@@ -278,20 +278,20 @@ export class UserInputService {
             choices.push({
                 key: 'c',
                 name: 'Update only the category',
-                value: UpdateTransactionMode.Category,
+                value: CategorizeMode.Category,
             });
         }
 
         choices.push({
             key: 'e',
             name: 'Edit',
-            value: UpdateTransactionMode.Edit,
+            value: CategorizeMode.Edit,
         });
 
         choices.push({
             key: 's',
             name: 'Skip',
-            value: UpdateTransactionMode.Skip,
+            value: CategorizeMode.Skip,
         });
 
         const answer = await expand({

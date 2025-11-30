@@ -1,17 +1,17 @@
-import { UpdateTransactionsCommand } from '../../src/commands/update-transaction.command.js';
+import { CategorizeCommand } from '../../src/commands/categorize.command.js';
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
-import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
-import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum.js';
-import { UpdateTransactionDisplayService } from '../../src/services/display/update-transaction-display.service.js';
+import { CategorizeMode } from '../../src/types/enum/categorize-mode.enum.js';
+import { CategorizeStatus } from '../../src/types/enum/categorize-status.enum.js';
+import { CategorizeDisplayService } from '../../src/services/display/categorize-display.service.js';
 import { jest } from '@jest/globals';
 
 jest.mock('../../src/services/ai-transaction-update-orchestrator.service');
-jest.mock('../../src/services/display/update-transaction-display.service');
+jest.mock('../../src/services/display/categorize-display.service');
 
-describe('UpdateTransactionsCommand', () => {
-    let command: UpdateTransactionsCommand;
+describe('CategorizeCommand', () => {
+    let command: CategorizeCommand;
     let mockAIOrchestrator: jest.Mocked<AITransactionUpdateOrchestrator>;
-    let mockDisplayService: jest.Mocked<UpdateTransactionDisplayService>;
+    let mockDisplayService: jest.Mocked<CategorizeDisplayService>;
 
     beforeEach(() => {
         mockAIOrchestrator = {
@@ -23,24 +23,24 @@ describe('UpdateTransactionsCommand', () => {
             formatTagNotFound: jest.fn().mockReturnValue('Tag not found'),
             formatEmptyTag: jest.fn().mockReturnValue('Empty tag'),
             formatError: jest.fn().mockReturnValue('Error'),
-        } as unknown as jest.Mocked<UpdateTransactionDisplayService>;
+        } as unknown as jest.Mocked<CategorizeDisplayService>;
 
         jest.spyOn(
-            UpdateTransactionDisplayService.prototype,
+            CategorizeDisplayService.prototype,
             'formatProcessingHeader'
         ).mockImplementation(mockDisplayService.formatProcessingHeader);
         jest.spyOn(
-            UpdateTransactionDisplayService.prototype,
+            CategorizeDisplayService.prototype,
             'formatTagNotFound'
         ).mockImplementation(mockDisplayService.formatTagNotFound);
-        jest.spyOn(UpdateTransactionDisplayService.prototype, 'formatEmptyTag').mockImplementation(
+        jest.spyOn(CategorizeDisplayService.prototype, 'formatEmptyTag').mockImplementation(
             mockDisplayService.formatEmptyTag
         );
-        jest.spyOn(UpdateTransactionDisplayService.prototype, 'formatError').mockImplementation(
+        jest.spyOn(CategorizeDisplayService.prototype, 'formatError').mockImplementation(
             mockDisplayService.formatError
         );
 
-        command = new UpdateTransactionsCommand(mockAIOrchestrator);
+        command = new CategorizeCommand(mockAIOrchestrator);
     });
 
     afterEach(() => {
@@ -51,11 +51,11 @@ describe('UpdateTransactionsCommand', () => {
         it('should handle tag not found', async () => {
             const params = {
                 tag: 'nonexistent-tag',
-                updateMode: UpdateTransactionMode.Both,
+                updateMode: CategorizeMode.Both,
             };
 
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
-                status: UpdateTransactionStatus.NO_TAG,
+                status: CategorizeStatus.NO_TAG,
                 transactionsUpdated: 0,
             });
 
@@ -77,11 +77,11 @@ describe('UpdateTransactionsCommand', () => {
         it('should handle empty tag', async () => {
             const params = {
                 tag: 'empty-tag',
-                updateMode: UpdateTransactionMode.Both,
+                updateMode: CategorizeMode.Both,
             };
 
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
-                status: UpdateTransactionStatus.EMPTY_TAG,
+                status: CategorizeStatus.EMPTY_TAG,
                 transactionsUpdated: 0,
             });
 
@@ -103,11 +103,11 @@ describe('UpdateTransactionsCommand', () => {
         it('should handle successful updates', async () => {
             const params = {
                 tag: 'test-tag',
-                updateMode: UpdateTransactionMode.Both,
+                updateMode: CategorizeMode.Both,
             };
 
             const results = {
-                status: UpdateTransactionStatus.HAS_RESULTS,
+                status: CategorizeStatus.HAS_RESULTS,
                 transactionsUpdated: 5,
             };
 
@@ -136,12 +136,12 @@ describe('UpdateTransactionsCommand', () => {
         it('should handle dry run mode', async () => {
             const params = {
                 tag: 'test-tag',
-                updateMode: UpdateTransactionMode.Both,
+                updateMode: CategorizeMode.Both,
                 dryRun: true,
             };
 
             const results = {
-                status: UpdateTransactionStatus.HAS_RESULTS,
+                status: CategorizeStatus.HAS_RESULTS,
                 transactionsUpdated: 3,
             };
 
@@ -170,7 +170,7 @@ describe('UpdateTransactionsCommand', () => {
         it('should handle errors', async () => {
             const params = {
                 tag: 'test-tag',
-                updateMode: UpdateTransactionMode.Both,
+                updateMode: CategorizeMode.Both,
             };
 
             const error = new Error('Test error');

@@ -32,11 +32,11 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
      * @param params The month and year to perform the analysis
      */
 
-    //TODO - add verbose to command output for transactions that are expenses within the filter and additional income
     //TODO - add a calculation to determine the difference between the expenses and the additional income
     //TODO - calculate the budget surplus or deficit and add to the calculation
     //TODO - calculate the actual bill cost over the average monthly bill cost and add to calculation
     //TODO - show total of transactions with the disposable income tag somewhere in the report
+    //TODO - add verbose to command output for transactions that are expenses within the filter and additional income
     //TODO - reformat the command output to something that's more readable and pleasing
     async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
         const spinner = ora(`Analyzing ${month}-${year}...`).start();
@@ -48,7 +48,6 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
         console.log(this.analyzeDisplayService.formatHeader('Budget Finalization Report'));
 
         try {
-            // Fetch all data in parallel using Result pattern
             const [additionalIncomeResult, unbudgetedExpenseResult, paycheckSurplusResult] =
                 await Promise.all([
                     this.additionalIncomeService.calculateAdditionalIncome(month, year),
@@ -121,6 +120,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
         }
     }
 
+    //TODO - assess if function still needed in refactor
     private getTransactionCounts(transactions: TransactionSplit[]): TransactionCounts {
         let bills = 0;
         let transfers = 0;

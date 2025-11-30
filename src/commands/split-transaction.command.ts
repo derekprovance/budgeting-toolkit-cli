@@ -22,6 +22,7 @@ interface SplitTransactionParams {
 export class SplitTransactionCommand implements Command<void, SplitTransactionParams> {
     /** Default currency symbol if transaction doesn't specify one */
     private static readonly DEFAULT_CURRENCY_SYMBOL = '$';
+    private readonly SPLIT_CMD_FAIL = 'Failed to split transaction';
 
     constructor(
         private readonly splitService: TransactionSplitService,
@@ -158,13 +159,13 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
                     )
                 );
             } else {
-                spinner.fail('Failed to split transaction');
+                spinner.fail(this.SPLIT_CMD_FAIL);
                 if (result.error) {
                     console.log(this.displayService.formatError(result.error));
                 }
             }
         } catch (error) {
-            spinner.fail('Failed to split transaction');
+            spinner.fail(this.SPLIT_CMD_FAIL);
             const errorObject = error instanceof Error ? error : new Error('Unknown error');
 
             // Diagnostic logging for troubleshooting
@@ -174,7 +175,7 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
                     stack: errorObject.stack,
                     transactionId,
                 },
-                'Split transaction command failed'
+                this.SPLIT_CMD_FAIL
             );
 
             // User-facing output

@@ -1,7 +1,7 @@
-import { UpdateTransactionStatus } from '../enum/update-transaction-status.enum.js';
+import { CategorizeStatus } from '../enum/categorize-status.enum.js';
 
 export interface UpdateTransactionStatusDto {
-    status: UpdateTransactionStatus;
+    status: CategorizeStatus;
     transactionsUpdated: number;
     transactionErrors?: number;
     error?: string;

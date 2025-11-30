@@ -5,14 +5,14 @@ import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
 import { ConfigManager } from './config/config-manager.js';
 import { AnalyzeCommand } from './commands/analyze.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
-import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
+import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
 import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
     UpdateTransactionOptions,
 } from './types/interface/command-options.interface.js';
-import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum.js';
+import { CategorizeMode } from './types/enum/categorize-mode.enum.js';
 import { CommandConfigValidator } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
 import { readFileSync } from 'fs';
@@ -219,10 +219,10 @@ Examples:
                         opts.dryRun
                     );
 
-                const command = new UpdateTransactionsCommand(aiTransactionUpdateOrchestrator);
+                const command = new CategorizeCommand(aiTransactionUpdateOrchestrator);
                 await command.execute({
                     tag,
-                    updateMode: opts.mode as UpdateTransactionMode,
+                    updateMode: opts.mode as CategorizeMode,
                     dryRun: opts.dryRun,
                 });
             } catch (error) {

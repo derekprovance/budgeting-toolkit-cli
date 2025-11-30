@@ -42,20 +42,20 @@ const createChalkMock = () => {
 
 jest.mock('chalk', () => createChalkMock());
 
-import { UpdateTransactionDisplayService } from '../../../src/services/display/update-transaction-display.service.js';
-import { UpdateTransactionMode } from '../../../src/types/enum/update-transaction-mode.enum.js';
+import { CategorizeDisplayService } from '../../../src/services/display/categorize-display.service.js';
+import { CategorizeMode } from '../../../src/types/enum/categorize-mode.enum.js';
 import { jest } from '@jest/globals';
 
-describe('UpdateTransactionDisplayService', () => {
-    let service: UpdateTransactionDisplayService;
+describe('CategorizeDisplayService', () => {
+    let service: CategorizeDisplayService;
 
     beforeEach(() => {
-        service = new UpdateTransactionDisplayService();
+        service = new CategorizeDisplayService();
     });
 
     describe('formatProcessingHeader', () => {
         it('should format the processing header correctly', () => {
-            const result = service.formatProcessingHeader('test-tag', UpdateTransactionMode.Both);
+            const result = service.formatProcessingHeader('test-tag', CategorizeMode.Both);
             expect(result).toContain(
                 'Processing transactions with tag "test-tag" for categories and budgets'
             );
