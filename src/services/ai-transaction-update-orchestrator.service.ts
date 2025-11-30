@@ -15,7 +15,7 @@ import {
     LLMTransactionProcessingService,
 } from './ai/llm-transaction-processing.service.js';
 import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
-import { UpdateTransactionStatusDto } from '../types/dto/update-transaction-status.dto.js';
+import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 import { CategorizeStatus } from '../types/enum/categorize-status.enum.js';
 import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { TransactionValidatorService } from './core/transaction-validator.service.js';
@@ -43,7 +43,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         tag: string,
         updateMode: CategorizeMode,
         dryRun?: boolean
-    ): Promise<UpdateTransactionStatusDto> {
+    ): Promise<CategorizeStatusDto> {
         try {
             if (!(await this.transactionService.tagExists(tag))) {
                 logger.debug(

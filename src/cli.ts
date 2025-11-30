@@ -10,7 +10,7 @@ import { SplitTransactionCommand } from './commands/split-transaction.command.js
 import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
-    UpdateTransactionOptions,
+    CategorizeOptions,
 } from './types/interface/command-options.interface.js';
 import { CategorizeMode } from './types/enum/categorize-mode.enum.js';
 import { CommandConfigValidator } from './utils/command-config-validator.js';
@@ -127,7 +127,7 @@ Examples:
                     verbose: program?.opts().verbose || false,
                 });
             } catch (error) {
-                handleError(error, 'finalizing budget');
+                handleError(error, 'analyzing budget');
             }
         });
 
@@ -199,7 +199,7 @@ Examples:
   $ budgeting-toolkit categorize Import-2025-06-23 -n           # preview changes only
   $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only`
         )
-        .action(async (tag: string, opts: UpdateTransactionOptions) => {
+        .action(async (tag: string, opts: CategorizeOptions) => {
             if (!tag || tag.trim() === '') {
                 console.error('❌ Error: Tag parameter is required and cannot be empty');
                 console.log('\nUsage: budgeting-toolkit categorize <tag> [options]');

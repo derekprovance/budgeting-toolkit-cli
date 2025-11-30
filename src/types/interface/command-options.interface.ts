@@ -5,7 +5,7 @@ export interface BudgetDateOptions {
     year?: number;
 }
 
-export interface UpdateTransactionOptions {
+export interface CategorizeOptions {
     tag: string;
     mode: CategorizeMode;
     includeClassified?: boolean;

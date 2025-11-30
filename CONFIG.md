@@ -176,7 +176,7 @@ excludedAdditionalIncomePatterns:
 
 #### excludeDisposableIncome
 
-Whether to exclude transactions tagged as disposable income from finalization reports.
+Whether to exclude transactions tagged as disposable income from budget analysis reports.
 
 ```yaml
 excludeDisposableIncome: true
