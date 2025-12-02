@@ -529,8 +529,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
-                [mockCategory.name],
-                [mockBudget.attributes.name]
+                [mockCategory.name, '(no category)'],
+                [mockBudget.attributes.name, '(no budget)']
             );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
@@ -599,8 +599,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
-                [mockCategory.name],
-                [mockBudget.attributes.name]
+                [mockCategory.name, '(no category)'],
+                [mockBudget.attributes.name, '(no budget)']
             );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,

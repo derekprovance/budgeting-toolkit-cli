@@ -186,7 +186,14 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         budgets?: BudgetRead[]
     ): Promise<AIResponse> {
         const categoryNames = categories?.map(c => c.name);
+        if (categoryNames) {
+            categoryNames.push('(no category)');
+        }
+
         const budgetNames = budgets?.map(b => b.attributes.name);
+        if (budgetNames) {
+            budgetNames.push('(no budget)');
+        }
 
         logger.debug(
             {
