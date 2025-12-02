@@ -32,12 +32,12 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
      * @param params The month and year to perform the analysis
      */
 
+    //TODO(DEREK) - show total of transactions with the disposable income tag somewhere in the report
+    //TODO(DEREK) - calculate the budget surplus or deficit and add to the calculation
+    //TODO(DEREK) - calculate the actual bill cost over the average monthly bill cost and add to calculation
     //TODO - add a calculation to determine the difference between the expenses and the additional income
-    //TODO - calculate the budget surplus or deficit and add to the calculation
-    //TODO - calculate the actual bill cost over the average monthly bill cost and add to calculation
-    //TODO - show total of transactions with the disposable income tag somewhere in the report
     //TODO - add verbose to command output for transactions that are expenses within the filter and additional income
-    //TODO - reformat the command output to something that's more readable and pleasing
+    //TODO(ai) - reformat the command output to something that's more readable and pleasing
     async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
         const spinner = ora(`Analyzing ${month}-${year}...`).start();
 

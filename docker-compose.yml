@@ -94,8 +94,6 @@ services:
                 condition: service_healthy
         environment:
             - FIREFLY_III_URL=http://firefly:8080
-            - VANITY_URL=http://localhost:8080
-            - FIREFLY_III_ACCESS_TOKEN=${FIREFLY_API_TOKEN:-}
             - TRUSTED_PROXIES=**
             - EXPECT_SECURE_URL=false
             - APP_ENV=local
