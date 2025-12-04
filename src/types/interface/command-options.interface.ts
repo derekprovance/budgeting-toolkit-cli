@@ -3,6 +3,7 @@ import { CategorizeMode } from '../enum/categorize-mode.enum.js';
 export interface BudgetDateOptions {
     month?: number;
     year?: number;
+    skipPaycheck?: boolean;
 }
 
 export interface CategorizeOptions {

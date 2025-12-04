@@ -5,11 +5,7 @@ export class CategorizeDisplayService {
     /**
      * Formats the processing header
      */
-    formatProcessingHeader(
-        tag: string,
-        updateMode: CategorizeMode,
-        dryRun?: boolean
-    ): string {
+    formatProcessingHeader(tag: string, updateMode: CategorizeMode, dryRun?: boolean): string {
         const modeText =
             updateMode === CategorizeMode.Both
                 ? 'categories and budgets'

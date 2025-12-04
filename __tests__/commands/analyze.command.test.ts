@@ -3,7 +3,10 @@ import { AdditionalIncomeService } from '../../src/services/additional-income.se
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
 import { DisposableIncomeService } from '../../src/services/disposable-income.service.js';
-import { BudgetSurplusService, BudgetSurplusResult } from '../../src/services/budget-surplus.service.js';
+import {
+    BudgetSurplusService,
+    BudgetSurplusResult,
+} from '../../src/services/budget-surplus.service.js';
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { AnalyzeDisplayService } from '../../src/services/display/analyze-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';

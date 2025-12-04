@@ -11,7 +11,7 @@ import ora from 'ora';
  * Command for displaying budget report
  */
 export class BudgetReportCommand implements Command<void, BudgetDateParams> {
-    private readonly BUDGET_GEN_FAIL = "Failed to generate budget report";
+    private readonly BUDGET_GEN_FAIL = 'Failed to generate budget report';
 
     constructor(
         private readonly budgetReportService: BudgetReportService,

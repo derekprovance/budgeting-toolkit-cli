@@ -71,9 +71,7 @@ export class ServiceFactory {
         const baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
         );
-        const analyzeDisplayService = new AnalyzeDisplayService(
-            baseTransactionDisplayService
-        );
+        const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url

@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { BaseTransactionDisplayService } from './base-transaction-display.service.js';
+import { TransactionClassificationService } from '../core/transaction-classification.service.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
@@ -9,7 +9,7 @@ import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
  * Service for formatting and displaying comprehensive budget analysis information
  */
 export class AnalyzeDisplayService {
-    constructor(private baseTransactionDisplayService: BaseTransactionDisplayService) {}
+    constructor(private transactionClassificationService: TransactionClassificationService) {}
 
     /**
      * Formats the complete analysis report with all sections
@@ -20,7 +20,7 @@ export class AnalyzeDisplayService {
             this.formatMonthHeader(data.month, data.year),
             this.formatIncomeSection(data, verbose),
             this.formatExpensesSection(data, verbose),
-            ...(data.skipPaycheck ? [] : [this.formatPaycheckSection(data, verbose)]),
+            ...(data.skipPaycheck ? [] : [this.formatPaycheckSection(data)]),
             this.formatSummarySection(data),
             this.formatRecommendations(data),
         ];
@@ -156,7 +156,7 @@ export class AnalyzeDisplayService {
     /**
      * Formats the paycheck analysis section
      */
-    private formatPaycheckSection(data: AnalyzeReportDto, verbose: boolean): string {
+    private formatPaycheckSection(data: AnalyzeReportDto): string {
         const lines = ['', this.formatSectionHeader('PAYCHECK ANALYSIS'), ''];
 
         // Use actual values from DTO
@@ -348,15 +348,11 @@ export class AnalyzeDisplayService {
      * Gets transaction type label for display
      */
     private getTransactionTypeLabel(transaction: TransactionSplit): string {
-        // Access the classification service through baseTransactionDisplayService
-        const classificationService = (this.baseTransactionDisplayService as any)
-            .transactionClassificationService;
-
-        if (classificationService.isBill(transaction)) {
+        if (this.transactionClassificationService.isBill(transaction)) {
             return chalk.dim('[BILL]');
-        } else if (classificationService.isTransfer(transaction)) {
+        } else if (this.transactionClassificationService.isTransfer(transaction)) {
             return chalk.dim('[TRANSFER]');
-        } else if (classificationService.isDeposit(transaction)) {
+        } else if (this.transactionClassificationService.isDeposit(transaction)) {
             return chalk.dim('[DEPOSIT]');
         }
         return chalk.dim('[OTHER]');
@@ -414,7 +410,6 @@ export class AnalyzeDisplayService {
             return chalk.red(`${sign}${absFormatted} ⚠`);
         }
     }
-
 
     /**
      * Gets appropriate status icon based on amount

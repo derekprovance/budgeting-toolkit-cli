@@ -69,7 +69,9 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<numb
      * @returns Array of disposable income transactions
      */
     private findDisposableIncome(transactions: TransactionSplit[]): TransactionSplit[] {
-        return transactions.filter(t => this.transactionClassificationService.isDisposableIncome(t));
+        return transactions.filter(t =>
+            this.transactionClassificationService.isDisposableIncome(t)
+        );
     }
 
     /**

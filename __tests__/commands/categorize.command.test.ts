@@ -25,14 +25,12 @@ describe('CategorizeCommand', () => {
             formatError: jest.fn().mockReturnValue('Error'),
         } as unknown as jest.Mocked<CategorizeDisplayService>;
 
-        jest.spyOn(
-            CategorizeDisplayService.prototype,
-            'formatProcessingHeader'
-        ).mockImplementation(mockDisplayService.formatProcessingHeader);
-        jest.spyOn(
-            CategorizeDisplayService.prototype,
-            'formatTagNotFound'
-        ).mockImplementation(mockDisplayService.formatTagNotFound);
+        jest.spyOn(CategorizeDisplayService.prototype, 'formatProcessingHeader').mockImplementation(
+            mockDisplayService.formatProcessingHeader
+        );
+        jest.spyOn(CategorizeDisplayService.prototype, 'formatTagNotFound').mockImplementation(
+            mockDisplayService.formatTagNotFound
+        );
         jest.spyOn(CategorizeDisplayService.prototype, 'formatEmptyTag').mockImplementation(
             mockDisplayService.formatEmptyTag
         );

@@ -126,7 +126,11 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             // Extract values from Result types
             const additionalIncome = additionalIncomeResult.value;
             const unbudgetedExpenses = unbudgetedExpenseResult.value;
-            const paycheckSurplus = paycheckSurplusResult.value;
+            const paycheckSurplus = skipPaycheck
+                ? 0
+                : paycheckSurplusResult.ok
+                  ? paycheckSurplusResult.value
+                  : 0; // Fallback (should never reach due to error handling above)
             const disposableIncome = disposableIncomeResult.value;
             const budgetResult = budgetSurplusResult.value;
             const billComparison = billComparisonResult.value;
@@ -160,7 +164,9 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             );
 
             // Display the comprehensive report
-            console.log(this.analyzeDisplayService.formatAnalysisReport(reportData, verbose || false));
+            console.log(
+                this.analyzeDisplayService.formatAnalysisReport(reportData, verbose || false)
+            );
         } catch (error) {
             spinner.fail(this.BUDGET_FAIL_MSG);
             throw error;

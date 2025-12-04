@@ -79,12 +79,13 @@ export class AnalyzeReportDto {
         // Negative factors: bill overspend, unbudgeted expenses, disposable income
         // Note: Bill variance is subtracted (positive variance = overspent = reduces position)
         // When variance is negative (underspent), subtracting it increases net position
-        const netImpact = additionalIncomeTotal
-                        + budgetSurplus
-                        + (skipPaycheck ? 0 : paycheckSurplus)  // Conditional paycheck
-                        - billComparison.variance  // Positive reduces, negative increases
-                        - unbudgetedExpenseTotal
-                        - disposableIncome;
+        const netImpact =
+            additionalIncomeTotal +
+            budgetSurplus +
+            (skipPaycheck ? 0 : paycheckSurplus) - // Conditional paycheck
+            billComparison.variance - // Positive reduces, negative increases
+            unbudgetedExpenseTotal -
+            disposableIncome;
 
         // Extract currency from bill comparison (or use defaults)
         const currencySymbol = billComparison.currencySymbol || '$';
