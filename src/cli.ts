@@ -117,8 +117,10 @@ Examples:
                 const command = new AnalyzeCommand(
                     services.additionalIncomeService,
                     services.unbudgetedExpenseService,
-                    services.transactionClassificationService,
                     services.paycheckSurplusService,
+                    services.disposableIncomeService,
+                    services.budgetSurplusService,
+                    services.billComparisonService,
                     services.analyzeDisplayService
                 );
                 await command.execute({

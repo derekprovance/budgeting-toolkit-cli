@@ -7,6 +7,12 @@ export class BillComparisonDto implements BillComparison {
     constructor(
         public predictedMonthlyAverage: number,
         public actualMonthlyTotal: number,
+        /**
+         * Variance between actual and predicted bill amounts.
+         * Positive: spent MORE than predicted (over budget)
+         * Negative: spent LESS than predicted (under budget)
+         * Formula: actualMonthlyTotal - predictedMonthlyAverage
+         */
         public variance: number,
         public bills: BillDetail[],
         public currencyCode: string,

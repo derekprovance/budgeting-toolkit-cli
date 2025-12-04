@@ -24,6 +24,8 @@ import { SplitTransactionDisplayService } from '../services/display/split-transa
 import { BillService } from '../services/core/bill.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionSplitService } from '../services/transaction-split.service.js';
+import { DisposableIncomeService } from '../services/disposable-income.service.js';
+import { BudgetSurplusService } from '../services/budget-surplus.service.js';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
@@ -79,6 +81,11 @@ export class ServiceFactory {
         const billService = new BillService(apiClient);
         const billComparisonService = new BillComparisonService(billService, transactionService);
         const transactionSplitService = new TransactionSplitService(apiClient);
+        const disposableIncomeService = new DisposableIncomeService(
+            transactionService,
+            transactionClassificationService
+        );
+        const budgetSurplusService = new BudgetSurplusService(budgetService);
 
         return {
             transactionService,
@@ -99,6 +106,8 @@ export class ServiceFactory {
             billService,
             billComparisonService,
             transactionSplitService,
+            disposableIncomeService,
+            budgetSurplusService,
         };
     }
 

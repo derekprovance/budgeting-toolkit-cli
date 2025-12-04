@@ -1,27 +1,36 @@
 import { AnalyzeCommand } from '../../src/commands/analyze.command.js';
 import { AdditionalIncomeService } from '../../src/services/additional-income.service.js';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
-import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
+import { DisposableIncomeService } from '../../src/services/disposable-income.service.js';
+import { BudgetSurplusService, BudgetSurplusResult } from '../../src/services/budget-surplus.service.js';
+import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { AnalyzeDisplayService } from '../../src/services/display/analyze-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
 import { Result } from '../../src/types/result.type.js';
 import { TransactionAnalysisError } from '../../src/types/error/transaction-analysis.error.js';
+import { BudgetError } from '../../src/types/error/budget.error.js';
+import { BillError } from '../../src/types/error/bill.error.js';
 
 // Mock services
 jest.mock('../../src/services/additional-income.service');
 jest.mock('../../src/services/unbudgeted-expense.service');
-jest.mock('../../src/services/core/transaction-classification.service');
 jest.mock('../../src/services/display/analyze-display.service');
 jest.mock('../../src/services/paycheck-surplus.service');
+jest.mock('../../src/services/disposable-income.service');
+jest.mock('../../src/services/budget-surplus.service');
+jest.mock('../../src/services/bill-comparison.service');
 
 describe('AnalyzeCommand', () => {
     let command: AnalyzeCommand;
     let additionalIncomeService: jest.Mocked<AdditionalIncomeService>;
     let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
-    let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
     let paycheckSurplusService: jest.Mocked<PaycheckSurplusService>;
+    let disposableIncomeService: jest.Mocked<DisposableIncomeService>;
+    let budgetSurplusService: jest.Mocked<BudgetSurplusService>;
+    let billComparisonService: jest.Mocked<BillComparisonService>;
     let analyzeDisplayService: jest.Mocked<AnalyzeDisplayService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
     let consoleErrorSpy: jest.Spied<typeof console.error>;
@@ -51,34 +60,57 @@ describe('AnalyzeCommand', () => {
                 .mockResolvedValue({ ok: true, value: [mockTransaction] }),
         } as unknown as jest.Mocked<UnbudgetedExpenseService>;
 
-        transactionClassificationService = {
-            isBill: jest.fn<(transaction: TransactionSplit) => boolean>().mockReturnValue(false),
-            isTransfer: jest
-                .fn<(transaction: TransactionSplit) => boolean>()
-                .mockReturnValue(false),
-            isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>().mockReturnValue(false),
-        } as unknown as jest.Mocked<TransactionClassificationService>;
-
         paycheckSurplusService = {
             calculatePaycheckSurplus: jest
                 .fn<() => Promise<Result<number, TransactionAnalysisError>>>()
                 .mockResolvedValue({ ok: true, value: 500.0 }),
         } as unknown as jest.Mocked<PaycheckSurplusService>;
 
+        disposableIncomeService = {
+            calculateDisposableIncome: jest
+                .fn<() => Promise<Result<number, TransactionAnalysisError>>>()
+                .mockResolvedValue({ ok: true, value: 150.0 }),
+        } as unknown as jest.Mocked<DisposableIncomeService>;
+
+        const mockBudgetSurplusResult: BudgetSurplusResult = {
+            totalAllocated: 1840,
+            totalSpent: 1794.94,
+            surplus: 45.06,
+        };
+
+        budgetSurplusService = {
+            calculateBudgetSurplus: jest
+                .fn<() => Promise<Result<BudgetSurplusResult, BudgetError>>>()
+                .mockResolvedValue({ ok: true, value: mockBudgetSurplusResult }),
+        } as unknown as jest.Mocked<BudgetSurplusService>;
+
+        const mockBillComparison: BillComparisonDto = {
+            predictedMonthlyAverage: 1200,
+            actualMonthlyTotal: 1250,
+            variance: 50,
+            bills: [],
+            currencyCode: 'USD',
+            currencySymbol: '$',
+        };
+
+        billComparisonService = {
+            calculateBillComparison: jest
+                .fn<() => Promise<Result<BillComparisonDto, BillError>>>()
+                .mockResolvedValue({ ok: true, value: mockBillComparison }),
+        } as unknown as jest.Mocked<BillComparisonService>;
+
         analyzeDisplayService = {
-            formatHeader: jest.fn().mockReturnValue('Mock Header'),
-            formatMonthHeader: jest.fn().mockReturnValue('Mock Month Header'),
-            formatAdditionalIncomeSection: jest.fn().mockReturnValue('Mock Additional Income'),
-            formatUnbudgetedExpensesSection: jest.fn().mockReturnValue('Mock Unbudgeted Expenses'),
-            formatSummary: jest.fn().mockReturnValue('Mock Summary'),
+            formatAnalysisReport: jest.fn().mockReturnValue('Mock Analysis Report'),
         } as unknown as jest.Mocked<AnalyzeDisplayService>;
 
         // Create command instance
         command = new AnalyzeCommand(
             additionalIncomeService,
             unbudgetedExpenseService,
-            transactionClassificationService,
             paycheckSurplusService,
+            disposableIncomeService,
+            budgetSurplusService,
+            billComparisonService,
             analyzeDisplayService
         );
 
@@ -102,6 +134,9 @@ describe('AnalyzeCommand', () => {
                 2024
             );
             expect(paycheckSurplusService.calculatePaycheckSurplus).toHaveBeenCalledWith(5, 2024);
+            expect(disposableIncomeService.calculateDisposableIncome).toHaveBeenCalledWith(5, 2024);
+            expect(budgetSurplusService.calculateBudgetSurplus).toHaveBeenCalledWith(5, 2024);
+            expect(billComparisonService.calculateBillComparison).toHaveBeenCalledWith(5, 2024);
             expect(consoleLogSpy).toHaveBeenCalled();
             expect(consoleErrorSpy).not.toHaveBeenCalled();
         });
@@ -119,6 +154,31 @@ describe('AnalyzeCommand', () => {
                 ok: true,
                 value: 0,
             });
+            disposableIncomeService.calculateDisposableIncome.mockResolvedValueOnce({
+                ok: true,
+                value: 0,
+            });
+            const emptyBudgetSurplusResult: BudgetSurplusResult = {
+                totalAllocated: 0,
+                totalSpent: 0,
+                surplus: 0,
+            };
+            budgetSurplusService.calculateBudgetSurplus.mockResolvedValueOnce({
+                ok: true,
+                value: emptyBudgetSurplusResult,
+            });
+            const emptyBillComparison: BillComparisonDto = {
+                predictedMonthlyAverage: 0,
+                actualMonthlyTotal: 0,
+                variance: 0,
+                bills: [],
+                currencyCode: 'USD',
+                currencySymbol: '$',
+            };
+            billComparisonService.calculateBillComparison.mockResolvedValueOnce({
+                ok: true,
+                value: emptyBillComparison,
+            });
 
             await command.execute({ month: 5, year: 2024 });
 
@@ -128,6 +188,9 @@ describe('AnalyzeCommand', () => {
                 2024
             );
             expect(paycheckSurplusService.calculatePaycheckSurplus).toHaveBeenCalledWith(5, 2024);
+            expect(disposableIncomeService.calculateDisposableIncome).toHaveBeenCalledWith(5, 2024);
+            expect(budgetSurplusService.calculateBudgetSurplus).toHaveBeenCalledWith(5, 2024);
+            expect(billComparisonService.calculateBillComparison).toHaveBeenCalledWith(5, 2024);
             expect(consoleLogSpy).toHaveBeenCalled();
             expect(consoleErrorSpy).not.toHaveBeenCalled();
         });
