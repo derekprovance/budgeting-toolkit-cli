@@ -1,13 +1,14 @@
-import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum.js';
+import { CategorizeMode } from '../enum/categorize-mode.enum.js';
 
 export interface BudgetDateOptions {
     month?: number;
     year?: number;
+    skipPaycheck?: boolean;
 }
 
-export interface UpdateTransactionOptions {
+export interface CategorizeOptions {
     tag: string;
-    mode: UpdateTransactionMode;
+    mode: CategorizeMode;
     includeClassified?: boolean;
     yes?: boolean;
     dryRun?: boolean;

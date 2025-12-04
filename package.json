@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "6.2.4",
+    "version": "7.0.0",
     "type": "module",
     "main": "./dist/index.js",
     "exports": {
@@ -23,15 +23,15 @@
         "node": "24.x"
     },
     "dependencies": {
-        "@anthropic-ai/sdk": "^0.70.1",
-        "@derekprovance/firefly-iii-sdk": "6.4.4",
+        "@anthropic-ai/sdk": "^0.71.0",
+        "@derekprovance/firefly-iii-sdk": "6.4.8",
         "@inquirer/prompts": "^8.0.1",
         "axios": "^1.13.2",
         "chalk": "^5.x.x",
         "commander": "^14.0.2",
         "dotenv": "^17.2.3",
         "js-yaml": "^4.1.1",
-        "ora": "^8.2.0",
+        "ora": "^9.0.0",
         "pino": "^10.1.0"
     },
     "devDependencies": {
@@ -44,10 +44,10 @@
         "globals": "^16.5.0",
         "jest": "^30.2.0",
         "jiti": "^2.6.1",
-        "prettier": "^3.6.2",
+        "prettier": "^3.7.3",
         "ts-jest": "^29.4.5",
-        "tsx": "^4.20.6",
+        "tsx": "^4.21.0",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.47.0"
+        "typescript-eslint": "^8.48.0"
     }
 }

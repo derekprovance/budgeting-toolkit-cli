@@ -3,16 +3,16 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
 import { ConfigManager } from './config/config-manager.js';
-import { FinalizeBudgetCommand } from './commands/finalize-budget.command.js';
+import { AnalyzeCommand } from './commands/analyze.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
-import { UpdateTransactionsCommand } from './commands/update-transaction.command.js';
+import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
 import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
-    UpdateTransactionOptions,
+    CategorizeOptions,
 } from './types/interface/command-options.interface.js';
-import { UpdateTransactionMode } from './types/enum/update-transaction-mode.enum.js';
+import { CategorizeMode } from './types/enum/categorize-mode.enum.js';
 import { CommandConfigValidator } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
 import { readFileSync } from 'fs';
@@ -90,9 +90,9 @@ export const createCli = (): Command => {
         .option('-v, --verbose', 'enable verbose logging');
 
     program
-        .command('finalize')
-        .alias('fin')
-        .description('Calculate budget finalization report with surplus/deficit analysis')
+        .command('analyze')
+        .alias('an')
+        .description('Budget analysis with surplus/deficit variance')
         .addOption(
             new Option('-m, --month <month>', 'target month (1-12)')
                 .argParser(validateMonth)
@@ -103,30 +103,41 @@ export const createCli = (): Command => {
                 .argParser(validateYear)
                 .default(getCurrentYear(), 'current year')
         )
+        .addOption(
+            new Option(
+                '--skip-paycheck',
+                'Skip paycheck analysis and variance calculations'
+            ).default(false)
+        )
         .addHelpText(
             'after',
             `
 Examples:
-  $ budgeting-toolkit finalize                   # current month
-  $ budgeting-toolkit finalize -m 6              # June, current year
-  $ budgeting-toolkit finalize -m 12 -y 2024     # December 2024
-  $ budgeting-toolkit fin -m 3                   # March (using alias)`
+  $ budgeting-toolkit analyze                   # current month
+  $ budgeting-toolkit analyze -m 6              # June, current year
+  $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
+  $ budgeting-toolkit an -m 3                   # March (using alias)
+  $ budgeting-toolkit an --skip-paycheck        # Skip paycheck analysis`
         )
         .action(async (opts: BudgetDateOptions) => {
             try {
-                const command = new FinalizeBudgetCommand(
+                const command = new AnalyzeCommand(
                     services.additionalIncomeService,
                     services.unbudgetedExpenseService,
-                    services.transactionClassificationService,
                     services.paycheckSurplusService,
-                    services.finalizeBudgetDisplayService
+                    services.disposableIncomeService,
+                    services.budgetSurplusService,
+                    services.billComparisonService,
+                    services.analyzeDisplayService
                 );
                 await command.execute({
                     month: opts.month!,
                     year: opts.year!,
+                    verbose: program?.opts().verbose || false,
+                    skipPaycheck: opts.skipPaycheck || false,
                 });
             } catch (error) {
-                handleError(error, 'finalizing budget');
+                handleError(error, 'analyzing budget');
             }
         });
 
@@ -198,7 +209,7 @@ Examples:
   $ budgeting-toolkit categorize Import-2025-06-23 -n           # preview changes only
   $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only`
         )
-        .action(async (tag: string, opts: UpdateTransactionOptions) => {
+        .action(async (tag: string, opts: CategorizeOptions) => {
             if (!tag || tag.trim() === '') {
                 console.error('❌ Error: Tag parameter is required and cannot be empty');
                 console.log('\nUsage: budgeting-toolkit categorize <tag> [options]');
@@ -218,10 +229,10 @@ Examples:
                         opts.dryRun
                     );
 
-                const command = new UpdateTransactionsCommand(aiTransactionUpdateOrchestrator);
+                const command = new CategorizeCommand(aiTransactionUpdateOrchestrator);
                 await command.execute({
                     tag,
-                    updateMode: opts.mode as UpdateTransactionMode,
+                    updateMode: opts.mode as CategorizeMode,
                     dryRun: opts.dryRun,
                 });
             } catch (error) {

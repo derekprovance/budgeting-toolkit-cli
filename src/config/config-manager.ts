@@ -49,7 +49,7 @@ interface YamlConfig {
  * Provides a unified interface for all application configuration.
  *
  * Configuration loading priority (high to low):
- * 1. YAML configuration file (budgeting-toolkit.config.yaml)
+ * 1. YAML configuration file (config.yaml)
  * 2. Environment variables (.env)
  * 3. Default values (config.defaults.ts)
  *
@@ -271,7 +271,7 @@ export class ConfigManager {
      * Loads and parses the YAML configuration file
      */
     private loadYamlFile(): YamlConfig | null {
-        const configPath = path.join(process.cwd(), 'budgeting-toolkit.config.yaml');
+        const configPath = path.join(process.cwd(), 'config.yaml');
 
         if (!fs.existsSync(configPath)) {
             console.warn(`Configuration file not found at ${configPath}, using defaults`);

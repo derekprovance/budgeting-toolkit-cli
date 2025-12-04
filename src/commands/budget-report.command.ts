@@ -11,6 +11,8 @@ import ora from 'ora';
  * Command for displaying budget report
  */
 export class BudgetReportCommand implements Command<void, BudgetDateParams> {
+    private readonly BUDGET_GEN_FAIL = 'Failed to generate budget report';
+
     constructor(
         private readonly budgetReportService: BudgetReportService,
         private readonly transactionService: TransactionService,
@@ -26,11 +28,10 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         const spinner = ora('Generating budget report...').start();
 
         try {
-            // Fetch budget report using Result pattern
             const budgetReportsResult = await this.budgetReportService.getBudgetReport(month, year);
 
             if (!budgetReportsResult.ok) {
-                spinner.fail('Failed to generate budget report');
+                spinner.fail(this.BUDGET_GEN_FAIL);
                 console.error(
                     chalk.red('Error fetching budget report:'),
                     chalk.red.bold(budgetReportsResult.error.userMessage)
@@ -109,7 +110,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 this.budgetDisplayService.listUnbudgetedTransactions(unbudgetedTransactions)
             );
 
-            // Display bill comparison using Result pattern
+            // Display bill comparison
             const billComparisonResult = await this.billComparisonService.calculateBillComparison(
                 month,
                 year
@@ -147,7 +148,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 }
             }
         } catch (error) {
-            spinner.fail('Failed to generate budget report');
+            spinner.fail(this.BUDGET_GEN_FAIL);
             throw error;
         }
     }

@@ -10,7 +10,7 @@ import { TransactionAIResultValidator } from './core/transaction-ai-result-valid
 import { UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
+import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
 import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
 
 export interface AIResults {
@@ -225,7 +225,7 @@ export class InteractiveTransactionUpdater {
 
         let currentCategory = category;
         let currentBudget = budget;
-        let action: UpdateTransactionMode;
+        let action: CategorizeMode;
 
         do {
             action = await this.userInputService.askToUpdateTransaction(
@@ -237,7 +237,7 @@ export class InteractiveTransactionUpdater {
                 }
             );
 
-            if (action === UpdateTransactionMode.Skip) {
+            if (action === CategorizeMode.Skip) {
                 logger.debug(
                     { description: transaction.description },
                     'User skipped transaction update'
@@ -245,7 +245,7 @@ export class InteractiveTransactionUpdater {
                 return Result.ok(undefined);
             }
 
-            if (action === UpdateTransactionMode.Edit) {
+            if (action === CategorizeMode.Edit) {
                 [currentCategory, currentBudget] = await this.processEditCommand(
                     transaction,
                     currentCategory,
@@ -253,7 +253,7 @@ export class InteractiveTransactionUpdater {
                     originalAISuggestion
                 );
             }
-        } while (action === UpdateTransactionMode.Edit);
+        } while (action === CategorizeMode.Edit);
 
         // Apply the final update
         const updatedTransaction = await this.applyTransactionUpdate(
@@ -329,7 +329,7 @@ export class InteractiveTransactionUpdater {
      */
     private async applyTransactionUpdate(
         transaction: TransactionSplit,
-        mode: UpdateTransactionMode,
+        mode: CategorizeMode,
         category?: CategoryProperties,
         budget?: BudgetRead
     ): Promise<TransactionRead | undefined> {
@@ -341,16 +341,16 @@ export class InteractiveTransactionUpdater {
      * Determines which parameters to update based on mode
      */
     private getUpdateParameters(
-        mode: UpdateTransactionMode,
+        mode: CategorizeMode,
         category?: CategoryProperties,
         budget?: BudgetRead
     ): { categoryName?: string; budgetId?: string } {
         switch (mode) {
-            case UpdateTransactionMode.Both:
+            case CategorizeMode.Both:
                 return { categoryName: category?.name, budgetId: budget?.id };
-            case UpdateTransactionMode.Budget:
+            case CategorizeMode.Budget:
                 return { budgetId: budget?.id };
-            case UpdateTransactionMode.Category:
+            case CategorizeMode.Category:
                 return { categoryName: category?.name };
             default:
                 return {};

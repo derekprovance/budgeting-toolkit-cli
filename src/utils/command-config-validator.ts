@@ -9,23 +9,23 @@ import { AppConfig } from '../config/config.types.js';
  */
 export class CommandConfigValidator {
     /**
-     * Validates configuration for finalize command
+     * Validates configuration for analyze command
      */
-    static validateFinalizeCommand(config: AppConfig): void {
+    static validateAnalyzeCommand(config: AppConfig): void {
         const errors: string[] = [];
 
         if (config.transactions.expectedMonthlyPaycheck === undefined) {
             errors.push(
-                'expectedMonthlyPaycheck is required for finalize command.\n' +
-                    '  Add to budgeting-toolkit.config.yaml:\n' +
+                'expectedMonthlyPaycheck is required for analyze command.\n' +
+                    '  Add to config.yaml:\n' +
                     '    expectedMonthlyPaycheck: 5000.00'
             );
         }
 
         if (config.accounts.validDestinationAccounts.length === 0) {
             errors.push(
-                'validDestinationAccounts is required for finalize command.\n' +
-                    '  Add to budgeting-toolkit.config.yaml:\n' +
+                'validDestinationAccounts is required for analyze command.\n' +
+                    '  Add to config.yaml:\n' +
                     '    validDestinationAccounts:\n' +
                     "      - '1'  # Your checking account ID from Firefly III"
             );
@@ -33,15 +33,15 @@ export class CommandConfigValidator {
 
         if (config.accounts.validExpenseAccounts.length === 0) {
             errors.push(
-                'validExpenseAccounts is required for finalize command.\n' +
-                    '  Add to budgeting-toolkit.config.yaml:\n' +
+                'validExpenseAccounts is required for analyze command.\n' +
+                    '  Add to config.yaml:\n' +
                     '    validExpenseAccounts:\n' +
                     "      - '3'  # Your expense account ID from Firefly III"
             );
         }
 
         if (errors.length > 0) {
-            console.error(chalk.red.bold('\n❌ Configuration Error: finalize command\n'));
+            console.error(chalk.red.bold('\n❌ Configuration Error: analyze command\n'));
             errors.forEach(error => console.error(chalk.red(error) + '\n'));
             console.error(chalk.yellow('See CONFIG.md for detailed configuration documentation.'));
             process.exit(1);

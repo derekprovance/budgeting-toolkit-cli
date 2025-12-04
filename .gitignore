@@ -10,7 +10,7 @@ certs/
 *.cer
 *.pem
 
-budgeting-toolkit.config.yaml
+config.yaml
 
 # Database backups
 *.sql

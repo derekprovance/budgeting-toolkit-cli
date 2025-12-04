@@ -27,7 +27,7 @@ npm install
 
 # Configure
 cp .env.example .env
-cp budgeting-toolkit.config.yaml.example budgeting-toolkit.config.yaml
+cp config.yaml.example config.yaml
 # Edit .env with your API credentials
 ```
 
@@ -59,7 +59,7 @@ Edit `.env` with your credentials:
 
 ### Optional YAML Configuration
 
-`budgeting-toolkit.config.yaml` contains application settings. **All fields are optional** with sensible defaults defined in `src/config/config.defaults.ts`.
+`config.yaml` contains application settings. **All fields are optional** with sensible defaults defined in `src/config/config.defaults.ts`.
 
 **Key defaults:**
 - LLM model: `claude-sonnet-4-5`
@@ -68,7 +68,7 @@ Edit `.env` with your credentials:
 - Disposable Income tag: `Disposable Income`
 - Bills tag: `Bills`
 
-See `budgeting-toolkit.config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) for comprehensive documentation.
+See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) for comprehensive documentation.
 
 ## Commands
 
@@ -76,7 +76,7 @@ See `budgeting-toolkit.config.yaml.example` for all available options or [CONFIG
 |---------|---------|---------|------------|
 | **`categorize <tag>`** | AI-powered transaction categorization | `./budget.sh categorize Import-2025-06-23` | `ANTHROPIC_API_KEY` |
 | `report` | Current budget status for a month | `./budget.sh report -m 8 -y 2024` | - |
-| `finalize` | Budget surplus/deficit analysis | `./budget.sh finalize -m 6 -y 2024` | `expectedMonthlyPaycheck` |
+| `variance` | Budget surplus/deficit analysis | `./budget.sh analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
 | `split <id>` | Interactive transaction splitting | `./budget.sh split 123` | - |
 
 ### Common Options

@@ -56,7 +56,7 @@ This project uses a unified configuration system managed by `ConfigManager` sing
 
 Configuration is loaded with clear precedence (high to low):
 
-1. **YAML Configuration** (`budgeting-toolkit.config.yaml`) - Highest priority
+1. **YAML Configuration** (`config.yaml`) - Highest priority
 2. **Environment Variables** (`.env`) - Overrides defaults
 3. **Code Defaults** (`src/config/config.defaults.ts`) - Lowest priority
 
@@ -69,7 +69,7 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 - Provides strongly-typed configuration access
 - Services receive configuration via dependency injection
 
-### YAML Configuration (`budgeting-toolkit.config.yaml`)
+### YAML Configuration (`config.yaml`)
 
 **Account Configuration:**
 
@@ -141,7 +141,7 @@ src/config/
 
 The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
-1. **finalize** (alias: `fin`) - Calculates budget finalization report including:
+1. **analyze** (alias: `an`) - Calculates budget finalization report including:
     - Additional income (deposits not from payroll)
     - Unbudgeted expenses (bills/expenses not in budget)
     - Paycheck surplus (actual vs expected paycheck amounts)
@@ -189,8 +189,8 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
 - `BaseTransactionDisplayService` - Base service for formatting transaction lists with type indicators
 - `BudgetDisplayService` - Formats budget reports with spending visualizations
-- `FinalizeBudgetDisplayService` - Formats finalize budget output with recommendations
-- `UpdateTransactionDisplayService` - Formats status messages for categorize command
+- `AnalyzeDisplayService` - Formats analyze budget output with recommendations
+- `CategorizeDisplayService` - Formats status messages for categorize command
 - `SplitTransactionDisplayService` - Formats split transaction previews and status messages
 
 ### Dependency Injection

@@ -1,4 +1,4 @@
-export enum UpdateTransactionStatus {
+export enum CategorizeStatus {
     NO_TAG,
     EMPTY_TAG,
     HAS_RESULTS,

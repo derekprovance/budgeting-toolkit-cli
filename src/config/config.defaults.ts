@@ -6,7 +6,7 @@ import { AppConfig } from './config.types.js';
  * This is the single source of truth for all default values.
  *
  * Precedence order:
- * 1. YAML configuration (budgeting-toolkit.config.yaml)
+ * 1. YAML configuration (config.yaml)
  * 2. Environment variables (.env)
  * 3. These defaults (lowest priority)
  */

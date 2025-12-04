@@ -1,20 +1,20 @@
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
-import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum.js';
+import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
+import { CategorizeStatus } from '../types/enum/categorize-status.enum.js';
 import { Command } from '../types/interface/command.interface.js';
-import { UpdateTransactionDisplayService } from '../services/display/update-transaction-display.service.js';
+import { CategorizeDisplayService } from '../services/display/categorize-display.service.js';
 
 interface UpdateTransactionsParams {
     tag: string;
-    updateMode: UpdateTransactionMode;
+    updateMode: CategorizeMode;
     dryRun?: boolean;
 }
 
-export class UpdateTransactionsCommand implements Command<void, UpdateTransactionsParams> {
-    private readonly displayService: UpdateTransactionDisplayService;
+export class CategorizeCommand implements Command<void, UpdateTransactionsParams> {
+    private readonly displayService: CategorizeDisplayService;
 
     constructor(private readonly aiTransactionUpdateOrchestrator: AITransactionUpdateOrchestrator) {
-        this.displayService = new UpdateTransactionDisplayService();
+        this.displayService = new CategorizeDisplayService();
     }
 
     async execute({ tag, updateMode, dryRun = false }: UpdateTransactionsParams): Promise<void> {
@@ -27,12 +27,12 @@ export class UpdateTransactionsCommand implements Command<void, UpdateTransactio
                 dryRun
             );
 
-            if (results.status === UpdateTransactionStatus.NO_TAG) {
+            if (results.status === CategorizeStatus.NO_TAG) {
                 console.log(this.displayService.formatTagNotFound(tag));
                 return;
             }
 
-            if (results.status === UpdateTransactionStatus.EMPTY_TAG) {
+            if (results.status === CategorizeStatus.EMPTY_TAG) {
                 console.log(this.displayService.formatEmptyTag(tag));
                 return;
             }

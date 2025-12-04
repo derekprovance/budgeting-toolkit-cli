@@ -9,14 +9,13 @@ import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
  *
  * Extends BaseTransactionAnalysisService for consistent error handling and Result types.
  *
- * A transaction is considered an unbudgeted expense if:
- * - It is a bill (has the "Bills" tag), OR
- * - It meets all regular expense criteria:
- *   - Has no budget assigned
- *   - Not supplemented by disposable income
- *   - Not in excluded transactions list
- *   - From a valid expense account
+ * A transaction is considered an unbudgeted expense if it meets all criteria:
+ * - Has no budget assigned
+ * - Not supplemented by disposable income
+ * - Not in excluded transactions list
+ * - From a valid expense account
  *
+ * Note: Bills are NOT included here - they are handled separately by BillComparisonService
  * Valid expense accounts defined in configuration
  * Transfers are ignored unless specified in configuration
  */
@@ -70,7 +69,6 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * Filters transactions to find unbudgeted expenses.
      *
      * 1. For each transaction:
-     *    - If it's a bill, include it
      *    - If it's a transfer, check transfer criteria
      *    - Otherwise, check regular expense criteria
      */
@@ -110,14 +108,9 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
 
     /**
      * Checks if a transaction should be counted as an expense.
-     *
-     * 1. If it's a bill, always count it
-     * 2. Otherwise, check regular expense criteria
+     * Checks regular expense criteria (bills are handled separately by BillComparisonService).
      */
     private async shouldCountExpense(transaction: TransactionSplit): Promise<boolean> {
-        if (this.transactionClassificationService.isBill(transaction)) {
-            return true;
-        }
         return this.isRegularExpenseTransaction(transaction);
     }
 
@@ -125,9 +118,10 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * Checks if a transaction is a regular unbudgeted expense.
      *
      * 1. Must have no budget assigned
-     * 2. Must not be supplemented by disposable income
-     * 3. Must not be in excluded transactions list
-     * 4. Must be from a valid expense account
+     * 2. Must not be tagged as a bill
+     * 3. Must not be supplemented by disposable income
+     * 4. Must not be in excluded transactions list
+     * 5. Must be from a valid expense account
      */
     private async isRegularExpenseTransaction(transaction: TransactionSplit): Promise<boolean> {
         const isExcludedTransaction =
@@ -138,6 +132,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
 
         const conditions = {
             hasNoBudget: !transaction.budget_id,
+            isNotBill: !this.transactionClassificationService.isBill(transaction),
             isNotDisposableSupplemented:
                 !this.transactionClassificationService.isSupplementedByDisposable(transaction.tags),
             isNotExcludedTransaction: !isExcludedTransaction,
@@ -155,6 +150,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
 
         return (
             conditions.hasNoBudget &&
+            conditions.isNotBill &&
             conditions.isNotDisposableSupplemented &&
             conditions.isNotExcludedTransaction &&
             conditions.isFromExpenseAccount

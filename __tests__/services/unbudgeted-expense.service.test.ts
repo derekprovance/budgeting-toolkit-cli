@@ -239,6 +239,44 @@ describe('UnbudgetedExpenseService', () => {
             }
         });
 
+        it('should exclude transactions tagged as bills even without bill_id', async () => {
+            const mockTransactions = [
+                createMockTransaction({
+                    description: 'Bill Without ID',
+                    source_id: TestAccount.PRIMARY,
+                    tags: ['Bills'],
+                    budget_id: null,
+                }),
+                createMockTransaction({
+                    description: 'Regular Expense',
+                    source_id: TestAccount.PRIMARY,
+                    tags: [],
+                    budget_id: null,
+                }),
+            ];
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+            (
+                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
+            ).mockResolvedValue(false);
+            (
+                mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
+            ).mockReturnValue(false);
+            // First transaction is a bill (tagged with 'Bills'), second is not
+            mockTransactionClassificationService.isBill
+                .mockReturnValueOnce(true)
+                .mockReturnValueOnce(false);
+
+            const result = await service.calculateUnbudgetedExpenses(4, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toHaveLength(1);
+                expect(result.value[0].description).toBe('Regular Expense');
+            }
+        });
+
         it('should handle transfers from PRIMARY to MONEY_MARKET', async () => {
             const mockTransactions = [
                 createMockTransaction({
@@ -300,116 +338,6 @@ describe('UnbudgetedExpenseService', () => {
             if (result.ok) {
                 expect(result.value).toHaveLength(1);
                 expect(result.value[0].description).toBe('Expense TestAccount');
-            }
-        });
-
-        it('should include bills regardless of other criteria', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Regular Bill',
-                    source_id: TestAccount.CHASE_SAPPHIRE,
-                    tags: ['Bills'],
-                }),
-                createMockTransaction({
-                    description: 'Regular Expense',
-                    source_id: TestAccount.PRIMARY,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
-            (
-                mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-            ).mockReturnValue(false);
-            mockTransactionClassificationService.isBill
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                expect(result.value).toHaveLength(2);
-                expect(result.value[0].description).toBe('Regular Bill');
-                expect(result.value[1].description).toBe('Regular Expense');
-            }
-        });
-
-        it('should include bills even if they have a budget', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Budgeted Bill',
-                    source_id: TestAccount.CHASE_SAPPHIRE,
-                    budget_id: '123',
-                    tags: ['Bills'],
-                }),
-                createMockTransaction({
-                    description: 'Regular Expense',
-                    source_id: TestAccount.PRIMARY,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
-            (
-                mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-            ).mockReturnValue(false);
-            mockTransactionClassificationService.isBill
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                expect(result.value).toHaveLength(2);
-                expect(result.value[0].description).toBe('Budgeted Bill');
-                expect(result.value[1].description).toBe('Regular Expense');
-            }
-        });
-
-        it('should include bills even if they are excluded', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Excluded Bill',
-                    source_id: TestAccount.CHASE_SAPPHIRE,
-                    tags: ['Bills'],
-                }),
-                createMockTransaction({
-                    description: 'Regular Expense',
-                    source_id: TestAccount.PRIMARY,
-                    budget_id: null,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
-            (
-                mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-            ).mockReturnValue(false);
-            mockTransactionClassificationService.isBill
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                expect(result.value).toHaveLength(2);
-                expect(result.value[0].description).toBe('Excluded Bill');
-                expect(result.value[1].description).toBe('Regular Expense');
-                expect(
-                    mockTransactionClassificationService.isExcludedTransaction
-                ).toHaveBeenCalledTimes(1);
             }
         });
 
@@ -497,92 +425,6 @@ describe('UnbudgetedExpenseService', () => {
                 expect(result.ok).toBe(false);
                 if (!result.ok) {
                     expect(result.error.message).toContain('month 4');
-                }
-            });
-        });
-
-        describe('bill edge cases', () => {
-            it('should include bills even with disposable income tags', async () => {
-                const mockTransactions = [
-                    createMockTransaction({
-                        description: 'Bill with Disposable',
-                        source_id: TestAccount.CHASE_SAPPHIRE,
-                        tags: ['Bills', 'Disposable'],
-                    }),
-                ];
-
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-                (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
-                (
-                    mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-                ).mockReturnValue(true);
-                mockTransactionClassificationService.isBill.mockReturnValue(true);
-
-                const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-                expect(result.ok).toBe(true);
-                if (result.ok) {
-                    expect(result.value).toHaveLength(1);
-                    expect(result.value[0].description).toBe('Bill with Disposable');
-                }
-            });
-
-            it('should include bills from non-expense accounts', async () => {
-                const mockTransactions = [
-                    createMockTransaction({
-                        description: 'Bill from Non-Expense',
-                        source_id: TestAccount.MONEY_MARKET,
-                        tags: ['Bills'],
-                    }),
-                ];
-
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-                (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
-                (
-                    mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-                ).mockReturnValue(false);
-                mockTransactionClassificationService.isBill.mockReturnValue(true);
-
-                const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-                expect(result.ok).toBe(true);
-                if (result.ok) {
-                    expect(result.value).toHaveLength(1);
-                    expect(result.value[0].description).toBe('Bill from Non-Expense');
-                }
-            });
-
-            it('should include bills even if they are excluded transactions', async () => {
-                const mockTransactions = [
-                    createMockTransaction({
-                        description: 'Excluded Bill',
-                        source_id: TestAccount.PRIMARY,
-                        tags: ['Bills'],
-                    }),
-                ];
-
-                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-                mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-                (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(true);
-                (
-                    mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-                ).mockReturnValue(false);
-                mockTransactionClassificationService.isBill.mockReturnValue(true);
-
-                const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-                expect(result.ok).toBe(true);
-                if (result.ok) {
-                    expect(result.value).toHaveLength(1);
-                    expect(result.value[0].description).toBe('Excluded Bill');
                 }
             });
         });

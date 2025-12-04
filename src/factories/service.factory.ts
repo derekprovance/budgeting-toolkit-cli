@@ -18,12 +18,14 @@ import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
 import { ConfigManager } from '../config/config-manager.js';
 import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
-import { FinalizeBudgetDisplayService } from '../services/display/finalize-budget-display.service.js';
+import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { BillService } from '../services/core/bill.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionSplitService } from '../services/transaction-split.service.js';
+import { DisposableIncomeService } from '../services/disposable-income.service.js';
+import { BudgetSurplusService } from '../services/budget-surplus.service.js';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
@@ -69,9 +71,7 @@ export class ServiceFactory {
         const baseTransactionDisplayService = new BaseTransactionDisplayService(
             transactionClassificationService
         );
-        const finalizeBudgetDisplayService = new FinalizeBudgetDisplayService(
-            baseTransactionDisplayService
-        );
+        const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
@@ -79,6 +79,11 @@ export class ServiceFactory {
         const billService = new BillService(apiClient);
         const billComparisonService = new BillComparisonService(billService, transactionService);
         const transactionSplitService = new TransactionSplitService(apiClient);
+        const disposableIncomeService = new DisposableIncomeService(
+            transactionService,
+            transactionClassificationService
+        );
+        const budgetSurplusService = new BudgetSurplusService(budgetService);
 
         return {
             transactionService,
@@ -93,12 +98,14 @@ export class ServiceFactory {
             paycheckSurplusService,
             transactionValidatorService,
             baseTransactionDisplayService,
-            finalizeBudgetDisplayService,
+            analyzeDisplayService,
             budgetDisplayService,
             splitTransactionDisplayService,
             billService,
             billComparisonService,
             transactionSplitService,
+            disposableIncomeService,
+            budgetSurplusService,
         };
     }
 

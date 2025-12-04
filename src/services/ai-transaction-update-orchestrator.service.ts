@@ -14,9 +14,9 @@ import {
     AIResponse,
     LLMTransactionProcessingService,
 } from './ai/llm-transaction-processing.service.js';
-import { UpdateTransactionMode } from '../types/enum/update-transaction-mode.enum.js';
-import { UpdateTransactionStatusDto } from '../types/dto/update-transaction-status.dto.js';
-import { UpdateTransactionStatus } from '../types/enum/update-transaction-status.enum.js';
+import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
+import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
+import { CategorizeStatus } from '../types/enum/categorize-status.enum.js';
 import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { TransactionValidatorService } from './core/transaction-validator.service.js';
 import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';
@@ -41,9 +41,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
     async updateTransactionsByTag(
         tag: string,
-        updateMode: UpdateTransactionMode,
+        updateMode: CategorizeMode,
         dryRun?: boolean
-    ): Promise<UpdateTransactionStatusDto> {
+    ): Promise<CategorizeStatusDto> {
         try {
             if (!(await this.transactionService.tagExists(tag))) {
                 logger.debug(
@@ -55,7 +55,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     'Tag does not exist'
                 );
                 return {
-                    status: UpdateTransactionStatus.NO_TAG,
+                    status: CategorizeStatus.NO_TAG,
                     transactionsUpdated: 0,
                 };
             }
@@ -78,7 +78,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     'No valid transactions found for tag'
                 );
                 return {
-                    status: UpdateTransactionStatus.EMPTY_TAG,
+                    status: CategorizeStatus.EMPTY_TAG,
                     transactionsUpdated: 0,
                 };
             }
@@ -97,12 +97,12 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             await this.aiValidator.initialize();
 
             let categories: CategoryProperties[] | undefined;
-            if (updateMode !== UpdateTransactionMode.Budget) {
+            if (updateMode !== CategorizeMode.Budget) {
                 categories = await this.categoryService.getCategories();
             }
 
             let budgets: BudgetRead[] | undefined;
-            if (updateMode !== UpdateTransactionMode.Category) {
+            if (updateMode !== CategorizeMode.Category) {
                 budgets = await this.budgetService.getBudgets();
             }
 
@@ -149,7 +149,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 );
 
                 return {
-                    status: UpdateTransactionStatus.HAS_RESULTS,
+                    status: CategorizeStatus.HAS_RESULTS,
                     transactionsUpdated: updatedTransactions.length,
                     transactionErrors: errors.length,
                 };
@@ -169,7 +169,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             );
 
             return {
-                status: UpdateTransactionStatus.PROCESSING_FAILED,
+                status: CategorizeStatus.PROCESSING_FAILED,
                 transactionsUpdated: 0,
                 error:
                     ex instanceof Error
@@ -181,12 +181,19 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
     private async getAIResultsForTransactions(
         transactions: TransactionSplit[],
-        updateMode: UpdateTransactionMode,
+        updateMode: CategorizeMode,
         categories?: CategoryProperties[],
         budgets?: BudgetRead[]
     ): Promise<AIResponse> {
         const categoryNames = categories?.map(c => c.name);
+        if (categoryNames) {
+            categoryNames.push('(no category)');
+        }
+
         const budgetNames = budgets?.map(b => b.attributes.name);
+        if (budgetNames) {
+            budgetNames.push('(no budget)');
+        }
 
         logger.debug(
             {
@@ -200,8 +207,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
         const aiResults = await this.llmService.processTransactions(
             transactions,
-            updateMode !== UpdateTransactionMode.Budget ? categoryNames : undefined,
-            updateMode !== UpdateTransactionMode.Category ? budgetNames : undefined
+            updateMode !== CategorizeMode.Budget ? categoryNames : undefined,
+            updateMode !== CategorizeMode.Category ? budgetNames : undefined
         );
 
         if (Object.keys(aiResults).length !== transactions.length) {

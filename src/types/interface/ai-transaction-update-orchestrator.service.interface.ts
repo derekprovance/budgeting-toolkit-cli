@@ -1,5 +1,5 @@
-import { UpdateTransactionMode } from '../enum/update-transaction-mode.enum.js';
-import { UpdateTransactionStatusDto } from '../dto/update-transaction-status.dto.js';
+import { CategorizeMode } from '../enum/categorize-mode.enum.js';
+import { CategorizeStatusDto } from '../dto/categorize-status.dto.js';
 
 export interface IAITransactionUpdateOrchestrator {
     /**
@@ -11,7 +11,7 @@ export interface IAITransactionUpdateOrchestrator {
      */
     updateTransactionsByTag(
         tag: string,
-        updateMode: UpdateTransactionMode,
+        updateMode: CategorizeMode,
         dryRun?: boolean
-    ): Promise<UpdateTransactionStatusDto>;
+    ): Promise<CategorizeStatusDto>;
 }

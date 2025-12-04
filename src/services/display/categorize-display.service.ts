@@ -1,19 +1,15 @@
 import chalk from 'chalk';
-import { UpdateTransactionMode } from '../../types/enum/update-transaction-mode.enum.js';
+import { CategorizeMode } from '../../types/enum/categorize-mode.enum.js';
 
-export class UpdateTransactionDisplayService {
+export class CategorizeDisplayService {
     /**
      * Formats the processing header
      */
-    formatProcessingHeader(
-        tag: string,
-        updateMode: UpdateTransactionMode,
-        dryRun?: boolean
-    ): string {
+    formatProcessingHeader(tag: string, updateMode: CategorizeMode, dryRun?: boolean): string {
         const modeText =
-            updateMode === UpdateTransactionMode.Both
+            updateMode === CategorizeMode.Both
                 ? 'categories and budgets'
-                : updateMode === UpdateTransactionMode.Category
+                : updateMode === CategorizeMode.Category
                   ? 'categories'
                   : 'budgets';
 

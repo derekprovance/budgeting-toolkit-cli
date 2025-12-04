@@ -26,8 +26,8 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { TransactionAIResultValidator } from '../../src/services/core/transaction-ai-result-validator.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
-import { UpdateTransactionMode } from '../../src/types/enum/update-transaction-mode.enum.js';
-import { UpdateTransactionStatus } from '../../src/types/enum/update-transaction-status.enum.js';
+import { CategorizeMode } from '../../src/types/enum/categorize-mode.enum.js';
+import { CategorizeStatus } from '../../src/types/enum/categorize-status.enum.js';
 import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
@@ -216,10 +216,10 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(
                 'nonexistent',
-                UpdateTransactionMode.Both
+                CategorizeMode.Both
             );
 
-            expect(result.status).toBe(UpdateTransactionStatus.NO_TAG);
+            expect(result.status).toBe(CategorizeStatus.NO_TAG);
             expect(result.transactionsUpdated).toBe(0);
         });
 
@@ -227,12 +227,9 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue([]);
 
-            const result = await service.updateTransactionsByTag(
-                'empty',
-                UpdateTransactionMode.Both
-            );
+            const result = await service.updateTransactionsByTag('empty', CategorizeMode.Both);
 
-            expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
+            expect(result.status).toBe(CategorizeStatus.EMPTY_TAG);
             expect(result.transactionsUpdated).toBe(0);
         });
 
@@ -263,12 +260,9 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
-            const result = await service.updateTransactionsByTag(
-                'test',
-                UpdateTransactionMode.Both
-            );
+            const result = await service.updateTransactionsByTag('test', CategorizeMode.Both);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledTimes(
                 mockTransactions.length
             );
@@ -280,12 +274,9 @@ describe('AITransactionUpdateOrchestrator', () => {
                 new Error('Processing failed')
             );
 
-            const result = await service.updateTransactionsByTag(
-                'test',
-                UpdateTransactionMode.Both
-            );
+            const result = await service.updateTransactionsByTag('test', CategorizeMode.Both);
 
-            expect(result.status).toBe(UpdateTransactionStatus.PROCESSING_FAILED);
+            expect(result.status).toBe(CategorizeStatus.PROCESSING_FAILED);
             // No need to check totalTransactions or data - they don't exist in the DTO
             expect(result.error).toBe('Processing failed');
         });
@@ -302,12 +293,9 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(false);
 
-            const result = await service.updateTransactionsByTag(
-                'test',
-                UpdateTransactionMode.Both
-            );
+            const result = await service.updateTransactionsByTag('test', CategorizeMode.Both);
 
-            expect(result.status).toBe(UpdateTransactionStatus.EMPTY_TAG);
+            expect(result.status).toBe(CategorizeStatus.EMPTY_TAG);
             expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
         });
 
@@ -328,12 +316,9 @@ describe('AITransactionUpdateOrchestrator', () => {
                 value: mockTransactions[0] as any,
             });
 
-            const result = await service.updateTransactionsByTag(
-                'test',
-                UpdateTransactionMode.Category
-            );
+            const result = await service.updateTransactionsByTag('test', CategorizeMode.Category);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
@@ -356,12 +341,9 @@ describe('AITransactionUpdateOrchestrator', () => {
                 value: mockTransactions[0] as any,
             });
 
-            const result = await service.updateTransactionsByTag(
-                'test',
-                UpdateTransactionMode.Budget
-            );
+            const result = await service.updateTransactionsByTag('test', CategorizeMode.Budget);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockCategoryService.getCategories).not.toHaveBeenCalled();
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
@@ -396,10 +378,10 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await serviceWithDryRun.updateTransactionsByTag(
                 'test',
-                UpdateTransactionMode.Both
+                CategorizeMode.Both
             );
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             // No need to check totalTransactions or data - they don't exist in the DTO
             expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
@@ -431,7 +413,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await serviceWithDryRun.updateTransactionsByTag(
                 'test',
-                UpdateTransactionMode.Both
+                CategorizeMode.Both
             );
             expect(result).toBeTruthy();
         });
@@ -463,16 +445,16 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await serviceWithBoth.updateTransactionsByTag(
                 'test',
-                UpdateTransactionMode.Both
+                CategorizeMode.Both
             );
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
 
         it('should handle successful updates', async () => {
             const tag = 'test-tag';
-            const updateMode = UpdateTransactionMode.Both;
+            const updateMode = CategorizeMode.Both;
             const dryRun = false;
 
             const mockTransaction = createMockTransaction({
@@ -518,7 +500,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
             expect(mockTransactionService.getTransactionsByTag).toHaveBeenCalledWith(tag);
             expect(mockValidator.shouldProcessTransaction).toHaveBeenCalledWith(
@@ -529,8 +511,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
-                [mockCategory.name],
-                [mockBudget.attributes.name]
+                [mockCategory.name, '(no category)'],
+                [mockBudget.attributes.name, '(no budget)']
             );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
@@ -542,7 +524,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('should handle dry run mode', async () => {
             const tag = 'test-tag';
-            const updateMode = UpdateTransactionMode.Both;
+            const updateMode = CategorizeMode.Both;
             const dryRun = true;
 
             const mockTransaction = createMockTransaction({
@@ -588,7 +570,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
             expect(mockTransactionService.getTransactionsByTag).toHaveBeenCalledWith(tag);
             expect(mockValidator.shouldProcessTransaction).toHaveBeenCalledWith(
@@ -599,8 +581,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
-                [mockCategory.name],
-                [mockBudget.attributes.name]
+                [mockCategory.name, '(no category)'],
+                [mockBudget.attributes.name, '(no budget)']
             );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
@@ -612,7 +594,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('should skip transactions with missing journal IDs during processing', async () => {
             const tag = 'test-tag';
-            const updateMode = UpdateTransactionMode.Both;
+            const updateMode = CategorizeMode.Both;
 
             const transactionWithoutId = {
                 transaction_journal_id: undefined,
@@ -634,13 +616,13 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
         });
 
         it('should handle SIGINT interruption and stop processing transactions', async () => {
             const tag = 'test-tag';
-            const updateMode = UpdateTransactionMode.Both;
+            const updateMode = CategorizeMode.Both;
 
             const mockTransaction1 = createMockTransaction({
                 transaction_journal_id: '1',
@@ -708,7 +690,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(result.transactionsUpdated).toBe(1); // Only first transaction updated
             expect(result.transactionErrors).toBe(1); // Second transaction errored
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledTimes(2);
@@ -716,7 +698,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('should handle validation errors and collect them properly', async () => {
             const tag = 'test-tag';
-            const updateMode = UpdateTransactionMode.Both;
+            const updateMode = CategorizeMode.Both;
 
             const mockTransaction1 = createMockTransaction({
                 transaction_journal_id: '1',
@@ -790,7 +772,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(result.transactionsUpdated).toBe(1);
             expect(result.transactionErrors).toBe(1);
 
@@ -816,7 +798,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('should handle multiple validation errors and display all of them', async () => {
             const tag = 'test-tag';
-            const updateMode = UpdateTransactionMode.Both;
+            const updateMode = CategorizeMode.Both;
 
             const mockTransaction1 = createMockTransaction({
                 transaction_journal_id: '1',
@@ -911,7 +893,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
-            expect(result.status).toBe(UpdateTransactionStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(result.transactionsUpdated).toBe(1);
             expect(result.transactionErrors).toBe(2);
 
