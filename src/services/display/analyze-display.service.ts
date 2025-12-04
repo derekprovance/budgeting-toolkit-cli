@@ -20,7 +20,7 @@ export class AnalyzeDisplayService {
             this.formatMonthHeader(data.month, data.year),
             this.formatIncomeSection(data, verbose),
             this.formatExpensesSection(data, verbose),
-            this.formatPaycheckSection(data, verbose),
+            ...(data.skipPaycheck ? [] : [this.formatPaycheckSection(data, verbose)]),
             this.formatSummarySection(data),
             this.formatRecommendations(data),
         ];
@@ -187,11 +187,20 @@ export class AnalyzeDisplayService {
             '',
             chalk.bold('  Total Adjustments:'),
             `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} Additional Income:      ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(data.paycheckSurplus, true)} Paycheck Variance:      ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`,
+        ];
+
+        // Conditionally add Paycheck Variance
+        if (!data.skipPaycheck) {
+            lines.push(
+                `    ${this.getStatusIcon(data.paycheckSurplus, true)} Paycheck Variance:      ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
+            );
+        }
+
+        lines.push(
             `    ${this.getStatusIcon(data.budgetSurplus, true)} Budget Surplus:         ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`,
             `    ${this.getStatusIcon(-data.billComparison.variance, true)} Bill Variance:          ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, false)} Unbudgeted Expenses:    ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, false)}`,
-        ];
+            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, false)} Unbudgeted Expenses:    ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, false)}`
+        );
 
         if (data.disposableIncome > 0) {
             lines.push(
@@ -203,7 +212,7 @@ export class AnalyzeDisplayService {
 
         const netPosition =
             data.additionalIncomeTotal +
-            data.paycheckSurplus +
+            (data.skipPaycheck ? 0 : data.paycheckSurplus) +
             data.budgetSurplus -
             data.billComparison.variance -
             data.unbudgetedExpenseTotal -

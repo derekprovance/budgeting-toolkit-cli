@@ -34,7 +34,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
      * Executes the analyze command
      * @param params The month and year to perform the analysis
      */
-    async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
+    async execute({ month, year, verbose, skipPaycheck = false }: BudgetDateParams): Promise<void> {
         const spinner = ora(`Analyzing ${month}-${year}...`).start();
 
         // Validate command-specific configuration
@@ -53,7 +53,9 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             ] = await Promise.all([
                 this.additionalIncomeService.calculateAdditionalIncome(month, year),
                 this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
-                this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
+                skipPaycheck
+                    ? Promise.resolve({ ok: true as const, value: 0 })
+                    : this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
                 this.disposableIncomeService.calculateDisposableIncome(month, year),
                 this.budgetSurplusService.calculateBudgetSurplus(month, year),
                 this.billComparisonService.calculateBillComparison(month, year),
@@ -80,7 +82,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             }
 
             // Handle paycheck surplus result
-            if (!paycheckSurplusResult.ok) {
+            if (!skipPaycheck && !paycheckSurplusResult.ok) {
                 spinner.fail(this.BUDGET_FAIL_MSG);
                 console.error(
                     chalk.red('Error calculating paycheck surplus:'),
@@ -148,12 +150,13 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 budgetSpent,
                 budgetSurplus,
                 billComparison,
-                expectedMonthlyPaycheck,
-                actualPaycheck,
-                paycheckSurplus,
+                skipPaycheck ? 0 : expectedMonthlyPaycheck,
+                skipPaycheck ? 0 : actualPaycheck,
+                skipPaycheck ? 0 : paycheckSurplus,
                 disposableIncome,
                 month,
-                year
+                year,
+                skipPaycheck
             );
 
             // Display the comprehensive report

@@ -103,6 +103,12 @@ export const createCli = (): Command => {
                 .argParser(validateYear)
                 .default(getCurrentYear(), 'current year')
         )
+        .addOption(
+            new Option(
+                '--skip-paycheck',
+                'Skip paycheck analysis and variance calculations'
+            ).default(false)
+        )
         .addHelpText(
             'after',
             `
@@ -110,7 +116,8 @@ Examples:
   $ budgeting-toolkit analyze                   # current month
   $ budgeting-toolkit analyze -m 6              # June, current year
   $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
-  $ budgeting-toolkit an -m 3                   # March (using alias)`
+  $ budgeting-toolkit an -m 3                   # March (using alias)
+  $ budgeting-toolkit an --skip-paycheck        # Skip paycheck analysis`
         )
         .action(async (opts: BudgetDateOptions) => {
             try {
@@ -127,6 +134,7 @@ Examples:
                     month: opts.month!,
                     year: opts.year!,
                     verbose: program?.opts().verbose || false,
+                    skipPaycheck: opts.skipPaycheck || false,
                 });
             } catch (error) {
                 handleError(error, 'analyzing budget');

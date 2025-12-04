@@ -34,6 +34,9 @@ export class AnalyzeReportDto {
         // Calculations
         public netImpact: number, // Total surplus/deficit from all sources
 
+        // Flags
+        public skipPaycheck: boolean, // Whether paycheck analysis was skipped
+
         // Metadata
         public month: number,
         public year: number,
@@ -57,7 +60,8 @@ export class AnalyzeReportDto {
         paycheckSurplus: number,
         disposableIncome: number,
         month: number,
-        year: number
+        year: number,
+        skipPaycheck: boolean = false
     ): AnalyzeReportDto {
         // Calculate totals
         const additionalIncomeTotal = additionalIncome.reduce((sum, t) => {
@@ -71,13 +75,13 @@ export class AnalyzeReportDto {
         }, 0);
 
         // Calculate net impact from all sources
-        // Positive factors: additional income, paycheck surplus, budget surplus
+        // Positive factors: additional income, paycheck surplus (if enabled), budget surplus
         // Negative factors: bill overspend, unbudgeted expenses, disposable income
         // Note: Bill variance is subtracted (positive variance = overspent = reduces position)
         // When variance is negative (underspent), subtracting it increases net position
         const netImpact = additionalIncomeTotal
                         + budgetSurplus
-                        + paycheckSurplus
+                        + (skipPaycheck ? 0 : paycheckSurplus)  // Conditional paycheck
                         - billComparison.variance  // Positive reduces, negative increases
                         - unbudgetedExpenseTotal
                         - disposableIncome;
@@ -100,6 +104,7 @@ export class AnalyzeReportDto {
             paycheckSurplus,
             disposableIncome,
             netImpact,
+            skipPaycheck,
             month,
             year,
             currencySymbol,
