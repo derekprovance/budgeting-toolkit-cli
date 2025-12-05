@@ -43,8 +43,8 @@ const createChalkMock = () => {
 jest.mock('chalk', () => createChalkMock());
 
 import { CategorizeDisplayService } from '../../../src/services/display/categorize-display.service.js';
-import { CategorizeMode } from '../../../src/types/enum/categorize-mode.enum.js';
 import { jest } from '@jest/globals';
+import { CategorizeMode } from '../../../src/types/enums.js';
 
 describe('CategorizeDisplayService', () => {
     let service: CategorizeDisplayService;

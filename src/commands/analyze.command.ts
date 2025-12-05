@@ -1,5 +1,5 @@
 import { Command } from '../types/interface/command.interface.js';
-import { BudgetDateParams } from '../types/interface/budget-date-params.interface.js';
+import { BudgetDateParams } from '../types/common.types.js';
 import { AdditionalIncomeService } from '../services/additional-income.service.js';
 import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
 import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';

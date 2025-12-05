@@ -11,9 +11,8 @@ import {
     IDateRangeService,
 } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
-import { BudgetService as IBudgetService } from '../../types/interface/budget.service.interface.js';
 
-export class BudgetService implements IBudgetService {
+export class BudgetService {
     private readonly dateRangeService: IDateRangeService;
 
     constructor(

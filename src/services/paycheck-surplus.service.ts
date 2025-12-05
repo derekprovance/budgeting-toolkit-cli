@@ -3,6 +3,7 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Service for calculating paycheck surplus (difference between actual and expected paychecks).
@@ -81,19 +82,9 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
 
     /**
      * Calculates total paycheck amount from a list of paycheck transactions.
-     *
-     * @param paychecks - Array of paycheck transactions
-     * @returns Sum of all paycheck amounts
      */
     private calculateTotalPaycheckAmount(paychecks: TransactionSplit[]): number {
-        return paychecks.reduce((sum, paycheck) => {
-            const amount = parseFloat(paycheck.amount);
-            if (isNaN(amount)) {
-                this.logger.warn({ paycheck }, 'Invalid paycheck amount found');
-                return sum;
-            }
-            return sum + amount;
-        }, 0);
+        return TransactionCalculationUtils.calculateTransactionTotal(paychecks, false, this.logger);
     }
 
     /**

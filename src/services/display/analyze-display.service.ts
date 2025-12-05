@@ -2,8 +2,8 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { TransactionClassificationService } from '../core/transaction-classification.service.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
-import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
+import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 
 /**
  * Service for formatting and displaying comprehensive budget analysis information
@@ -16,8 +16,9 @@ export class AnalyzeDisplayService {
      */
     formatAnalysisReport(data: AnalyzeReportDto, verbose: boolean = false): string {
         const sections = [
-            this.formatHeader('Budget Finalization Report'),
-            this.formatMonthHeader(data.month, data.year),
+            this.formatHeader(
+                `Budget Finalization Report + ${this.formatMonthHeader(data.month, data.year)}`
+            ),
             this.formatIncomeSection(data, verbose),
             this.formatExpensesSection(data, verbose),
             ...(data.skipPaycheck ? [] : [this.formatPaycheckSection(data)]),
@@ -32,15 +33,7 @@ export class AnalyzeDisplayService {
      * Formats the header box
      */
     private formatHeader(text: string): string {
-        const padding = 2;
-        const textLength = text.length;
-        const totalLength = textLength + padding * 2;
-
-        const topBorder = '╔' + '═'.repeat(totalLength) + '╗';
-        const middleLine = '║' + ' '.repeat(padding) + text + ' '.repeat(padding) + '║';
-        const bottomBorder = '╚' + '═'.repeat(totalLength) + '╝';
-
-        return `\n${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
+        return DisplayFormatterUtils.createBoxHeader(text);
     }
 
     /**
@@ -50,7 +43,7 @@ export class AnalyzeDisplayService {
         const monthName = Intl.DateTimeFormat('en', { month: 'long' }).format(
             new Date(year, month - 1)
         );
-        return `\n${chalk.cyan('📅')} ${chalk.bold(monthName + ' ' + year)}`;
+        return `${chalk.bold(monthName + ' ' + year)}`;
     }
 
     /**
@@ -186,25 +179,25 @@ export class AnalyzeDisplayService {
             ),
             '',
             chalk.bold('  Total Adjustments:'),
-            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} Additional Income:      ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
         ];
 
         // Conditionally add Paycheck Variance
         if (!data.skipPaycheck) {
             lines.push(
-                `    ${this.getStatusIcon(data.paycheckSurplus, true)} Paycheck Variance:      ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
+                `    ${this.getStatusIcon(data.paycheckSurplus, true)} ${'Paycheck Variance:'.padEnd(30)} ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
             );
         }
 
         lines.push(
-            `    ${this.getStatusIcon(data.budgetSurplus, true)} Budget Surplus:         ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.billComparison.variance, true)} Bill Variance:          ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, false)} Unbudgeted Expenses:    ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, false)}`
+            `    ${this.getStatusIcon(data.budgetSurplus, true)} ${'Budget Surplus:'.padEnd(30)} ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.billComparison.variance, true)} ${'Bill Variance:'.padEnd(30)} ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`
         );
 
         if (data.disposableIncome > 0) {
             lines.push(
-                `    ${this.getStatusIcon(-data.disposableIncome, false)} Disposable Spending:    ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
+                `    ${this.getStatusIcon(-data.disposableIncome, false)} ${'Disposable Spending:'.padEnd(30)} ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
             );
         }
 
@@ -219,7 +212,7 @@ export class AnalyzeDisplayService {
             data.disposableIncome;
 
         lines.push(
-            `    Net Position:           ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
+            `    ${'Net Position:'.padEnd(32)} ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
         );
 
         return lines.join('\n');
@@ -247,7 +240,7 @@ export class AnalyzeDisplayService {
             );
         } else {
             lines.push(
-                chalk.blue('  ✓ Balanced Month:') + chalk.white(' Maintain current approach'),
+                chalk.blueBright('  ✓ Balanced Month:') + chalk.white(' Maintain current approach'),
                 '    • Monitor recurring unbudgeted expenses',
                 '    • Consider adding buffer to monthly budget'
             );
@@ -286,12 +279,7 @@ export class AnalyzeDisplayService {
      * Formats a section header with box drawing characters
      */
     private formatSectionHeader(title: string): string {
-        const width = 45;
-        const topBorder = '┌' + '─'.repeat(width) + '┐';
-        const middleLine = '│ ' + chalk.bold(title) + ' '.repeat(width - title.length - 1) + '│';
-        const bottomBorder = '└' + '─'.repeat(width) + '┘';
-
-        return `${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
+        return DisplayFormatterUtils.createSectionHeader(title);
     }
 
     /**
@@ -322,12 +310,12 @@ export class AnalyzeDisplayService {
         symbol: string,
         count?: number
     ): string {
-        const formattedAmount = this.formatNetImpact(-amount, symbol, false);
+        const formattedAmount = this.formatNetImpact(-amount, symbol, true);
         const countText =
             count !== undefined
                 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
                 : '';
-        const icon = this.getStatusIcon(-amount, false);
+        const icon = this.getStatusIcon(-amount, true);
 
         return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount} ${icon}${countText}`;
     }
@@ -375,51 +363,24 @@ export class AnalyzeDisplayService {
      * Formats currency with symbol
      */
     private formatCurrency(amount: number, symbol: string): string {
-        return CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
+        return DisplayFormatterUtils.formatCurrency(amount, symbol);
     }
 
     /**
-     * Formats a financial value with accounting-style display.
-     * Shows sign based on impact to net position.
-     *
-     * @param amount - The amount to format (can be positive or negative)
-     * @param symbol - Currency symbol
-     * @param positiveIsGood - Whether positive values are good (default: true)
-     * @returns Formatted string with sign, color, and icon
+     * Formats a financial value with accounting-style display
      */
     private formatNetImpact(
         amount: number,
         symbol: string,
         positiveIsGood: boolean = true
     ): string {
-        const absFormatted = CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
-
-        if (amount === 0) {
-            return chalk.white(`${absFormatted} ○`);
-        }
-
-        // Determine if this is good or bad based on amount and context
-        const isGood = positiveIsGood ? amount > 0 : amount < 0;
-
-        // Format with appropriate sign, color, and icon
-        if (isGood) {
-            const sign = amount > 0 ? '+' : '-';
-            return chalk.green(`${sign}${absFormatted} ✓`);
-        } else {
-            const sign = amount > 0 ? '+' : '-';
-            return chalk.red(`${sign}${absFormatted} ⚠`);
-        }
+        return DisplayFormatterUtils.formatNetImpact(amount, symbol, positiveIsGood);
     }
 
     /**
      * Gets appropriate status icon based on amount
      */
     private getStatusIcon(amount: number, positiveIsGood: boolean): string {
-        if (amount === 0) return '○';
-        if (positiveIsGood) {
-            return amount > 0 ? chalk.green('✓') : chalk.red('⚠');
-        } else {
-            return amount < 0 ? chalk.green('✓') : chalk.red('⚠');
-        }
+        return DisplayFormatterUtils.getStatusIcon(amount, positiveIsGood);
     }
 }

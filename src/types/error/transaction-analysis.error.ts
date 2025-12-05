@@ -1,14 +1,11 @@
-import { ValidationError } from '../result.type.js';
+import { BaseMonthYearError, BaseErrorFactory, ErrorMessages } from './base-error.factory.js';
 
 /**
  * Error type for transaction analysis operations.
  * Provides structured error information for business logic services.
  */
-export interface TransactionAnalysisError extends ValidationError {
-    month: number;
-    year: number;
-    operation: string; // e.g., "calculateAdditionalIncome", "calculatePaycheckSurplus"
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TransactionAnalysisError extends BaseMonthYearError {}
 
 /**
  * Error types for specific transaction analysis failures
@@ -24,7 +21,10 @@ export enum TransactionAnalysisErrorType {
 /**
  * Helper to create transaction analysis errors with consistent structure
  */
-export class TransactionAnalysisErrorFactory {
+export class TransactionAnalysisErrorFactory extends BaseErrorFactory<
+    TransactionAnalysisErrorType,
+    TransactionAnalysisError
+> {
     static create(
         type: TransactionAnalysisErrorType,
         month: number,
@@ -32,32 +32,20 @@ export class TransactionAnalysisErrorFactory {
         operation: string,
         originalError?: Error
     ): TransactionAnalysisError {
-        const messages = this.getMessages(type, month, operation, originalError);
-
-        return {
-            field: type,
-            message: messages.technical,
-            userMessage: messages.user,
-            month,
-            year,
-            operation,
-            details: originalError
-                ? {
-                      originalError: originalError.message,
-                      errorType: originalError.constructor.name,
-                  }
-                : undefined,
-        };
+        const instance = new TransactionAnalysisErrorFactory();
+        const messages = instance.getMessages(type, month, year, operation, originalError);
+        return this.createError(type, month, year, operation, messages, originalError);
     }
 
-    private static getMessages(
+    protected getMessages(
         type: TransactionAnalysisErrorType,
         month: number,
+        year: number,
         operation: string,
         originalError?: Error
-    ): { technical: string; user: string } {
-        const monthStr = `month ${month}`;
-        const errorDetail = originalError ? `: ${originalError.message}` : '';
+    ): ErrorMessages {
+        const monthStr = this.buildMonthString(month);
+        const errorDetail = this.buildErrorDetail(originalError);
 
         switch (type) {
             case TransactionAnalysisErrorType.INVALID_DATE:

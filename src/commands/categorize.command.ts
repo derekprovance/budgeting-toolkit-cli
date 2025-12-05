@@ -1,6 +1,6 @@
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
-import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
-import { CategorizeStatus } from '../types/enum/categorize-status.enum.js';
+import { CategorizeMode } from '../types/enums.js';
+import { CategorizeStatus } from '../types/enums.js';
 import { Command } from '../types/interface/command.interface.js';
 import { CategorizeDisplayService } from '../services/display/categorize-display.service.js';
 

@@ -1,7 +1,7 @@
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { Command } from '../types/interface/command.interface.js';
-import { BudgetDateParams } from '../types/interface/budget-date-params.interface.js';
+import { BudgetDateParams } from '../types/common.types.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import chalk from 'chalk';
