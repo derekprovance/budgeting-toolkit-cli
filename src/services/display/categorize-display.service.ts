@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { CategorizeMode } from '../../types/enum/categorize-mode.enum.js';
+import { CategorizeMode } from '../../types/enums.js';
 
 export class CategorizeDisplayService {
     /**

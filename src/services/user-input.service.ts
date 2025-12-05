@@ -1,8 +1,8 @@
 import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
-import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
-import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
+import { CategorizeMode } from '../types/enums.js';
+import { EditTransactionAttribute } from '../types/enums.js';
 
 /**
  * Interface for transaction update options

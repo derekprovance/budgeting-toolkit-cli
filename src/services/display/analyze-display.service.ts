@@ -2,8 +2,8 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { TransactionClassificationService } from '../core/transaction-classification.service.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
-import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
+import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 
 /**
  * Service for formatting and displaying comprehensive budget analysis information
@@ -32,15 +32,7 @@ export class AnalyzeDisplayService {
      * Formats the header box
      */
     private formatHeader(text: string): string {
-        const padding = 2;
-        const textLength = text.length;
-        const totalLength = textLength + padding * 2;
-
-        const topBorder = '╔' + '═'.repeat(totalLength) + '╗';
-        const middleLine = '║' + ' '.repeat(padding) + text + ' '.repeat(padding) + '║';
-        const bottomBorder = '╚' + '═'.repeat(totalLength) + '╝';
-
-        return `\n${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
+        return DisplayFormatterUtils.createBoxHeader(text);
     }
 
     /**
@@ -286,12 +278,7 @@ export class AnalyzeDisplayService {
      * Formats a section header with box drawing characters
      */
     private formatSectionHeader(title: string): string {
-        const width = 45;
-        const topBorder = '┌' + '─'.repeat(width) + '┐';
-        const middleLine = '│ ' + chalk.bold(title) + ' '.repeat(width - title.length - 1) + '│';
-        const bottomBorder = '└' + '─'.repeat(width) + '┘';
-
-        return `${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
+        return DisplayFormatterUtils.createSectionHeader(title);
     }
 
     /**
@@ -375,51 +362,24 @@ export class AnalyzeDisplayService {
      * Formats currency with symbol
      */
     private formatCurrency(amount: number, symbol: string): string {
-        return CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
+        return DisplayFormatterUtils.formatCurrency(amount, symbol);
     }
 
     /**
-     * Formats a financial value with accounting-style display.
-     * Shows sign based on impact to net position.
-     *
-     * @param amount - The amount to format (can be positive or negative)
-     * @param symbol - Currency symbol
-     * @param positiveIsGood - Whether positive values are good (default: true)
-     * @returns Formatted string with sign, color, and icon
+     * Formats a financial value with accounting-style display
      */
     private formatNetImpact(
         amount: number,
         symbol: string,
         positiveIsGood: boolean = true
     ): string {
-        const absFormatted = CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
-
-        if (amount === 0) {
-            return chalk.white(`${absFormatted} ○`);
-        }
-
-        // Determine if this is good or bad based on amount and context
-        const isGood = positiveIsGood ? amount > 0 : amount < 0;
-
-        // Format with appropriate sign, color, and icon
-        if (isGood) {
-            const sign = amount > 0 ? '+' : '-';
-            return chalk.green(`${sign}${absFormatted} ✓`);
-        } else {
-            const sign = amount > 0 ? '+' : '-';
-            return chalk.red(`${sign}${absFormatted} ⚠`);
-        }
+        return DisplayFormatterUtils.formatNetImpact(amount, symbol, positiveIsGood);
     }
 
     /**
      * Gets appropriate status icon based on amount
      */
     private getStatusIcon(amount: number, positiveIsGood: boolean): string {
-        if (amount === 0) return '○';
-        if (positiveIsGood) {
-            return amount > 0 ? chalk.green('✓') : chalk.red('⚠');
-        } else {
-            return amount < 0 ? chalk.green('✓') : chalk.red('⚠');
-        }
+        return DisplayFormatterUtils.getStatusIcon(amount, positiveIsGood);
     }
 }

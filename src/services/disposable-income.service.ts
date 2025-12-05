@@ -3,6 +3,7 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Service for calculating disposable income total.
@@ -77,18 +78,8 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<numb
     /**
      * Calculates total amount from disposable income transactions.
      * Uses absolute values since these are expenses (negative amounts).
-     *
-     * @param transactions - Array of disposable income transactions
-     * @returns Sum of absolute values of all amounts
      */
     private calculateTotal(transactions: TransactionSplit[]): number {
-        return transactions.reduce((sum, transaction) => {
-            const amount = parseFloat(transaction.amount);
-            if (isNaN(amount)) {
-                this.logger.warn({ transaction }, 'Invalid disposable income amount found');
-                return sum;
-            }
-            return sum + Math.abs(amount);
-        }, 0);
+        return TransactionCalculationUtils.calculateTransactionTotal(transactions, true, this.logger);
     }
 }

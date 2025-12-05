@@ -1,5 +1,5 @@
 import { DateUtils } from '../../src/utils/date.utils.js';
-import { BudgetDateParams } from '../../src/types/interface/budget-date-params.interface.js';
+import { BudgetDateParams } from '../../../src/types/common.types.js';
 import { DateRangeDto } from '../../src/types/dto/date-range.dto.js';
 
 describe('DateUtils', () => {

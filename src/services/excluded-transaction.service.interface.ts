@@ -1,4 +1,4 @@
-import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto.js';
+import { ExcludedTransactionDto } from '../types/common.types.js';
 
 /**
  * Interface for ExcludedTransactionService

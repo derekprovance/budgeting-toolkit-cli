@@ -1,9 +1,8 @@
 import { CategorizeCommand } from '../../src/commands/categorize.command.js';
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
-import { CategorizeMode } from '../../src/types/enum/categorize-mode.enum.js';
-import { CategorizeStatus } from '../../src/types/enum/categorize-status.enum.js';
 import { CategorizeDisplayService } from '../../src/services/display/categorize-display.service.js';
 import { jest } from '@jest/globals';
+import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 
 jest.mock('../../src/services/ai-transaction-update-orchestrator.service');
 jest.mock('../../src/services/display/categorize-display.service');

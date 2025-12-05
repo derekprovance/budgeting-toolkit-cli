@@ -12,7 +12,7 @@ import {
     BudgetDateOptions,
     CategorizeOptions,
 } from './types/interface/command-options.interface.js';
-import { CategorizeMode } from './types/enum/categorize-mode.enum.js';
+import { CategorizeMode } from './types/enums.js';
 import { CommandConfigValidator } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
 import { readFileSync } from 'fs';

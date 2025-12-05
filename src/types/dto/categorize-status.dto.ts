@@ -1,4 +1,4 @@
-import { CategorizeStatus } from '../enum/categorize-status.enum.js';
+import { CategorizeStatus } from '../enums.js';
 
 export interface CategorizeStatusDto {
     status: CategorizeStatus;

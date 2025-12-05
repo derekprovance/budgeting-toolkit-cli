@@ -1,4 +1,4 @@
-import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
+import { ValidTransfer } from '../types/common.types.js';
 
 /**
  * Complete application configuration structure.

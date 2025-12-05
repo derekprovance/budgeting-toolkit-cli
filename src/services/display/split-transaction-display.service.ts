@@ -1,5 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
+import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 
 /**
  * Service for formatting split transaction display output
@@ -16,7 +17,7 @@ export class SplitTransactionDisplayService {
     formatOriginalTransaction(transaction: TransactionSplit, transactionId: string): string {
         const lines = [
             chalk.bold('\nOriginal Transaction:'),
-            chalk.dim('━'.repeat(60)),
+            DisplayFormatterUtils.createHorizontalLine(),
             `${chalk.bold('Description:')} ${transaction.description}`,
             `${chalk.bold('Amount:')} ${transaction.currency_symbol}${transaction.amount}`,
             `${chalk.bold('Date:')} ${transaction.date}`,
@@ -39,7 +40,7 @@ export class SplitTransactionDisplayService {
         }
 
         lines.push(`${chalk.bold('Link:')} ${this.getTransactionLink(transactionId)}`);
-        lines.push(chalk.dim('━'.repeat(60)));
+        lines.push(DisplayFormatterUtils.createHorizontalLine());
 
         return lines.join('\n');
     }
@@ -64,7 +65,7 @@ export class SplitTransactionDisplayService {
     ): string {
         const lines = [
             chalk.bold('\nSplit Preview:'),
-            chalk.dim('━'.repeat(60)),
+            DisplayFormatterUtils.createHorizontalLine(),
             chalk.yellow.bold(`\nParent Transaction: "${parentDescription}"`),
             chalk.cyan.bold('\nSplit 1:'),
             `  ${chalk.bold('Description:')} ${split1Description}`,
@@ -74,7 +75,7 @@ export class SplitTransactionDisplayService {
             `  ${chalk.bold('Description:')} ${split2Description}`,
             `  ${chalk.bold('Amount:')} ${currencySymbol}${split2Amount}`,
             `  ${chalk.dim('(category and budget left unset for manual assignment)')}`,
-            chalk.dim('━'.repeat(60)),
+            DisplayFormatterUtils.createHorizontalLine(),
         ];
 
         return lines.join('\n');

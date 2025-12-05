@@ -1,8 +1,7 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import { BillService as IBillService } from '../../types/interface/bill.service.interface.js';
 
-export class BillService implements IBillService {
+export class BillService  {
     constructor(private readonly client: FireflyClientWithCerts) {}
 
     async getBills(): Promise<BillRead[]> {

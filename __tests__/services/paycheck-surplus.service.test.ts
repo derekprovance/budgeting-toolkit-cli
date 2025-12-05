@@ -171,13 +171,13 @@ describe('PaycheckSurplusService', () => {
                 expect(result.value).toBe(-2000.0);
                 expect(mockLogger.warn).toHaveBeenCalledWith(
                     {
-                        paycheck: {
+                        transaction: {
                             amount: 'invalid',
                             category_name: 'Paycheck',
                             source_type: 'Revenue account',
                         },
                     },
-                    'Invalid paycheck amount found'
+                    'Invalid transaction amount found'
                 );
             }
         });

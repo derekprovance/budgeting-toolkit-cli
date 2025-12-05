@@ -14,9 +14,9 @@ import {
     AIResponse,
     LLMTransactionProcessingService,
 } from './ai/llm-transaction-processing.service.js';
-import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
+import { CategorizeMode } from '../types/enums.js';
 import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
-import { CategorizeStatus } from '../types/enum/categorize-status.enum.js';
+import { CategorizeStatus } from '../types/enums.js';
 import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { TransactionValidatorService } from './core/transaction-validator.service.js';
 import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';

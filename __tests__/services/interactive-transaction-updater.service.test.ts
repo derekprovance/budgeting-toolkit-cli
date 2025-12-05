@@ -3,8 +3,6 @@ import { TransactionService } from '../../src/services/core/transaction.service.
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { TransactionAIResultValidator } from '../../src/services/core/transaction-ai-result-validator.service.js';
 import { UserInputService } from '../../src/services/user-input.service.js';
-import { CategorizeMode } from '../../src/types/enum/categorize-mode.enum.js';
-import { EditTransactionAttribute } from '../../src/types/enum/edit-transaction-attribute.enum.js';
 import {
     TransactionSplit,
     CategoryProperties,
@@ -12,6 +10,7 @@ import {
     TransactionRead,
 } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
+import { CategorizeMode, EditTransactionAttribute } from '../../src/types/enums.js';
 
 // Mock the logger to prevent console output during tests
 jest.mock('../../src/logger', () => ({

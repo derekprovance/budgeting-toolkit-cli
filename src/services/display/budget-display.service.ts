@@ -1,9 +1,10 @@
 import chalk, { ChalkInstance } from 'chalk';
-import { BudgetReport } from '../../types/interface/budget-report.interface.js';
+import { BudgetReportDto as BudgetReport } from '../../types/dto/budget-report.dto.js';
 import { BaseTransactionDisplayService } from './base-transaction-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 
 /**
  * Service for formatting and displaying budget information
@@ -215,7 +216,7 @@ export class BudgetDisplayService {
     }
 
     private formatCurrencyWithSymbol(amount: number, symbol: string): string {
-        return `${symbol}${amount.toFixed(2)}`;
+        return DisplayFormatterUtils.formatCurrency(amount, symbol);
     }
 
     private getDailyRateIndicator(

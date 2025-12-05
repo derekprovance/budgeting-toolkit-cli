@@ -26,13 +26,12 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { TransactionAIResultValidator } from '../../src/services/core/transaction-ai-result-validator.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
-import { CategorizeMode } from '../../src/types/enum/categorize-mode.enum.js';
-import { CategorizeStatus } from '../../src/types/enum/categorize-status.enum.js';
 import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { createMockTransaction } from '../shared/test-data.js';
 import { jest } from '@jest/globals';
+import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 
 describe('AITransactionUpdateOrchestrator', () => {
     let service: AITransactionUpdateOrchestrator;

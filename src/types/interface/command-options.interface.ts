@@ -1,4 +1,4 @@
-import { CategorizeMode } from '../enum/categorize-mode.enum.js';
+import { CategorizeMode } from '../enums.js';
 
 export interface BudgetDateOptions {
     month?: number;
