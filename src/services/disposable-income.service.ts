@@ -80,6 +80,10 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<numb
      * Uses absolute values since these are expenses (negative amounts).
      */
     private calculateTotal(transactions: TransactionSplit[]): number {
-        return TransactionCalculationUtils.calculateTransactionTotal(transactions, true, this.logger);
+        return TransactionCalculationUtils.calculateTransactionTotal(
+            transactions,
+            true,
+            this.logger
+        );
     }
 }

@@ -218,7 +218,12 @@ export class ConfigManager {
     /**
      * Deep merges source object into target, only overwriting defined values
      */
-    private deepMerge<T extends Record<string, any>>(target: T, source: any): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private deepMerge<T extends Record<string, any>>(
+        target: T,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        source: any
+    ): void {
         for (const [key, value] of Object.entries(source)) {
             if (value === undefined) {
                 continue;
@@ -227,12 +232,15 @@ export class ConfigManager {
             if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
                 // Recursively merge nested objects
                 if (target[key as keyof T] && typeof target[key as keyof T] === 'object') {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     this.deepMerge(target[key as keyof T] as any, value);
                 } else {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     (target as any)[key] = value;
                 }
             } else {
                 // Direct assignment for primitives and arrays
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (target as any)[key] = value;
             }
         }

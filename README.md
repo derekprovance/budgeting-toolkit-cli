@@ -76,7 +76,7 @@ See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) fo
 |---------|---------|---------|------------|
 | **`categorize <tag>`** | AI-powered transaction categorization | `./budget.sh categorize Import-2025-06-23` | `ANTHROPIC_API_KEY` |
 | `report` | Current budget status for a month | `./budget.sh report -m 8 -y 2024` | - |
-| `variance` | Budget surplus/deficit analysis | `./budget.sh analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
+| `analyze` | Budget surplus/deficit analysis | `./budget.sh analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
 | `split <id>` | Interactive transaction splitting | `./budget.sh split 123` | - |
 
 ### Common Options

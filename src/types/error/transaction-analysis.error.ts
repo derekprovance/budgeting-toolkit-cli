@@ -3,8 +3,8 @@ import { BaseMonthYearError, BaseErrorFactory, ErrorMessages } from './base-erro
 /**
  * Error type for transaction analysis operations.
  * Provides structured error information for business logic services.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TransactionAnalysisError extends BaseMonthYearError {}
 
 /**
@@ -21,7 +21,10 @@ export enum TransactionAnalysisErrorType {
 /**
  * Helper to create transaction analysis errors with consistent structure
  */
-export class TransactionAnalysisErrorFactory extends BaseErrorFactory<TransactionAnalysisErrorType, TransactionAnalysisError> {
+export class TransactionAnalysisErrorFactory extends BaseErrorFactory<
+    TransactionAnalysisErrorType,
+    TransactionAnalysisError
+> {
     static create(
         type: TransactionAnalysisErrorType,
         month: number,
