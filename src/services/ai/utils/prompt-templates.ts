@@ -1,4 +1,5 @@
 import { LLMTransactionData } from './transaction-mapper.js';
+import { StringUtils } from '../../../utils/string.utils.js';
 
 export type AssignmentType = 'category' | 'budget';
 
@@ -90,14 +91,31 @@ export function parseAssignmentResponse(
             throw new Error(`Expected ${expectedCount} ${fieldName}, got ${results.length}`);
         }
 
-        // Validate each result is in the valid options
-        for (const result of results) {
-            if (!validOptions.includes(result)) {
-                throw new Error(`Invalid ${type}: ${result}`);
+        // Create normalized lookup map for case-insensitive matching
+        const normalizedOptions = new Map<string, string>();
+        for (const option of validOptions) {
+            const normalized = StringUtils.normalizeForMatching(option);
+            normalizedOptions.set(normalized, option);
+        }
+
+        // Validate and normalize results
+        const validatedResults: string[] = [];
+        for (let i = 0; i < results.length; i++) {
+            const result = results[i];
+            const normalized = StringUtils.normalizeForMatching(result);
+
+            if (normalizedOptions.has(normalized)) {
+                // Use the exact category/budget name from the system
+                validatedResults.push(normalizedOptions.get(normalized)!);
+            } else {
+                throw new Error(
+                    `Invalid ${type} at index ${i}: "${result}" (normalized: "${normalized}"). ` +
+                        `Available options include: ${validOptions.slice(0, 5).join(', ')}${validOptions.length > 5 ? '...' : ''}`
+                );
             }
         }
 
-        return results;
+        return validatedResults;
     } catch (error) {
         throw new Error(
             `Failed to parse ${type} assignment response: ${error instanceof Error ? error.message : String(error)}`

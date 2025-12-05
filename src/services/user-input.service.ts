@@ -24,8 +24,10 @@ export class UserInputService {
     /**
      * Asks the user whether to update a transaction with new category and/or budget
      * @param transaction The transaction to potentially update
+     * @param transactionId The transaction ID for linking
      * @param options The proposed changes to the transaction
-     * @returns Promise<boolean> Whether the user approved the changes
+     * @param updateMode The mode indicating what to update (category, budget, or both)
+     * @returns Promise<CategorizeMode> The user's choice
      * @throws Error if the transaction is invalid
      */
     async askToUpdateTransaction(
@@ -44,7 +46,7 @@ export class UserInputService {
 
         const message = this.formatUpdateMessage(transaction, transactionId, changes);
 
-        return this.promptUser(message, options);
+        return this.promptUser(message);
     }
 
     async shouldEditCategoryBudget(): Promise<string[]> {
@@ -183,34 +185,75 @@ export class UserInputService {
 
     /**
      * Gets a list of changes to be made to the transaction
+     * @param transaction The transaction being updated
+     * @param options The proposed changes (category and/or budget)
+     * @param updateMode The mode indicating what to update (category, budget, or both)
+     * @returns Array of formatted change strings to display
      */
     private getChangeList(
         transaction: TransactionSplit,
         options: TransactionUpdateOptions
     ): string[] {
-        return [
-            options.category &&
-                options.category !== transaction.category_name &&
+        const changes: string[] = [];
+
+        // Always show both fields for all modes - this gives users flexibility to manually set either field
+        // If AI has a suggestion, show as a change. Otherwise, just show current value.
+
+        // Category field
+        if (options.category) {
+            // AI has a suggestion - show as change
+            changes.push(
                 this.formatChange(
                     EditTransactionAttribute.Category,
                     transaction.category_name ?? undefined,
                     options.category
-                ),
-            options.budget &&
-                options.budget !== transaction.budget_name &&
+                )
+            );
+        } else {
+            // No AI suggestion - just show current value
+            changes.push(
+                this.formatCurrentValue(
+                    EditTransactionAttribute.Category,
+                    transaction.category_name ?? undefined
+                )
+            );
+        }
+
+        // Budget field
+        if (options.budget) {
+            // AI has a suggestion - show as change
+            changes.push(
                 this.formatChange(
                     EditTransactionAttribute.Budget,
                     transaction.budget_name ?? undefined,
                     options.budget
-                ),
-        ].filter(Boolean) as string[];
+                )
+            );
+        } else {
+            // No AI suggestion - just show current value
+            changes.push(
+                this.formatCurrentValue(
+                    EditTransactionAttribute.Budget,
+                    transaction.budget_name ?? undefined
+                )
+            );
+        }
+
+        return changes;
     }
 
     /**
-     * Formats a single change for display
+     * Formats a single change for display (old value → new value)
      */
     private formatChange(field: string, oldValue: string | undefined, newValue: string): string {
         return `${field}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}`;
+    }
+
+    /**
+     * Formats a current value for display (no change indicator)
+     */
+    private formatCurrentValue(field: string, currentValue: string | undefined): string {
+        return `${field}: ${chalk.gray(currentValue || 'None')}`;
     }
 
     /**
@@ -248,10 +291,7 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    private async promptUser(
-        message: string,
-        options: TransactionUpdateOptions
-    ): Promise<CategorizeMode> {
+    private async promptUser(message: string): Promise<CategorizeMode> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
@@ -266,21 +306,19 @@ export class UserInputService {
             },
         ];
 
-        if (options.budget) {
-            choices.push({
-                key: 'b',
-                name: 'Update only the budget',
-                value: CategorizeMode.Budget,
-            });
-        }
+        // Always offer both individual update options
+        // This allows users to manually set fields via Edit even when AI didn't suggest a value
+        choices.push({
+            key: 'b',
+            name: 'Update only the budget',
+            value: CategorizeMode.Budget,
+        });
 
-        if (options.category) {
-            choices.push({
-                key: 'c',
-                name: 'Update only the category',
-                value: CategorizeMode.Category,
-            });
-        }
+        choices.push({
+            key: 'c',
+            name: 'Update only the category',
+            value: CategorizeMode.Category,
+        });
 
         choices.push({
             key: 'e',
