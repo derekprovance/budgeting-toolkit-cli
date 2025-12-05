@@ -24,8 +24,10 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 ### Building and Running
 
 - `npm run compile` - Compile TypeScript to ESM JavaScript in `/dist`
-- `npm start -- [command] [options]` - Run in development mode with tsx
-- `./budget.sh [command] [options]` - Run compiled CLI (production mode)
+- `npm start -- [command] [options]` - Run in development mode with tsx (use this for testing/development)
+- `./budget.sh [command] [options]` - Run compiled CLI (production mode, requires compilation first)
+
+**Important:** For integration testing during development, always use `npm start` instead of `./budget.sh` to avoid compilation delays and ensure latest code changes are tested.
 
 ### Docker Development
 
@@ -258,6 +260,28 @@ Claude AI integration through `@anthropic-ai/sdk`:
 - **Batch Processing**: Handled by `ClaudeClient` with rate limiting and concurrency control
 - **Validation**: AI responses validated against available options before applying
 - **Dry-run mode**: Test AI suggestions without making changes
+
+#### Case-Insensitive Matching
+
+The LLM assignment service uses case-insensitive, whitespace-tolerant matching for categories and budgets:
+
+- **Normalization Strategy**: All category/budget names are normalized using `StringUtils.normalizeForMatching()` (trim + lowercase)
+- **AI Response Handling**: AI responses are normalized before validation in `parseAssignmentResponse()`
+- **Validator Service**: `TransactionAIResultValidator` uses normalized lookup maps for O(1) performance
+- **Preserved Casing**: Actual category/budget names (with original casing) are applied to transactions
+- **Special Characters**: Whitespace variations and special characters (e.g., "Bills & Utilities", "Children's Expenses") are preserved
+
+**Example Matches:**
+
+- AI suggests `"groceries"` → matches `"Groceries"` category
+- AI suggests `" BILLS & UTILITIES "` → matches `"Bills & Utilities"` category
+- AI suggests `"food"` → matches `"Food"` budget
+
+**Implementation Files:**
+
+- `src/utils/string.utils.ts` - Normalization utility (`normalizeForMatching()`)
+- `src/services/ai/utils/prompt-templates.ts` - AI response parsing with normalization
+- `src/services/core/transaction-ai-result-validator.service.ts` - Case-insensitive lookup maps
 
 ### User Interface and Workflow
 

@@ -4,6 +4,7 @@ import { TransactionValidatorService } from './transaction-validator.service.js'
 import { CategoryService } from './category.service.js';
 import { BudgetService } from './budget.service.js';
 import { logger } from '../../logger.js';
+import { StringUtils } from '../../utils/string.utils.js';
 
 export interface AIValidationResult {
     category?: CategoryProperties;
@@ -28,6 +29,7 @@ export class TransactionAIResultValidator {
      * Initializes lookup maps for categories and budgets.
      * Should be called before validating transactions.
      * Uses O(1) map lookups instead of O(n) array.find() for better performance.
+     * Map keys are normalized (lowercase, trimmed) for case-insensitive matching.
      */
     async initialize(): Promise<void> {
         const [categories, budgets] = await Promise.all([
@@ -35,15 +37,17 @@ export class TransactionAIResultValidator {
             this.budgetService.getBudgets(),
         ]);
 
-        // Build O(1) lookup maps
+        // Build O(1) lookup maps with normalized keys for case-insensitive matching
         this.categoryLookup = new Map(
             categories
                 .filter(c => c?.name) // Filter out categories without names
-                .map(c => [c.name!, c])
+                .map(c => [StringUtils.normalizeForMatching(c.name!), c])
         );
 
         this.budgetLookup = new Map(
-            budgets.filter(b => b.attributes?.name).map(b => [b.attributes.name, b])
+            budgets
+                .filter(b => b.attributes?.name)
+                .map(b => [StringUtils.normalizeForMatching(b.attributes.name), b])
         );
 
         logger.debug(
@@ -75,7 +79,23 @@ export class TransactionAIResultValidator {
         // Validate category if provided
         let category: CategoryProperties | undefined;
         if (aiCategory && aiCategory !== '') {
-            category = this.categoryLookup.get(aiCategory);
+            // Normalize for case-insensitive lookup
+            const normalizedKey = StringUtils.normalizeForMatching(aiCategory);
+            category = this.categoryLookup.get(normalizedKey);
+
+            // Log validation result for debugging
+            logger.trace(
+                {
+                    transactionId,
+                    description,
+                    aiCategory,
+                    normalizedKey,
+                    foundInMap: !!category,
+                    categoryName: category?.name,
+                    mapSize: this.categoryLookup.size,
+                },
+                'Category validation and lookup'
+            );
 
             if (!category) {
                 const error: TransactionValidationError = {
@@ -86,7 +106,9 @@ export class TransactionAIResultValidator {
                     transactionDescription: description,
                     details: {
                         suggestedCategory: aiCategory,
-                        availableCategories: Array.from(this.categoryLookup.keys()).slice(0, 10),
+                        availableCategories: Array.from(this.categoryLookup.values())
+                            .map(c => c.name)
+                            .slice(0, 10),
                     },
                 };
 
@@ -95,6 +117,7 @@ export class TransactionAIResultValidator {
                         transactionId,
                         description,
                         aiCategory,
+                        normalizedKey,
                         availableCount: this.categoryLookup.size,
                     },
                     error.message
@@ -110,7 +133,9 @@ export class TransactionAIResultValidator {
         // Validate budget if provided and appropriate for transaction type
         let budget: BudgetRead | undefined;
         if (shouldUpdateBudget && aiBudget && aiBudget !== '') {
-            budget = this.budgetLookup.get(aiBudget);
+            // Normalize for case-insensitive lookup
+            const normalizedKey = StringUtils.normalizeForMatching(aiBudget);
+            budget = this.budgetLookup.get(normalizedKey);
 
             if (!budget) {
                 const error: TransactionValidationError = {
@@ -121,7 +146,9 @@ export class TransactionAIResultValidator {
                     transactionDescription: description,
                     details: {
                         suggestedBudget: aiBudget,
-                        availableBudgets: Array.from(this.budgetLookup.keys()).slice(0, 10),
+                        availableBudgets: Array.from(this.budgetLookup.values())
+                            .map(b => b.attributes.name)
+                            .slice(0, 10),
                     },
                 };
 
@@ -130,6 +157,7 @@ export class TransactionAIResultValidator {
                         transactionId,
                         description,
                         aiBudget,
+                        normalizedKey,
                         availableCount: this.budgetLookup.size,
                     },
                     error.message
@@ -156,31 +184,59 @@ export class TransactionAIResultValidator {
     }
 
     /**
-     * Gets a category by name using O(1) lookup
+     * Gets a category by name using O(1) lookup with case-insensitive matching.
+     *
+     * Normalizes the input name (trim + lowercase) before lookup, so "Groceries",
+     * "groceries", "GROCERIES", and " Groceries " all match the same category.
+     *
+     * @param name - The category name to look up (case-insensitive)
+     * @returns The matching CategoryProperties object, or undefined if not found
+     *
+     * @example
+     * // All of these return the same category:
+     * getCategoryByName("Groceries")
+     * getCategoryByName("groceries")
+     * getCategoryByName(" GROCERIES ")
      */
     getCategoryByName(name: string): CategoryProperties | undefined {
-        return this.categoryLookup.get(name);
+        return this.categoryLookup.get(StringUtils.normalizeForMatching(name));
     }
 
     /**
-     * Gets a budget by name using O(1) lookup
+     * Gets a budget by name using O(1) lookup with case-insensitive matching.
+     *
+     * Normalizes the input name (trim + lowercase) before lookup, so "Food",
+     * "food", "FOOD", and " Food " all match the same budget.
+     *
+     * @param name - The budget name to look up (case-insensitive)
+     * @returns The matching BudgetRead object, or undefined if not found
+     *
+     * @example
+     * // All of these return the same budget:
+     * getBudgetByName("Food")
+     * getBudgetByName("food")
+     * getBudgetByName(" FOOD ")
      */
     getBudgetByName(name: string): BudgetRead | undefined {
-        return this.budgetLookup.get(name);
+        return this.budgetLookup.get(StringUtils.normalizeForMatching(name));
     }
 
     /**
-     * Gets all available category names
+     * Gets all available category names (returns actual names, not normalized keys)
      */
     getAvailableCategoryNames(): string[] {
-        return Array.from(this.categoryLookup.keys()).sort();
+        return Array.from(this.categoryLookup.values())
+            .map(c => c.name!)
+            .sort();
     }
 
     /**
-     * Gets all available budget names
+     * Gets all available budget names (returns actual names, not normalized keys)
      */
     getAvailableBudgetNames(): string[] {
-        return Array.from(this.budgetLookup.keys()).sort();
+        return Array.from(this.budgetLookup.values())
+            .map(b => b.attributes.name)
+            .sort();
     }
 
     /**

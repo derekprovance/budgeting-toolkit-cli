@@ -325,7 +325,7 @@ describe('prompt-templates', () => {
 
                 expect(() =>
                     parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Invalid category: InvalidCategory');
+                ).toThrow('Invalid category at index 0: "InvalidCategory"');
             });
 
             it('should throw error when budget is not in valid options', () => {
@@ -334,7 +334,7 @@ describe('prompt-templates', () => {
                 });
 
                 expect(() => parseAssignmentResponse('budget', response, 3, validBudgets)).toThrow(
-                    'Invalid budget: InvalidBudget'
+                    'Invalid budget at index 1: "InvalidBudget"'
                 );
             });
 
@@ -386,25 +386,48 @@ describe('prompt-templates', () => {
                 expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
             });
 
-            it('should throw error for case-sensitive category mismatch', () => {
+            it('should handle case-insensitive category matching', () => {
                 const response = JSON.stringify({
-                    categories: ['groceries', 'Healthcare', 'Shopping'],
+                    categories: ['groceries', 'HEALTHCARE', 'Shopping'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Invalid category: groceries');
+                const result = parseAssignmentResponse('category', response, 3, validCategories);
+
+                // Should normalize to the exact case from validCategories
+                expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
             });
 
             it('should handle whitespace in response', () => {
                 // The valid option has no whitespace, response has extra space
                 const response = JSON.stringify({
-                    categories: ['Groceries ', 'Healthcare', 'Shopping'],
+                    categories: ['Groceries ', ' Healthcare', '  Shopping  '],
+                });
+
+                const result = parseAssignmentResponse('category', response, 3, validCategories);
+
+                // Should trim and match correctly
+                expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
+            });
+
+            it('should handle mixed case and whitespace variations', () => {
+                const response = JSON.stringify({
+                    categories: [' GROCERIES ', '  healthcare', 'ShOpPiNg '],
+                });
+
+                const result = parseAssignmentResponse('category', response, 3, validCategories);
+
+                // Should normalize all variations to exact matches
+                expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
+            });
+
+            it('should throw error for truly invalid category after normalization', () => {
+                const response = JSON.stringify({
+                    categories: ['InvalidCategory', 'Healthcare', 'Shopping'],
                 });
 
                 expect(() =>
                     parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Invalid category: Groceries ');
+                ).toThrow('Invalid category at index 0: "InvalidCategory"');
             });
         });
     });

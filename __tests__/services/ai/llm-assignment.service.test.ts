@@ -27,6 +27,7 @@ describe('LLMAssignmentService', () => {
             warn: jest.fn<(obj: unknown, msg: string) => void>(),
             error: jest.fn<(obj: unknown, msg: string) => void>(),
             debug: jest.fn<(obj: unknown, msg: string) => void>(),
+            trace: jest.fn<(obj: unknown, msg: string) => void>(),
         } as jest.Mocked<ILogger>;
 
         // Create mock Claude client
@@ -52,7 +53,9 @@ describe('LLMAssignmentService', () => {
                 description: 'Assign categories',
                 parameters: {},
             }),
-            parseAssignmentResponse: jest.fn(),
+            parseAssignmentResponse: jest.fn().mockImplementation(() => {
+                throw new Error('parseAssignmentResponse mock not configured for this test');
+            }),
             logger: mockLogger,
         } as jest.Mocked<LLMAssignmentDependencies>;
 

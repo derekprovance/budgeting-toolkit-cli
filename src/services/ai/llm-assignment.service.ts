@@ -140,6 +140,19 @@ export class LLMAssignmentService {
                 validOptions
             );
 
+            // Log each transaction's AI assignment for debugging
+            assignments.forEach((assignment, index) => {
+                this.deps.logger.trace(
+                    {
+                        index,
+                        transactionDescription: transactionData[index]?.description,
+                        aiResponse: assignment,
+                        isPlaceholder: assignment === `(no ${type})`,
+                    },
+                    `AI ${type} assignment result`
+                );
+            });
+
             this.deps.logger.debug(
                 {
                     type,
