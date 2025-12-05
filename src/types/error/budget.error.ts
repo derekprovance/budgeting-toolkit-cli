@@ -1,13 +1,10 @@
-import { ValidationError } from '../result.type.js';
+import { BaseMonthYearError, BaseErrorFactory, ErrorMessages } from './base-error.factory.js';
 
 /**
  * Error type for budget-related operations.
  */
-export interface BudgetError extends ValidationError {
-    month: number;
-    year: number;
-    operation: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BudgetError extends BaseMonthYearError {}
 
 /**
  * Error types for budget operations
@@ -24,7 +21,7 @@ export enum BudgetErrorType {
 /**
  * Factory for creating budget errors with consistent structure
  */
-export class BudgetErrorFactory {
+export class BudgetErrorFactory extends BaseErrorFactory<BudgetErrorType, BudgetError> {
     static create(
         type: BudgetErrorType,
         month: number,
@@ -32,32 +29,20 @@ export class BudgetErrorFactory {
         operation: string,
         originalError?: Error
     ): BudgetError {
-        const messages = this.getMessages(type, month, operation, originalError);
-
-        return {
-            field: type,
-            message: messages.technical,
-            userMessage: messages.user,
-            month,
-            year,
-            operation,
-            details: originalError
-                ? {
-                      originalError: originalError.message,
-                      errorType: originalError.constructor.name,
-                  }
-                : undefined,
-        };
+        const instance = new BudgetErrorFactory();
+        const messages = instance.getMessages(type, month, year, operation, originalError);
+        return this.createError(type, month, year, operation, messages, originalError);
     }
 
-    private static getMessages(
+    protected getMessages(
         type: BudgetErrorType,
         month: number,
+        year: number,
         operation: string,
         originalError?: Error
-    ): { technical: string; user: string } {
-        const monthStr = `month ${month}`;
-        const errorDetail = originalError ? `: ${originalError.message}` : '';
+    ): ErrorMessages {
+        const monthStr = this.buildMonthString(month);
+        const errorDetail = this.buildErrorDetail(originalError);
 
         switch (type) {
             case BudgetErrorType.INVALID_DATE:

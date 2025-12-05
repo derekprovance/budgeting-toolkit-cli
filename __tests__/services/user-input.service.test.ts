@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { CategorizeMode } from '../../src/types/enum/categorize-mode.enum.js';
+import { CategorizeMode } from '../../src/types/enums.js';
 
 // Create mock functions first
 const mockExpand = jest.fn();

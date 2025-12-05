@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { AppConfig, ExcludedTransaction } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
-import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
+import { ValidTransfer } from '../types/common.types.js';
 
 /**
  * YAML configuration file structure (maps to AppConfig)
@@ -182,11 +182,9 @@ export class ConfigManager {
         if (yamlConfig.validDestinationAccounts) {
             config.accounts.validDestinationAccounts = yamlConfig.validDestinationAccounts;
         }
-
         if (yamlConfig.validExpenseAccounts) {
             config.accounts.validExpenseAccounts = yamlConfig.validExpenseAccounts;
         }
-
         if (yamlConfig.validTransfers) {
             config.accounts.validTransfers = yamlConfig.validTransfers;
         }
@@ -196,15 +194,12 @@ export class ConfigManager {
             config.transactions.excludedAdditionalIncomePatterns =
                 yamlConfig.excludedAdditionalIncomePatterns;
         }
-
         if (yamlConfig.excludeDisposableIncome !== undefined) {
             config.transactions.excludeDisposableIncome = yamlConfig.excludeDisposableIncome;
         }
-
         if (yamlConfig.expectedMonthlyPaycheck !== undefined) {
             config.transactions.expectedMonthlyPaycheck = yamlConfig.expectedMonthlyPaycheck;
         }
-
         if (yamlConfig.excludedTransactions) {
             config.transactions.excludedTransactions = yamlConfig.excludedTransactions;
         }
@@ -214,55 +209,31 @@ export class ConfigManager {
             config.api.firefly.noNameExpenseAccountId = yamlConfig.firefly.noNameExpenseAccountId;
         }
 
-        // LLM Configuration
+        // LLM Configuration - Use deep merge for nested structures
         if (yamlConfig.llm) {
-            if (yamlConfig.llm.model !== undefined) {
-                config.llm.model = yamlConfig.llm.model;
-            }
-            if (yamlConfig.llm.temperature !== undefined) {
-                config.llm.temperature = yamlConfig.llm.temperature;
-            }
-            if (yamlConfig.llm.maxTokens !== undefined) {
-                config.llm.maxTokens = yamlConfig.llm.maxTokens;
-            }
-            if (yamlConfig.llm.batchSize !== undefined) {
-                config.llm.batchSize = yamlConfig.llm.batchSize;
-            }
-            if (yamlConfig.llm.maxConcurrent !== undefined) {
-                config.llm.maxConcurrent = yamlConfig.llm.maxConcurrent;
-            }
-            if (yamlConfig.llm.retryDelayMs !== undefined) {
-                config.llm.retryDelayMs = yamlConfig.llm.retryDelayMs;
-            }
-            if (yamlConfig.llm.maxRetryDelayMs !== undefined) {
-                config.llm.maxRetryDelayMs = yamlConfig.llm.maxRetryDelayMs;
+            this.deepMerge(config.llm, yamlConfig.llm);
+        }
+    }
+
+    /**
+     * Deep merges source object into target, only overwriting defined values
+     */
+    private deepMerge<T extends Record<string, any>>(target: T, source: any): void {
+        for (const [key, value] of Object.entries(source)) {
+            if (value === undefined) {
+                continue;
             }
 
-            // Rate Limit Configuration
-            if (yamlConfig.llm.rateLimit) {
-                if (yamlConfig.llm.rateLimit.maxTokensPerMinute !== undefined) {
-                    config.llm.rateLimit.maxTokensPerMinute =
-                        yamlConfig.llm.rateLimit.maxTokensPerMinute;
+            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                // Recursively merge nested objects
+                if (target[key as keyof T] && typeof target[key as keyof T] === 'object') {
+                    this.deepMerge(target[key as keyof T] as any, value);
+                } else {
+                    (target as any)[key] = value;
                 }
-                if (yamlConfig.llm.rateLimit.refillInterval !== undefined) {
-                    config.llm.rateLimit.refillInterval = yamlConfig.llm.rateLimit.refillInterval;
-                }
-            }
-
-            // Circuit Breaker Configuration
-            if (yamlConfig.llm.circuitBreaker) {
-                if (yamlConfig.llm.circuitBreaker.failureThreshold !== undefined) {
-                    config.llm.circuitBreaker.failureThreshold =
-                        yamlConfig.llm.circuitBreaker.failureThreshold;
-                }
-                if (yamlConfig.llm.circuitBreaker.resetTimeout !== undefined) {
-                    config.llm.circuitBreaker.resetTimeout =
-                        yamlConfig.llm.circuitBreaker.resetTimeout;
-                }
-                if (yamlConfig.llm.circuitBreaker.halfOpenTimeout !== undefined) {
-                    config.llm.circuitBreaker.halfOpenTimeout =
-                        yamlConfig.llm.circuitBreaker.halfOpenTimeout;
-                }
+            } else {
+                // Direct assignment for primitives and arrays
+                (target as any)[key] = value;
             }
         }
     }

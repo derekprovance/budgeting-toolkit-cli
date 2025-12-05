@@ -1,13 +1,10 @@
-import { ValidationError } from '../result.type.js';
+import { BaseMonthYearError, BaseErrorFactory, ErrorMessages } from './base-error.factory.js';
 
 /**
  * Error type for bill-related operations.
  */
-export interface BillError extends ValidationError {
-    month: number;
-    year: number;
-    operation: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BillError extends BaseMonthYearError {}
 
 /**
  * Error types for bill operations
@@ -23,7 +20,7 @@ export enum BillErrorType {
 /**
  * Factory for creating bill errors with consistent structure
  */
-export class BillErrorFactory {
+export class BillErrorFactory extends BaseErrorFactory<BillErrorType, BillError> {
     static create(
         type: BillErrorType,
         month: number,
@@ -31,33 +28,20 @@ export class BillErrorFactory {
         operation: string,
         originalError?: Error
     ): BillError {
-        const messages = this.getMessages(type, month, year, operation, originalError);
-
-        return {
-            field: type,
-            message: messages.technical,
-            userMessage: messages.user,
-            month,
-            year,
-            operation,
-            details: originalError
-                ? {
-                      originalError: originalError.message,
-                      errorType: originalError.constructor.name,
-                  }
-                : undefined,
-        };
+        const instance = new BillErrorFactory();
+        const messages = instance.getMessages(type, month, year, operation, originalError);
+        return this.createError(type, month, year, operation, messages, originalError);
     }
 
-    private static getMessages(
+    protected getMessages(
         type: BillErrorType,
         month: number,
         year: number,
         operation: string,
         originalError?: Error
-    ): { technical: string; user: string } {
-        const monthStr = `month ${month}`;
-        const errorDetail = originalError ? `: ${originalError.message}` : '';
+    ): ErrorMessages {
+        const monthStr = this.buildMonthString(month);
+        const errorDetail = this.buildErrorDetail(originalError);
 
         switch (type) {
             case BillErrorType.INVALID_DATE:

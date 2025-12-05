@@ -2,7 +2,7 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
-import { ValidTransfer } from '../types/interface/valid-transfer.interface.js';
+import { ValidTransfer } from '../types/common.types.js';
 
 /**
  * Service for calculating unbudgeted expenses.

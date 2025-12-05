@@ -1,8 +1,9 @@
-import { ExcludedTransactionDto } from '../types/dto/excluded-transaction.dto.js';
+import { ExcludedTransactionDto } from '../types/common.types.js';
 import { logger as defaultLogger } from '../logger.js';
 import { IExcludedTransactionService } from './excluded-transaction.service.interface.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { ExcludedTransaction } from '../config/config.types.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Service for managing excluded transactions.
@@ -70,25 +71,6 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
     }
 
     private convertCurrencyToFloat(amount: string): string {
-        if (!amount) {
-            throw new Error('Amount cannot be empty');
-        }
-
-        const isNegative = amount.includes('(') && amount.includes(')');
-
-        const cleanAmount = amount
-            .replace(/[()]/g, '')
-            .replace(/[$€£¥]/g, '')
-            .replace(/,/g, '')
-            .trim();
-
-        if (!/^-?\d*\.?\d+$/.test(cleanAmount)) {
-            throw new Error(`Invalid amount format: ${amount}`);
-        }
-
-        const parsedAmount = parseFloat(cleanAmount);
-        const finalAmount = isNegative ? -Math.abs(parsedAmount) : parsedAmount;
-
-        return (Math.round(finalAmount * 100) / 100).toFixed(2);
+        return TransactionCalculationUtils.convertCurrencyToFloat(amount);
     }
 }

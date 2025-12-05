@@ -10,8 +10,8 @@ import { TransactionAIResultValidator } from './core/transaction-ai-result-valid
 import { UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
-import { CategorizeMode } from '../types/enum/categorize-mode.enum.js';
-import { EditTransactionAttribute } from '../types/enum/edit-transaction-attribute.enum.js';
+import { CategorizeMode } from '../types/enums.js';
+import { EditTransactionAttribute } from '../types/enums.js';
 
 export interface AIResults {
     category?: string;
