@@ -105,7 +105,7 @@ export const createCli = (): Command => {
         )
         .addOption(
             new Option(
-                '--skip-paycheck',
+                '-p, --skip-paycheck',
                 'Skip paycheck analysis and variance calculations'
             ).default(false)
         )
@@ -117,7 +117,7 @@ Examples:
   $ budgeting-toolkit analyze -m 6              # June, current year
   $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
   $ budgeting-toolkit an -m 3                   # March (using alias)
-  $ budgeting-toolkit an --skip-paycheck        # Skip paycheck analysis`
+  $ budgeting-toolkit an -p                    # Skip paycheck analysis`
         )
         .action(async (opts: BudgetDateOptions) => {
             try {

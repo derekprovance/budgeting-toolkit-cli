@@ -12,7 +12,7 @@ import {
 } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
 
-export class BudgetService  {
+export class BudgetService {
     private readonly dateRangeService: IDateRangeService;
 
     constructor(

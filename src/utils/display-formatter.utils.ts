@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import stripAnsi from 'strip-ansi';
 import { CurrencyUtils } from './currency.utils.js';
 
 /**
@@ -14,12 +15,13 @@ export class DisplayFormatterUtils {
 
     /**
      * Creates a header box with box drawing characters
-     * @param text Header text
+     * @param text Header text (may contain ANSI color codes)
      * @returns Formatted header with top, middle, and bottom borders
      */
     static createBoxHeader(text: string): string {
         const padding = 2;
-        const textLength = text.length;
+        // Use stripAnsi to get the actual visible text length, excluding ANSI escape codes
+        const textLength = stripAnsi(text).length;
         const totalLength = textLength + padding * 2;
 
         const topBorder = '╔' + '═'.repeat(totalLength) + '╗';
@@ -62,11 +64,7 @@ export class DisplayFormatterUtils {
      * @param positiveIsGood Whether positive values are good (default: true)
      * @returns Formatted string with sign, color, and icon
      */
-    static formatNetImpact(
-        amount: number,
-        symbol: string,
-        positiveIsGood: boolean = true
-    ): string {
+    static formatNetImpact(amount: number, symbol: string, positiveIsGood: boolean = true): string {
         const absFormatted = CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
 
         if (amount === 0) {

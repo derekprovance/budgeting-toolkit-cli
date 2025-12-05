@@ -21,7 +21,11 @@ export interface ErrorMessages {
  * Base factory class for creating domain-specific errors with consistent structure.
  * Provides common error creation logic that subclasses can extend.
  */
-export abstract class BaseErrorFactory<_TErrorType extends string, TError extends BaseMonthYearError> {
+export abstract class BaseErrorFactory<
+    _TErrorType extends string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    TError extends BaseMonthYearError,
+> {
     /**
      * Creates a structured error with technical and user-facing messages
      */
@@ -67,7 +71,7 @@ export abstract class BaseErrorFactory<_TErrorType extends string, TError extend
      * Subclasses must implement this to provide domain-specific error messages
      */
     protected abstract getMessages(
-        type: TErrorType,
+        type: _TErrorType,
         month: number,
         year: number,
         operation: string,

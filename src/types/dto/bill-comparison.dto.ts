@@ -1,4 +1,7 @@
-import { BillComparisonDto as BillComparison, BillDetailDto as BillDetail } from './bill-comparison.dto.js';
+import {
+    BillComparisonDto as BillComparison,
+    BillDetailDto as BillDetail,
+} from './bill-comparison.dto.js';
 
 /**
  * Data Transfer Object for bill comparison results

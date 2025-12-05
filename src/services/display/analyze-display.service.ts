@@ -16,8 +16,9 @@ export class AnalyzeDisplayService {
      */
     formatAnalysisReport(data: AnalyzeReportDto, verbose: boolean = false): string {
         const sections = [
-            this.formatHeader('Budget Finalization Report'),
-            this.formatMonthHeader(data.month, data.year),
+            this.formatHeader(
+                `Budget Finalization Report + ${this.formatMonthHeader(data.month, data.year)}`
+            ),
             this.formatIncomeSection(data, verbose),
             this.formatExpensesSection(data, verbose),
             ...(data.skipPaycheck ? [] : [this.formatPaycheckSection(data)]),
@@ -42,7 +43,7 @@ export class AnalyzeDisplayService {
         const monthName = Intl.DateTimeFormat('en', { month: 'long' }).format(
             new Date(year, month - 1)
         );
-        return `\n${chalk.cyan('📅')} ${chalk.bold(monthName + ' ' + year)}`;
+        return `${chalk.bold(monthName + ' ' + year)}`;
     }
 
     /**
@@ -178,25 +179,25 @@ export class AnalyzeDisplayService {
             ),
             '',
             chalk.bold('  Total Adjustments:'),
-            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} Additional Income:      ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
         ];
 
         // Conditionally add Paycheck Variance
         if (!data.skipPaycheck) {
             lines.push(
-                `    ${this.getStatusIcon(data.paycheckSurplus, true)} Paycheck Variance:      ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
+                `    ${this.getStatusIcon(data.paycheckSurplus, true)} ${'Paycheck Variance:'.padEnd(30)} ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
             );
         }
 
         lines.push(
-            `    ${this.getStatusIcon(data.budgetSurplus, true)} Budget Surplus:         ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.billComparison.variance, true)} Bill Variance:          ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, false)} Unbudgeted Expenses:    ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, false)}`
+            `    ${this.getStatusIcon(data.budgetSurplus, true)} ${'Budget Surplus:'.padEnd(30)} ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.billComparison.variance, true)} ${'Bill Variance:'.padEnd(30)} ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`
         );
 
         if (data.disposableIncome > 0) {
             lines.push(
-                `    ${this.getStatusIcon(-data.disposableIncome, false)} Disposable Spending:    ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
+                `    ${this.getStatusIcon(-data.disposableIncome, false)} ${'Disposable Spending:'.padEnd(30)} ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
             );
         }
 
@@ -211,7 +212,7 @@ export class AnalyzeDisplayService {
             data.disposableIncome;
 
         lines.push(
-            `    Net Position:           ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
+            `    ${'Net Position:'.padEnd(32)} ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
         );
 
         return lines.join('\n');
@@ -239,7 +240,7 @@ export class AnalyzeDisplayService {
             );
         } else {
             lines.push(
-                chalk.blue('  ✓ Balanced Month:') + chalk.white(' Maintain current approach'),
+                chalk.blueBright('  ✓ Balanced Month:') + chalk.white(' Maintain current approach'),
                 '    • Monitor recurring unbudgeted expenses',
                 '    • Consider adding buffer to monthly budget'
             );
@@ -309,12 +310,12 @@ export class AnalyzeDisplayService {
         symbol: string,
         count?: number
     ): string {
-        const formattedAmount = this.formatNetImpact(-amount, symbol, false);
+        const formattedAmount = this.formatNetImpact(-amount, symbol, true);
         const countText =
             count !== undefined
                 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
                 : '';
-        const icon = this.getStatusIcon(-amount, false);
+        const icon = this.getStatusIcon(-amount, true);
 
         return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount} ${icon}${countText}`;
     }
