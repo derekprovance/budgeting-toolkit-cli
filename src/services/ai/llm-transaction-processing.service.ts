@@ -68,6 +68,21 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
             const hasValidCategory = category && category !== '(no category)';
             const hasValidBudget = budget && budget !== '(no budget)';
 
+            // Log filtering decision for debugging
+            logger.trace(
+                {
+                    transactionId: t.transaction_journal_id,
+                    description: t.description,
+                    categoryFromAI: category,
+                    budgetFromAI: budget,
+                    hasValidCategory,
+                    hasValidBudget,
+                    willIncludeCategory: hasValidCategory,
+                    willIncludeBudget: hasValidBudget,
+                },
+                'Building AI result for transaction'
+            );
+
             acc[t.transaction_journal_id || ''] = {
                 ...(hasValidCategory && { category }),
                 ...(hasValidBudget && { budget }),

@@ -80,7 +80,9 @@ describe('UserInputService', () => {
             ).rejects.toThrow('Transaction cannot be null or undefined');
         });
 
-        it('should return Skip when no changes are proposed', async () => {
+        it('should always show both fields even when values match current', async () => {
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
                 mockTransactionId,
@@ -91,7 +93,8 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(CategorizeMode.Skip);
-            expect(mockExpand).not.toHaveBeenCalled();
+            // Should still prompt user since both fields are always displayed
+            expect(mockExpand).toHaveBeenCalled();
         });
 
         it('should prompt for category change only', async () => {
@@ -269,7 +272,7 @@ describe('UserInputService', () => {
             expect(result).toBe(CategorizeMode.Skip);
         });
 
-        it('should show only Update all and Skip choices when only category is proposed but matches budget', async () => {
+        it('should show all update options including individual category and budget', async () => {
             const mockTransactionNoBudget: Partial<TransactionSplit> = {
                 description: 'Test Transaction',
                 category_name: 'Old Category',
@@ -293,6 +296,11 @@ describe('UserInputService', () => {
                             value: CategorizeMode.Both,
                         }),
                         expect.objectContaining({
+                            key: 'b',
+                            name: 'Update only the budget',
+                            value: CategorizeMode.Budget,
+                        }),
+                        expect.objectContaining({
                             key: 'c',
                             name: 'Update only the category',
                             value: CategorizeMode.Category,
@@ -301,17 +309,6 @@ describe('UserInputService', () => {
                             key: 's',
                             name: 'Skip',
                             value: CategorizeMode.Skip,
-                        }),
-                    ]),
-                })
-            );
-            // Should not have budget option
-            expect(mockExpand).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    choices: expect.not.arrayContaining([
-                        expect.objectContaining({
-                            key: 'b',
-                            name: 'Update only the budget',
                         }),
                     ]),
                 })

@@ -233,7 +233,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     private async updateTransactionsWithAIResults(
         transactions: TransactionSplit[],
         aiResults: Record<string, { category?: string; budget?: string }>,
-        dryRun?: boolean
+        dryRun: boolean | undefined
     ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
         const results: TransactionRead[] = [];

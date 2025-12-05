@@ -37,6 +37,7 @@ export class InteractiveTransactionUpdater {
      *
      * @param transaction The transaction to update
      * @param aiResults The AI-suggested category and budget
+     * @param updateMode The mode indicating what to update (category, budget, or both)
      * @returns Result containing updated transaction or validation error
      */
     async updateTransaction(
