@@ -1,11 +1,13 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import { DateRangeService } from '../../types/interface/date-range.service.interface.js';
+import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
+import { DateUtils } from '../../utils/date.utils.js';
 
 export class BillService {
-    private readonly dateRangeService = new DateRangeService();
-
-    constructor(private readonly client: FireflyClientWithCerts) {}
+    constructor(
+        private readonly client: FireflyClientWithCerts,
+        private readonly dateRangeService: IDateRangeService
+    ) {}
 
     async getBills(): Promise<BillRead[]> {
         const results = await this.client.bills.listBill();
@@ -36,8 +38,14 @@ export class BillService {
      * Get all bills with pay_dates populated for the specified month.
      * When date range is provided, Firefly III populates the pay_dates array
      * with expected payment dates within that range.
+     *
+     * @param month - Month number (1-12)
+     * @param year - Four-digit year
+     * @returns Promise resolving to array of BillRead with populated pay_dates
+     * @throws Error if month/year is invalid or API fails
      */
     async getBillsForMonth(month: number, year: number): Promise<BillRead[]> {
+        DateUtils.validateMonthYear(month, year);
         const range = this.dateRangeService.getDateRange(month, year);
         const start = range.startDate.toISOString().split('T')[0];
         const end = range.endDate.toISOString().split('T')[0];

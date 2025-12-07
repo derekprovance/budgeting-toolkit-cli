@@ -26,6 +26,7 @@ import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionSplitService } from '../services/transaction-split.service.js';
 import { DisposableIncomeService } from '../services/disposable-income.service.js';
 import { BudgetSurplusService } from '../services/budget-surplus.service.js';
+import { DateRangeService } from '../types/interface/date-range.service.interface.js';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
@@ -75,7 +76,8 @@ export class ServiceFactory {
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
         );
-        const billService = new BillService(apiClient);
+        const dateRangeService = new DateRangeService();
+        const billService = new BillService(apiClient, dateRangeService);
         const billComparisonService = new BillComparisonService(
             billService,
             transactionService,

@@ -1,13 +1,24 @@
-import {
-    BillComparisonDto as BillComparison,
-    BillDetailDto as BillDetail,
-} from './bill-comparison.dto.js';
+/**
+ * Data Transfer Object for individual bill details.
+ * Represents a single bill's expected and actual payment for a specific month.
+ */
+export class BillDetailDto {
+    constructor(
+        public id: string,
+        public name: string,
+        /** Expected payment amount for this month (0 if not due) */
+        public predicted: number,
+        /** Actual payment amount this month */
+        public actual: number,
+        public frequency: string
+    ) {}
+}
 
 /**
  * Data Transfer Object for bill comparison results.
  * Compares expected bill payments for a specific month against actual payments.
  */
-export class BillComparisonDto implements BillComparison {
+export class BillComparisonDto {
     constructor(
         /** Total expected bill payments for this specific month */
         public predictedTotal: number,
@@ -20,7 +31,7 @@ export class BillComparisonDto implements BillComparison {
          * Formula: actualTotal - predictedTotal
          */
         public variance: number,
-        public bills: BillDetail[],
+        public bills: BillDetailDto[],
         public currencyCode: string,
         public currencySymbol: string
     ) {}
@@ -31,7 +42,7 @@ export class BillComparisonDto implements BillComparison {
     static create(
         predictedTotal: number,
         actualTotal: number,
-        bills: BillDetail[],
+        bills: BillDetailDto[],
         currencyCode: string,
         currencySymbol: string
     ): BillComparisonDto {
@@ -45,17 +56,4 @@ export class BillComparisonDto implements BillComparison {
             currencySymbol
         );
     }
-}
-
-/**
- * Data Transfer Object for individual bill details
- */
-export class BillDetailDto implements BillDetail {
-    constructor(
-        public id: string,
-        public name: string,
-        public predicted: number,
-        public actual: number,
-        public frequency: string
-    ) {}
 }
