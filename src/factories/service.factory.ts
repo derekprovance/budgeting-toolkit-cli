@@ -40,8 +40,7 @@ export class ServiceFactory {
         const transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService,
             config.api.firefly.noNameExpenseAccountId,
-            config.transactions.tags.disposableIncome,
-            config.transactions.tags.bills
+            config.transactions.tags.disposableIncome
         );
         const transactionValidatorService = new TransactionValidatorService(
             transactionClassificationService
@@ -77,7 +76,11 @@ export class ServiceFactory {
             config.api.firefly.url
         );
         const billService = new BillService(apiClient);
-        const billComparisonService = new BillComparisonService(billService, transactionService);
+        const billComparisonService = new BillComparisonService(
+            billService,
+            transactionService,
+            transactionClassificationService
+        );
         const transactionSplitService = new TransactionSplitService(apiClient);
         const disposableIncomeService = new DisposableIncomeService(
             transactionService,
