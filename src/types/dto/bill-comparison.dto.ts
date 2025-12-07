@@ -4,17 +4,20 @@ import {
 } from './bill-comparison.dto.js';
 
 /**
- * Data Transfer Object for bill comparison results
+ * Data Transfer Object for bill comparison results.
+ * Compares expected bill payments for a specific month against actual payments.
  */
 export class BillComparisonDto implements BillComparison {
     constructor(
-        public predictedMonthlyAverage: number,
-        public actualMonthlyTotal: number,
+        /** Total expected bill payments for this specific month */
+        public predictedTotal: number,
+        /** Total actual bill payments made this month */
+        public actualTotal: number,
         /**
          * Variance between actual and predicted bill amounts.
          * Positive: spent MORE than predicted (over budget)
          * Negative: spent LESS than predicted (under budget)
-         * Formula: actualMonthlyTotal - predictedMonthlyAverage
+         * Formula: actualTotal - predictedTotal
          */
         public variance: number,
         public bills: BillDetail[],
@@ -26,16 +29,16 @@ export class BillComparisonDto implements BillComparison {
      * Creates a BillComparisonDto from raw data
      */
     static create(
-        predictedMonthlyAverage: number,
-        actualMonthlyTotal: number,
+        predictedTotal: number,
+        actualTotal: number,
         bills: BillDetail[],
         currencyCode: string,
         currencySymbol: string
     ): BillComparisonDto {
-        const variance = actualMonthlyTotal - predictedMonthlyAverage;
+        const variance = actualTotal - predictedTotal;
         return new BillComparisonDto(
-            predictedMonthlyAverage,
-            actualMonthlyTotal,
+            predictedTotal,
+            actualTotal,
             variance,
             bills,
             currencyCode,

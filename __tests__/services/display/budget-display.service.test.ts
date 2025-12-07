@@ -125,8 +125,8 @@ describe('BudgetDisplayService', () => {
 
     describe('formatBillComparisonSection', () => {
         const mockComparison = {
-            predictedMonthlyAverage: 1000,
-            actualMonthlyTotal: 950,
+            predictedTotal: 1000,
+            actualTotal: 950,
             variance: -50,
             bills: [
                 { id: '1', name: 'Electric', predicted: 150, actual: 140, frequency: 'monthly' },
@@ -167,7 +167,7 @@ describe('BudgetDisplayService', () => {
         it('should handle positive variance (over budget)', () => {
             const overBudgetComparison = {
                 ...mockComparison,
-                actualMonthlyTotal: 1100,
+                actualTotal: 1100,
                 variance: 100,
             };
             const result = service.formatBillComparisonSection(overBudgetComparison, false);
@@ -176,8 +176,8 @@ describe('BudgetDisplayService', () => {
 
         it('should handle no bills configured', () => {
             const noBillsComparison = {
-                predictedMonthlyAverage: 0,
-                actualMonthlyTotal: 0,
+                predictedTotal: 0,
+                actualTotal: 0,
                 variance: 0,
                 bills: [],
                 currencyCode: 'USD',
