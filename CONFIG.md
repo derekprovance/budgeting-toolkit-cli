@@ -198,7 +198,6 @@ Custom tag names used to identify special transaction types in Firefly III.
 ```yaml
 tags:
     disposableIncome: 'Fun Money'
-    bills: 'Bills'
 ```
 
 **Type:** `object`
@@ -207,7 +206,6 @@ tags:
 ```yaml
 tags:
     disposableIncome: 'Disposable Income'
-    bills: 'Bills'
 ```
 
 **Used by:** Transaction classification, filtering logic
@@ -216,7 +214,7 @@ tags:
 
 - Only customize if you use different tag names in your Firefly III instance
 - Tag matching is exact (case-sensitive)
-- Both tags must be defined if you override this section
+- Bills are identified by their Firefly III bill linkage (`bill_id` or `subscription_id`), not by tags
 
 #### excludedTransactions
 

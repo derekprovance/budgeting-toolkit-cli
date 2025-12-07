@@ -89,8 +89,44 @@ export function createCustomAxiosInstance(config: CertificateConfig): AxiosInsta
             timeout: 30000,
         });
     } catch (error) {
-        logger.error({ error }, 'Failed to create custom axios instance with certificates');
-        logger.warn('Falling back to default axios without client certificates');
+        // Provide specific error messages for common certificate issues
+        let errorMessage = 'Failed to create custom axios instance with certificates';
+        let suggestion = '';
+
+        if (error instanceof Error) {
+            const message = error.message.toLowerCase();
+
+            if (message.includes('enoent') || message.includes('not found')) {
+                errorMessage = 'Certificate file not found';
+                suggestion =
+                    'Verify certificate paths in .env file (CLIENT_CERT_PATH or CLIENT_CERT_CA_PATH)';
+            } else if (message.includes('eacces') || message.includes('permission')) {
+                errorMessage = 'Permission denied reading certificate';
+                suggestion =
+                    'Check file permissions with ls -la <cert-path> and ensure the current user can read the file';
+            } else if (
+                message.includes('passphrase') ||
+                message.includes('decrypt') ||
+                message.includes('mac verify failure')
+            ) {
+                errorMessage = 'Invalid certificate password or corrupted P12/PFX file';
+                suggestion =
+                    'Verify CLIENT_CERT_PASSWORD is correct or that the certificate is not corrupted';
+            } else if (
+                message.includes('parse') ||
+                message.includes('invalid') ||
+                message.includes('malformed')
+            ) {
+                errorMessage = 'Invalid certificate format';
+                suggestion = 'Ensure the certificate is a valid PEM or P12/PFX file';
+            }
+        }
+
+        logger.error({ error, suggestion }, errorMessage);
+        logger.warn(
+            'Falling back to default axios without client certificates. ' +
+                'mTLS authentication will not be available.'
+        );
         return axios.create();
     }
 }

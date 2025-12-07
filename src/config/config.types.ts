@@ -56,6 +56,7 @@ export interface AccountsConfig {
     validDestinationAccounts: string[];
     validExpenseAccounts: string[];
     validTransfers: ValidTransfer[];
+    disposableIncomeAccounts: string[];
 }
 
 /**

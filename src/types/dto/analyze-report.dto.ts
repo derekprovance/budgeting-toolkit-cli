@@ -29,6 +29,8 @@ export class AnalyzeReportDto {
         public paycheckSurplus: number, // variance: positive = surplus (earned more), negative = deficit (earned less)
 
         // Disposable Income
+        public disposableIncomeTransactions: TransactionSplit[],
+        public disposableIncomeTransfers: TransactionSplit[], // Transfers OUT that reduce balance
         public disposableIncome: number,
 
         // Calculations
@@ -58,6 +60,8 @@ export class AnalyzeReportDto {
         expectedMonthlyPaycheck: number,
         actualPaycheck: number,
         paycheckSurplus: number,
+        disposableIncomeTransactions: TransactionSplit[],
+        disposableIncomeTransfers: TransactionSplit[],
         disposableIncome: number,
         month: number,
         year: number,
@@ -103,6 +107,8 @@ export class AnalyzeReportDto {
             expectedMonthlyPaycheck,
             actualPaycheck,
             paycheckSurplus,
+            disposableIncomeTransactions,
+            disposableIncomeTransfers,
             disposableIncome,
             netImpact,
             skipPaycheck,

@@ -1,6 +1,6 @@
 import { AppConfig } from './config.types.js';
 import { Result, ValidationError } from '../types/result.type.js';
-import * as fs from 'fs';
+import { CertificateValidator } from '../utils/certificate-validator.js';
 
 /**
  * Validates application configuration format at startup.
@@ -22,6 +22,7 @@ export class ConfigValidator {
      */
     validate(config: AppConfig): Result<void, ValidationError> {
         const errors: string[] = [];
+        const warnings: string[] = [];
 
         // API Configuration Validation
         this.validateFireflyApi(config, errors);
@@ -30,7 +31,13 @@ export class ConfigValidator {
         this.validateLoggingConfig(config, errors);
 
         // Certificate Configuration Validation (optional but if present, must be valid)
-        this.validateCertificates(config, errors);
+        this.validateCertificates(config, errors, warnings);
+
+        // Display warnings if any (non-blocking)
+        if (warnings.length > 0) {
+            console.warn('\n⚠️  Certificate Warnings:');
+            warnings.forEach(warning => console.warn(`  ${warning}\n`));
+        }
 
         if (errors.length > 0) {
             return {
@@ -67,7 +74,7 @@ export class ConfigValidator {
         }
     }
 
-    private validateCertificates(config: AppConfig, errors: string[]): void {
+    private validateCertificates(config: AppConfig, errors: string[], warnings: string[]): void {
         const certs = config.api.firefly.certificates;
 
         // Certificates are optional, but if clientCertPath is specified, validate it
@@ -75,12 +82,18 @@ export class ConfigValidator {
             return;
         }
 
-        if (!fs.existsSync(certs.clientCertPath)) {
-            errors.push(`Client certificate not found: ${certs.clientCertPath}`);
-        }
+        const validator = new CertificateValidator();
 
-        if (certs.caCertPath && !fs.existsSync(certs.caCertPath)) {
-            errors.push(`CA certificate not found: ${certs.caCertPath}`);
+        // Validate client certificate
+        const clientResult = validator.validateCertificate(certs.clientCertPath, 'client');
+        errors.push(...clientResult.errors);
+        warnings.push(...clientResult.warnings);
+
+        // Validate CA certificate if provided
+        if (certs.caCertPath) {
+            const caResult = validator.validateCertificate(certs.caCertPath, 'ca');
+            errors.push(...caResult.errors);
+            warnings.push(...caResult.warnings);
         }
     }
 

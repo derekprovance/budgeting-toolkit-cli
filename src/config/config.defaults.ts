@@ -33,6 +33,7 @@ export const DEFAULT_CONFIG: AppConfig = {
         validDestinationAccounts: [],
         validExpenseAccounts: [],
         validTransfers: [],
+        disposableIncomeAccounts: [],
     },
     transactions: {
         expectedMonthlyPaycheck: undefined,

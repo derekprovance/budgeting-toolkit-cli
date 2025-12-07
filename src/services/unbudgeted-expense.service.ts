@@ -118,7 +118,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * Checks if a transaction is a regular unbudgeted expense.
      *
      * 1. Must have no budget assigned
-     * 2. Must not be tagged as a bill
+     * 2. Must not be a bill (linked via bill_id or subscription_id)
      * 3. Must not be supplemented by disposable income
      * 4. Must not be in excluded transactions list
      * 5. Must be from a valid expense account

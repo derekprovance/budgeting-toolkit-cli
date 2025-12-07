@@ -239,18 +239,17 @@ describe('UnbudgetedExpenseService', () => {
             }
         });
 
-        it('should exclude transactions tagged as bills even without bill_id', async () => {
+        it('should exclude bills identified via subscription_id', async () => {
             const mockTransactions = [
                 createMockTransaction({
-                    description: 'Bill Without ID',
+                    description: 'Bill With Subscription',
                     source_id: TestAccount.PRIMARY,
-                    tags: ['Bills'],
+                    subscription_id: 'sub-123',
                     budget_id: null,
                 }),
                 createMockTransaction({
                     description: 'Regular Expense',
                     source_id: TestAccount.PRIMARY,
-                    tags: [],
                     budget_id: null,
                 }),
             ];
@@ -263,7 +262,7 @@ describe('UnbudgetedExpenseService', () => {
             (
                 mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
             ).mockReturnValue(false);
-            // First transaction is a bill (tagged with 'Bills'), second is not
+            // First transaction is a bill (via subscription_id), second is not
             mockTransactionClassificationService.isBill
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
