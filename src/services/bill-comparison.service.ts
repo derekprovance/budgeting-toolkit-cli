@@ -5,13 +5,15 @@ import { BillComparisonService as IBillComparisonService } from '../types/interf
 import { DateUtils } from '../utils/date.utils.js';
 import { BillService } from './core/bill.service.js';
 import { TransactionService } from './core/transaction.service.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { Result } from '../types/result.type.js';
 import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
 
 export class BillComparisonService implements IBillComparisonService {
     constructor(
         private readonly billService: BillService,
-        private readonly transactionService: TransactionService
+        private readonly transactionService: TransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 
     /**
@@ -41,8 +43,8 @@ export class BillComparisonService implements IBillComparisonService {
         }
 
         try {
-            // Get active bills
-            const activeBills = await this.billService.getActiveBills();
+            // Get active bills with pay_dates populated for this month
+            const activeBills = await this.billService.getActiveBillsForMonth(month, year);
 
             if (activeBills.length === 0) {
                 logger.debug('No active bills found for year ' + year);
@@ -50,17 +52,16 @@ export class BillComparisonService implements IBillComparisonService {
                 return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
             }
 
-            // Calculate predicted monthly average from all active bills
-            const predictedMonthlyAverage = this.calculatePredictedMonthlyAverage(activeBills);
-
             // Get actual transactions for the specific month
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
             // Filter to transactions linked to bills
-            const billTransactions = transactions.filter(t => this.isLinkedToBill(t));
+            const billTransactions = transactions.filter(t =>
+                this.transactionClassificationService.isBill(t)
+            );
 
-            // Calculate actual costs and build bill details
-            const { actualMonthlyTotal, billDetails } = this.calculateActualCosts(
+            // Calculate bill details with predicted amounts based on pay_dates
+            const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
                 activeBills,
                 billTransactions
             );
@@ -76,8 +77,8 @@ export class BillComparisonService implements IBillComparisonService {
                 '$';
 
             const result = BillComparisonDto.create(
-                predictedMonthlyAverage,
-                actualMonthlyTotal,
+                predictedTotal,
+                actualTotal,
                 billDetails,
                 currencyCode,
                 currencySymbol
@@ -88,8 +89,8 @@ export class BillComparisonService implements IBillComparisonService {
                     month,
                     year,
                     billCount: activeBills.length,
-                    predictedMonthlyAverage,
-                    actualMonthlyTotal,
+                    predictedTotal,
+                    actualTotal,
                 },
                 'Bill comparison calculated successfully'
             );
@@ -122,36 +123,13 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Calculate the predicted monthly average cost from all active bills
-     * Prorates bills with different frequencies to monthly equivalents
+     * Check if a bill has a payment date within the requested period.
+     * When Firefly III returns bills with a date range, it populates pay_dates
+     * with expected payment dates within that range.
      */
-    private calculatePredictedMonthlyAverage(bills: BillRead[]): number {
-        let totalMonthlyEquivalent = 0;
-
-        logger.debug(`Calculating predicted monthly average for ${bills.length} bills`);
-
-        for (const bill of bills) {
-            const amount = this.getBillAmount(bill);
-            const frequency = bill.attributes.repeat_freq ?? 'monthly';
-            const skip = bill.attributes.skip ?? 0;
-            const monthlyAmount = this.prorateToMonthly(amount, frequency, skip);
-
-            logger.debug({
-                billName: bill.attributes.name,
-                billId: bill.id,
-                rawAmount: amount,
-                frequency,
-                skip,
-                monthlyAmount,
-                runningTotal: totalMonthlyEquivalent + monthlyAmount,
-            });
-
-            totalMonthlyEquivalent += monthlyAmount;
-        }
-
-        logger.debug({ totalMonthlyEquivalent, billCount: bills.length });
-
-        return totalMonthlyEquivalent;
+    private isBillDueThisMonth(bill: BillRead): boolean {
+        const payDates = bill.attributes.pay_dates;
+        return Array.isArray(payDates) && payDates.length > 0;
     }
 
     /**
@@ -189,66 +167,20 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Prorate bill amount to monthly equivalent based on frequency and skip
-     * @param amount - The bill amount
-     * @param frequency - How often the bill repeats (weekly, monthly, etc.)
-     * @param skip - How many periods to skip (0 = every period, 1 = every other period, etc.)
+     * Calculate bill details with predicted amounts based on pay_dates.
+     * If a bill has a pay_date in the requested period, predicted = bill amount.
+     * If a bill has no pay_date in the requested period, predicted = 0.
      */
-    private prorateToMonthly(amount: number, frequency: string, skip: number = 0): number {
-        // skip indicates how many periods are skipped
-        // skip = 0: every period (weekly, monthly, etc.)
-        // skip = 1: every 2 periods (bi-weekly, bi-monthly, etc.)
-        // skip = 2: every 3 periods, etc.
-        // Defensive: ensure periodMultiplier is at least 1
-        const periodMultiplier = Math.max(skip + 1, 1);
-
-        switch (frequency) {
-            case 'weekly':
-                // Weekly: 52 weeks per year
-                // With skip: divide by period multiplier
-                return (amount * 52) / periodMultiplier / 12;
-            case 'monthly':
-                // Monthly: 12 months per year
-                // With skip: divide by period multiplier
-                return amount / periodMultiplier;
-            case 'quarterly':
-                // Quarterly: 4 times per year = every 3 months
-                // With skip: divide by period multiplier
-                return amount / 3 / periodMultiplier;
-            case 'half-year':
-                // Half-year: 2 times per year = every 6 months
-                // With skip: divide by period multiplier
-                return amount / 6 / periodMultiplier;
-            case 'yearly':
-                // Yearly: 1 time per year = every 12 months
-                // With skip: divide by period multiplier
-                return amount / 12 / periodMultiplier;
-            default:
-                logger.warn(`Unknown bill frequency: ${frequency}, treating as monthly`);
-                return amount / periodMultiplier;
-        }
-    }
-
-    /**
-     * Check if a transaction is linked to a bill
-     * Checks both bill_id and subscription_id fields
-     */
-    private isLinkedToBill(transaction: TransactionSplit): boolean {
-        return !!(transaction.bill_id || transaction.subscription_id);
-    }
-
-    /**
-     * Calculate actual costs from transactions and build bill details
-     */
-    private calculateActualCosts(
+    private calculateBillDetails(
         bills: BillRead[],
         transactions: TransactionSplit[]
-    ): { actualMonthlyTotal: number; billDetails: BillDetailDto[] } {
-        let actualMonthlyTotal = 0;
+    ): { predictedTotal: number; actualTotal: number; billDetails: BillDetailDto[] } {
+        let predictedTotal = 0;
+        let actualTotal = 0;
         const billDetails: BillDetailDto[] = [];
 
         logger.debug(
-            `Calculating actual costs from ${transactions.length} bill-linked transactions for ${bills.length} bills`
+            `Calculating bill details from ${transactions.length} bill-linked transactions for ${bills.length} bills`
         );
 
         // Create a map of bill ID to transactions
@@ -275,29 +207,30 @@ export class BillComparisonService implements IBillComparisonService {
         for (const bill of bills) {
             const billId = bill.id;
             const billTransactions = billTransactionMap.get(billId) ?? [];
+            const frequency = bill.attributes.repeat_freq ?? 'monthly';
 
             // Calculate actual amount for this bill (sum of all transactions)
             const actualAmount = billTransactions.reduce((sum, t) => {
                 return sum + Math.abs(parseFloat(t.amount));
             }, 0);
 
-            actualMonthlyTotal += actualAmount;
+            actualTotal += actualAmount;
 
-            // Calculate predicted amount for this bill
-            const billAmount = this.getBillAmount(bill);
-            const frequency = bill.attributes.repeat_freq ?? 'monthly';
-            const skip = bill.attributes.skip ?? 0;
-            const predictedAmount = this.prorateToMonthly(billAmount, frequency, skip);
+            // Predicted amount: full bill amount if due this month, 0 if not
+            const isDue = this.isBillDueThisMonth(bill);
+            const predictedAmount = isDue ? this.getBillAmount(bill) : 0;
 
-            if (billTransactions.length > 0) {
-                logger.debug({
-                    billName: bill.attributes.name,
-                    billId,
-                    transactionCount: billTransactions.length,
-                    actualAmount,
-                    predictedAmount,
-                });
-            }
+            predictedTotal += predictedAmount;
+
+            logger.debug({
+                billName: bill.attributes.name,
+                billId,
+                isDue,
+                payDates: bill.attributes.pay_dates,
+                transactionCount: billTransactions.length,
+                actualAmount,
+                predictedAmount,
+            });
 
             billDetails.push(
                 new BillDetailDto(
@@ -310,8 +243,8 @@ export class BillComparisonService implements IBillComparisonService {
             );
         }
 
-        logger.debug({ actualMonthlyTotal, billDetailsCount: billDetails.length });
+        logger.debug({ predictedTotal, actualTotal, billDetailsCount: billDetails.length });
 
-        return { actualMonthlyTotal, billDetails };
+        return { predictedTotal, actualTotal, billDetails };
     }
 }

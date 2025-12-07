@@ -83,7 +83,6 @@ export interface ExcludedTransaction {
  */
 export interface TagsConfig {
     disposableIncome: string;
-    bills: string;
 }
 
 /**

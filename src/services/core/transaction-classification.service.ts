@@ -6,8 +6,7 @@ export class TransactionClassificationService implements ITransactionClassificat
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
         private readonly noNameExpenseAccountId: string,
-        private readonly disposableIncomeTag: string,
-        private readonly billsTag: string
+        private readonly disposableIncomeTag: string
     ) {}
 
     isTransfer(transaction: TransactionSplit): boolean {
@@ -15,7 +14,7 @@ export class TransactionClassificationService implements ITransactionClassificat
     }
 
     isBill(transaction: TransactionSplit): boolean {
-        return transaction.tags ? transaction.tags?.includes(this.billsTag) : false;
+        return !!(transaction.bill_id || transaction.subscription_id);
     }
 
     isDisposableIncome(transaction: TransactionSplit): boolean {

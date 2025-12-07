@@ -114,10 +114,10 @@ export class AnalyzeDisplayService {
         lines.push('');
         lines.push(chalk.bold('  Bills Performance'));
         lines.push(
-            `    Predicted:    ${this.formatCurrency(data.billComparison.predictedMonthlyAverage, data.currencySymbol)}`
+            `    Predicted:    ${this.formatCurrency(data.billComparison.predictedTotal, data.currencySymbol)}`
         );
         lines.push(
-            `    Actual:       ${this.formatCurrency(data.billComparison.actualMonthlyTotal, data.currencySymbol)}`
+            `    Actual:       ${this.formatCurrency(data.billComparison.actualTotal, data.currencySymbol)}`
         );
         lines.push(
             `    Variance:     ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`

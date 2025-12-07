@@ -41,7 +41,6 @@ export const DEFAULT_CONFIG: AppConfig = {
         excludedTransactions: [],
         tags: {
             disposableIncome: 'Disposable Income',
-            bills: 'Bills',
         },
     },
     llm: {

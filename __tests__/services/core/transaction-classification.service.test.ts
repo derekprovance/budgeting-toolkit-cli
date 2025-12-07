@@ -4,7 +4,6 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 
 const DISPOSABLE_INCOME_TAG = 'Disposable Income';
-const BILLS_TAG = 'Bills';
 
 describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
@@ -18,8 +17,7 @@ describe('TransactionClassificationService', () => {
         service = new TransactionClassificationService(
             mockExcludedTransactionService,
             '5', // noNameExpenseAccountId
-            DISPOSABLE_INCOME_TAG,
-            BILLS_TAG
+            DISPOSABLE_INCOME_TAG
         );
     });
 
@@ -36,25 +34,36 @@ describe('TransactionClassificationService', () => {
     });
 
     describe('isBill', () => {
-        it('should return true when transaction has Bills tag', () => {
-            const transaction = {
-                tags: [BILLS_TAG, 'other'],
-            } as TransactionSplit;
+        it('should return true when transaction has bill_id', () => {
+            const transaction = { bill_id: '123' } as TransactionSplit;
             expect(service.isBill(transaction)).toBe(true);
         });
 
-        it('should return false when transaction has no Bills tag', () => {
-            const transaction = { tags: ['other'] } as TransactionSplit;
-            expect(service.isBill(transaction)).toBe(false);
+        it('should return true when transaction has subscription_id', () => {
+            const transaction = { subscription_id: '456' } as TransactionSplit;
+            expect(service.isBill(transaction)).toBe(true);
         });
 
-        it('should return false when transaction has no tags', () => {
+        it('should return true when transaction has both bill_id and subscription_id', () => {
+            const transaction = { bill_id: '123', subscription_id: '456' } as TransactionSplit;
+            expect(service.isBill(transaction)).toBe(true);
+        });
+
+        it('should return false when transaction has no bill_id or subscription_id', () => {
             const transaction = {} as TransactionSplit;
             expect(service.isBill(transaction)).toBe(false);
         });
 
-        it('should return false when tags is null', () => {
-            const transaction = { tags: null } as TransactionSplit;
+        it('should return false when bill_id and subscription_id are null', () => {
+            const transaction = { bill_id: null, subscription_id: null } as TransactionSplit;
+            expect(service.isBill(transaction)).toBe(false);
+        });
+
+        it('should return false when bill_id and subscription_id are undefined', () => {
+            const transaction = {
+                bill_id: undefined,
+                subscription_id: undefined,
+            } as TransactionSplit;
             expect(service.isBill(transaction)).toBe(false);
         });
     });

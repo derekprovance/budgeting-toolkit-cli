@@ -164,19 +164,19 @@ export class BudgetDisplayService {
         const output: string[] = [];
         output.push('\n' + chalk.bold('=== Bill Comparison ==='));
 
-        // Format predicted monthly average
+        // Format predicted total for this month
         const predicted = this.formatCurrencyWithSymbol(
-            comparison.predictedMonthlyAverage,
+            comparison.predictedTotal,
             comparison.currencySymbol
         );
-        output.push(chalk.gray(`Predicted Monthly Avg: ${chalk.white(predicted)}`));
+        output.push(chalk.gray(`Predicted This Month:  ${chalk.white(predicted)}`));
 
-        // Format actual monthly total
+        // Format actual total for this month
         const actual = this.formatCurrencyWithSymbol(
-            comparison.actualMonthlyTotal,
+            comparison.actualTotal,
             comparison.currencySymbol
         );
-        output.push(chalk.gray(`Actual Month Total:    ${chalk.white(actual)}`));
+        output.push(chalk.gray(`Actual This Month:     ${chalk.white(actual)}`));
 
         // Format variance with color
         const variance = this.formatCurrencyWithSymbol(
