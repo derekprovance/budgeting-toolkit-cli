@@ -66,7 +66,6 @@ Edit `.env` with your credentials:
 - Temperature: `0.2`
 - Batch size: `10`
 - Disposable Income tag: `Disposable Income`
-- Bills tag: `Bills`
 
 See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) for comprehensive documentation.
 
