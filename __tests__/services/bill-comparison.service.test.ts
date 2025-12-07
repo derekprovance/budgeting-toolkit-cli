@@ -15,12 +15,17 @@ describe('BillComparisonService', () => {
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockTransactionClassificationService: jest.Mocked<ITransactionClassificationService>;
 
+    /**
+     * Creates a mock bill with pay_dates to indicate if it's due this month
+     * @param isDueThisMonth - If true, pay_dates will be populated; if false, empty array
+     */
     const createMockBill = (
         id: string,
         name: string,
         amount_avg: string,
         frequency: string,
-        skip: number = 0
+        skip: number = 0,
+        isDueThisMonth: boolean = true
     ): BillRead => ({
         type: 'bills',
         id,
@@ -34,6 +39,8 @@ describe('BillComparisonService', () => {
             skip,
             currency_code: 'USD',
             currency_symbol: '$',
+            // pay_dates populated by Firefly III when date range is passed
+            pay_dates: isDueThisMonth ? ['2024-10-15'] : [],
         },
     });
 
@@ -56,6 +63,8 @@ describe('BillComparisonService', () => {
     beforeEach(() => {
         mockBillService = {
             getActiveBills: jest.fn(),
+            getActiveBillsForMonth: jest.fn(),
+            getBillsForMonth: jest.fn(),
             getBills: jest.fn(),
             getBill: jest.fn(),
         } as unknown as jest.Mocked<BillService>;
@@ -84,10 +93,10 @@ describe('BillComparisonService', () => {
     });
 
     describe('calculateBillComparison', () => {
-        it('should calculate comparison with multiple bills', async () => {
+        it('should calculate comparison with multiple bills due this month', async () => {
             const mockBills = [
-                createMockBill('1', 'Rent', '2000', 'monthly'),
-                createMockBill('2', 'Internet', '100', 'monthly'),
+                createMockBill('1', 'Rent', '2000', 'monthly', 0, true),
+                createMockBill('2', 'Internet', '100', 'monthly', 0, true),
             ];
 
             const mockTransactions = [
@@ -95,30 +104,30 @@ describe('BillComparisonService', () => {
                 createMockTransaction('Internet Payment', '100.00', '2'),
             ];
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(2100);
-                expect(result.value.actualMonthlyTotal).toBe(2100);
+                expect(result.value.predictedTotal).toBe(2100);
+                expect(result.value.actualTotal).toBe(2100);
                 expect(result.value.variance).toBe(0);
                 expect(result.value.bills).toHaveLength(2);
             }
         });
 
         it('should handle empty bills gracefully', async () => {
-            mockBillService.getActiveBills.mockResolvedValue([]);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(0);
-                expect(result.value.actualMonthlyTotal).toBe(0);
+                expect(result.value.predictedTotal).toBe(0);
+                expect(result.value.actualTotal).toBe(0);
                 expect(result.value.variance).toBe(0);
                 expect(result.value.bills).toEqual([]);
             }
@@ -133,61 +142,75 @@ describe('BillComparisonService', () => {
         });
 
         it('should calculate variance correctly', async () => {
-            const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly')];
+            const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
             const mockTransactions = [createMockTransaction('Subscription Payment', '60.00', '1')];
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(50);
-                expect(result.value.actualMonthlyTotal).toBe(60);
+                expect(result.value.predictedTotal).toBe(50);
+                expect(result.value.actualTotal).toBe(60);
                 expect(result.value.variance).toBe(10); // actual - predicted
             }
         });
 
-        it('should handle bills with different frequencies', async () => {
+        it('should show full amount for bills due this month regardless of frequency', async () => {
+            // All bills are due this month (pay_dates populated)
             const mockBills = [
-                createMockBill('1', 'Monthly', '100', 'monthly'),
-                createMockBill('2', 'Yearly', '1200', 'yearly'), // 100/month
-                createMockBill('3', 'Quarterly', '300', 'quarterly'), // 100/month
+                createMockBill('1', 'Monthly', '100', 'monthly', 0, true),
+                createMockBill('2', 'Yearly', '1200', 'yearly', 0, true), // Full $1200 if due
+                createMockBill('3', 'Quarterly', '300', 'quarterly', 0, true), // Full $300 if due
             ];
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(300); // 100 + 100 + 100
+                // All three bills are due, so total = 100 + 1200 + 300
+                expect(result.value.predictedTotal).toBe(1600);
             }
         });
 
-        it('should handle bills with skip values', async () => {
+        it('should show zero for bills not due this month', async () => {
+            // Mix of bills due and not due
             const mockBills = [
-                createMockBill('1', 'Bi-weekly', '130', 'weekly', 1), // 130 * 52 / 2 / 12 = 281.67
-                createMockBill('2', 'Bi-monthly', '80', 'monthly', 1), // 80 / 2 = 40
+                createMockBill('1', 'Monthly Due', '100', 'monthly', 0, true),
+                createMockBill('2', 'Yearly Not Due', '1200', 'yearly', 0, false),
+                createMockBill('3', 'Quarterly Not Due', '300', 'quarterly', 0, false),
             ];
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBeCloseTo(321.67, 2); // 281.67 + 40
+                // Only monthly bill is due
+                expect(result.value.predictedTotal).toBe(100);
+
+                // Check individual bill predictions
+                const monthlyBill = result.value.bills.find(b => b.id === '1');
+                const yearlyBill = result.value.bills.find(b => b.id === '2');
+                const quarterlyBill = result.value.bills.find(b => b.id === '3');
+
+                expect(monthlyBill?.predicted).toBe(100);
+                expect(yearlyBill?.predicted).toBe(0);
+                expect(quarterlyBill?.predicted).toBe(0);
             }
         });
 
         it('should map transactions to bills correctly', async () => {
             const mockBills = [
-                createMockBill('1', 'Bill A', '100', 'monthly'),
-                createMockBill('2', 'Bill B', '200', 'monthly'),
+                createMockBill('1', 'Bill A', '100', 'monthly', 0, true),
+                createMockBill('2', 'Bill B', '200', 'monthly', 0, true),
             ];
 
             const mockTransactions = [
@@ -196,7 +219,7 @@ describe('BillComparisonService', () => {
                 createMockTransaction('Payment B2', '100.00', '2'),
             ];
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -212,20 +235,20 @@ describe('BillComparisonService', () => {
         });
 
         it('should handle transactions without bill_id', async () => {
-            const mockBills = [createMockBill('1', 'Bill A', '100', 'monthly')];
+            const mockBills = [createMockBill('1', 'Bill A', '100', 'monthly', 0, true)];
             const unbilledTransaction: TransactionSplit = {
                 ...createMockTransaction('Unbilled', '50.00', ''),
                 bill_id: null,
             };
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([unbilledTransaction]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.actualMonthlyTotal).toBe(0); // Unbilled transaction not counted
+                expect(result.value.actualTotal).toBe(0); // Unbilled transaction not counted
             }
         });
 
@@ -240,11 +263,12 @@ describe('BillComparisonService', () => {
                     amount_min: '100',
                     amount_max: '100',
                     repeat_freq: 'monthly',
+                    pay_dates: ['2024-10-15'],
                     // No currency fields
                 },
             };
 
-            mockBillService.getActiveBills.mockResolvedValue([billWithoutCurrency]);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([billWithoutCurrency]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -257,14 +281,14 @@ describe('BillComparisonService', () => {
         });
 
         it('should handle bills with subscription_id instead of bill_id', async () => {
-            const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly')];
+            const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
             const transactionWithSubscriptionId: TransactionSplit = {
                 ...createMockTransaction('Sub Payment', '50.00', ''),
                 bill_id: null,
                 subscription_id: '1',
             };
 
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([
                 transactionWithSubscriptionId,
             ]);
@@ -273,7 +297,7 @@ describe('BillComparisonService', () => {
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.actualMonthlyTotal).toBe(50);
+                expect(result.value.actualTotal).toBe(50);
             }
         });
 
@@ -288,17 +312,18 @@ describe('BillComparisonService', () => {
                     amount_min: 'also invalid',
                     amount_max: 'still invalid',
                     repeat_freq: 'monthly',
+                    pay_dates: ['2024-10-15'],
                 },
             };
 
-            mockBillService.getActiveBills.mockResolvedValue([invalidBill]);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([invalidBill]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(0); // Invalid amount defaults to 0
+                expect(result.value.predictedTotal).toBe(0); // Invalid amount defaults to 0
             }
         });
 
@@ -313,22 +338,23 @@ describe('BillComparisonService', () => {
                     amount_min: '-100',
                     amount_max: '-100',
                     repeat_freq: 'monthly',
+                    pay_dates: ['2024-10-15'],
                 },
             };
 
-            mockBillService.getActiveBills.mockResolvedValue([negativeBill]);
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([negativeBill]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(0); // Negative amount defaults to 0
+                expect(result.value.predictedTotal).toBe(0); // Negative amount defaults to 0
             }
         });
 
         it('should handle errors from bill service', async () => {
-            mockBillService.getActiveBills.mockRejectedValue(new Error('API Error'));
+            mockBillService.getActiveBillsForMonth.mockRejectedValue(new Error('API Error'));
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
             expect(result.ok).toBe(false);
@@ -340,8 +366,8 @@ describe('BillComparisonService', () => {
         });
 
         it('should handle errors from transaction service', async () => {
-            const mockBills = [createMockBill('1', 'Test Bill', '100', 'monthly')];
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+            const mockBills = [createMockBill('1', 'Test Bill', '100', 'monthly', 0, true)];
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockRejectedValue(
                 new Error('Transaction Error')
             );
@@ -356,71 +382,59 @@ describe('BillComparisonService', () => {
         });
     });
 
-    describe('prorateToMonthly', () => {
-        it('should prorate weekly bills correctly', async () => {
-            const mockBills = [createMockBill('1', 'Weekly', '52', 'weekly')];
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+    describe('isBillDueThisMonth', () => {
+        it('should return true when pay_dates is populated', async () => {
+            const mockBills = [createMockBill('1', 'Due Bill', '100', 'monthly', 0, true)];
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                // 52 * 52 / 12 = 225.33...
-                expect(result.value.predictedMonthlyAverage).toBeCloseTo(225.33, 2);
+                expect(result.value.predictedTotal).toBe(100);
             }
         });
 
-        it('should prorate quarterly bills correctly', async () => {
-            const mockBills = [createMockBill('1', 'Quarterly', '300', 'quarterly')];
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+        it('should return false when pay_dates is empty', async () => {
+            const mockBills = [createMockBill('1', 'Not Due Bill', '100', 'monthly', 0, false)];
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(100); // 300 / 3
+                expect(result.value.predictedTotal).toBe(0);
             }
         });
 
-        it('should prorate half-year bills correctly', async () => {
-            const mockBills = [createMockBill('1', 'Half-Year', '600', 'half-year')];
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
+        it('should handle bill without pay_dates field', async () => {
+            const billWithoutPayDates: BillRead = {
+                type: 'bills',
+                id: '1',
+                attributes: {
+                    name: 'Bill without pay_dates',
+                    active: true,
+                    amount_avg: '100',
+                    amount_min: '100',
+                    amount_max: '100',
+                    repeat_freq: 'monthly',
+                    currency_code: 'USD',
+                    currency_symbol: '$',
+                    // No pay_dates field
+                },
+            };
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([billWithoutPayDates]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(100); // 600 / 6
-            }
-        });
-
-        it('should handle skip parameter with weekly bills', async () => {
-            const mockBills = [createMockBill('1', 'Bi-weekly', '100', 'weekly', 1)];
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
-
-            const result = await billComparisonService.calculateBillComparison(10, 2024);
-
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                // 100 * 52 / 2 / 12 = 216.67
-                expect(result.value.predictedMonthlyAverage).toBeCloseTo(216.67, 2);
-            }
-        });
-
-        it('should handle skip parameter with monthly bills', async () => {
-            const mockBills = [createMockBill('1', 'Bi-monthly', '100', 'monthly', 1)];
-            mockBillService.getActiveBills.mockResolvedValue(mockBills);
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
-
-            const result = await billComparisonService.calculateBillComparison(10, 2024);
-
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                expect(result.value.predictedMonthlyAverage).toBe(50); // 100 / 2
+                // Without pay_dates, bill is considered not due
+                expect(result.value.predictedTotal).toBe(0);
             }
         });
     });

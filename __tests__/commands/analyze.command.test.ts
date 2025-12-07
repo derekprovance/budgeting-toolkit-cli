@@ -88,8 +88,8 @@ describe('AnalyzeCommand', () => {
         } as unknown as jest.Mocked<BudgetSurplusService>;
 
         const mockBillComparison: BillComparisonDto = {
-            predictedMonthlyAverage: 1200,
-            actualMonthlyTotal: 1250,
+            predictedTotal: 1200,
+            actualTotal: 1250,
             variance: 50,
             bills: [],
             currencyCode: 'USD',
@@ -171,8 +171,8 @@ describe('AnalyzeCommand', () => {
                 value: emptyBudgetSurplusResult,
             });
             const emptyBillComparison: BillComparisonDto = {
-                predictedMonthlyAverage: 0,
-                actualMonthlyTotal: 0,
+                predictedTotal: 0,
+                actualTotal: 0,
                 variance: 0,
                 bills: [],
                 currencyCode: 'USD',

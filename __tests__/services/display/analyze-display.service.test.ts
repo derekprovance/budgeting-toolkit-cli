@@ -71,8 +71,8 @@ describe('AnalyzeDisplayService', () => {
         budgetSurplus: 500,
         disposableIncome: 0,
         billComparison: {
-            predictedMonthlyAverage: 1000,
-            actualMonthlyTotal: 950,
+            predictedTotal: 1000,
+            actualTotal: 950,
             variance: -50,
             bills: [],
             currencyCode: 'USD',
