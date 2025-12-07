@@ -5,13 +5,15 @@ import { BillComparisonService as IBillComparisonService } from '../types/interf
 import { DateUtils } from '../utils/date.utils.js';
 import { BillService } from './core/bill.service.js';
 import { TransactionService } from './core/transaction.service.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { Result } from '../types/result.type.js';
 import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
 
 export class BillComparisonService implements IBillComparisonService {
     constructor(
         private readonly billService: BillService,
-        private readonly transactionService: TransactionService
+        private readonly transactionService: TransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 
     /**
@@ -57,7 +59,9 @@ export class BillComparisonService implements IBillComparisonService {
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
             // Filter to transactions linked to bills
-            const billTransactions = transactions.filter(t => this.isLinkedToBill(t));
+            const billTransactions = transactions.filter(t =>
+                this.transactionClassificationService.isBill(t)
+            );
 
             // Calculate actual costs and build bill details
             const { actualMonthlyTotal, billDetails } = this.calculateActualCosts(
@@ -227,14 +231,6 @@ export class BillComparisonService implements IBillComparisonService {
                 logger.warn(`Unknown bill frequency: ${frequency}, treating as monthly`);
                 return amount / periodMultiplier;
         }
-    }
-
-    /**
-     * Check if a transaction is linked to a bill
-     * Checks both bill_id and subscription_id fields
-     */
-    private isLinkedToBill(transaction: TransactionSplit): boolean {
-        return !!(transaction.bill_id || transaction.subscription_id);
     }
 
     /**

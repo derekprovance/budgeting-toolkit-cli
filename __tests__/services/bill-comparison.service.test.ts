@@ -1,6 +1,7 @@
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { BillService } from '../../src/services/core/bill.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 
@@ -12,6 +13,7 @@ describe('BillComparisonService', () => {
     let billComparisonService: BillComparisonService;
     let mockBillService: jest.Mocked<BillService>;
     let mockTransactionService: jest.Mocked<TransactionService>;
+    let mockTransactionClassificationService: jest.Mocked<ITransactionClassificationService>;
 
     const createMockBill = (
         id: string,
@@ -63,7 +65,22 @@ describe('BillComparisonService', () => {
                 jest.fn<(month: number, year: number) => Promise<TransactionSplit[]>>(),
         } as unknown as jest.Mocked<TransactionService>;
 
-        billComparisonService = new BillComparisonService(mockBillService, mockTransactionService);
+        mockTransactionClassificationService = {
+            isBill: jest.fn((t: TransactionSplit) => !!(t.bill_id || t.subscription_id)),
+            isTransfer: jest.fn(),
+            isDisposableIncome: jest.fn(),
+            hasNoDestination: jest.fn(),
+            isSupplementedByDisposable: jest.fn(),
+            isExcludedTransaction: jest.fn(),
+            isDeposit: jest.fn(),
+            hasACategory: jest.fn(),
+        } as unknown as jest.Mocked<ITransactionClassificationService>;
+
+        billComparisonService = new BillComparisonService(
+            mockBillService,
+            mockTransactionService,
+            mockTransactionClassificationService
+        );
     });
 
     describe('calculateBillComparison', () => {

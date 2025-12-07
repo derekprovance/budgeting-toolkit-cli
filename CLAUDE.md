@@ -210,7 +210,7 @@ The `TransactionClassificationService` provides the core logic for classifying t
 
 - **Deposits**: `type === "deposit"`
 - **Transfers**: `type === "transfer"`
-- **Bills**: Transactions tagged with "Bills"
+- **Bills**: Transactions linked to a bill (bill_id or subscription_id is set)
 - **Disposable Income**: Transactions tagged with "Disposable Income"
 - **Paychecks**: Transactions with "PAYROLL" in description OR category "Paycheck" + source type "Revenue account"
 

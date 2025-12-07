@@ -11,7 +11,7 @@ export interface ITransactionClassificationService {
     isTransfer(transaction: TransactionSplit): boolean;
 
     /**
-     * Checks if transaction is tagged as a bill
+     * Checks if transaction is linked to a bill (bill_id or subscription_id is set)
      */
     isBill(transaction: TransactionSplit): boolean;
 
