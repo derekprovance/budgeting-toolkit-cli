@@ -3,10 +3,22 @@ import { AppConfig } from '../../src/config/config.types.js';
 
 // Mock fs module BEFORE importing ConfigValidator
 const mockExistsSync = jest.fn<() => boolean>();
+const mockAccessSync = jest.fn<() => void>();
+const mockReadFileSync = jest.fn<() => string>();
 jest.unstable_mockModule('fs', () => ({
     existsSync: mockExistsSync,
+    accessSync: mockAccessSync,
+    readFileSync: mockReadFileSync,
+    constants: {
+        R_OK: 4,
+    },
     default: {
         existsSync: mockExistsSync,
+        accessSync: mockAccessSync,
+        readFileSync: mockReadFileSync,
+        constants: {
+            R_OK: 4,
+        },
     },
 }));
 
@@ -20,6 +32,8 @@ describe('ConfigValidator', () => {
     beforeEach(() => {
         validator = new ConfigValidator();
         mockExistsSync.mockReset();
+        mockAccessSync.mockReset();
+        mockReadFileSync.mockReset();
 
         // Base valid configuration
         validConfig = {
@@ -189,6 +203,27 @@ describe('ConfigValidator', () => {
             };
 
             mockExistsSync.mockReturnValue(true);
+            mockAccessSync.mockReturnValue(undefined);
+            const validPemCert = `-----BEGIN CERTIFICATE-----
+MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
+BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
+MTFaMA8xDTALBgNVBAMMBHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDCecHz8BL2Nlh1c7Cnw0CHs2gE4aLGkLIigCFCsTW+jjWgHg5TvFuFWjxW
+1+P0NtAzehatNLuqC/FsaUr+uTQ2AcdbQHvM5n1VvrCAcDG8zUNTq0flWmeqIkZQ
+EK1HDuaa97VuFUb32jCfziXtaGe8X3lycteECxyvRUNI/+3XrRrkDzd+aEDuSjYU
+Q7iJ4xRmqOBZITu/EHzi5Fad1RWjuehlshv4km87eM17QamPc6KwihrS0atatqa3
+rHMN7X7C/ToH+J+UDz+nCbgPRtOlQ1qWkgRT+/ghSvDyS3IBQjQyOXTElj9incBt
+VKiAjNF6akysN1qYuElGXpR+0DifAgMBAAGjUzBRMB0GA1UdDgQWBBTk29HZ8tif
+hFHDmgfvIz3/8BAOFDAfBgNVHSMEGDAWgBTk29HZ8tifhFHDmgfvIz3/8BAOFDAP
+BgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB3uwRWIRlBEvHJuYeN
+DtPoGRxz40Gtub0TdwZeijeF5uAE+JQoUgUrkyqihdvn0+5q1Y2gJarkWRjd2n4r
+aEv6cz0uos54EREa2S/6B9kM3WdywscmWe4bBXcDuv8pX4+DsQKhIyL1qYX5Y9LA
+HtlYo9qvGBgHFYQCpmYNYiGoj7Z1gGrK5orYBqg+FRscv4H5R2gvcspWL/rd4Cu7
+m2kMFHexOHT+gEzRCpAo2AKos/N4DAB8HoRfIAgyrf9i+z5v7iBYW47p6n4AChVi
+UNX55bDN8vWfo+f9xp6sXW7yMBTYwpJJJOOzP7jkv1YIsDv4OTzYFYlEwoAU0Lbb
+qZXQ
+-----END CERTIFICATE-----`;
+            mockReadFileSync.mockReturnValue(validPemCert);
 
             const result = validator.validate(validConfig);
 
@@ -207,7 +242,7 @@ describe('ConfigValidator', () => {
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toContain(
+                expect(result.error.details.errors[0]).toContain(
                     'Client certificate not found: /path/to/missing/cert.pem'
                 );
             }
@@ -222,14 +257,37 @@ describe('ConfigValidator', () => {
             mockExistsSync.mockImplementation((path: any) => {
                 return path === '/path/to/cert.pem';
             });
+            mockAccessSync.mockReturnValue(undefined);
+            const validPemCert = `-----BEGIN CERTIFICATE-----
+MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
+BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
+MTFaMA8xDTALBgNVBAMMBHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDCecHz8BL2Nlh1c7Cnw0CHs2gE4aLGkLIigCFCsTW+jjWgHg5TvFuFWjxW
+1+P0NtAzehatNLuqC/FsaUr+uTQ2AcdbQHvM5n1VvrCAcDG8zUNTq0flWmeqIkZQ
+EK1HDuaa97VuFUb32jCfziXtaGe8X3lycteECxyvRUNI/+3XrRrkDzd+aEDuSjYU
+Q7iJ4xRmqOBZITu/EHzi5Fad1RWjuehlshv4km87eM17QamPc6KwihrS0atatqa3
+rHMN7X7C/ToH+J+UDz+nCbgPRtOlQ1qWkgRT+/ghSvDyS3IBQjQyOXTElj9incBt
+VKiAjNF6akysN1qYuElGXpR+0DifAgMBAAGjUzBRMB0GA1UdDgQWBBTk29HZ8tif
+hFHDmgfvIz3/8BAOFDAfBgNVHSMEGDAWgBTk29HZ8tifhFHDmgfvIz3/8BAOFDAP
+BgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB3uwRWIRlBEvHJuYeN
+DtPoGRxz40Gtub0TdwZeijeF5uAE+JQoUgUrkyqihdvn0+5q1Y2gJarkWRjd2n4r
+aEv6cz0uos54EREa2S/6B9kM3WdywscmWe4bBXcDuv8pX4+DsQKhIyL1qYX5Y9LA
+HtlYo9qvGBgHFYQCpmYNYiGoj7Z1gGrK5orYBqg+FRscv4H5R2gvcspWL/rd4Cu7
+m2kMFHexOHT+gEzRCpAo2AKos/N4DAB8HoRfIAgyrf9i+z5v7iBYW47p6n4AChVi
+UNX55bDN8vWfo+f9xp6sXW7yMBTYwpJJJOOzP7jkv1YIsDv4OTzYFYlEwoAU0Lbb
+qZXQ
+-----END CERTIFICATE-----`;
+            mockReadFileSync.mockReturnValue(validPemCert);
 
             const result = validator.validate(validConfig);
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toContain(
-                    'CA certificate not found: /path/to/missing/ca.pem'
+                // The error message now includes a multi-line string with suggestions
+                const errorMessage = result.error.details.errors.find(e =>
+                    e.includes('CA certificate not found: /path/to/missing/ca.pem')
                 );
+                expect(errorMessage).toBeDefined();
             }
         });
 
@@ -241,6 +299,27 @@ describe('ConfigValidator', () => {
             };
 
             mockExistsSync.mockReturnValue(true);
+            mockAccessSync.mockReturnValue(undefined);
+            const validPemCert = `-----BEGIN CERTIFICATE-----
+MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
+BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
+MTFaMA8xDTALBgNVBAMMBHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDCecHz8BL2Nlh1c7Cnw0CHs2gE4aLGkLIigCFCsTW+jjWgHg5TvFuFWjxW
+1+P0NtAzehatNLuqC/FsaUr+uTQ2AcdbQHvM5n1VvrCAcDG8zUNTq0flWmeqIkZQ
+EK1HDuaa97VuFUb32jCfziXtaGe8X3lycteECxyvRUNI/+3XrRrkDzd+aEDuSjYU
+Q7iJ4xRmqOBZITu/EHzi5Fad1RWjuehlshv4km87eM17QamPc6KwihrS0atatqa3
+rHMN7X7C/ToH+J+UDz+nCbgPRtOlQ1qWkgRT+/ghSvDyS3IBQjQyOXTElj9incBt
+VKiAjNF6akysN1qYuElGXpR+0DifAgMBAAGjUzBRMB0GA1UdDgQWBBTk29HZ8tif
+hFHDmgfvIz3/8BAOFDAfBgNVHSMEGDAWgBTk29HZ8tifhFHDmgfvIz3/8BAOFDAP
+BgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB3uwRWIRlBEvHJuYeN
+DtPoGRxz40Gtub0TdwZeijeF5uAE+JQoUgUrkyqihdvn0+5q1Y2gJarkWRjd2n4r
+aEv6cz0uos54EREa2S/6B9kM3WdywscmWe4bBXcDuv8pX4+DsQKhIyL1qYX5Y9LA
+HtlYo9qvGBgHFYQCpmYNYiGoj7Z1gGrK5orYBqg+FRscv4H5R2gvcspWL/rd4Cu7
+m2kMFHexOHT+gEzRCpAo2AKos/N4DAB8HoRfIAgyrf9i+z5v7iBYW47p6n4AChVi
+UNX55bDN8vWfo+f9xp6sXW7yMBTYwpJJJOOzP7jkv1YIsDv4OTzYFYlEwoAU0Lbb
+qZXQ
+-----END CERTIFICATE-----`;
+            mockReadFileSync.mockReturnValue(validPemCert);
 
             const result = validator.validate(validConfig);
 

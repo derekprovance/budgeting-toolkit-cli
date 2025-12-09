@@ -3,6 +3,7 @@ import { jest } from '@jest/globals';
 // Create mock functions
 const mockExistsSync = jest.fn<() => boolean>();
 const mockReadFileSync = jest.fn<() => string>();
+const mockAccessSync = jest.fn<() => void>();
 const mockYamlLoad = jest.fn<() => any>();
 const mockConfigSync = jest.fn<() => void>();
 
@@ -10,9 +11,17 @@ const mockConfigSync = jest.fn<() => void>();
 jest.unstable_mockModule('fs', () => ({
     existsSync: mockExistsSync,
     readFileSync: mockReadFileSync,
+    accessSync: mockAccessSync,
+    constants: {
+        R_OK: 4,
+    },
     default: {
         existsSync: mockExistsSync,
         readFileSync: mockReadFileSync,
+        accessSync: mockAccessSync,
+        constants: {
+            R_OK: 4,
+        },
     },
 }));
 
@@ -69,12 +78,14 @@ describe('ConfigManager', () => {
         // Reset mocks
         mockExistsSync.mockReset();
         mockReadFileSync.mockReset();
+        mockAccessSync.mockReset();
         mockYamlLoad.mockReset();
         mockConfigSync.mockReset();
 
         // Default mock implementations
         mockConfigSync.mockReturnValue(undefined);
         mockExistsSync.mockReturnValue(false); // No YAML file by default
+        mockAccessSync.mockReturnValue(undefined);
     });
 
     describe('FIREFLY_API_URL trailing slash normalization', () => {
@@ -183,6 +194,28 @@ describe('ConfigManager', () => {
                 return false;
             });
 
+            // Mock readFileSync to return a valid PEM certificate content
+            const validPemCert = `-----BEGIN CERTIFICATE-----
+MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
+BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
+MTFaMA8xDTALBgNVBAMMBHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDCecHz8BL2Nlh1c7Cnw0CHs2gE4aLGkLIigCFCsTW+jjWgHg5TvFuFWjxW
+1+P0NtAzehatNLuqC/FsaUr+uTQ2AcdbQHvM5n1VvrCAcDG8zUNTq0flWmeqIkZQ
+EK1HDuaa97VuFUb32jCfziXtaGe8X3lycteECxyvRUNI/+3XrRrkDzd+aEDuSjYU
+Q7iJ4xRmqOBZITu/EHzi5Fad1RWjuehlshv4km87eM17QamPc6KwihrS0atatqa3
+rHMN7X7C/ToH+J+UDz+nCbgPRtOlQ1qWkgRT+/ghSvDyS3IBQjQyOXTElj9incBt
+VKiAjNF6akysN1qYuElGXpR+0DifAgMBAAGjUzBRMB0GA1UdDgQWBBTk29HZ8tif
+hFHDmgfvIz3/8BAOFDAfBgNVHSMEGDAWgBTk29HZ8tifhFHDmgfvIz3/8BAOFDAP
+BgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB3uwRWIRlBEvHJuYeN
+DtPoGRxz40Gtub0TdwZeijeF5uAE+JQoUgUrkyqihdvn0+5q1Y2gJarkWRjd2n4r
+aEv6cz0uos54EREa2S/6B9kM3WdywscmWe4bBXcDuv8pX4+DsQKhIyL1qYX5Y9LA
+HtlYo9qvGBgHFYQCpmYNYiGoj7Z1gGrK5orYBqg+FRscv4H5R2gvcspWL/rd4Cu7
+m2kMFHexOHT+gEzRCpAo2AKos/N4DAB8HoRfIAgyrf9i+z5v7iBYW47p6n4AChVi
+UNX55bDN8vWfo+f9xp6sXW7yMBTYwpJJJOOzP7jkv1YIsDv4OTzYFYlEwoAU0Lbb
+qZXQ
+-----END CERTIFICATE-----`;
+            mockReadFileSync.mockReturnValue(validPemCert);
+
             const configManager = ConfigManager.getInstance();
             const config = configManager.getConfig();
 
@@ -201,6 +234,28 @@ describe('ConfigManager', () => {
                 }
                 return false;
             });
+
+            // Mock readFileSync to return a valid PEM certificate content
+            const validPemCert = `-----BEGIN CERTIFICATE-----
+MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
+BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
+MTFaMA8xDTALBgNVBAMMBHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDCecHz8BL2Nlh1c7Cnw0CHs2gE4aLGkLIigCFCsTW+jjWgHg5TvFuFWjxW
+1+P0NtAzehatNLuqC/FsaUr+uTQ2AcdbQHvM5n1VvrCAcDG8zUNTq0flWmeqIkZQ
+EK1HDuaa97VuFUb32jCfziXtaGe8X3lycteECxyvRUNI/+3XrRrkDzd+aEDuSjYU
+Q7iJ4xRmqOBZITu/EHzi5Fad1RWjuehlshv4km87eM17QamPc6KwihrS0atatqa3
+rHMN7X7C/ToH+J+UDz+nCbgPRtOlQ1qWkgRT+/ghSvDyS3IBQjQyOXTElj9incBt
+VKiAjNF6akysN1qYuElGXpR+0DifAgMBAAGjUzBRMB0GA1UdDgQWBBTk29HZ8tif
+hFHDmgfvIz3/8BAOFDAfBgNVHSMEGDAWgBTk29HZ8tifhFHDmgfvIz3/8BAOFDAP
+BgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB3uwRWIRlBEvHJuYeN
+DtPoGRxz40Gtub0TdwZeijeF5uAE+JQoUgUrkyqihdvn0+5q1Y2gJarkWRjd2n4r
+aEv6cz0uos54EREa2S/6B9kM3WdywscmWe4bBXcDuv8pX4+DsQKhIyL1qYX5Y9LA
+HtlYo9qvGBgHFYQCpmYNYiGoj7Z1gGrK5orYBqg+FRscv4H5R2gvcspWL/rd4Cu7
+m2kMFHexOHT+gEzRCpAo2AKos/N4DAB8HoRfIAgyrf9i+z5v7iBYW47p6n4AChVi
+UNX55bDN8vWfo+f9xp6sXW7yMBTYwpJJJOOzP7jkv1YIsDv4OTzYFYlEwoAU0Lbb
+qZXQ
+-----END CERTIFICATE-----`;
+            mockReadFileSync.mockReturnValue(validPemCert);
 
             const configManager = ConfigManager.getInstance();
             const config = configManager.getConfig();

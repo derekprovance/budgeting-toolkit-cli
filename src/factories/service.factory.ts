@@ -86,7 +86,9 @@ export class ServiceFactory {
         const transactionSplitService = new TransactionSplitService(apiClient);
         const disposableIncomeService = new DisposableIncomeService(
             transactionService,
-            transactionClassificationService
+            transactionClassificationService,
+            config.accounts.disposableIncomeAccounts,
+            config.accounts.validDestinationAccounts
         );
         const budgetSurplusService = new BudgetSurplusService(budgetService);
 

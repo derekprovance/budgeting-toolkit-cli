@@ -59,6 +59,7 @@ describe('AnalyzeDisplayService', () => {
         month: 11,
         year: 2025,
         currencySymbol: '$',
+        currencyCode: 'USD',
         additionalIncome: [],
         additionalIncomeTotal: 0,
         unbudgetedExpenses: [],
@@ -69,6 +70,8 @@ describe('AnalyzeDisplayService', () => {
         budgetAllocated: 2000,
         budgetSpent: 1500,
         budgetSurplus: 500,
+        disposableIncomeTransactions: [],
+        disposableIncomeTransfers: [],
         disposableIncome: 0,
         billComparison: {
             predictedTotal: 1000,
@@ -188,6 +191,9 @@ describe('AnalyzeDisplayService', () => {
         it('should align disposable spending when present', () => {
             const data = {
                 ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Disposable expense', 500, 'withdrawal'),
+                ],
                 disposableIncome: 500,
             };
             const result = service.formatAnalysisReport(data, false);
@@ -275,6 +281,9 @@ describe('AnalyzeDisplayService', () => {
         it('should include disposable income when present', () => {
             const data = {
                 ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Disposable expense', 300, 'withdrawal'),
+                ],
                 disposableIncome: 300,
             };
             const result = service.formatAnalysisReport(data, false);

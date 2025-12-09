@@ -21,6 +21,14 @@ validTransfers:
     - source: '5' # Remote Investment Account ID
       destination: '1' # Checking Account ID
 
+# Disposable income account IDs (optional)
+# Transfers OUT of these accounts INTO validDestinationAccounts will reduce
+# the disposable income total shown in the analysis report
+# If not configured, only tag-based calculation is used
+disposableIncomeAccounts:
+    - '6' # Cash Account ID
+    - '7' # Spending Account ID
+
 excludeDisposableIncome: false
 
 # Custom tag names (optional - override if you use different tags in Firefly III)

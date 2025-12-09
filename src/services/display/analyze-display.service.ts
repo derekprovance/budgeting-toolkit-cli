@@ -132,15 +132,32 @@ export class AnalyzeDisplayService {
         }
 
         // Disposable income subsection
-        if (data.disposableIncome > 0) {
+        if (data.disposableIncomeTransactions.length > 0) {
             lines.push('');
             lines.push(
                 this.formatExpenseItem(
                     'Disposable Income',
                     data.disposableIncome,
-                    data.currencySymbol
+                    data.currencySymbol,
+                    data.disposableIncomeTransactions.length
                 )
             );
+
+            if (verbose) {
+                lines.push('');
+                lines.push(chalk.dim('  Tagged Transactions:'));
+                data.disposableIncomeTransactions.forEach(transaction => {
+                    lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
+                });
+
+                if (data.disposableIncomeTransfers.length > 0) {
+                    lines.push('');
+                    lines.push(chalk.dim('  Transfers (Reducing Balance):'));
+                    data.disposableIncomeTransfers.forEach(transaction => {
+                        lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
+                    });
+                }
+            }
         }
 
         return lines.join('\n');
@@ -195,7 +212,7 @@ export class AnalyzeDisplayService {
             `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`
         );
 
-        if (data.disposableIncome > 0) {
+        if (data.disposableIncomeTransactions.length > 0) {
             lines.push(
                 `    ${this.getStatusIcon(-data.disposableIncome, false)} ${'Disposable Spending:'.padEnd(30)} ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
             );
@@ -208,7 +225,6 @@ export class AnalyzeDisplayService {
             (data.skipPaycheck ? 0 : data.paycheckSurplus) +
             data.budgetSurplus -
             data.billComparison.variance -
-            data.unbudgetedExpenseTotal -
             data.disposableIncome;
 
         lines.push(

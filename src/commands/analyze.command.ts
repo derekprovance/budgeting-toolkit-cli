@@ -48,6 +48,8 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 unbudgetedExpenseResult,
                 paycheckSurplusResult,
                 disposableIncomeResult,
+                disposableIncomeTransfers,
+                disposableIncomeBalance,
                 budgetSurplusResult,
                 billComparisonResult,
             ] = await Promise.all([
@@ -57,6 +59,8 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                     ? Promise.resolve({ ok: true as const, value: 0 })
                     : this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
                 this.disposableIncomeService.calculateDisposableIncome(month, year),
+                this.disposableIncomeService.getDisposableIncomeTransfers(month, year),
+                this.disposableIncomeService.calculateDisposableIncomeBalance(month, year),
                 this.budgetSurplusService.calculateBudgetSurplus(month, year),
                 this.billComparisonService.calculateBillComparison(month, year),
             ]);
@@ -131,7 +135,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 : paycheckSurplusResult.ok
                   ? paycheckSurplusResult.value
                   : 0; // Fallback (should never reach due to error handling above)
-            const disposableIncome = disposableIncomeResult.value;
+            const disposableIncomeTransactions = disposableIncomeResult.value;
             const budgetResult = budgetSurplusResult.value;
             const billComparison = billComparisonResult.value;
 
@@ -157,7 +161,9 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 skipPaycheck ? 0 : expectedMonthlyPaycheck,
                 skipPaycheck ? 0 : actualPaycheck,
                 skipPaycheck ? 0 : paycheckSurplus,
-                disposableIncome,
+                disposableIncomeTransactions,
+                disposableIncomeTransfers,
+                disposableIncomeBalance,
                 month,
                 year,
                 skipPaycheck
