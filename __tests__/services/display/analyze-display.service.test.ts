@@ -450,6 +450,101 @@ describe('AnalyzeDisplayService', () => {
         });
     });
 
+    describe('Bill Details with Frequency', () => {
+        it('should include bill details with frequency badges in verbose mode', () => {
+            const data = {
+                ...createBasicReportData(),
+                billComparison: {
+                    ...createBasicReportData().billComparison,
+                    bills: [
+                        {
+                            id: '1',
+                            name: 'Rent',
+                            predicted: 1000,
+                            actual: 1000,
+                            frequency: 'monthly',
+                        },
+                        {
+                            id: '2',
+                            name: 'Insurance',
+                            predicted: 50,
+                            actual: 0,
+                            frequency: 'yearly',
+                        },
+                        {
+                            id: '3',
+                            name: 'Utilities',
+                            predicted: 150,
+                            actual: 140,
+                            frequency: 'quarterly',
+                        },
+                    ],
+                },
+            };
+            const result = service.formatAnalysisReport(data, true);
+
+            expect(result).toContain('Bill Details:');
+            expect(result).toContain('Rent');
+            expect(result).toContain('[Monthly]');
+            expect(result).toContain('Insurance');
+            expect(result).toContain('[Yearly]');
+            expect(result).toContain('Utilities');
+            expect(result).toContain('[Quarterly]');
+        });
+
+        it('should not include bill details in non-verbose mode', () => {
+            const data = {
+                ...createBasicReportData(),
+                billComparison: {
+                    ...createBasicReportData().billComparison,
+                    bills: [
+                        {
+                            id: '1',
+                            name: 'Rent',
+                            predicted: 1000,
+                            actual: 1000,
+                            frequency: 'monthly',
+                        },
+                    ],
+                },
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).not.toContain('Bill Details:');
+            expect(result).not.toContain('[Monthly]');
+            expect(result).toContain('Bills Performance');
+        });
+
+        it('should capitalize frequency badge correctly', () => {
+            const data = {
+                ...createBasicReportData(),
+                billComparison: {
+                    ...createBasicReportData().billComparison,
+                    bills: [
+                        {
+                            id: '1',
+                            name: 'Weekly Bill',
+                            predicted: 25,
+                            actual: 25,
+                            frequency: 'weekly',
+                        },
+                        {
+                            id: '2',
+                            name: 'Half-year Bill',
+                            predicted: 100,
+                            actual: 100,
+                            frequency: 'half-year',
+                        },
+                    ],
+                },
+            };
+            const result = service.formatAnalysisReport(data, true);
+
+            expect(result).toContain('[Weekly]');
+            expect(result).toContain('[Half-year]');
+        });
+    });
+
     describe('Edge Cases', () => {
         it('should handle zero values gracefully', () => {
             const data = createBasicReportData();

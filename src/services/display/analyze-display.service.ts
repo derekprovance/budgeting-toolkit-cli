@@ -372,7 +372,11 @@ export class AnalyzeDisplayService {
             `(${variance > 0 ? '+' : ''}${this.formatCurrency(variance, symbol)})`
         );
 
-        return `    ${bill.name.substring(0, 30).padEnd(30)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
+        // Format frequency with capitalization
+        const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);
+        const freqBadge = chalk.dim(`[${freq}]`);
+
+        return `    ${bill.name.substring(0, 30).padEnd(30)} ${freqBadge.padEnd(15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
     }
 
     /**
