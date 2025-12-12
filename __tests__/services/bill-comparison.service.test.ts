@@ -158,12 +158,12 @@ describe('BillComparisonService', () => {
             }
         });
 
-        it('should show full amount for bills due this month regardless of frequency', async () => {
+        it('should show full bill amounts when due, regardless of frequency', async () => {
             // All bills are due this month (pay_dates populated)
             const mockBills = [
                 createMockBill('1', 'Monthly', '100', 'monthly', 0, true),
-                createMockBill('2', 'Yearly', '1200', 'yearly', 0, true), // Full $1200 if due
-                createMockBill('3', 'Quarterly', '300', 'quarterly', 0, true), // Full $300 if due
+                createMockBill('2', 'Yearly', '1200', 'yearly', 0, true),
+                createMockBill('3', 'Quarterly', '300', 'quarterly', 0, true),
             ];
 
             mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
@@ -173,8 +173,16 @@ describe('BillComparisonService', () => {
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                // All three bills are due, so total = 100 + 1200 + 300
+                // All three bills are due, show full amounts: 100 + 1200 + 300 = 1600
                 expect(result.value.predictedTotal).toBe(1600);
+
+                const monthlyBill = result.value.bills.find(b => b.id === '1');
+                const yearlyBill = result.value.bills.find(b => b.id === '2');
+                const quarterlyBill = result.value.bills.find(b => b.id === '3');
+
+                expect(monthlyBill?.predicted).toBe(100); // Full amount when due
+                expect(yearlyBill?.predicted).toBe(1200); // Full amount when due
+                expect(quarterlyBill?.predicted).toBe(300); // Full amount when due
             }
         });
 
@@ -353,6 +361,34 @@ describe('BillComparisonService', () => {
             }
         });
 
+        it('should use amount_min and amount_max midpoint when amount_avg is missing', async () => {
+            const billWithoutAverage: BillRead = {
+                type: 'bills',
+                id: '1',
+                attributes: {
+                    name: 'Bill with Min/Max',
+                    active: true,
+                    // amount_avg is missing
+                    amount_min: '100',
+                    amount_max: '200',
+                    repeat_freq: 'monthly',
+                    pay_dates: ['2024-10-15'],
+                },
+            };
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([billWithoutAverage]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Midpoint of 100 and 200 is 150
+                expect(result.value.predictedTotal).toBe(150);
+                expect(result.value.bills[0].predicted).toBe(150);
+            }
+        });
+
         it('should handle errors from bill service', async () => {
             mockBillService.getActiveBillsForMonth.mockRejectedValue(new Error('API Error'));
 
@@ -383,16 +419,53 @@ describe('BillComparisonService', () => {
     });
 
     describe('isBillDueThisMonth', () => {
-        it('should return true when pay_dates is populated', async () => {
-            const mockBills = [createMockBill('1', 'Due Bill', '100', 'monthly', 0, true)];
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+        it('should only count bills with pay_dates in the requested month/year', async () => {
+            const billDueThisMonth: BillRead = {
+                type: 'bills',
+                id: '1',
+                attributes: {
+                    name: 'Due This Month',
+                    active: true,
+                    amount_avg: '100',
+                    amount_min: '100',
+                    amount_max: '100',
+                    repeat_freq: 'monthly',
+                    pay_dates: ['2024-10-15'], // October 2024
+                    currency_code: 'USD',
+                    currency_symbol: '$',
+                },
+            };
+
+            const billDueNextMonth: BillRead = {
+                type: 'bills',
+                id: '2',
+                attributes: {
+                    name: 'Due Next Month',
+                    active: true,
+                    amount_avg: '200',
+                    amount_min: '200',
+                    amount_max: '200',
+                    repeat_freq: 'monthly',
+                    pay_dates: ['2024-11-15'], // November 2024 (not this month)
+                    currency_code: 'USD',
+                    currency_symbol: '$',
+                },
+            };
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([
+                billDueThisMonth,
+                billDueNextMonth,
+            ]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
+                // Only the bill due in October should be counted
                 expect(result.value.predictedTotal).toBe(100);
+                expect(result.value.bills.find(b => b.id === '1')?.predicted).toBe(100);
+                expect(result.value.bills.find(b => b.id === '2')?.predicted).toBe(0);
             }
         });
 
@@ -435,6 +508,55 @@ describe('BillComparisonService', () => {
             if (result.ok) {
                 // Without pay_dates, bill is considered not due
                 expect(result.value.predictedTotal).toBe(0);
+            }
+        });
+    });
+
+    describe('Bill frequency information', () => {
+        it('should show full amounts when bills are due, with frequency information', async () => {
+            const mockBills = [
+                createMockBill('1', 'Weekly Bill', '25', 'weekly', 0, true),
+                createMockBill('2', 'Half-Year Bill', '600', 'half-year', 0, true),
+                createMockBill('3', 'Yearly Bill', '1200', 'yearly', 0, true),
+            ];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Show full amounts: 25 + 600 + 1200 = 1825
+                expect(result.value.predictedTotal).toBe(1825);
+
+                // Each bill shows the full amount and includes frequency info for display
+                expect(result.value.bills[0].frequency).toBe('weekly');
+                expect(result.value.bills[0].predicted).toBe(25);
+                expect(result.value.bills[1].frequency).toBe('half-year');
+                expect(result.value.bills[1].predicted).toBe(600);
+                expect(result.value.bills[2].frequency).toBe('yearly');
+                expect(result.value.bills[2].predicted).toBe(1200);
+            }
+        });
+
+        it('should include frequency in bill details for information purposes', async () => {
+            const mockBills = [
+                createMockBill('1', 'Monthly', '100', 'monthly', 0, true),
+                createMockBill('2', 'Quarterly', '300', 'quarterly', 0, true),
+                createMockBill('3', 'Yearly', '1200', 'yearly', 0, true),
+            ];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].frequency).toBe('monthly');
+                expect(result.value.bills[1].frequency).toBe('quarterly');
+                expect(result.value.bills[2].frequency).toBe('yearly');
             }
         });
     });

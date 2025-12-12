@@ -63,7 +63,9 @@ export class BillComparisonService implements IBillComparisonService {
             // Calculate bill details with predicted amounts based on pay_dates
             const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
                 activeBills,
-                billTransactions
+                billTransactions,
+                month,
+                year
             );
 
             // Get currency info from first bill or use default
@@ -123,13 +125,20 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Check if a bill has a payment date within the requested period.
-     * When Firefly III returns bills with a date range, it populates pay_dates
-     * with expected payment dates within that range.
+     * Check if a bill has a payment date within the requested month and year.
+     * Verifies that the pay_dates actually fall within the specified month/year.
      */
-    private isBillDueThisMonth(bill: BillRead): boolean {
+    private isBillDueThisMonth(bill: BillRead, month: number, year: number): boolean {
         const payDates = bill.attributes.pay_dates;
-        return Array.isArray(payDates) && payDates.length > 0;
+        if (!Array.isArray(payDates) || payDates.length === 0) {
+            return false;
+        }
+
+        // Check if any pay_date falls within the requested month/year
+        return payDates.some(dateStr => {
+            const date = new Date(dateStr);
+            return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
+        });
     }
 
     /**
@@ -173,7 +182,9 @@ export class BillComparisonService implements IBillComparisonService {
      */
     private calculateBillDetails(
         bills: BillRead[],
-        transactions: TransactionSplit[]
+        transactions: TransactionSplit[],
+        month: number,
+        year: number
     ): { predictedTotal: number; actualTotal: number; billDetails: BillDetailDto[] } {
         let predictedTotal = 0;
         let actualTotal = 0;
@@ -217,7 +228,8 @@ export class BillComparisonService implements IBillComparisonService {
             actualTotal += actualAmount;
 
             // Predicted amount: full bill amount if due this month, 0 if not
-            const isDue = this.isBillDueThisMonth(bill);
+            // (represents what's actually owed this month, not the monthly budget equivalent)
+            const isDue = this.isBillDueThisMonth(bill, month, year);
             const predictedAmount = isDue ? this.getBillAmount(bill) : 0;
 
             predictedTotal += predictedAmount;
@@ -227,9 +239,11 @@ export class BillComparisonService implements IBillComparisonService {
                 billId,
                 isDue,
                 payDates: bill.attributes.pay_dates,
+                frequency: bill.attributes.repeat_freq ?? 'monthly',
+                fullAmount: this.getBillAmount(bill),
+                predictedAmount,
                 transactionCount: billTransactions.length,
                 actualAmount,
-                predictedAmount,
             });
 
             billDetails.push(
