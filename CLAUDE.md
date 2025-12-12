@@ -95,6 +95,11 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
           reason: 'Specific amount to exclude'
     ```
 
+**Transaction Tags Configuration:**
+
+- `tags.disposableIncome` - Tag name for identifying disposable income transactions (default: "Disposable Income")
+- `tags.paycheck` - Tag name for identifying paycheck transactions (default: "Paycheck")
+
 **Firefly Configuration:**
 
 - `firefly.noNameExpenseAccountId` - Account ID for transactions with no destination
@@ -211,8 +216,8 @@ The `TransactionClassificationService` provides the core logic for classifying t
 - **Deposits**: `type === "deposit"`
 - **Transfers**: `type === "transfer"`
 - **Bills**: Transactions linked to a bill (bill_id or subscription_id is set)
-- **Disposable Income**: Transactions tagged with "Disposable Income"
-- **Paychecks**: Transactions with "PAYROLL" in description OR category "Paycheck" + source type "Revenue account"
+- **Disposable Income**: Transactions tagged with configured disposable income tag (default: "Disposable Income")
+- **Paychecks**: Transactions tagged with configured paycheck tag (default: "Paycheck"). Supports all transaction types (deposits, transfers, etc).
 
 ### Transaction Splitting System
 

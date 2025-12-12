@@ -44,4 +44,9 @@ export interface ITransactionClassificationService {
      * Checks if transaction has a category assigned
      */
     hasACategory(transaction: TransactionSplit): boolean;
+
+    /**
+     * Checks if transaction is tagged as a paycheck
+     */
+    isPaycheck(transaction: TransactionSplit): boolean;
 }

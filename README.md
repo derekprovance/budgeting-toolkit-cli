@@ -65,7 +65,7 @@ Edit `.env` with your credentials:
 - LLM model: `claude-sonnet-4-5`
 - Temperature: `0.2`
 - Batch size: `10`
-- Disposable Income tag: `Disposable Income`
+- Tags: `Disposable Income`, `Paycheck`
 
 See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) for comprehensive documentation.
 

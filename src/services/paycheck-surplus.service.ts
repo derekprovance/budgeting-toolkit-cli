@@ -90,38 +90,46 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
     /**
      * Finds all paycheck transactions in the given list.
      *
+     * Uses tag-based identification - any transaction tagged with the configured
+     * paycheck tag (default: "Paycheck") is considered a paycheck.
+     *
+     * Works with all transaction types (deposits, transfers, etc).
+     *
      * @param transactions - All transactions to search
      * @returns Array of paycheck transactions, sorted by amount descending
      */
     private findPaychecks(transactions: TransactionSplit[]): TransactionSplit[] {
-        return transactions
-            .filter(t => this.transactionClassificationService.isDeposit(t))
-            .filter(t => this.isPaycheck(t))
+        const paychecks = transactions
+            .filter(t => {
+                const isPaycheck = this.transactionClassificationService.isPaycheck(t);
+                if (isPaycheck) {
+                    this.logger.debug(
+                        {
+                            transaction_id: t.transaction_journal_id,
+                            type: t.type,
+                            description: t.description,
+                            amount: t.amount,
+                            tags: t.tags,
+                        },
+                        'Identified paycheck transaction via tag'
+                    );
+                }
+                return isPaycheck;
+            })
             .sort((a, b) => {
                 const amountA = parseFloat(a.amount);
                 const amountB = parseFloat(b.amount);
                 return amountB - amountA;
             });
-    }
 
-    /**
-     * Checks if a transaction is a paycheck based on description or category.
-     *
-     * A transaction is considered a paycheck if:
-     * - Description contains "payroll" (case-insensitive), OR
-     * - Category is "Paycheck" AND source type is "Revenue account"
-     *
-     * @param transaction - Transaction to check
-     * @returns True if transaction is a paycheck
-     */
-    private isPaycheck(transaction: TransactionSplit): boolean {
-        const hasPayrollDescription =
-            transaction.description?.toLowerCase().includes('payroll') || false;
+        this.logger.debug(
+            {
+                totalTransactions: transactions.length,
+                paychecksFound: paychecks.length,
+            },
+            'Paycheck search completed'
+        );
 
-        const hasPaycheckCategory =
-            transaction.category_name === 'Paycheck' &&
-            transaction.source_type === 'Revenue account';
-
-        return hasPayrollDescription || hasPaycheckCategory;
+        return paychecks;
     }
 }

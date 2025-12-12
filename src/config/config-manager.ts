@@ -20,6 +20,11 @@ interface YamlConfig {
     expectedMonthlyPaycheck?: number;
     excludedTransactions?: ExcludedTransaction[];
 
+    tags?: {
+        disposableIncome?: string;
+        paycheck?: string;
+    };
+
     firefly?: {
         noNameExpenseAccountId?: string;
     };
@@ -206,6 +211,16 @@ export class ConfigManager {
         }
         if (yamlConfig.excludedTransactions) {
             config.transactions.excludedTransactions = yamlConfig.excludedTransactions;
+        }
+
+        // Tags Configuration
+        if (yamlConfig.tags) {
+            if (yamlConfig.tags.disposableIncome !== undefined) {
+                config.transactions.tags.disposableIncome = yamlConfig.tags.disposableIncome;
+            }
+            if (yamlConfig.tags.paycheck !== undefined) {
+                config.transactions.tags.paycheck = yamlConfig.tags.paycheck;
+            }
         }
 
         // Firefly Configuration

@@ -4,6 +4,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 
 const DISPOSABLE_INCOME_TAG = 'Disposable Income';
+const PAYCHECK_TAG = 'Paycheck';
 
 describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
@@ -17,7 +18,8 @@ describe('TransactionClassificationService', () => {
         service = new TransactionClassificationService(
             mockExcludedTransactionService,
             '5', // noNameExpenseAccountId
-            DISPOSABLE_INCOME_TAG
+            DISPOSABLE_INCOME_TAG,
+            PAYCHECK_TAG
         );
     });
 
@@ -173,6 +175,80 @@ describe('TransactionClassificationService', () => {
         it('should return false when category_id is null', () => {
             const transaction = { category_id: null } as TransactionSplit;
             expect(service.hasACategory(transaction)).toBe(false);
+        });
+    });
+
+    describe('isPaycheck', () => {
+        it('should return true when transaction has paycheck tag', () => {
+            const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
+            expect(service.isPaycheck(transaction)).toBe(true);
+        });
+
+        it('should return true when transaction has paycheck tag with other tags', () => {
+            const transaction = {
+                tags: ['Work', PAYCHECK_TAG, 'Income'],
+            } as TransactionSplit;
+            expect(service.isPaycheck(transaction)).toBe(true);
+        });
+
+        it('should return false when transaction does not have paycheck tag', () => {
+            const transaction = { tags: ['Other', 'Tags'] } as TransactionSplit;
+            expect(service.isPaycheck(transaction)).toBe(false);
+        });
+
+        it('should return false when transaction has no tags', () => {
+            const transaction = {} as TransactionSplit;
+            expect(service.isPaycheck(transaction)).toBe(false);
+        });
+
+        it('should return false when tags is null', () => {
+            const transaction = { tags: null } as TransactionSplit;
+            expect(service.isPaycheck(transaction)).toBe(false);
+        });
+
+        it('should return false when tags is empty array', () => {
+            const transaction = { tags: [] } as TransactionSplit;
+            expect(service.isPaycheck(transaction)).toBe(false);
+        });
+
+        it('should support custom paycheck tag name', () => {
+            const customPaycheckTag = 'Salary';
+            const customService = new TransactionClassificationService(
+                mockExcludedTransactionService,
+                '5',
+                DISPOSABLE_INCOME_TAG,
+                customPaycheckTag
+            );
+
+            const transaction = { tags: [customPaycheckTag] } as TransactionSplit;
+            expect(customService.isPaycheck(transaction)).toBe(true);
+        });
+
+        it('should not match wrong tag name for custom paycheck tag', () => {
+            const customPaycheckTag = 'Salary';
+            const customService = new TransactionClassificationService(
+                mockExcludedTransactionService,
+                '5',
+                DISPOSABLE_INCOME_TAG,
+                customPaycheckTag
+            );
+
+            const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
+            expect(customService.isPaycheck(transaction)).toBe(false);
+        });
+
+        it('should work for both deposit and transfer type transactions', () => {
+            const depositTransaction = {
+                type: 'deposit',
+                tags: [PAYCHECK_TAG],
+            } as TransactionSplit;
+            expect(service.isPaycheck(depositTransaction)).toBe(true);
+
+            const transferTransaction = {
+                type: 'transfer',
+                tags: [PAYCHECK_TAG],
+            } as TransactionSplit;
+            expect(service.isPaycheck(transferTransaction)).toBe(true);
         });
     });
 });
