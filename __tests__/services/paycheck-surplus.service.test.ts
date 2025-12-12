@@ -45,6 +45,7 @@ describe('PaycheckSurplusService', () => {
                 jest.fn<(description: string, amount: string) => Promise<boolean>>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isPaycheck: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
 
         service = new PaycheckSurplusService(
@@ -56,18 +57,21 @@ describe('PaycheckSurplusService', () => {
     });
 
     describe('calculatePaycheckSurplus', () => {
-        const mockPaycheck = (amount: string): TransactionSplit =>
+        const mockPaycheck = (amount: string, hasPaycheckTag: boolean = true): TransactionSplit =>
             ({
                 amount,
-                category_name: 'Paycheck',
-                source_type: 'Revenue account',
+                tags: hasPaycheckTag ? ['Paycheck'] : [],
+                transaction_journal_id: '123',
+                type: 'transfer',
             }) as TransactionSplit;
 
         it('should calculate surplus when actual paychecks exceed expected amount', async () => {
             // Arrange
             const paychecks = [mockPaycheck('3000.00'), mockPaycheck('3000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                t => t.tags?.includes('Paycheck') ?? false
+            );
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -94,7 +98,9 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('2000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                t => t.tags?.includes('Paycheck') ?? false
+            );
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -109,7 +115,7 @@ describe('PaycheckSurplusService', () => {
         it('should handle no paychecks found', async () => {
             // Arrange
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isPaycheck.mockReturnValue(false);
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -125,7 +131,9 @@ describe('PaycheckSurplusService', () => {
             // Arrange
             const paychecks = [mockPaycheck('3000.00')];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                t => t.tags?.includes('Paycheck') ?? false
+            );
 
             // Create local logger mock for this test
             const testMockLogger = {
@@ -158,9 +166,19 @@ describe('PaycheckSurplusService', () => {
 
         it('should handle invalid paycheck amounts', async () => {
             // Arrange
-            const paychecks = [mockPaycheck('3000.00'), mockPaycheck('invalid')];
+            const validPaycheck = mockPaycheck('3000.00');
+            const invalidPaycheck = {
+                amount: 'invalid',
+                tags: ['Paycheck'],
+                transaction_journal_id: '124',
+                type: 'transfer',
+            } as TransactionSplit;
+
+            const paychecks = [validPaycheck, invalidPaycheck];
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(paychecks);
-            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                t => t.tags?.includes('Paycheck') ?? false
+            );
 
             // Act
             const result = await service.calculatePaycheckSurplus(1, 2024);
@@ -173,8 +191,9 @@ describe('PaycheckSurplusService', () => {
                     {
                         transaction: {
                             amount: 'invalid',
-                            category_name: 'Paycheck',
-                            source_type: 'Revenue account',
+                            tags: ['Paycheck'],
+                            transaction_journal_id: '124',
+                            type: 'transfer',
                         },
                     },
                     'Invalid transaction amount found'
@@ -223,47 +242,198 @@ describe('PaycheckSurplusService', () => {
         });
     });
 
-    describe('isPaycheck', () => {
-        it('should identify valid paycheck transactions', () => {
-            const transaction = {
-                category_name: 'Paycheck',
-                source_type: 'Revenue account',
+    describe('findPaychecks with tag-based identification', () => {
+        it('should identify deposit-type paychecks with tag', async () => {
+            // Arrange
+            const depositPaycheck = {
+                type: 'deposit',
+                amount: '3000.00',
+                tags: ['Paycheck'],
+                transaction_journal_id: '123',
+                description: 'Monthly paycheck',
             } as TransactionSplit;
 
-            const result = (
-                service as unknown as {
-                    isPaycheck: (t: TransactionSplit) => boolean;
-                }
-            ).isPaycheck(transaction);
-            expect(result).toBe(true);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([depositPaycheck]);
+            mockTransactionClassificationService.isPaycheck.mockReturnValue(true);
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-2000.0); // 3000 - 5000
+            }
         });
 
-        it('should reject transactions with wrong category', () => {
-            const transaction = {
-                category_name: 'Salary',
-                source_type: 'Revenue account',
+        it('should identify transfer-type paychecks with tag', async () => {
+            // Arrange
+            const transferPaycheck = {
+                type: 'transfer',
+                amount: '3000.00',
+                tags: ['Paycheck'],
+                transaction_journal_id: '123',
+                description: 'Transfer from business account',
             } as TransactionSplit;
 
-            const result = (
-                service as unknown as {
-                    isPaycheck: (t: TransactionSplit) => boolean;
-                }
-            ).isPaycheck(transaction);
-            expect(result).toBe(false);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([transferPaycheck]);
+            mockTransactionClassificationService.isPaycheck.mockReturnValue(true);
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-2000.0); // 3000 - 5000
+            }
         });
 
-        it('should reject transactions with wrong source type', () => {
-            const transaction = {
-                category_name: 'Paycheck',
-                source_type: 'Asset account',
+        it('should support both deposit and transfer type paychecks in same month', async () => {
+            // Arrange
+            const depositPaycheck = {
+                type: 'deposit',
+                amount: '2000.00',
+                tags: ['Paycheck'],
+                transaction_journal_id: '123',
             } as TransactionSplit;
 
-            const result = (
-                service as unknown as {
-                    isPaycheck: (t: TransactionSplit) => boolean;
-                }
-            ).isPaycheck(transaction);
-            expect(result).toBe(false);
+            const transferPaycheck = {
+                type: 'transfer',
+                amount: '3000.00',
+                tags: ['Paycheck'],
+                transaction_journal_id: '124',
+            } as TransactionSplit;
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                depositPaycheck,
+                transferPaycheck,
+            ]);
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                t => t.tags?.includes('Paycheck') ?? false
+            );
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(0); // 2000 + 3000 = 5000 (matches expected)
+            }
+        });
+
+        it('should NOT identify transactions without paycheck tag', async () => {
+            // Arrange
+            const regularTransfer = {
+                type: 'transfer',
+                amount: '500.00',
+                tags: ['Other'],
+                transaction_journal_id: '123',
+                description: 'Transfer to savings',
+            } as TransactionSplit;
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([regularTransfer]);
+            mockTransactionClassificationService.isPaycheck.mockReturnValue(false);
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-5000.0); // No paychecks found
+            }
+        });
+
+        it('should identify transaction with multiple tags including paycheck tag', async () => {
+            // Arrange
+            const paycheckWithMultipleTags = {
+                type: 'transfer',
+                amount: '3000.00',
+                tags: ['Paycheck', 'Work', 'Income'],
+                transaction_journal_id: '123',
+            } as TransactionSplit;
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                paycheckWithMultipleTags,
+            ]);
+            mockTransactionClassificationService.isPaycheck.mockReturnValue(true);
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-2000.0); // 3000 - 5000
+            }
+        });
+
+        it('should handle transaction with null tags', async () => {
+            // Arrange
+            const transactionNoTags = {
+                type: 'deposit',
+                amount: '3000.00',
+                tags: null,
+                transaction_journal_id: '123',
+            } as unknown as TransactionSplit;
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([transactionNoTags]);
+            mockTransactionClassificationService.isPaycheck.mockReturnValue(false);
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toBe(-5000.0); // No paychecks identified
+            }
+        });
+
+        it('should sort paychecks by amount descending', async () => {
+            // Arrange
+            const smallPaycheck = {
+                type: 'deposit',
+                amount: '1000.00',
+                tags: ['Paycheck'],
+                transaction_journal_id: '123',
+            } as TransactionSplit;
+
+            const largePaycheck = {
+                type: 'transfer',
+                amount: '4000.00',
+                tags: ['Paycheck'],
+                transaction_journal_id: '124',
+            } as TransactionSplit;
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                smallPaycheck,
+                largePaycheck,
+            ]);
+
+            // Mock isPaycheck to return true for both
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                t => t.tags?.includes('Paycheck') ?? false
+            );
+
+            // Act
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            // Assert
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // 1000 + 4000 = 5000 - 5000 = 0
+                expect(result.value).toBe(0);
+                // Verify that debug logging was called with the paycheck identification info
+                expect(mockLogger.debug).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        paychecksFound: 2,
+                    }),
+                    'Paycheck search completed'
+                );
+            }
         });
     });
 });

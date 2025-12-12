@@ -41,7 +41,8 @@ export class ServiceFactory {
         const transactionClassificationService = new TransactionClassificationService(
             excludedTransactionService,
             config.api.firefly.noNameExpenseAccountId,
-            config.transactions.tags.disposableIncome
+            config.transactions.tags.disposableIncome,
+            config.transactions.tags.paycheck
         );
         const transactionValidatorService = new TransactionValidatorService(
             transactionClassificationService

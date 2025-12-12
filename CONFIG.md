@@ -198,6 +198,7 @@ Custom tag names used to identify special transaction types in Firefly III.
 ```yaml
 tags:
     disposableIncome: 'Fun Money'
+    paycheck: 'Salary'
 ```
 
 **Type:** `object`
@@ -206,14 +207,21 @@ tags:
 ```yaml
 tags:
     disposableIncome: 'Disposable Income'
+    paycheck: 'Paycheck'
 ```
 
-**Used by:** Transaction classification, filtering logic
+**Available tags:**
+
+| Tag                | Purpose                            | Used by                       |
+| ------------------ | ---------------------------------- | ----------------------------- |
+| `disposableIncome` | Identifies personal spending money | Additional income filtering   |
+| `paycheck`         | Identifies paycheck transactions   | Paycheck surplus calculations |
 
 **Notes:**
 
 - Only customize if you use different tag names in your Firefly III instance
 - Tag matching is exact (case-sensitive)
+- Paycheck tag works with any transaction type (deposits, transfers, etc.)
 - Bills are identified by their Firefly III bill linkage (`bill_id` or `subscription_id`), not by tags
 
 #### excludedTransactions

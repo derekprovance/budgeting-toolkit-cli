@@ -6,7 +6,8 @@ export class TransactionClassificationService implements ITransactionClassificat
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
         private readonly noNameExpenseAccountId: string,
-        private readonly disposableIncomeTag: string
+        private readonly disposableIncomeTag: string,
+        private readonly paycheckTag: string
     ) {}
 
     isTransfer(transaction: TransactionSplit): boolean {
@@ -43,5 +44,13 @@ export class TransactionClassificationService implements ITransactionClassificat
 
     hasACategory(transaction: TransactionSplit): boolean {
         return !(transaction.category_id === undefined || transaction.category_id === null);
+    }
+
+    isPaycheck(transaction: TransactionSplit): boolean {
+        if (!transaction.tags) {
+            return false;
+        }
+
+        return transaction.tags.includes(this.paycheckTag);
     }
 }

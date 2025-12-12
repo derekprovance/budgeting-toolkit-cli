@@ -34,6 +34,7 @@ excludeDisposableIncome: false
 # Custom tag names (optional - override if you use different tags in Firefly III)
 # tags:
 #     disposableIncome: 'Fun Money'
+#     paycheck: 'Salary'
 
 # Globally excluded transactions (removes transactions from all reports)
 # At least one field (description or amount) is required per entry
