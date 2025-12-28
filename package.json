@@ -22,6 +22,12 @@
     "engines": {
         "node": "24.x"
     },
+    "bin": {
+        "btk": "./dist/index.js"
+    },
+    "files": [
+        "dist"
+    ],
     "dependencies": {
         "@anthropic-ai/sdk": "^0.71.2",
         "@derekprovance/firefly-iii-sdk": "6.4.8",

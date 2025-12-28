@@ -17,6 +17,8 @@ config.yaml
 *.dump
 backup.sql
 
+*.tgz
+
 #Mac Specific
 .DS_Store
 .claude
