@@ -23,9 +23,10 @@ export class ConfigValidator {
     validate(config: AppConfig): Result<void, ValidationError> {
         const errors: string[] = [];
         const warnings: string[] = [];
+        const missingEnvVars: string[] = [];
 
         // API Configuration Validation
-        this.validateFireflyApi(config, errors);
+        this.validateFireflyApi(config, errors, missingEnvVars);
 
         // Logging Configuration Validation
         this.validateLoggingConfig(config, errors);
@@ -47,7 +48,7 @@ export class ConfigValidator {
                     message: 'Configuration validation failed',
                     userMessage:
                         'Invalid configuration detected. Please check your .env and YAML config files.',
-                    details: { errors },
+                    details: { errors, missingEnvVars },
                 },
             };
         }
@@ -55,15 +56,21 @@ export class ConfigValidator {
         return { ok: true, value: undefined };
     }
 
-    private validateFireflyApi(config: AppConfig, errors: string[]): void {
+    private validateFireflyApi(
+        config: AppConfig,
+        errors: string[],
+        missingEnvVars: string[]
+    ): void {
         if (!config.api.firefly.url) {
             errors.push('FIREFLY_API_URL is required');
+            missingEnvVars.push('FIREFLY_API_URL');
         } else if (!this.isValidUrl(config.api.firefly.url)) {
             errors.push('FIREFLY_API_URL must be a valid URL');
         }
 
         if (!config.api.firefly.token) {
             errors.push('FIREFLY_API_TOKEN is required');
+            missingEnvVars.push('FIREFLY_API_TOKEN');
         }
     }
 

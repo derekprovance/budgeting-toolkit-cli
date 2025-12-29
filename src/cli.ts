@@ -7,6 +7,7 @@ import { AnalyzeCommand } from './commands/analyze.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
+import { InitCommand } from './commands/init.command.js';
 import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
@@ -53,14 +54,50 @@ const handleError = (error: unknown, operation: string): never => {
     process.exit(1);
 };
 
-export const createCli = (): Command => {
+export const createCli = (configPath?: string): Command => {
     const program = new Command();
 
+    program
+        .name('budgeting-toolkit')
+        .description(packageJson.description)
+        .version(packageJson.version)
+        .option('-v, --verbose', 'enable verbose logging')
+        .option('-c, --config <path>', 'path to config.yaml file');
+
+    // Register init command BEFORE trying to initialize API client
+    // (init command doesn't require configuration)
+    program
+        .command('init')
+        .description('Initialize configuration files in ~/.budgeting/')
+        .option('--force', 'overwrite existing configuration files')
+        .addHelpText(
+            'after',
+            `
+Examples:
+  $ budgeting-toolkit init              # interactive setup
+  $ budgeting-toolkit init --force      # overwrite existing files
+
+This command creates:
+  - ~/.budgeting/config.yaml  (budget configuration)
+  - ~/.budgeting/.env         (API credentials)
+        `
+        )
+        .action(async (opts: { force?: boolean }) => {
+            try {
+                const command = new InitCommand();
+                await command.execute({ force: opts.force });
+            } catch (error) {
+                handleError(error, 'initializing configuration');
+            }
+        });
+
+    // Now try to initialize API client and services for other commands
     let apiClient: FireflyClientWithCerts;
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
     try {
-        const config = ConfigManager.getInstance().getConfig();
+        const configManager = ConfigManager.getInstance(configPath);
+        const config = configManager.getConfig();
 
         // Create Firefly client with properly formatted config
         apiClient = new FireflyClientWithCerts({
@@ -73,21 +110,72 @@ export const createCli = (): Command => {
 
         services = ServiceFactory.createServices(apiClient);
     } catch (error) {
-        console.error(
-            'Failed to initialize API client:',
-            error instanceof Error ? error.message : String(error)
-        );
-        console.log('\nCheck your configuration:');
-        console.log('  - .env file with FIREFLY_API_URL and FIREFLY_API_TOKEN');
-        console.log('  - Certificate paths (if using mTLS): CLIENT_CERT_PATH, CLIENT_CERT_CA_PATH');
+        const isValidationError =
+            error instanceof Error && error.message.includes('Configuration validation failed');
+        const configManager = ConfigManager.getInstance(configPath);
+
+        if (isValidationError) {
+            // Show detailed validation error with file paths
+            console.log('\n[!] Configuration validation failed\n');
+
+            const loadedConfigPath = configManager.getLoadedConfigPath();
+            const loadedEnvPath = configManager.getLoadedEnvPath();
+
+            console.log('Loaded files:');
+            console.log(`  config.yaml: ${loadedConfigPath ? loadedConfigPath : '(none found)'}`);
+            console.log(`  .env:        ${loadedEnvPath ? loadedEnvPath : '(none found)'}`);
+
+            // Extract missing environment variables from error message if available
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            const missingVars = errorMsg
+                .split('\n')
+                .filter((line: string) => line.includes('is required'))
+                .map((line: string) => {
+                    // eslint-disable-next-line no-regex-spaces
+                    const match = line.match(/^  -  (.+?) is required/);
+                    return match ? match[1] : null;
+                })
+                .filter((v): v is string => v !== null);
+
+            if (missingVars.length > 0) {
+                console.log(
+                    `\nMissing required environment variables in ${loadedEnvPath || '.env'}:`
+                );
+                missingVars.forEach((varName: string) => {
+                    console.log(`  - ${varName}`);
+                });
+            }
+
+            // Check if current directory files are being used
+            const usingCwdFiles =
+                (loadedConfigPath && loadedConfigPath.startsWith(process.cwd())) ||
+                (loadedEnvPath && loadedEnvPath.startsWith(process.cwd()));
+
+            if (usingCwdFiles) {
+                console.log(
+                    '\nNote: Files in the current directory take priority over ~/.budgeting/'
+                );
+                console.log('      You can:');
+                console.log('      - Move/delete local config files to use ~/.budgeting/ instead');
+                console.log('      - Or update values in the current directory files');
+                console.log(
+                    '      - Or use --config flag to override: btk --config ~/.budgeting/config.yaml'
+                );
+            } else {
+                console.log('\nRun "btk init" to create configuration files in ~/.budgeting/');
+            }
+
+            console.log('\nSee example file: .env.example\n');
+        } else {
+            console.error(
+                'Failed to initialize API client:',
+                error instanceof Error ? error.message : String(error)
+            );
+            console.log('\nRun "btk init" to create configuration files or check your config.\n');
+        }
+
         process.exit(1);
     }
-
-    program
-        .name('budgeting-toolkit')
-        .description(packageJson.description)
-        .version(packageJson.version)
-        .option('-v, --verbose', 'enable verbose logging');
 
     program
         .command('analyze')

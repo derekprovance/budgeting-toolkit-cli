@@ -1,6 +1,7 @@
 import path from 'path';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
+import * as os from 'os';
 import dotenv from 'dotenv';
 import { AppConfig, ExcludedTransaction } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
@@ -64,9 +65,14 @@ interface YamlConfig {
  */
 export class ConfigManager {
     private static instance: ConfigManager | undefined;
+    private static configFilePath: string | null = null;
     private config: AppConfig;
+    private loadedEnvPath: string | null = null;
 
-    private constructor() {
+    private constructor(configPath?: string) {
+        // Resolve config file path (searches multiple locations based on priority)
+        ConfigManager.configFilePath = ConfigManager.resolveConfigPath(configPath);
+
         // Load .env file
         this.loadEnvironmentFile();
 
@@ -79,10 +85,11 @@ export class ConfigManager {
 
     /**
      * Gets the singleton ConfigManager instance
+     * @param configPath Optional path to config file (only used on first initialization)
      */
-    static getInstance(): ConfigManager {
+    static getInstance(configPath?: string): ConfigManager {
         if (!ConfigManager.instance) {
-            ConfigManager.instance = new ConfigManager();
+            ConfigManager.instance = new ConfigManager(configPath);
         }
         return ConfigManager.instance;
     }
@@ -95,21 +102,145 @@ export class ConfigManager {
     }
 
     /**
+     * Gets the path to the loaded config.yaml file
+     * @returns Absolute path to loaded config file or null if none was loaded
+     */
+    getLoadedConfigPath(): string | null {
+        return ConfigManager.configFilePath;
+    }
+
+    /**
+     * Gets the path to the loaded .env file
+     * @returns Absolute path to loaded .env file or null if none was loaded
+     */
+    getLoadedEnvPath(): string | null {
+        return this.loadedEnvPath;
+    }
+
+    /**
      * Resets the singleton instance (for testing only)
      */
     static resetInstance(): void {
         ConfigManager.instance = undefined;
+        ConfigManager.configFilePath = null;
     }
 
     /**
-     * Loads the .env file into process.env
+     * Gets the default config directory path (~/.budgeting)
+     * @returns Absolute path to ~/.budgeting directory
+     */
+    static getDefaultConfigDir(): string {
+        return path.join(os.homedir(), '.budgeting');
+    }
+
+    /**
+     * Gets the default config file path (~/.budgeting/config.yaml)
+     * @returns Absolute path to default config.yaml
+     */
+    static getDefaultConfigPath(): string {
+        return path.join(ConfigManager.getDefaultConfigDir(), 'config.yaml');
+    }
+
+    /**
+     * Gets the default .env file path (~/.budgeting/.env)
+     * @returns Absolute path to default .env
+     */
+    static getDefaultEnvPath(): string {
+        return path.join(ConfigManager.getDefaultConfigDir(), '.env');
+    }
+
+    /**
+     * Resolves the config file path by searching multiple locations in priority order:
+     * 1. CLI flag --config path (if provided)
+     * 2. Current working directory: ./config.yaml
+     * 3. User home directory: ~/.budgeting/config.yaml
+     * 4. null (use defaults if no config file found)
+     *
+     * @param customPath Optional custom path from CLI flag
+     * @returns Path to config file or null if none found
+     */
+    private static resolveConfigPath(customPath?: string): string | null {
+        // Priority 1: CLI flag --config path (highest priority)
+        if (customPath) {
+            const resolved = path.isAbsolute(customPath)
+                ? customPath
+                : path.resolve(process.cwd(), customPath);
+
+            if (fs.existsSync(resolved)) {
+                return resolved;
+            }
+
+            throw new Error(`Config file not found: ${resolved}`);
+        }
+
+        // Priority 2: Current working directory
+        const cwdPath = path.join(process.cwd(), 'config.yaml');
+        if (fs.existsSync(cwdPath)) {
+            return cwdPath;
+        }
+
+        // Priority 3: User home directory ~/.budgeting/config.yaml
+        const homePath = ConfigManager.getDefaultConfigPath();
+        if (fs.existsSync(homePath)) {
+            return homePath;
+        }
+
+        // Priority 4: No config file found (use defaults)
+        console.warn(
+            'No config.yaml found. Using defaults. Run "budgeting-toolkit init" to create configuration.'
+        );
+        return null;
+    }
+
+    /**
+     * Loads the .env file into process.env from multiple possible locations:
+     * 1. ENV_FILE environment variable (if set)
+     * 2. Current working directory: ./.env
+     * 3. User home directory: ~/.budgeting/.env
+     *
+     * Uses dotenv.config which silently ignores missing files (quiet: true)
+     * Tracks which .env file was loaded in this.loadedEnvPath
      */
     private loadEnvironmentFile(): void {
-        const envFile = process.env.ENV_FILE || '.env';
+        // Priority 1: ENV_FILE environment variable
+        if (process.env.ENV_FILE) {
+            dotenv.config({
+                path: process.env.ENV_FILE,
+                quiet: true,
+            });
+            this.loadedEnvPath = process.env.ENV_FILE;
+            return;
+        }
+
+        // Priority 2: Current working directory
+        const cwdEnv = path.join(process.cwd(), '.env');
+        const cwdEnvExists = fs.existsSync(cwdEnv);
+        if (cwdEnvExists) {
+            dotenv.config({
+                path: cwdEnv,
+                quiet: true,
+            });
+            this.loadedEnvPath = cwdEnv;
+            return;
+        }
+
+        // Priority 3: User home directory ~/.budgeting/.env
+        const homeEnv = ConfigManager.getDefaultEnvPath();
+        if (fs.existsSync(homeEnv)) {
+            dotenv.config({
+                path: homeEnv,
+                quiet: true,
+            });
+            this.loadedEnvPath = homeEnv;
+            return;
+        }
+
+        // Priority 4: Fallback to .env in current directory (will be silently ignored if not found)
         dotenv.config({
-            path: envFile,
+            path: '.env',
             quiet: true,
         });
+        // loadedEnvPath remains null since this is a fallback that will be ignored anyway
     }
 
     /**
@@ -269,10 +400,11 @@ export class ConfigManager {
      * Loads and parses the YAML configuration file
      */
     private loadYamlFile(): YamlConfig | null {
-        const configPath = path.join(process.cwd(), 'config.yaml');
+        // Use the resolved config path (may be null if no config file found)
+        const configPath = ConfigManager.configFilePath;
 
-        if (!fs.existsSync(configPath)) {
-            console.warn(`Configuration file not found at ${configPath}, using defaults`);
+        if (!configPath) {
+            // No config file found - use defaults
             return null;
         }
 
@@ -280,7 +412,9 @@ export class ConfigManager {
             const fileContents = fs.readFileSync(configPath, 'utf8');
             return (yaml.load(fileContents) as YamlConfig) || null;
         } catch (error) {
-            throw new Error(`Failed to load YAML configuration: ${error}`);
+            throw new Error(
+                `Failed to parse YAML configuration at ${configPath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
         }
     }
 

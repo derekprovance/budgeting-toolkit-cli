@@ -50,6 +50,19 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 - ESLint config: `eslint.config.mts` (already ESM) with TypeScript, Node.js globals, and Prettier integration
 - Prettier integration for consistent code formatting
 
+### ASCII Art Style Guide
+
+User-facing console output uses ASCII art instead of emoticons for better cross-platform compatibility:
+
+- `[>>]` - Launch/start action
+- `[!]` - Warning/alert message
+- `[*]` - Information/input prompt
+- `[+]` - Success/completion
+- `[-]` - Error/failure
+- `[?]` - Question/confirmation
+
+Apply this consistently across all CLI commands and messages to users.
+
 ## Configuration System
 
 This project uses a unified configuration system managed by `ConfigManager` singleton.

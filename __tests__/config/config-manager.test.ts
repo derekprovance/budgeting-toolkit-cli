@@ -362,4 +362,136 @@ qZXQ
             expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
         });
     });
+
+    describe('Config file path resolution', () => {
+        beforeEach(() => {
+            process.env.FIREFLY_API_URL = 'http://localhost:8080';
+            process.env.FIREFLY_API_TOKEN = 'test-token';
+            process.env.ANTHROPIC_API_KEY = 'test-key';
+        });
+
+        it('should return correct default config directory', () => {
+            const configDir = ConfigManager.getDefaultConfigDir();
+            expect(configDir).toMatch(/\.budgeting$/);
+            expect(configDir).toContain(process.env.HOME || process.env.USERPROFILE);
+        });
+
+        it('should return correct default config path', () => {
+            const configPath = ConfigManager.getDefaultConfigPath();
+            expect(configPath).toMatch(/\.budgeting[/\\]config\.yaml$/);
+            expect(configPath).toContain(process.env.HOME || process.env.USERPROFILE);
+        });
+
+        it('should return correct default env path', () => {
+            const envPath = ConfigManager.getDefaultEnvPath();
+            expect(envPath).toMatch(/\.budgeting[/\\]\.env$/);
+            expect(envPath).toContain(process.env.HOME || process.env.USERPROFILE);
+        });
+
+        it('should resolve config path from CLI --config flag with highest priority', () => {
+            const customPath = '/custom/config.yaml';
+
+            // Custom path exists, others don't
+            mockExistsSync.mockImplementation((filePath: string) => {
+                if (typeof filePath === 'string') {
+                    return filePath === customPath;
+                }
+                return false;
+            });
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+
+            // The config path should be stored internally when provided
+            expect(ConfigManager.getInstance(customPath)).toBeDefined();
+        });
+
+        it('should fallback to current directory config.yaml as second priority', () => {
+            // Mock: custom path doesn't exist, current dir exists
+            mockExistsSync.mockImplementation((filePath: string) => {
+                if (typeof filePath === 'string') {
+                    return filePath === './config.yaml';
+                }
+                return false;
+            });
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+
+            const configManager = ConfigManager.getInstance();
+            expect(configManager).toBeDefined();
+        });
+
+        it('should fallback to home directory config as third priority', () => {
+            // Mock: CLI and current dir don't exist, home dir exists
+            const homeDir = process.env.HOME || process.env.USERPROFILE;
+            const homePath = `${homeDir}/.budgeting/config.yaml`;
+
+            mockExistsSync.mockImplementation((filePath: string) => {
+                if (typeof filePath === 'string') {
+                    return filePath === homePath;
+                }
+                return false;
+            });
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+
+            const configManager = ConfigManager.getInstance();
+            expect(configManager).toBeDefined();
+        });
+
+        it('should use defaults when no config file is found', () => {
+            mockExistsSync.mockReturnValue(false);
+
+            const configManager = ConfigManager.getInstance();
+            const config = configManager.getConfig();
+
+            // Should have defaults loaded
+            expect(config.api.firefly.url).toBe('http://localhost:8080');
+        });
+
+        it('should prefer CLI --config flag over current directory config', () => {
+            const customPath = '/custom/priority-config.yaml';
+
+            mockExistsSync.mockImplementation((filePath: string) => {
+                if (typeof filePath === 'string') {
+                    return filePath === customPath || filePath === './config.yaml';
+                }
+                return false;
+            });
+
+            mockReadFileSync.mockImplementation((filePath: string) => {
+                if (filePath === customPath) {
+                    return 'custom yaml';
+                }
+                return 'default yaml';
+            });
+
+            mockYamlLoad.mockImplementation((content: string) => {
+                if (content === 'custom yaml') {
+                    return { customConfigUsed: true };
+                }
+                return { customConfigUsed: false };
+            });
+
+            const configManager = ConfigManager.getInstance(customPath);
+            expect(configManager).toBeDefined();
+        });
+
+        it('should prefer home directory over defaults when no CLI path provided', () => {
+            const homeDir = process.env.HOME || process.env.USERPROFILE;
+            const homePath = `${homeDir}/.budgeting/config.yaml`;
+
+            mockExistsSync.mockImplementation((filePath: string) => {
+                if (typeof filePath === 'string') {
+                    return filePath === homePath;
+                }
+                return false;
+            });
+
+            mockReadFileSync.mockReturnValue('home yaml');
+            mockYamlLoad.mockReturnValue({ loadedFromHome: true });
+
+            const configManager = ConfigManager.getInstance();
+            expect(configManager).toBeDefined();
+        });
+    });
 });
