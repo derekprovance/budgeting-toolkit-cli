@@ -24,16 +24,14 @@ export class CategorizeDisplayService {
      * Formats the tag not found message
      */
     formatTagNotFound(tag: string): string {
-        return ['\n', chalk.yellow(`❌ Tag "${tag}" not found`)].join('\n');
+        return [chalk.yellow(`\n❌ Tag "${tag}" not found`)].join('\n');
     }
 
     /**
      * Formats the empty tag message
      */
     formatEmptyTag(tag: string): string {
-        return ['\n', chalk.yellow(`No processable transactions found with tag "${tag}"`)].join(
-            '\n'
-        );
+        return [chalk.yellow(`\nNo processable transactions found with tag "${tag}"`)].join('\n');
     }
 
     /**
