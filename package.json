@@ -12,8 +12,9 @@
         "compile": "rm -Rf ./dist && tsc",
         "test": "NODE_OPTIONS=--experimental-vm-modules jest",
         "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-        "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-        "linter": "eslint . && prettier . --write"
+        "linter": "eslint . && prettier . --write",
+        "prepack": "npm run compile",
+        "dev:install": "npm pack && npm install -g *.tgz && rm -f *.tgz"
     },
     "keywords": [],
     "author": "Derek Provance",
