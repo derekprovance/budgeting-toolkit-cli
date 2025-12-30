@@ -61,6 +61,7 @@ export class BudgetReportService implements IBudgetReportService {
                 const insight = insights.find(insight => insight.id == budgetId);
 
                 return {
+                    budgetId: budgetId,
                     name: budgetName,
                     amount: budgetLimit ? Number(budgetLimit.attributes.amount) : 0.0,
                     spent: insight ? insight.difference_float : 0.0,

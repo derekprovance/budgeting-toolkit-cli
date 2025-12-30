@@ -257,7 +257,8 @@ Examples:
                     services.budgetReport,
                     services.transactionService,
                     services.budgetDisplayService,
-                    services.billComparisonService
+                    services.billComparisonService,
+                    services.budgetService
                 );
                 await command.execute({
                     month: opts.month!,

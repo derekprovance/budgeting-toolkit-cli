@@ -215,6 +215,35 @@ export class BudgetDisplayService {
         return output.join('\n');
     }
 
+    /**
+     * Formats transaction list for a budget in verbose mode
+     * Transactions should be pre-sorted by amount (highest first)
+     * @param transactions Sorted list of transactions
+     * @param budgetName Name of the budget
+     * @returns Formatted transaction listing with header
+     */
+    formatBudgetTransactions(transactions: TransactionSplit[], budgetName: string): string {
+        if (transactions.length === 0) {
+            return '';
+        }
+
+        const lines = [chalk.dim(`  Transactions for ${budgetName}:`)];
+
+        transactions.forEach(transaction => {
+            const transactionId = transaction.transaction_journal_id;
+            if (transactionId) {
+                lines.push(
+                    this.baseTransactionDisplayService.formatBudgetTransaction(
+                        transaction,
+                        transactionId
+                    )
+                );
+            }
+        });
+
+        return lines.join('\n');
+    }
+
     private formatCurrencyWithSymbol(amount: number, symbol: string): string {
         return DisplayFormatterUtils.formatCurrency(amount, symbol);
     }

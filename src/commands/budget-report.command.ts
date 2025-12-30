@@ -1,9 +1,12 @@
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
+import { BudgetService } from '../services/core/budget.service.js';
 import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/common.types.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { logger } from '../logger.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -17,7 +20,8 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         private readonly budgetReportService: BudgetReportService,
         private readonly transactionService: TransactionService,
         private readonly budgetDisplayService: BudgetDisplayService,
-        private readonly billComparisonService: BillComparisonService
+        private readonly billComparisonService: BillComparisonService,
+        private readonly budgetService: BudgetService
     ) {}
 
     /**
@@ -79,18 +83,74 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             // Display individual budget items
             const nameWidth = Math.max(...budgetReports.map(report => report.name.length), 20);
 
-            budgetReports.forEach(report => {
+            // Pre-fetch all budget transactions in parallel when verbose to avoid N+1 queries
+            const budgetTransactionsMap = new Map<string, TransactionSplit[]>();
+            const budgetErrorsMap = new Map<string, string>();
+
+            if (verbose) {
+                const budgetsWithSpending = budgetReports.filter(b => b.spent !== 0);
+
+                const transactionPromises = budgetsWithSpending.map(async budget => {
+                    try {
+                        const transactions = await this.getBudgetTransactionsSorted(
+                            budget.budgetId,
+                            month,
+                            year
+                        );
+                        return { budgetId: budget.budgetId, transactions, error: null };
+                    } catch (error) {
+                        const err = error instanceof Error ? error : new Error(String(error));
+                        return { budgetId: budget.budgetId, transactions: [], error: err.message };
+                    }
+                });
+
+                const results = await Promise.all(transactionPromises);
+
+                results.forEach(result => {
+                    if (result.error) {
+                        budgetErrorsMap.set(result.budgetId, result.error);
+                        logger.error(
+                            { budgetId: result.budgetId, error: result.error },
+                            `Failed to fetch transactions for budget ${result.budgetId}`
+                        );
+                    } else {
+                        budgetTransactionsMap.set(result.budgetId, result.transactions);
+                    }
+                });
+            }
+
+            for (const budget of budgetReports) {
                 console.log(
                     this.budgetDisplayService.formatBudgetItem(
-                        report,
+                        budget,
                         nameWidth,
                         isCurrentMonth,
                         currentDay,
                         totalDays
                     )
                 );
+
+                // Show verbose transaction listing if enabled and budget has spending
+                if (verbose && budget.spent !== 0) {
+                    if (budgetErrorsMap.has(budget.budgetId)) {
+                        console.log(
+                            chalk.yellow(`  [!] Could not load transactions for ${budget.name}`)
+                        );
+                    } else {
+                        const transactions = budgetTransactionsMap.get(budget.budgetId) || [];
+                        const formattedTransactions =
+                            this.budgetDisplayService.formatBudgetTransactions(
+                                transactions,
+                                budget.name
+                            );
+                        if (formattedTransactions) {
+                            console.log(formattedTransactions);
+                        }
+                    }
+                }
+
                 console.log();
-            });
+            }
 
             // Display summary
             console.log('─'.repeat(nameWidth + 50));
@@ -170,5 +230,27 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     private getPercentageSpent(spent: number, amount: number): number {
         const percentage = Math.abs(spent) / amount;
         return percentage ? percentage * 100 : 0;
+    }
+
+    /**
+     * Fetches and sorts transactions for a budget by amount descending
+     * @param budgetId The budget ID
+     * @param month The month (1-12)
+     * @param year The year
+     * @returns Sorted transactions (highest amount first)
+     */
+    private async getBudgetTransactionsSorted(budgetId: string, month: number, year: number) {
+        const transactions = await this.budgetService.getTransactionsForBudget(
+            budgetId,
+            month,
+            year
+        );
+
+        // Sort by amount descending (highest absolute value first)
+        return transactions.sort((a, b) => {
+            const amountA = Math.abs(parseFloat(a.amount));
+            const amountB = Math.abs(parseFloat(b.amount));
+            return amountB - amountA;
+        });
     }
 }

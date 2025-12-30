@@ -1,5 +1,11 @@
 import { BudgetService } from '../../src/services/core/budget.service.js';
-import { BudgetLimitRead, BudgetRead, InsightGroup } from '@derekprovance/firefly-iii-sdk';
+import {
+    BudgetLimitRead,
+    BudgetRead,
+    InsightGroup,
+    TransactionRead,
+    TransactionSplit,
+} from '@derekprovance/firefly-iii-sdk';
 import { IDateRangeService } from '../../src/types/interface/date-range.service.interface.js';
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { jest } from '@jest/globals';
@@ -15,6 +21,7 @@ describe('BudgetService', () => {
                 listBudget: jest.fn(),
                 listBudgetLimit: jest.fn(),
                 listTransactionWithoutBudget: jest.fn(),
+                listTransactionByBudget: jest.fn(),
             },
             insight: {
                 insightExpenseBudget: jest.fn(),
@@ -192,6 +199,158 @@ describe('BudgetService', () => {
         it('should validate month and year', async () => {
             await expect(budgetService.getBudgetLimits(0, 2024)).rejects.toThrow();
             await expect(budgetService.getBudgetLimits(13, 2024)).rejects.toThrow();
+        });
+    });
+
+    describe('getTransactionsForBudget', () => {
+        it('should return transactions for a specific budget', async () => {
+            const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
+            const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
+
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
+                startDate: mockStartDate,
+                endDate: mockEndDate,
+            });
+
+            const mockTransaction: TransactionSplit = {
+                description: 'Test Transaction',
+                amount: '100.00',
+                currency_symbol: '$',
+                date: '2024-01-15T00:00:00.000Z',
+                transaction_journal_id: '1',
+            } as TransactionSplit;
+
+            const mockTransactions: TransactionRead[] = [
+                {
+                    id: '1',
+                    attributes: {
+                        transactions: [mockTransaction],
+                    },
+                } as TransactionRead,
+            ];
+
+            (mockApiClient.budgets.listTransactionByBudget as jest.Mock).mockResolvedValueOnce({
+                data: mockTransactions,
+            });
+
+            const result = await budgetService.getTransactionsForBudget('budget-1', 1, 2024);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].description).toBe('Test Transaction');
+            expect(mockApiClient.budgets.listTransactionByBudget).toHaveBeenCalledWith(
+                'budget-1',
+                undefined,
+                undefined,
+                undefined,
+                mockStartDate.toISOString().split('T')[0],
+                mockEndDate.toISOString().split('T')[0]
+            );
+        });
+
+        it('should return empty array when no transactions found', async () => {
+            const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
+            const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
+
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
+                startDate: mockStartDate,
+                endDate: mockEndDate,
+            });
+
+            (mockApiClient.budgets.listTransactionByBudget as jest.Mock).mockResolvedValueOnce({
+                data: [],
+            });
+
+            const result = await budgetService.getTransactionsForBudget('budget-1', 1, 2024);
+
+            expect(result).toEqual([]);
+        });
+
+        it('should throw error when API returns null', async () => {
+            const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
+            const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
+
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
+                startDate: mockStartDate,
+                endDate: mockEndDate,
+            });
+
+            (mockApiClient.budgets.listTransactionByBudget as jest.Mock).mockResolvedValueOnce(
+                null
+            );
+
+            await expect(
+                budgetService.getTransactionsForBudget('budget-1', 1, 2024)
+            ).rejects.toThrow('Failed to fetch transactions for budget budget-1 in month 1/2024');
+        });
+
+        it('should throw error when API call fails', async () => {
+            const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
+            const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
+
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
+                startDate: mockStartDate,
+                endDate: mockEndDate,
+            });
+
+            (mockApiClient.budgets.listTransactionByBudget as jest.Mock).mockRejectedValueOnce(
+                new Error('API Error')
+            );
+
+            await expect(
+                budgetService.getTransactionsForBudget('budget-1', 1, 2024)
+            ).rejects.toThrow('API Error');
+        });
+
+        it('should validate month and year', async () => {
+            await expect(
+                budgetService.getTransactionsForBudget('budget-1', 0, 2024)
+            ).rejects.toThrow();
+            await expect(
+                budgetService.getTransactionsForBudget('budget-1', 13, 2024)
+            ).rejects.toThrow();
+        });
+
+        it('should flatten multiple transaction splits correctly', async () => {
+            const mockStartDate = new Date('2024-01-01T00:00:00.000Z');
+            const mockEndDate = new Date('2024-01-31T23:59:59.999Z');
+
+            (mockDateRangeService.getDateRange as jest.Mock).mockReturnValue({
+                startDate: mockStartDate,
+                endDate: mockEndDate,
+            });
+
+            const mockTransaction1: TransactionSplit = {
+                description: 'Transaction 1',
+                amount: '50.00',
+                currency_symbol: '$',
+                date: '2024-01-15T00:00:00.000Z',
+            } as TransactionSplit;
+
+            const mockTransaction2: TransactionSplit = {
+                description: 'Transaction 2',
+                amount: '75.00',
+                currency_symbol: '$',
+                date: '2024-01-20T00:00:00.000Z',
+            } as TransactionSplit;
+
+            const mockTransactions: TransactionRead[] = [
+                {
+                    id: '1',
+                    attributes: {
+                        transactions: [mockTransaction1, mockTransaction2],
+                    },
+                } as TransactionRead,
+            ];
+
+            (mockApiClient.budgets.listTransactionByBudget as jest.Mock).mockResolvedValueOnce({
+                data: mockTransactions,
+            });
+
+            const result = await budgetService.getTransactionsForBudget('budget-1', 1, 2024);
+
+            expect(result).toHaveLength(2);
+            expect(result[0].description).toBe('Transaction 1');
+            expect(result[1].description).toBe('Transaction 2');
         });
     });
 });

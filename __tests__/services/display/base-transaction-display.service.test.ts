@@ -28,6 +28,7 @@ describe('BaseTransactionDisplayService', () => {
 
         service = new BaseTransactionDisplayService(
             mockTransactionClassificationService,
+            '', // baseUrl - empty string for tests
             mockTransactionUtils
         );
     });
@@ -413,6 +414,185 @@ describe('BaseTransactionDisplayService', () => {
 
             expect(result).toContain('Amount: undefined100.00');
             expect(result).toContain('Total Expenses: undefined100.00');
+        });
+    });
+
+    describe('formatBudgetTransaction', () => {
+        it('should format transaction with clickable link', () => {
+            const transaction = createMockTransaction({
+                description: 'Walmart Supercenter',
+                amount: '100.00',
+                currency_symbol: '$',
+                date: '2025-01-15T12:00:00Z',
+                transaction_journal_id: '123',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('$100.00');
+            expect(result).toContain('Walmart Supercenter');
+            // Date format depends on locale, just verify it's present
+            expect(result).toMatch(/\d{1,2}\/\d{1,2}\/2025/);
+            // Check for ANSI hyperlink escape sequence
+            expect(result).toContain('\x1B]8;;');
+        });
+
+        it('should include transaction ID in hyperlink', () => {
+            const transaction = createMockTransaction({
+                description: 'Test Transaction',
+                amount: '50.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, 'abc123');
+
+            expect(result).toContain('transactions/show/abc123');
+        });
+
+        it('should truncate long descriptions at 60 characters', () => {
+            const longDesc = 'A'.repeat(70);
+            const transaction = createMockTransaction({
+                description: longDesc,
+                amount: '100.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('A'.repeat(57) + '...');
+            expect(result).not.toContain(longDesc);
+        });
+
+        it('should not truncate descriptions under 60 characters', () => {
+            const shortDesc = 'Short description';
+            const transaction = createMockTransaction({
+                description: shortDesc,
+                amount: '100.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain(shortDesc);
+            expect(result).not.toContain('...');
+        });
+
+        it('should handle exactly 60 character descriptions', () => {
+            const exactDesc = 'A'.repeat(60);
+            const transaction = createMockTransaction({
+                description: exactDesc,
+                amount: '100.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain(exactDesc);
+            expect(result).not.toContain('...');
+        });
+
+        it('should handle descriptions with special characters', () => {
+            const transaction = createMockTransaction({
+                description: 'Café & Bakery - "Special" Items (50% off)',
+                amount: '25.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('Café & Bakery - "Special" Items (50% off)');
+        });
+
+        it('should format negative amounts as absolute value', () => {
+            const transaction = createMockTransaction({
+                description: 'Refund',
+                amount: '-75.50',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('$75.50');
+            expect(result).not.toContain('-');
+        });
+
+        it('should format amounts with two decimal places', () => {
+            const transaction = createMockTransaction({
+                description: 'Test',
+                amount: '123.456',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('$123.46');
+        });
+
+        it('should handle zero amounts', () => {
+            const transaction = createMockTransaction({
+                description: 'Zero Amount',
+                amount: '0.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('$0.00');
+        });
+
+        it('should handle different currency symbols', () => {
+            const transaction = createMockTransaction({
+                description: 'Café',
+                amount: '50.00',
+                currency_symbol: '€',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('€50.00');
+        });
+
+        it('should include base URL when provided', () => {
+            const serviceWithBaseUrl = new BaseTransactionDisplayService(
+                mockTransactionClassificationService,
+                'http://firefly.local'
+            );
+
+            const transaction = createMockTransaction({
+                description: 'Test',
+                amount: '100.00',
+                currency_symbol: '$',
+            });
+
+            const result = serviceWithBaseUrl.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('http://firefly.local/transactions/show/123');
+        });
+
+        it('should work with empty base URL', () => {
+            const transaction = createMockTransaction({
+                description: 'Test',
+                amount: '100.00',
+                currency_symbol: '$',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            expect(result).toContain('/transactions/show/123');
+        });
+
+        it('should format date correctly', () => {
+            const transaction = createMockTransaction({
+                description: 'Test',
+                amount: '100.00',
+                currency_symbol: '$',
+                date: '2025-12-25T10:30:00Z',
+            });
+
+            const result = service.formatBudgetTransaction(transaction, '123');
+
+            const expectedDate = new Date('2025-12-25T10:30:00Z').toLocaleDateString();
+            expect(result).toContain(expectedDate);
         });
     });
 });

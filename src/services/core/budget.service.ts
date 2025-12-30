@@ -86,6 +86,41 @@ export class BudgetService {
         return this.flattenTransactions(response.data);
     }
 
+    /**
+     * Gets all transactions for a specific budget within a date range
+     * @param budgetId The budget ID
+     * @param month Month (1-12)
+     * @param year Year
+     * @returns Promise<TransactionSplit[]> Flattened transaction splits
+     * @throws Error when month/year validation fails
+     * @throws Error when API call fails or returns null/undefined
+     */
+    async getTransactionsForBudget(
+        budgetId: string,
+        month: number,
+        year: number
+    ): Promise<TransactionSplit[]> {
+        DateUtils.validateMonthYear(month, year);
+        const range = this.dateRangeService.getDateRange(month, year);
+
+        const response = await this.client.budgets.listTransactionByBudget(
+            budgetId,
+            undefined, // xTraceId
+            undefined, // limit
+            undefined, // page
+            range.startDate.toISOString().split('T')[0],
+            range.endDate.toISOString().split('T')[0]
+        );
+
+        if (!response || !response.data) {
+            throw new Error(
+                `Failed to fetch transactions for budget ${budgetId} in month ${month}/${year}`
+            );
+        }
+
+        return this.flattenTransactions(response.data);
+    }
+
     private async fetchBudgets(): Promise<BudgetRead[]> {
         const results = await this.client.budgets.listBudget();
         if (!results || !results.data) {

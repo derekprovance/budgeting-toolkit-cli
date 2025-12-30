@@ -8,6 +8,7 @@ export class BaseTransactionDisplayService {
 
     constructor(
         private readonly transactionClassificationService: TransactionClassificationService,
+        private readonly baseUrl: string = '',
         transactionUtils: TransactionUtils = new TransactionUtils()
     ) {
         this.transactionUtils = transactionUtils;
@@ -50,6 +51,32 @@ export class BaseTransactionDisplayService {
 
         lines.push(''); // Add extra spacing between transactions
         return lines.join('\n');
+    }
+
+    /**
+     * Formats a transaction for budget verbose listing with clickable link
+     * Truncates description at 60 characters with ellipsis
+     * @param transaction Transaction split to format
+     * @param transactionId Transaction ID for linking
+     * @returns Formatted transaction line
+     */
+    formatBudgetTransaction(transaction: TransactionSplit, transactionId: string): string {
+        const amount = parseFloat(transaction.amount);
+        const date = new Date(transaction.date).toLocaleDateString();
+        const amountStr = `${transaction.currency_symbol}${Math.abs(amount).toFixed(2)}`;
+
+        // Truncate description at 60 characters
+        const MAX_LENGTH = 60;
+        const truncated =
+            transaction.description.length > MAX_LENGTH
+                ? transaction.description.substring(0, 57) + '...'
+                : transaction.description;
+
+        // Create ANSI hyperlink for entire description
+        const link = `${this.baseUrl}/transactions/show/${transactionId}`;
+        const clickableDescription = `\x1B]8;;${link}\x1B\\${truncated}\x1B]8;;\x1B\\`;
+
+        return `  ${chalk.yellow(amountStr.padStart(12))}  ${chalk.white(clickableDescription)}  ${chalk.dim(date)}`;
     }
 
     private getTransactionTypeIndicator(transaction: TransactionSplit): string {

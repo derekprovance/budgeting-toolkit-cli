@@ -77,11 +77,13 @@ describe('BudgetReportService', () => {
             if (result.ok) {
                 expect(result.value).toHaveLength(2);
                 expect(result.value[0]).toEqual({
+                    budgetId: '1',
                     name: 'Budget 1',
                     amount: 100.0,
                     spent: 50.0,
                 } as BudgetReportDto);
                 expect(result.value[1]).toEqual({
+                    budgetId: '2',
                     name: 'Budget 2',
                     amount: 200.0,
                     spent: 150.0,
@@ -109,6 +111,7 @@ describe('BudgetReportService', () => {
             if (result.ok) {
                 expect(result.value).toHaveLength(1);
                 expect(result.value[0]).toEqual({
+                    budgetId: '1',
                     name: 'Budget 1',
                     amount: 0.0,
                     spent: 0.0,

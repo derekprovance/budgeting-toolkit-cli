@@ -45,6 +45,9 @@ describe('BudgetDisplayService', () => {
         baseTransactionDisplayService.listTransactionsWithHeader = jest
             .fn<(transactions: TransactionSplit[], description: string) => string>()
             .mockReturnValue('=== Unbudgeted Transactions ===\n\nNo transactions found');
+        baseTransactionDisplayService.formatBudgetTransaction = jest
+            .fn<(transaction: TransactionSplit, transactionId: string) => string>()
+            .mockReturnValue('  $100.00  Test Transaction  1/15/2025');
 
         service = new BudgetDisplayService(baseTransactionDisplayService);
     });
@@ -192,6 +195,150 @@ describe('BudgetDisplayService', () => {
             expect(result).toContain('Electric');
             expect(result).toContain('Water');
             expect(result).not.toContain('Internet');
+        });
+    });
+
+    describe('formatBudgetTransactions', () => {
+        const mockTransaction1: TransactionSplit = {
+            description: 'Transaction 1',
+            amount: '100.00',
+            currency_symbol: '$',
+            date: '2025-01-15T00:00:00Z',
+            transaction_journal_id: '123',
+        } as TransactionSplit;
+
+        const mockTransaction2: TransactionSplit = {
+            description: 'Transaction 2',
+            amount: '75.00',
+            currency_symbol: '$',
+            date: '2025-01-20T00:00:00Z',
+            transaction_journal_id: '456',
+        } as TransactionSplit;
+
+        it('should return empty string when no transactions provided', () => {
+            const result = service.formatBudgetTransactions([], 'Groceries');
+            expect(result).toBe('');
+        });
+
+        it('should format budget transaction list with header', () => {
+            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock)
+                .mockReturnValueOnce('  $100.00  Transaction 1  1/15/2025')
+                .mockReturnValueOnce('  $75.00  Transaction 2  1/20/2025');
+
+            const result = service.formatBudgetTransactions(
+                [mockTransaction1, mockTransaction2],
+                'Groceries'
+            );
+
+            expect(result).toContain('Transactions for Groceries:');
+            expect(result).toContain('  $100.00  Transaction 1  1/15/2025');
+            expect(result).toContain('  $75.00  Transaction 2  1/20/2025');
+        });
+
+        it('should display single transaction', () => {
+            (
+                baseTransactionDisplayService.formatBudgetTransaction as jest.Mock
+            ).mockReturnValueOnce('  $100.00  Transaction 1  1/15/2025');
+
+            const result = service.formatBudgetTransactions([mockTransaction1], 'Groceries');
+
+            expect(result).toContain('Transactions for Groceries:');
+            expect(result).toContain('  $100.00  Transaction 1  1/15/2025');
+        });
+
+        it('should delegate formatting to BaseTransactionDisplayService', () => {
+            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock).mockReturnValue(
+                'formatted'
+            );
+
+            service.formatBudgetTransactions([mockTransaction1, mockTransaction2], 'Bills');
+
+            expect(baseTransactionDisplayService.formatBudgetTransaction).toHaveBeenCalledWith(
+                mockTransaction1,
+                '123'
+            );
+            expect(baseTransactionDisplayService.formatBudgetTransaction).toHaveBeenCalledWith(
+                mockTransaction2,
+                '456'
+            );
+        });
+
+        it('should skip transactions without journal ID', () => {
+            const transactionWithoutId = {
+                ...mockTransaction1,
+                transaction_journal_id: undefined,
+            };
+
+            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock).mockReturnValue(
+                'formatted'
+            );
+
+            const result = service.formatBudgetTransactions([transactionWithoutId], 'Test');
+
+            expect(baseTransactionDisplayService.formatBudgetTransaction).not.toHaveBeenCalled();
+            expect(result).toContain('Transactions for Test:');
+            // Header should be present but no transaction lines
+            const lines = result.split('\n');
+            expect(lines).toHaveLength(1);
+        });
+
+        it('should handle mixed transactions with and without IDs', () => {
+            const transactionWithoutId = {
+                ...mockTransaction1,
+                transaction_journal_id: undefined,
+            };
+
+            (
+                baseTransactionDisplayService.formatBudgetTransaction as jest.Mock
+            ).mockReturnValueOnce('  $75.00  Transaction 2  1/20/2025');
+
+            const result = service.formatBudgetTransactions(
+                [transactionWithoutId, mockTransaction2],
+                'Test'
+            );
+
+            expect(result).toContain('Transactions for Test:');
+            expect(result).toContain('  $75.00  Transaction 2  1/20/2025');
+            // Only one transaction should be formatted
+            expect(baseTransactionDisplayService.formatBudgetTransaction).toHaveBeenCalledTimes(1);
+        });
+
+        it('should use budget name in header', () => {
+            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock).mockReturnValue(
+                'formatted'
+            );
+
+            const result1 = service.formatBudgetTransactions([mockTransaction1], 'Groceries');
+            expect(result1).toContain('Transactions for Groceries:');
+
+            const result2 = service.formatBudgetTransactions([mockTransaction1], 'Utilities');
+            expect(result2).toContain('Transactions for Utilities:');
+        });
+
+        it('should preserve transaction order', () => {
+            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock)
+                .mockReturnValueOnce('  $100.00  Transaction 1  1/15/2025')
+                .mockReturnValueOnce('  $75.00  Transaction 2  1/20/2025')
+                .mockReturnValueOnce('  $50.00  Transaction 3  1/25/2025');
+
+            const transaction3: TransactionSplit = {
+                description: 'Transaction 3',
+                amount: '50.00',
+                currency_symbol: '$',
+                date: '2025-01-25T00:00:00Z',
+                transaction_journal_id: '789',
+            } as TransactionSplit;
+
+            const result = service.formatBudgetTransactions(
+                [mockTransaction1, mockTransaction2, transaction3],
+                'Test'
+            );
+
+            const lines = result.split('\n');
+            expect(lines[0]).toContain('Transactions for Test:');
+            expect(lines[1]).toContain('Transaction 1');
+            expect(lines[2]).toContain('Transaction 2');
+            expect(lines[3]).toContain('Transaction 3');
         });
     });
 });

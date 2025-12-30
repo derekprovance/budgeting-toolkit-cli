@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "7.3.2",
+    "version": "7.4.0",
     "type": "module",
     "main": "./dist/index.js",
     "exports": {

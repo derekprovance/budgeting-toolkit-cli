@@ -70,7 +70,8 @@ export class ServiceFactory {
             config.transactions.expectedMonthlyPaycheck
         );
         const baseTransactionDisplayService = new BaseTransactionDisplayService(
-            transactionClassificationService
+            transactionClassificationService,
+            config.api.firefly.url
         );
         const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
         const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
