@@ -1,5 +1,9 @@
 import chalk, { ChalkInstance } from 'chalk';
-import { BudgetReportDto as BudgetReport } from '../../types/dto/budget-report.dto.js';
+import {
+    BudgetReportDto as BudgetReport,
+    HistoricalComparisonDto,
+    TransactionStats,
+} from '../../types/dto/budget-report.dto.js';
 import { BaseTransactionDisplayService } from './base-transaction-display.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
@@ -11,6 +15,9 @@ import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
  */
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
+    private static readonly NAME_COLUMN_WIDTH = 25;
+    private static readonly SPENT_COLUMN_WIDTH = 14;
+    private static readonly PERCENTAGE_COLUMN_WIDTH = 8;
 
     constructor(private baseTransactionDisplayService: BaseTransactionDisplayService) {}
 
@@ -49,11 +56,10 @@ export class BudgetDisplayService {
     }
 
     /**
-     * Formats an individual budget item
+     * Formats an individual budget item with clean spacing
      */
     formatBudgetItem(
         report: BudgetReport,
-        nameWidth: number,
         isCurrentMonth: boolean,
         currentDay?: number,
         totalDays?: number
@@ -65,26 +71,59 @@ export class BudgetDisplayService {
         );
 
         const remaining = report.amount + report.spent;
-        const progressBar = this.createProgressBar(percentage);
+        const progressBar = this.createProgressBar(percentage, report.spent, report.amount);
 
         const dailyRateInfo =
             isCurrentMonth && currentDay && totalDays
                 ? this.getDailyRateIndicator(report.spent, report.amount, currentDay, totalDays)
                 : '';
 
-        return (
-            chalk.bold(report.name.padEnd(nameWidth)) +
-            color(this.formatCurrency(Math.abs(report.spent)).padStart(12)) +
-            ' of ' +
-            chalk.bold(this.formatCurrency(report.amount).padStart(12)) +
-            color(` (${percentage.toFixed(1)}%)`.padStart(8)) +
-            '  ' +
-            color(progressBar) +
-            (dailyRateInfo ? ' ' + dailyRateInfo : '') +
-            '\n' +
-            ' '.repeat(nameWidth) +
-            chalk.gray(`Remaining: ${this.formatCurrency(remaining)}`)
+        // Format remaining with color based on overspent status
+        const remainingColor = remaining < 0 ? chalk.red : chalk.gray;
+        const remainingLabel = remaining < 0 ? 'Overspent' : 'Remaining';
+        const remainingText = `${remainingLabel}: ${this.formatCurrency(remaining)}`;
+
+        // Build manual formatting for clean, compact spacing
+        const spentStr = color(this.formatCurrency(Math.abs(report.spent)));
+        const budgetStr = chalk.bold(this.formatCurrency(report.amount));
+        const percentStr = color(`(${percentage.toFixed(1)}%)`);
+
+        const lines: string[] = [];
+        lines.push(
+            chalk.bold(report.name.padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH)) +
+                spentStr.padStart(BudgetDisplayService.SPENT_COLUMN_WIDTH) +
+                ' of '.padStart(5) +
+                budgetStr.padStart(BudgetDisplayService.SPENT_COLUMN_WIDTH) +
+                '  ' +
+                percentStr.padStart(BudgetDisplayService.PERCENTAGE_COLUMN_WIDTH) +
+                '  ' +
+                color(progressBar) +
+                (dailyRateInfo ? '  ' + dailyRateInfo : '')
         );
+
+        lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + remainingColor(remainingText));
+
+        // Add projected spending if available
+        const projectedSpendingInfo =
+            isCurrentMonth && currentDay && totalDays
+                ? this.formatProjectedSpending(report.spent, report.amount, currentDay, totalDays)
+                : '';
+
+        if (projectedSpendingInfo) {
+            lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + projectedSpendingInfo);
+        }
+
+        // Add historical comparison if available
+        const historicalComparisonInfo = this.formatHistoricalComparison(
+            report.spent,
+            report.historicalComparison
+        );
+
+        if (historicalComparisonInfo) {
+            lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + historicalComparisonInfo);
+        }
+
+        return lines.join('\n');
     }
 
     /**
@@ -93,7 +132,6 @@ export class BudgetDisplayService {
     formatSummary(
         totalSpent: number,
         totalBudget: number,
-        nameWidth: number,
         isCurrentMonth: boolean,
         currentDay?: number,
         totalDays?: number
@@ -104,21 +142,34 @@ export class BudgetDisplayService {
             isCurrentMonth ? 100 - (currentDay! / totalDays!) * 100 : undefined
         );
 
-        const totalDailyRateInfo =
-            isCurrentMonth && currentDay && totalDays
-                ? this.getDailyRateIndicator(totalSpent, totalBudget, currentDay, totalDays)
-                : '';
+        const progressBar = this.createProgressBar(totalPercentage, totalSpent, totalBudget);
 
-        return (
-            chalk.bold('TOTAL'.padEnd(nameWidth)) +
-            summaryColor(this.formatCurrency(Math.abs(totalSpent)).padStart(12)) +
-            ' of ' +
-            chalk.bold(this.formatCurrency(totalBudget).padStart(12)) +
-            summaryColor(` (${totalPercentage.toFixed(1)}%)`.padStart(8)) +
-            '  ' +
-            summaryColor(this.createProgressBar(totalPercentage)) +
-            (totalDailyRateInfo ? ' ' + totalDailyRateInfo : '')
+        // Add total row
+        const remaining = totalBudget + totalSpent;
+        const remainingColor = remaining < 0 ? chalk.red : chalk.gray;
+        const remainingLabel = remaining < 0 ? 'Overspent' : 'Remaining';
+        const remainingText = `${remainingLabel}: ${this.formatCurrency(remaining)}`;
+
+        // Build manual formatting for clean, compact spacing
+        const spentStr = summaryColor(this.formatCurrency(Math.abs(totalSpent)));
+        const budgetStr = chalk.bold(this.formatCurrency(totalBudget));
+        const percentStr = summaryColor(`(${totalPercentage.toFixed(1)}%)`);
+
+        const lines: string[] = [];
+        lines.push(
+            chalk.bold('TOTAL'.padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH)) +
+                spentStr.padStart(BudgetDisplayService.SPENT_COLUMN_WIDTH) +
+                ' of '.padStart(5) +
+                budgetStr.padStart(BudgetDisplayService.SPENT_COLUMN_WIDTH) +
+                '  ' +
+                percentStr.padStart(BudgetDisplayService.PERCENTAGE_COLUMN_WIDTH) +
+                '  ' +
+                summaryColor(progressBar)
         );
+
+        lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + remainingColor(remainingText));
+
+        return lines.join('\n');
     }
 
     /**
@@ -244,6 +295,79 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
+    /**
+     * Formats transaction list with statistics for a budget in verbose mode
+     * @param transactions Sorted list of transactions
+     * @param budgetName Name of the budget
+     * @param stats Optional transaction statistics
+     * @returns Formatted transaction listing with header and stats
+     */
+    formatBudgetTransactionsWithStats(
+        transactions: TransactionSplit[],
+        budgetName: string,
+        stats?: TransactionStats
+    ): string {
+        if (transactions.length === 0) {
+            return '';
+        }
+
+        const lines = [];
+
+        // Header with statistics
+        if (stats) {
+            const countText = `${stats.count} transaction${stats.count !== 1 ? 's' : ''}`;
+            const avgText = `avg: ${this.formatCurrency(stats.average)}`;
+            lines.push(chalk.dim(`  Transactions for ${budgetName} (${countText}, ${avgText}):`));
+        } else {
+            lines.push(chalk.dim(`  Transactions for ${budgetName}:`));
+        }
+
+        // Individual transactions
+        transactions.forEach(transaction => {
+            const transactionId = transaction.transaction_journal_id;
+            if (transactionId) {
+                lines.push(
+                    this.baseTransactionDisplayService.formatBudgetTransaction(
+                        transaction,
+                        transactionId
+                    )
+                );
+            }
+        });
+
+        // Merchant insights
+        if (stats?.topMerchant) {
+            lines.push('');
+            const merchantText =
+                chalk.dim('    Top Merchant: ') +
+                chalk.white(stats.topMerchant.name) +
+                chalk.dim(
+                    ` (${this.formatCurrency(stats.topMerchant.totalSpent)}, ${stats.topMerchant.visitCount} visit${stats.topMerchant.visitCount !== 1 ? 's' : ''})`
+                );
+            lines.push(merchantText);
+        }
+
+        // Spending trend
+        if (stats?.spendingTrend) {
+            const trend = stats.spendingTrend;
+            const diffFormatted = this.formatCurrency(Math.abs(trend.difference));
+            const percFormatted = trend.percentageChange.toFixed(1);
+
+            let trendText = '';
+            if (trend.direction === 'increasing') {
+                trendText = chalk.red(`↑ Increasing (+${diffFormatted}, +${percFormatted}%)`);
+            } else if (trend.direction === 'decreasing') {
+                trendText = chalk.green(`↓ Decreasing (-${diffFormatted}, ${percFormatted}%)`);
+            } else {
+                trendText = chalk.gray(`→ Stable (${diffFormatted}, ${percFormatted}%)`);
+            }
+
+            lines.push(chalk.dim('    Spending vs Last Month: ') + trendText);
+        }
+
+        return lines.join('\n');
+    }
+
     private formatCurrencyWithSymbol(amount: number, symbol: string): string {
         return DisplayFormatterUtils.formatCurrency(amount, symbol);
     }
@@ -270,7 +394,67 @@ export class BudgetDisplayService {
         }
     }
 
-    private createProgressBar(percentage: number): string {
+    private formatProjectedSpending(
+        spent: number,
+        amount: number,
+        currentDay: number,
+        totalDays: number
+    ): string {
+        const actualSpent = Math.abs(spent);
+        const dailyRate = actualSpent / currentDay;
+        const projected = dailyRate * totalDays;
+        const difference = projected - amount;
+
+        const dailyRateFormatted = this.formatCurrency(dailyRate);
+        const projectedFormatted = this.formatCurrency(projected);
+        const differenceFormatted = this.formatCurrency(Math.abs(difference));
+
+        let statusText = '';
+        if (Math.abs(difference) < 1) {
+            statusText = chalk.green('On track');
+        } else if (difference > 0) {
+            statusText = chalk.red(`Over by ${differenceFormatted}`);
+        } else {
+            statusText = chalk.cyan(`Under by ${differenceFormatted}`);
+        }
+
+        return (
+            chalk.dim(`                 Pace: ${dailyRateFormatted}/day → Projected: `) +
+            chalk.white(projectedFormatted) +
+            ' ' +
+            statusText
+        );
+    }
+
+    private formatHistoricalComparison(
+        spent: number,
+        historical?: HistoricalComparisonDto
+    ): string {
+        if (!historical) {
+            return '';
+        }
+
+        const currentSpent = Math.abs(spent);
+        const previousSpent = Math.abs(historical.previousMonthSpent);
+        const difference = currentSpent - previousSpent;
+        const percentageChange = previousSpent > 0 ? (difference / previousSpent) * 100 : 0;
+
+        const diffFormatted = this.formatCurrency(Math.abs(difference));
+        const prevFormatted = this.formatCurrency(previousSpent);
+
+        let indicator = '';
+        if (Math.abs(difference) < 1) {
+            indicator = chalk.gray('→ No change');
+        } else if (difference > 0) {
+            indicator = chalk.red(`↑${diffFormatted}, +${percentageChange.toFixed(1)}%`);
+        } else {
+            indicator = chalk.cyan(`↓${diffFormatted}, ${percentageChange.toFixed(1)}%`);
+        }
+
+        return chalk.dim(`                 vs Last Month: ${prevFormatted} `) + indicator;
+    }
+
+    private createProgressBar(percentage: number, spent?: number, amount?: number): string {
         const normalizedPercentage = Math.min(percentage, 100);
         const filledWidth = Math.round(
             (normalizedPercentage / 100) * BudgetDisplayService.PROGRESS_BAR_WIDTH
@@ -278,7 +462,14 @@ export class BudgetDisplayService {
         const emptyWidth = Math.max(0, BudgetDisplayService.PROGRESS_BAR_WIDTH - filledWidth);
 
         const bar = '█'.repeat(filledWidth) + ' '.repeat(emptyWidth);
-        return percentage > 100 ? `[${bar}] +${(percentage - 100).toFixed(0)}%` : `[${bar}]`;
+
+        if (percentage > 100 && spent !== undefined && amount !== undefined) {
+            const overAmount = Math.abs(spent) - amount;
+            const overFormatted = this.formatCurrency(overAmount);
+            return chalk.redBright(`[${bar}>>>] ${overFormatted} OVER`);
+        }
+
+        return `[${bar}]`;
     }
 
     private formatCurrency(amount: number): string {

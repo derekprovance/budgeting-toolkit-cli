@@ -42,7 +42,8 @@
         "js-yaml": "^4.1.1",
         "ora": "^9.0.0",
         "pino": "^10.1.0",
-        "strip-ansi": "^7.1.2"
+        "strip-ansi": "^7.1.2",
+        "table": "^6.9.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.1",

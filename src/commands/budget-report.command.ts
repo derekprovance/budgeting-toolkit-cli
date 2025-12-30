@@ -80,9 +80,6 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 )
             );
 
-            // Display individual budget items
-            const nameWidth = Math.max(...budgetReports.map(report => report.name.length), 20);
-
             // Pre-fetch all budget transactions in parallel when verbose to avoid N+1 queries
             const budgetTransactionsMap = new Map<string, TransactionSplit[]>();
             const budgetErrorsMap = new Map<string, string>();
@@ -119,22 +116,22 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 });
             }
 
+            // Display budget items with transactions underneath
             for (const budget of budgetReports) {
                 console.log(
                     this.budgetDisplayService.formatBudgetItem(
                         budget,
-                        nameWidth,
                         isCurrentMonth,
                         currentDay,
                         totalDays
                     )
                 );
 
-                // Show verbose transaction listing if enabled and budget has spending
+                // Show verbose transaction listing for this budget if enabled and has spending
                 if (verbose && budget.spent !== 0) {
                     if (budgetErrorsMap.has(budget.budgetId)) {
                         console.log(
-                            chalk.yellow(`  [!] Could not load transactions for ${budget.name}`)
+                            chalk.yellow(`\n  [!] Could not load transactions for ${budget.name}`)
                         );
                     } else {
                         const transactions = budgetTransactionsMap.get(budget.budgetId) || [];
@@ -144,21 +141,21 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                                 budget.name
                             );
                         if (formattedTransactions) {
+                            console.log('');
                             console.log(formattedTransactions);
+                            console.log('');
+                            console.log('');
                         }
                     }
                 }
-
-                console.log();
             }
 
             // Display summary
-            console.log('─'.repeat(nameWidth + 50));
+            console.log('\n' + chalk.bold('SUMMARY'));
             console.log(
                 this.budgetDisplayService.formatSummary(
                     totalSpent,
                     totalBudget,
-                    nameWidth,
                     isCurrentMonth,
                     currentDay,
                     totalDays

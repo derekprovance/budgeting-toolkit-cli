@@ -1,6 +1,7 @@
 import { BudgetReportCommand } from '../../src/commands/budget-report.command.js';
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { BudgetService } from '../../src/services/core/budget.service.js';
 import { BudgetDisplayService } from '../../src/services/display/budget-display.service.js';
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { BudgetReport } from '../../src/types/interface/budget-report.interface.js';
@@ -11,6 +12,7 @@ import { jest } from '@jest/globals';
 // Mock services
 jest.mock('../../src/services/budget-report.service');
 jest.mock('../../src/services/core/transaction.service');
+jest.mock('../../src/services/core/budget.service');
 jest.mock('../../src/services/display/budget-display.service');
 jest.mock('../../src/services/bill-comparison.service');
 
@@ -18,6 +20,7 @@ describe('BudgetReportCommand', () => {
     let command: BudgetReportCommand;
     let budgetReportService: jest.Mocked<BudgetReportService>;
     let transactionService: jest.Mocked<TransactionService>;
+    let budgetService: jest.Mocked<BudgetService>;
     let displayService: jest.Mocked<BudgetDisplayService>;
     let billComparisonService: jest.Mocked<BillComparisonService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
@@ -49,11 +52,20 @@ describe('BudgetReportCommand', () => {
                 .mockResolvedValue(new Date('2024-05-15')),
         } as unknown as jest.Mocked<TransactionService>;
 
+        budgetService = {
+            getTransactionsForBudget: jest
+                .fn<(budgetId: string, month: number, year: number) => Promise<TransactionSplit[]>>()
+                .mockResolvedValue([]),
+        } as unknown as jest.Mocked<BudgetService>;
+
         displayService = {
             formatHeader: jest.fn<(...args: any[]) => string>().mockReturnValue('Formatted Header'),
             formatBudgetItem: jest
                 .fn<(...args: any[]) => string>()
                 .mockReturnValue('Formatted Budget Item'),
+            formatBudgetsTable: jest
+                .fn<(...args: any[]) => string>()
+                .mockReturnValue('Formatted Budgets Table'),
             formatSummary: jest
                 .fn<(...args: any[]) => string>()
                 .mockReturnValue('Formatted Summary'),
@@ -80,7 +92,8 @@ describe('BudgetReportCommand', () => {
             budgetReportService,
             transactionService,
             displayService,
-            billComparisonService
+            billComparisonService,
+            budgetService
         );
 
         // Spy on console.log
@@ -107,7 +120,7 @@ describe('BudgetReportCommand', () => {
             expect(displayService.getSpendRateWarning).toHaveBeenCalled();
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
             expect(displayService.formatBillComparisonSection).toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalledTimes(9); // Header + 2 items + separator + summary + unbudgeted + bill comparison
+            expect(consoleLogSpy).toHaveBeenCalledTimes(7); // Header + 2 budget items + summary header + summary + unbudgeted + bill comparison
         });
 
         it('should display budget report for non-current month', async () => {
@@ -125,7 +138,7 @@ describe('BudgetReportCommand', () => {
             expect(displayService.getSpendRateWarning).not.toHaveBeenCalled();
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
             expect(displayService.formatBillComparisonSection).toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalledTimes(9); // Header + 2 items + separator + summary + newline + unbudgeted + bill comparison
+            expect(consoleLogSpy).toHaveBeenCalledTimes(7); // Header + 2 budget items + summary header + summary + unbudgeted + bill comparison
         });
 
         it('should display warning when spend rate is too high', async () => {
