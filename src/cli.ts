@@ -254,11 +254,12 @@ Examples:
         .action(async (opts: BudgetDateOptions) => {
             try {
                 const command = new BudgetReportCommand(
+                    services.budgetAnalyticsService,
+                    services.budgetInsightService,
+                    services.enhancedBudgetDisplayService,
                     services.budgetReport,
-                    services.transactionService,
-                    services.budgetDisplayService,
                     services.billComparisonService,
-                    services.budgetService
+                    services.transactionService
                 );
                 await command.execute({
                     month: opts.month!,
