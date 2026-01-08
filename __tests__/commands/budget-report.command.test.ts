@@ -54,7 +54,9 @@ describe('BudgetReportCommand', () => {
 
         budgetService = {
             getTransactionsForBudget: jest
-                .fn<(budgetId: string, month: number, year: number) => Promise<TransactionSplit[]>>()
+                .fn<
+                    (budgetId: string, month: number, year: number) => Promise<TransactionSplit[]>
+                >()
                 .mockResolvedValue([]),
         } as unknown as jest.Mocked<BudgetService>;
 

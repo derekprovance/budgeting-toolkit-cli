@@ -101,7 +101,9 @@ export class BudgetDisplayService {
                 (dailyRateInfo ? '  ' + dailyRateInfo : '')
         );
 
-        lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + remainingColor(remainingText));
+        lines.push(
+            ' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + remainingColor(remainingText)
+        );
 
         // Add projected spending if available
         const projectedSpendingInfo =
@@ -120,7 +122,9 @@ export class BudgetDisplayService {
         );
 
         if (historicalComparisonInfo) {
-            lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + historicalComparisonInfo);
+            lines.push(
+                ' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + historicalComparisonInfo
+            );
         }
 
         return lines.join('\n');
@@ -167,7 +171,9 @@ export class BudgetDisplayService {
                 summaryColor(progressBar)
         );
 
-        lines.push(' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + remainingColor(remainingText));
+        lines.push(
+            ' '.repeat(BudgetDisplayService.NAME_COLUMN_WIDTH) + remainingColor(remainingText)
+        );
 
         return lines.join('\n');
     }
@@ -278,7 +284,7 @@ export class BudgetDisplayService {
             return '';
         }
 
-        const lines = [chalk.dim(`  Transactions for ${budgetName}:`)];
+        const lines = [chalk.cyanBright(`  Transactions for ${budgetName}:`)];
 
         transactions.forEach(transaction => {
             const transactionId = transaction.transaction_journal_id;
