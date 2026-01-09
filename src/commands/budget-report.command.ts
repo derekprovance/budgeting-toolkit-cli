@@ -1,7 +1,6 @@
 import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/common.types.js';
 import { logger } from '../logger.js';
-import chalk from 'chalk';
 import ora from 'ora';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
@@ -38,7 +37,14 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
             // Get days left info for current month
-            let daysInfo: { daysLeft: number; percentageLeft: number; currentDay: number; totalDays: number } | undefined;
+            let daysInfo:
+                | {
+                      daysLeft: number;
+                      percentageLeft: number;
+                      currentDay: number;
+                      totalDays: number;
+                  }
+                | undefined;
             if (isCurrentMonth) {
                 const lastUpdatedOn =
                     (await this.transactionService.getMostRecentTransactionDate()) || new Date();
@@ -68,7 +74,9 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             // Generate insights from budget data
             const insights = this.budgetInsightService.generateInsights(
                 enhancedBudgets,
-                billComparisonResult.ok ? billComparisonResult.value : this.createEmptyBillComparison()
+                billComparisonResult.ok
+                    ? billComparisonResult.value
+                    : this.createEmptyBillComparison()
             );
 
             spinner.succeed('Budget report generated');
@@ -88,12 +96,13 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 daysInfo,
             };
 
-            const formattedReport = this.enhancedBudgetDisplayService.formatEnhancedReport(reportData);
+            const formattedReport =
+                this.enhancedBudgetDisplayService.formatEnhancedReport(reportData);
             console.log(formattedReport);
 
             // If verbose flag is set, show transaction details
             if (verbose) {
-                await this.displayVerboseTransactions(enhancedBudgets);
+                await this.displayVerboseTransactions();
             }
         } catch (error) {
             spinner.fail(this.BUDGET_GEN_FAIL);
@@ -106,7 +115,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     /**
      * Displays verbose transaction details for budgets
      */
-    private async displayVerboseTransactions(budgets: any[]): Promise<void> {
+    private async displayVerboseTransactions(): Promise<void> {
         // Placeholder for verbose transaction display
         // In the future, this could show detailed transaction lists per budget
         logger.debug('Verbose flag set - transaction details available via --category flag');

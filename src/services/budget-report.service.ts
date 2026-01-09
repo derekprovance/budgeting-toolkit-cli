@@ -130,7 +130,10 @@ export class BudgetReportService implements IBudgetReportService {
      * @param year Year
      * @returns Categorized unbudgeted transactions with emoji
      */
-    async getCategorizedUnbudgetedTransactions(month: number, year: number): Promise<CategorizedUnbudgetedDto[]> {
+    async getCategorizedUnbudgetedTransactions(
+        month: number,
+        year: number
+    ): Promise<CategorizedUnbudgetedDto[]> {
         const unbudgeted = await this.getUntrackedTransactions(month, year);
 
         return unbudgeted.map(transaction => ({

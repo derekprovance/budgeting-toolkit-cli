@@ -131,9 +131,7 @@ export class BillComparisonService implements IBillComparisonService {
      * @returns Top N bills sorted by actual amount descending
      */
     getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
-        return [...comparison.bills]
-            .sort((a, b) => b.actual - a.actual)
-            .slice(0, limit);
+        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(0, limit);
     }
 
     /**
@@ -143,9 +141,7 @@ export class BillComparisonService implements IBillComparisonService {
      * @returns Remaining bills (those not in top N)
      */
     getRemainingBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
-        return [...comparison.bills]
-            .sort((a, b) => b.actual - a.actual)
-            .slice(limit);
+        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(limit);
     }
 
     /**

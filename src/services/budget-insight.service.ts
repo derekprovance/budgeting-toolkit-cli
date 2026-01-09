@@ -2,6 +2,7 @@ import { EnhancedBudgetReportDto } from '../types/dto/enhanced-budget-report.dto
 import { BillComparisonDto } from '../types/dto/bill-comparison.dto.js';
 import { BudgetInsight } from '../types/dto/budget-insight.dto.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
+import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 
 /**
  * Service for generating rule-based insights about spending patterns
@@ -42,11 +43,15 @@ export class BudgetInsightService {
             if (
                 budget.transactionStats &&
                 budget.transactionStats.count &&
-                budget.transactionStats.count >= 30 &&
+                budget.transactionStats.count >=
+                    BUSINESS_CONSTANTS.TRANSACTIONS.HIGH_FREQUENCY_COUNT &&
                 budget.spent !== 0
             ) {
                 const avgSpent = Math.abs(budget.spent) / budget.transactionStats.count;
-                const avgFormatted = CurrencyUtils.formatWithSymbol(avgSpent, billComparison.currencySymbol);
+                const avgFormatted = CurrencyUtils.formatWithSymbol(
+                    avgSpent,
+                    billComparison.currencySymbol
+                );
                 insights.push({
                     type: 'info',
                     message: `You had ${budget.transactionStats.count} transactions in ${budget.name} (avg ${avgFormatted} each)`,
@@ -58,7 +63,12 @@ export class BudgetInsightService {
 
         // Rule 3: Good performance - budgets well under budget
         const underBudgets = budgets
-            .filter(b => b.status === 'under' && b.percentageUsed < 70 && b.spent !== 0)
+            .filter(
+                b =>
+                    b.status === 'under' &&
+                    b.percentageUsed < BUSINESS_CONSTANTS.BUDGET.WELL_UNDER_THRESHOLD &&
+                    b.spent !== 0
+            )
             .sort((a, b) => a.percentageUsed - b.percentageUsed);
 
         if (underBudgets.length > 0) {
@@ -74,7 +84,7 @@ export class BudgetInsightService {
         // Rule 5: Significant bill variance
         if (billComparison.variance > 0) {
             const percentageOver = (billComparison.variance / billComparison.predictedTotal) * 100;
-            if (percentageOver > 20) {
+            if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.CRITICAL_VARIANCE_PERCENT) {
                 insights.push({
                     type: 'warning',
                     message: `Bills are ${percentageOver.toFixed(0)}% higher than expected`,

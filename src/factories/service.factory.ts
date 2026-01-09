@@ -29,7 +29,6 @@ import { BudgetSurplusService } from '../services/budget-surplus.service.js';
 import { DateRangeService } from '../types/interface/date-range.service.interface.js';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
-import { CategoryMappingService } from '../services/category-mapping.service.js';
 import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budget-display.service.js';
 
 export class ServiceFactory {
@@ -103,7 +102,6 @@ export class ServiceFactory {
             transactionService
         );
         const budgetInsightService = new BudgetInsightService();
-        const categoryMappingService = new CategoryMappingService();
         const enhancedBudgetDisplayService = new EnhancedBudgetDisplayService();
 
         return {
@@ -129,7 +127,6 @@ export class ServiceFactory {
             budgetSurplusService,
             budgetAnalyticsService,
             budgetInsightService,
-            categoryMappingService,
             enhancedBudgetDisplayService,
         };
     }

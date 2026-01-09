@@ -53,11 +53,15 @@ export class EnhancedBudgetDisplayService {
         const onTrackBudgets = data.budgets.filter(b => b.status !== 'over');
 
         if (overBudgets.length > 0) {
-            sections.push(this.formatAttentionNeededSection(overBudgets));
+            sections.push(
+                this.formatAttentionNeededSection(overBudgets, data.billComparison.currencySymbol)
+            );
         }
 
         if (onTrackBudgets.length > 0) {
-            sections.push(this.formatOnTrackSection(onTrackBudgets));
+            sections.push(
+                this.formatOnTrackSection(onTrackBudgets, data.billComparison.currencySymbol)
+            );
         }
 
         // Top expenses
@@ -70,7 +74,9 @@ export class EnhancedBudgetDisplayService {
 
         // Unbudgeted expenses
         if (data.unbudgeted.length > 0) {
-            sections.push(this.formatUnbudgetedSection(data.unbudgeted));
+            sections.push(
+                this.formatUnbudgetedSection(data.unbudgeted, data.billComparison.currencySymbol)
+            );
         }
 
         // Insights
@@ -92,9 +98,7 @@ export class EnhancedBudgetDisplayService {
             month: 'long',
         });
 
-        const totalSpent = Math.abs(
-            data.budgets.reduce((sum, b) => sum + b.spent, 0)
-        );
+        const totalSpent = Math.abs(data.budgets.reduce((sum, b) => sum + b.spent, 0));
         const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
         const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
         const isOverBudget = totalSpent > totalBudget;
@@ -108,16 +112,23 @@ export class EnhancedBudgetDisplayService {
         const lines: string[] = [header, ''];
 
         // Total spent line
-        const spentFormatted = CurrencyUtils.formatWithSymbol(totalSpent, data.billComparison.currencySymbol);
-        const budgetFormatted = CurrencyUtils.formatWithSymbol(totalBudget, data.billComparison.currencySymbol);
-        lines.push(
-            `${chalk.bold('Total Spent:')}      ${spentFormatted} / ${budgetFormatted}`
+        const spentFormatted = CurrencyUtils.formatWithSymbol(
+            totalSpent,
+            data.billComparison.currencySymbol
         );
+        const budgetFormatted = CurrencyUtils.formatWithSymbol(
+            totalBudget,
+            data.billComparison.currencySymbol
+        );
+        lines.push(`${chalk.bold('Total Spent:')}      ${spentFormatted} / ${budgetFormatted}`);
 
         // Status line
         if (isOverBudget) {
             const overAmount = totalSpent - totalBudget;
-            const overFormatted = CurrencyUtils.formatWithSymbol(overAmount, data.billComparison.currencySymbol);
+            const overFormatted = CurrencyUtils.formatWithSymbol(
+                overAmount,
+                data.billComparison.currencySymbol
+            );
             lines.push(
                 `${chalk.bold('Status:')}           ${statusEmoji} OVER BUDGET by ${overFormatted} (${percentageUsed.toFixed(1)}%)`
             );
@@ -130,9 +141,10 @@ export class EnhancedBudgetDisplayService {
         // Days remaining (for current month only)
         if (data.isCurrentMonth && data.daysInfo) {
             lines.push(`${chalk.bold('Days Remaining:')}   ${data.daysInfo.daysLeft} days`);
-            const dailyBudget = data.daysInfo.daysLeft > 0
-                ? (totalBudget - totalSpent) / data.daysInfo.daysLeft
-                : 0;
+            const dailyBudget =
+                data.daysInfo.daysLeft > 0
+                    ? (totalBudget - totalSpent) / data.daysInfo.daysLeft
+                    : 0;
             const dailyFormatted = CurrencyUtils.formatWithSymbol(
                 Math.max(0, dailyBudget),
                 data.billComparison.currencySymbol
@@ -149,7 +161,10 @@ export class EnhancedBudgetDisplayService {
     /**
      * Formats the attention needed section (over-budget items)
      */
-    private formatAttentionNeededSection(budgets: EnhancedBudgetReportDto[]): string {
+    private formatAttentionNeededSection(
+        budgets: EnhancedBudgetReportDto[],
+        currencySymbol: string
+    ): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('ATTENTION NEEDED'));
         lines.push('');
@@ -160,11 +175,11 @@ export class EnhancedBudgetDisplayService {
         sorted.forEach(budget => {
             const spentFormatted = CurrencyUtils.formatWithSymbol(
                 Math.abs(budget.spent),
-                '$'
+                currencySymbol
             );
-            const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, '$');
+            const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
             const remaining = Math.abs(budget.spent) - budget.amount;
-            const remainingFormatted = CurrencyUtils.formatWithSymbol(remaining, '$');
+            const remainingFormatted = CurrencyUtils.formatWithSymbol(remaining, currencySymbol);
 
             const progressBar = this.createProgressBar(budget.percentageUsed);
             const line =
@@ -191,7 +206,10 @@ export class EnhancedBudgetDisplayService {
     /**
      * Formats the on-track section (under-budget items)
      */
-    private formatOnTrackSection(budgets: EnhancedBudgetReportDto[]): string {
+    private formatOnTrackSection(
+        budgets: EnhancedBudgetReportDto[],
+        currencySymbol: string
+    ): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('ON TRACK'));
         lines.push('');
@@ -202,12 +220,15 @@ export class EnhancedBudgetDisplayService {
         sorted.forEach(budget => {
             const spentFormatted = CurrencyUtils.formatWithSymbol(
                 Math.abs(budget.spent),
-                '$'
+                currencySymbol
             );
-            const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, '$');
+            const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
 
             const progressBar = this.createProgressBar(budget.percentageUsed);
-            const remainingFormatted = CurrencyUtils.formatWithSymbol(budget.remaining, '$');
+            const remainingFormatted = CurrencyUtils.formatWithSymbol(
+                budget.remaining,
+                currencySymbol
+            );
 
             const line =
                 chalk.green('🟢') +
@@ -239,7 +260,10 @@ export class EnhancedBudgetDisplayService {
         lines.push('');
 
         expenses.forEach((expense, index) => {
-            const amountFormatted = CurrencyUtils.formatWithSymbol(expense.amount, expense.currencySymbol);
+            const amountFormatted = CurrencyUtils.formatWithSymbol(
+                expense.amount,
+                expense.currencySymbol
+            );
             const truncatedDescription = expense.description.substring(0, 35).padEnd(35);
 
             const line =
@@ -299,8 +323,14 @@ export class EnhancedBudgetDisplayService {
         const otherBills = billComparison.bills.slice(4);
 
         topBills.forEach(bill => {
-            const predictedFormatted = CurrencyUtils.formatWithSymbol(bill.predicted, billComparison.currencySymbol);
-            const actualFormatted = CurrencyUtils.formatWithSymbol(bill.actual, billComparison.currencySymbol);
+            const predictedFormatted = CurrencyUtils.formatWithSymbol(
+                bill.predicted,
+                billComparison.currencySymbol
+            );
+            const actualFormatted = CurrencyUtils.formatWithSymbol(
+                bill.actual,
+                billComparison.currencySymbol
+            );
             const variance = bill.actual - bill.predicted;
             const varianceEmoji = EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
 
@@ -313,10 +343,19 @@ export class EnhancedBudgetDisplayService {
             const otherActual = otherBills.reduce((sum, b) => sum + b.actual, 0);
             const otherPredicted = otherBills.reduce((sum, b) => sum + b.predicted, 0);
             const otherVariance = otherActual - otherPredicted;
-            const otherVarianceEmoji = EmojiUtils.getBillVarianceEmoji(otherVariance, otherPredicted);
+            const otherVarianceEmoji = EmojiUtils.getBillVarianceEmoji(
+                otherVariance,
+                otherPredicted
+            );
 
-            const otherActualFormatted = CurrencyUtils.formatWithSymbol(otherActual, billComparison.currencySymbol);
-            const otherPredictedFormatted = CurrencyUtils.formatWithSymbol(otherPredicted, billComparison.currencySymbol);
+            const otherActualFormatted = CurrencyUtils.formatWithSymbol(
+                otherActual,
+                billComparison.currencySymbol
+            );
+            const otherPredictedFormatted = CurrencyUtils.formatWithSymbol(
+                otherPredicted,
+                billComparison.currencySymbol
+            );
 
             const line = `${otherVarianceEmoji} Others (${otherBills.length})${' '.repeat(
                 20 - String(otherBills.length).length
@@ -332,7 +371,10 @@ export class EnhancedBudgetDisplayService {
     /**
      * Formats the unbudgeted expenses section
      */
-    private formatUnbudgetedSection(unbudgeted: CategorizedUnbudgetedDto[]): string {
+    private formatUnbudgetedSection(
+        unbudgeted: CategorizedUnbudgetedDto[],
+        currencySymbol: string
+    ): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('UNBUDGETED EXPENSES'));
         lines.push('');
@@ -343,7 +385,10 @@ export class EnhancedBudgetDisplayService {
             const amount = Math.abs(parseFloat(item.transaction.amount));
             total += amount;
 
-            const amountFormatted = CurrencyUtils.formatWithSymbol(amount, item.transaction.currency_symbol || '$');
+            const amountFormatted = CurrencyUtils.formatWithSymbol(
+                amount,
+                item.transaction.currency_symbol || currencySymbol
+            );
             const date = item.transaction.date || new Date().toISOString().split('T')[0];
 
             const line =
@@ -359,7 +404,7 @@ export class EnhancedBudgetDisplayService {
         });
 
         lines.push('');
-        lines.push(chalk.bold(`Total: ${CurrencyUtils.formatWithSymbol(total, '$')}`));
+        lines.push(chalk.bold(`Total: ${CurrencyUtils.formatWithSymbol(total, currencySymbol)}`));
         lines.push('');
         return lines.join('\n');
     }
@@ -388,7 +433,12 @@ export class EnhancedBudgetDisplayService {
      */
     private formatFooterTip(): string {
         const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createHorizontalLine('─', EnhancedBudgetDisplayService.SECTION_WIDTH));
+        lines.push(
+            DisplayFormatterUtils.createHorizontalLine(
+                '─',
+                EnhancedBudgetDisplayService.SECTION_WIDTH
+            )
+        );
         lines.push('');
         lines.push(
             chalk.cyan('💡 TIP: ') +
@@ -396,7 +446,12 @@ export class EnhancedBudgetDisplayService {
                 '   specific category breakdown'
         );
         lines.push('');
-        lines.push(DisplayFormatterUtils.createHorizontalLine('─', EnhancedBudgetDisplayService.SECTION_WIDTH));
+        lines.push(
+            DisplayFormatterUtils.createHorizontalLine(
+                '─',
+                EnhancedBudgetDisplayService.SECTION_WIDTH
+            )
+        );
         lines.push('');
 
         return lines.join('\n');

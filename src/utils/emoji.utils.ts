@@ -1,3 +1,5 @@
+import { BUSINESS_CONSTANTS } from './business-constants.js';
+
 /**
  * Utility class for emoji selection based on status, variance, and categories
  * Provides consistent emoji indicators for the enhanced report display
@@ -13,7 +15,7 @@ export class EmojiUtils {
         if (isOverBudget) {
             return '🔴';
         }
-        if (percentage > 85) {
+        if (percentage > BUSINESS_CONSTANTS.BUDGET.ON_TRACK_THRESHOLD) {
             return '🟡';
         }
         return '🟢';
@@ -33,10 +35,10 @@ export class EmojiUtils {
 
         const percentageOver = (variance / Math.abs(predictedAmount)) * 100;
 
-        if (percentageOver > 20) {
+        if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.CRITICAL_VARIANCE_PERCENT) {
             return '🔴'; // Significantly over
         }
-        if (percentageOver > 10) {
+        if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.WARNING_VARIANCE_PERCENT) {
             return '🟡'; // Moderately over
         }
         return '🟢'; // On track or under

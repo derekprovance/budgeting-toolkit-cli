@@ -1,11 +1,17 @@
 import { EnhancedBudgetReportDto } from '../types/dto/enhanced-budget-report.dto.js';
 import { TopExpenseDto } from '../types/dto/top-expense.dto.js';
-import { HistoricalComparisonDto, TransactionStats, MerchantInsight } from '../types/dto/budget-report.dto.js';
+import {
+    BudgetReportDto,
+    HistoricalComparisonDto,
+    TransactionStats,
+    MerchantInsight,
+} from '../types/dto/budget-report.dto.js';
 import { BudgetReportService } from './budget-report.service.js';
 import { BudgetService } from './core/budget.service.js';
 import { TransactionService } from './core/transaction.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
+import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 
 /**
  * Service for aggregating and analyzing budget data with historical context
@@ -42,7 +48,7 @@ export class BudgetAnalyticsService {
             const currentBudgets = currentResult.value;
 
             // Fetch historical months data in parallel
-            const historicalData: Map<string, any[]> = new Map();
+            const historicalData: Map<string, BudgetReportDto[]> = new Map();
             const historicalPromises = [];
 
             for (let i = 1; i <= historyMonths; i++) {
@@ -98,7 +104,10 @@ export class BudgetAnalyticsService {
             return enhanced;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            logger.error({ error: err.message, month, year }, 'Failed to get enhanced budget report');
+            logger.error(
+                { error: err.message, month, year },
+                'Failed to get enhanced budget report'
+            );
             throw err;
         }
     }
@@ -235,7 +244,7 @@ export class BudgetAnalyticsService {
         budgetId: string,
         budgetAmount: number,
         currentSpent: number,
-        historicalData: Map<string, any[]>
+        historicalData: Map<string, BudgetReportDto[]>
     ): HistoricalComparisonDto {
         try {
             const historicalValues: number[] = [];
@@ -288,7 +297,7 @@ export class BudgetAnalyticsService {
         if (isOverBudget) {
             return 'over';
         }
-        if (percentageUsed >= 85) {
+        if (percentageUsed >= BUSINESS_CONSTANTS.BUDGET.ON_TRACK_THRESHOLD) {
             return 'on-track';
         }
         return 'under';
