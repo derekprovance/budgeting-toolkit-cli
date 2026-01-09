@@ -125,6 +125,26 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
+     * Gets the top N bills by actual amount spent
+     * @param comparison Bill comparison data
+     * @param limit Number of bills to return (default: 4)
+     * @returns Top N bills sorted by actual amount descending
+     */
+    getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
+        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(0, limit);
+    }
+
+    /**
+     * Gets the remaining bills after top N
+     * @param comparison Bill comparison data
+     * @param limit Number of top bills (default: 4)
+     * @returns Remaining bills (those not in top N)
+     */
+    getRemainingBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
+        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(limit);
+    }
+
+    /**
      * Check if a bill has a payment date within the requested month and year.
      * Verifies that the pay_dates actually fall within the specified month/year.
      */
