@@ -220,12 +220,7 @@ export class AnalyzeDisplayService {
 
         lines.push(`    ${chalk.dim('────────────────────────────────────')}`);
 
-        const netPosition =
-            data.additionalIncomeTotal +
-            (data.skipPaycheck ? 0 : data.paycheckSurplus) +
-            data.budgetSurplus -
-            data.billComparison.variance -
-            data.disposableIncome;
+        const netPosition = data.netImpact;
 
         lines.push(
             `    ${'Net Position:'.padEnd(32)} ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
