@@ -134,15 +134,46 @@ export class AnalyzeDisplayService {
         // Disposable income subsection
         if (data.disposableIncomeTransactions.length > 0) {
             lines.push('');
-            lines.push(
-                this.formatExpenseItem(
-                    'Disposable Income',
-                    data.disposableIncome,
-                    data.currencySymbol,
-                    data.disposableIncomeTransactions.length
-                )
+
+            // Calculate tagged total for breakdown
+            const taggedTotal = this.calculateTransactionTotal(
+                data.disposableIncomeTransactions,
+                true
             );
 
+            // Show breakdown format when transfers exist
+            if (data.disposableIncomeTransfers.length > 0) {
+                lines.push(chalk.bold('  Disposable Income'));
+                lines.push(
+                    `    Tagged:       ${this.formatCurrency(taggedTotal, data.currencySymbol)}`
+                );
+
+                // Calculate transfer total
+                const transferTotal = this.calculateTransactionTotal(
+                    data.disposableIncomeTransfers,
+                    false
+                );
+
+                lines.push(
+                    `    Transfers:    ${this.formatNetImpact(-transferTotal, data.currencySymbol, true)}`
+                );
+                lines.push(`    ${chalk.dim('────────────────────────')}`);
+                lines.push(
+                    `    Net:          ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, true)}`
+                );
+            } else {
+                // Original single-line format when no transfers
+                lines.push(
+                    this.formatExpenseItem(
+                        'Disposable Income',
+                        data.disposableIncome,
+                        data.currencySymbol,
+                        data.disposableIncomeTransactions.length
+                    )
+                );
+            }
+
+            // Verbose mode: transaction details (unchanged)
             if (verbose) {
                 lines.push('');
                 lines.push(chalk.dim('  Tagged Transactions:'));
@@ -372,6 +403,23 @@ export class AnalyzeDisplayService {
         const freqBadge = chalk.dim(`[${freq}]`);
 
         return `    ${bill.name.substring(0, 30).padEnd(30)} ${freqBadge.padEnd(15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
+    }
+
+    /**
+     * Calculates total amount from array of transactions
+     * @param transactions Transaction array
+     * @param useAbsolute Whether to use absolute values (true for expenses)
+     * @returns Total amount
+     */
+    private calculateTransactionTotal(
+        transactions: TransactionSplit[],
+        useAbsolute: boolean = true
+    ): number {
+        return transactions.reduce((sum, t) => {
+            const amount = parseFloat(t.amount);
+            const value = isNaN(amount) ? 0 : amount;
+            return sum + (useAbsolute ? Math.abs(value) : value);
+        }, 0);
     }
 
     /**
