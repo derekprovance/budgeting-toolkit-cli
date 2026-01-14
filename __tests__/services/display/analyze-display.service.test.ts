@@ -300,6 +300,130 @@ describe('AnalyzeDisplayService', () => {
         });
     });
 
+    describe('Disposable Income Breakdown', () => {
+        it('should show single-line format when no transfers exist', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Disposable expense', 440.33, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [],
+                disposableIncome: 440.33,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Disposable Income');
+            expect(result).toContain('$440.33');
+            expect(result).toContain('[1 transaction]');
+            expect(result).not.toContain('Tagged:');
+            expect(result).not.toContain('Transfers:');
+        });
+
+        it('should show breakdown format when transfers exist', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense 1', 1940.33, 'withdrawal'),
+                    createMockTransaction('Tagged expense 2', 1000.0, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 2500.0, 'transfer'),
+                ],
+                disposableIncome: 440.33,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Disposable Income');
+            expect(result).toContain('Tagged:');
+            expect(result).toContain('$2940.33');
+            expect(result).toContain('Transfers:');
+            expect(result).toContain('$2500.00');
+            expect(result).toContain('Net:');
+            expect(result).toContain('$440.33');
+        });
+
+        it('should show net as zero when transfers equal tagged', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 1000.0, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 1000.0, 'transfer'),
+                ],
+                disposableIncome: 0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Net:');
+            expect(result).toContain('$0.00');
+        });
+
+        it('should show net as zero when transfers exceed tagged', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 500.0, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 1000.0, 'transfer'),
+                ],
+                disposableIncome: 0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Tagged:');
+            expect(result).toContain('$500.00');
+            expect(result).toContain('Transfers:');
+            expect(result).toContain('$1000.00');
+            expect(result).toContain('Net:');
+            expect(result).toContain('$0.00');
+        });
+
+        it('should show breakdown with multiple transfers summed', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 3000.0, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer 1', 1000.0, 'transfer'),
+                    createMockTransaction('Transfer 2', 1500.0, 'transfer'),
+                ],
+                disposableIncome: 500.0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Transfers:');
+            expect(result).toContain('$2500.00');
+        });
+
+        it('should show transaction details in verbose mode with breakdown', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 2940.33, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 2500.0, 'transfer'),
+                ],
+                disposableIncome: 440.33,
+            };
+            const result = service.formatAnalysisReport(data, true);
+
+            // Breakdown shown
+            expect(result).toContain('Tagged:');
+            expect(result).toContain('Transfers:');
+            expect(result).toContain('Net:');
+
+            // Transaction details also shown
+            expect(result).toContain('Tagged Transactions:');
+            expect(result).toContain('Tagged expense');
+            expect(result).toContain('Transfers (Reducing Balance):');
+            expect(result).toContain('Transfer out');
+        });
+    });
+
     describe('Paycheck Analysis Section', () => {
         it('should format paycheck analysis with expected and actual values', () => {
             const data = {
