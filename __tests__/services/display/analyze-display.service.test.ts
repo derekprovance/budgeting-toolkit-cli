@@ -474,9 +474,8 @@ describe('AnalyzeDisplayService', () => {
             const result = service.formatAnalysisReport(data, false);
 
             expect(result).toContain('FINANCIAL SUMMARY');
-            expect(result).toContain('Net Impact');
             expect(result).toContain('Total Adjustments:');
-            expect(result).toContain('Net Position:');
+            expect(result).toContain('$300.00');
         });
 
         it('should exclude paycheck variance from net position when skipped', () => {
@@ -696,8 +695,10 @@ describe('AnalyzeDisplayService', () => {
             };
             const result = service.formatAnalysisReport(data, false);
 
-            expect(result).toContain('Net Impact');
             expect(result).toBeTruthy();
+            expect(result).toContain('Total Adjustments:');
+            expect(result).toContain('$1000.00');
+            expect(result).toContain('FINANCIAL SUMMARY');
         });
     });
 });

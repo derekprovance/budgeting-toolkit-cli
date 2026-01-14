@@ -222,10 +222,6 @@ export class AnalyzeDisplayService {
             '',
             this.formatSectionHeader('FINANCIAL SUMMARY'),
             '',
-            chalk.bold(
-                `  Net Impact                  ${this.formatCurrency(data.netImpact, data.currencySymbol)} ${this.getStatusIcon(data.netImpact, true)}`
-            ),
-            '',
             chalk.bold('  Total Adjustments:'),
             `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
         ];
@@ -254,7 +250,7 @@ export class AnalyzeDisplayService {
         const netPosition = data.netImpact;
 
         lines.push(
-            `    ${'Net Position:'.padEnd(32)} ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
+            `    ${' '.repeat(32)} ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
         );
 
         return lines.join('\n');
