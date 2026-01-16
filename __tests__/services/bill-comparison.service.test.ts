@@ -512,6 +512,149 @@ describe('BillComparisonService', () => {
         });
     });
 
+    describe('Defensive logic for empty pay_dates', () => {
+        it('should use fallback logic when bill has empty pay_dates but has transactions', async () => {
+            // Bill with empty pay_dates (bug scenario)
+            const mockBills = [createMockBill('1', 'Buggy Bill', '100', 'monthly', 0, false)];
+
+            // But it has transactions
+            const mockTransactions = [
+                createMockTransaction('Payment for Buggy Bill', '100.00', '1'),
+            ];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Should use bill amount as predicted (fallback logic)
+                expect(result.value.predictedTotal).toBe(100); // Not 0!
+                expect(result.value.actualTotal).toBe(100);
+                expect(result.value.variance).toBe(0);
+
+                const buggyBill = result.value.bills.find(b => b.id === '1');
+                expect(buggyBill?.predicted).toBe(100); // Used fallback logic
+                expect(buggyBill?.actual).toBe(100);
+            }
+        });
+
+        it('should keep predicted=0 when bill has empty pay_dates and no transactions', async () => {
+            // Bill not due this month
+            const mockBills = [
+                createMockBill('1', 'Not Due Bill', '100', 'monthly', 0, false), // isDueThisMonth = false
+            ];
+
+            // And no transactions
+            const mockTransactions: TransactionSplit[] = [];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Should remain 0 (no fallback logic needed)
+                expect(result.value.predictedTotal).toBe(0);
+                expect(result.value.actualTotal).toBe(0);
+
+                const notDueBill = result.value.bills.find(b => b.id === '1');
+                expect(notDueBill?.predicted).toBe(0); // Stays 0
+                expect(notDueBill?.actual).toBe(0);
+            }
+        });
+
+        it('should handle mixed scenarios: normal due, fallback logic, and not due', async () => {
+            const mockBills = [
+                createMockBill('1', 'Normal Due Bill', '100', 'monthly', 0, true), // Normal: due with pay_dates
+                createMockBill('2', 'Buggy Bill', '200', 'monthly', 0, false), // Bug: empty pay_dates but has transactions
+                createMockBill('3', 'Not Due Bill', '300', 'monthly', 0, false), // Normal: not due, no transactions
+            ];
+
+            const mockTransactions = [
+                createMockTransaction('Payment 1', '100.00', '1'), // Normal due bill
+                createMockTransaction('Payment 2', '200.00', '2'), // Buggy bill with transactions
+                // No transaction for bill 3
+            ];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Expected: 100 (normal) + 200 (fallback) + 0 (not due) = 300
+                expect(result.value.predictedTotal).toBe(300);
+                expect(result.value.actualTotal).toBe(300);
+
+                const normalBill = result.value.bills.find(b => b.id === '1');
+                const buggyBill = result.value.bills.find(b => b.id === '2');
+                const notDueBill = result.value.bills.find(b => b.id === '3');
+
+                expect(normalBill?.predicted).toBe(100);
+                expect(buggyBill?.predicted).toBe(200); // Fallback logic applied
+                expect(notDueBill?.predicted).toBe(0);
+            }
+        });
+
+        it('should use fallback logic even when actual amount differs from bill amount', async () => {
+            // Bill with empty pay_dates
+            const mockBills = [
+                createMockBill('1', 'Partially Paid Bill', '100', 'monthly', 0, false),
+            ];
+
+            // Partial payment
+            const mockTransactions = [createMockTransaction('Partial Payment', '50.00', '1')];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Should use full bill amount as predicted (fallback logic)
+                expect(result.value.predictedTotal).toBe(100);
+                expect(result.value.actualTotal).toBe(50);
+                expect(result.value.variance).toBe(-50); // Under-paid
+
+                const bill = result.value.bills.find(b => b.id === '1');
+                expect(bill?.predicted).toBe(100);
+                expect(bill?.actual).toBe(50);
+            }
+        });
+
+        it('should use fallback logic when bill has multiple transactions but empty pay_dates', async () => {
+            const mockBills = [
+                createMockBill('1', 'Bill with Multiple Payments', '200', 'monthly', 0, false),
+            ];
+
+            // Multiple payments for the same bill
+            const mockTransactions = [
+                createMockTransaction('Payment 1', '100.00', '1'),
+                createMockTransaction('Payment 2', '100.00', '1'),
+            ];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedTotal).toBe(200); // Fallback logic
+                expect(result.value.actualTotal).toBe(200); // Sum of both payments
+
+                const bill = result.value.bills.find(b => b.id === '1');
+                expect(bill?.predicted).toBe(200);
+                expect(bill?.actual).toBe(200);
+            }
+        });
+    });
+
     describe('Bill frequency information', () => {
         it('should show full amounts when bills are due, with frequency information', async () => {
             const mockBills = [
