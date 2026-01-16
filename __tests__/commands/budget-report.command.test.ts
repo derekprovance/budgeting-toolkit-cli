@@ -84,7 +84,7 @@ describe('BudgetReportCommand', () => {
 
         enhancedBudgetDisplayService = {
             formatEnhancedReport: jest
-                .fn<(reportData: any) => string>()
+                .fn<(reportData: any, verbose?: boolean) => string>()
                 .mockReturnValue('Formatted Enhanced Report'),
         } as unknown as jest.Mocked<EnhancedBudgetDisplayService>;
 
@@ -179,6 +179,47 @@ describe('BudgetReportCommand', () => {
             expect(budgetInsightService.generateInsights).toHaveBeenCalledWith(
                 mockEnhancedBudgets,
                 mockBillComparison
+            );
+        });
+
+        it('should pass verbose flag to display service when provided', async () => {
+            const currentDate = new Date();
+            await command.execute({
+                month: currentDate.getMonth() + 1,
+                year: currentDate.getFullYear(),
+                verbose: true,
+            });
+
+            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalledWith(
+                expect.any(Object),
+                true
+            );
+        });
+
+        it('should default verbose to false when not provided', async () => {
+            const currentDate = new Date();
+            await command.execute({
+                month: currentDate.getMonth() + 1,
+                year: currentDate.getFullYear(),
+            });
+
+            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalledWith(
+                expect.any(Object),
+                false
+            );
+        });
+
+        it('should pass verbose flag false when explicitly set to false', async () => {
+            const currentDate = new Date();
+            await command.execute({
+                month: currentDate.getMonth() + 1,
+                year: currentDate.getFullYear(),
+                verbose: false,
+            });
+
+            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalledWith(
+                expect.any(Object),
+                false
             );
         });
     });

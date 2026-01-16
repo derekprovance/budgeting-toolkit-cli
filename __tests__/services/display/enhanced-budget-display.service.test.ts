@@ -1,7 +1,6 @@
 import { EnhancedBudgetDisplayService } from '../../../src/services/display/enhanced-budget-display.service.js';
 import { EnhancedBudgetReportDto } from '../../../src/types/dto/enhanced-budget-report.dto.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
-import { BudgetInsight } from '../../../src/types/dto/budget-insight.dto.js';
 import { jest } from '@jest/globals';
 
 // Mock chalk to return the input string (disable styling for tests)
@@ -317,7 +316,7 @@ describe('EnhancedBudgetDisplayService', () => {
             expect(result).toContain('$110');
 
             // Should not contain "Top Merchant" line since it's missing
-            const topMerchantLine = result.split('\n').find((line) => line.includes('Top Merchant'));
+            const topMerchantLine = result.split('\n').find(line => line.includes('Top Merchant'));
             expect(topMerchantLine).toBeUndefined();
         });
 
@@ -365,7 +364,7 @@ describe('EnhancedBudgetDisplayService', () => {
             expect(result).toContain('3-Month Avg');
 
             // Should not contain "Trend" line since it's missing
-            const trendLine = result.split('\n').find((line) => line.includes('Trend'));
+            const trendLine = result.split('\n').find(line => line.includes('Trend'));
             expect(trendLine).toBeUndefined();
         });
 

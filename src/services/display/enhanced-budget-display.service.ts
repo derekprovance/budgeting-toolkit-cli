@@ -55,13 +55,21 @@ export class EnhancedBudgetDisplayService {
 
         if (overBudgets.length > 0) {
             sections.push(
-                this.formatAttentionNeededSection(overBudgets, data.billComparison.currencySymbol, verbose)
+                this.formatAttentionNeededSection(
+                    overBudgets,
+                    data.billComparison.currencySymbol,
+                    verbose
+                )
             );
         }
 
         if (onTrackBudgets.length > 0) {
             sections.push(
-                this.formatOnTrackSection(onTrackBudgets, data.billComparison.currencySymbol, verbose)
+                this.formatOnTrackSection(
+                    onTrackBudgets,
+                    data.billComparison.currencySymbol,
+                    verbose
+                )
             );
         }
 
@@ -167,56 +175,15 @@ export class EnhancedBudgetDisplayService {
         currencySymbol: string,
         verbose = false
     ): string {
-        const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader('ATTENTION NEEDED'));
-        lines.push('');
-
-        // Sort by percentage descending (worst first)
-        const sorted = [...budgets].sort((a, b) => b.percentageUsed - a.percentageUsed);
-
-        sorted.forEach(budget => {
-            const spentFormatted = CurrencyUtils.formatWithSymbol(
-                Math.abs(budget.spent),
-                currencySymbol
-            );
-            const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
-            const remaining = Math.abs(budget.spent) - budget.amount;
-            const remainingFormatted = CurrencyUtils.formatWithSymbol(remaining, currencySymbol);
-
-            const progressBar = this.createProgressBar(budget.percentageUsed);
-            const line =
-                chalk.red('🔴') +
-                ' ' +
-                budget.name.padEnd(EnhancedBudgetDisplayService.NAME_COLUMN_WIDTH) +
-                spentFormatted.padStart(12) +
-                ' / ' +
-                budgetFormatted.padStart(12) +
-                '  ' +
-                chalk.red(`${budget.percentageUsed.toFixed(0)}%`.padStart(5)) +
-                '  ' +
-                chalk.red(progressBar) +
-                '  ' +
-                chalk.red(`+${remainingFormatted}`);
-
-            lines.push(line);
+        return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
+            sectionTitle: 'ATTENTION NEEDED',
+            statusColor: chalk.red,
+            statusEmoji: '🔴',
+            formatRemaining: (budget: EnhancedBudgetReportDto, formatted: string) =>
+                `+${formatted}`,
+            getRemainingAmount: (budget: EnhancedBudgetReportDto) =>
+                Math.abs(budget.spent) - budget.amount,
         });
-
-        lines.push('');
-
-        // Display statistics below all budgets if verbose
-        if (verbose) {
-            sorted.forEach(budget => {
-                lines.push(budget.name.toUpperCase());
-                const stats = this.formatBudgetStatistics(budget, currencySymbol);
-                if (stats) {
-                    lines.push(stats);
-                }
-                lines.push('');
-            });
-        }
-
-        lines.push('');
-        return lines.join('\n');
     }
 
     /**
@@ -227,39 +194,64 @@ export class EnhancedBudgetDisplayService {
         currencySymbol: string,
         verbose = false
     ): string {
+        return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
+            sectionTitle: 'ON TRACK',
+            statusColor: chalk.green,
+            statusEmoji: '🟢',
+            formatRemaining: (budget: EnhancedBudgetReportDto, formatted: string) =>
+                `${formatted} left`,
+            getRemainingAmount: (budget: EnhancedBudgetReportDto) => budget.remaining,
+        });
+    }
+
+    /**
+     * Shared method for formatting budget sections (Attention Needed and On Track)
+     * Reduces code duplication between the two methods
+     */
+    private formatBudgetSectionWithConfig(
+        budgets: EnhancedBudgetReportDto[],
+        currencySymbol: string,
+        verbose: boolean,
+        config: {
+            sectionTitle: string;
+            statusColor: (str: string) => string;
+            statusEmoji: string;
+            formatRemaining: (budget: EnhancedBudgetReportDto, formatted: string) => string;
+            getRemainingAmount: (budget: EnhancedBudgetReportDto) => number;
+        }
+    ): string {
         const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader('ON TRACK'));
+        lines.push(DisplayFormatterUtils.createSectionHeader(config.sectionTitle));
         lines.push('');
 
-        // Sort by percentage descending
+        // Sort by percentage descending (worst first)
         const sorted = [...budgets].sort((a, b) => b.percentageUsed - a.percentageUsed);
 
+        // Display all budget lines
         sorted.forEach(budget => {
             const spentFormatted = CurrencyUtils.formatWithSymbol(
                 Math.abs(budget.spent),
                 currencySymbol
             );
             const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
+            const remaining = config.getRemainingAmount(budget);
+            const remainingFormatted = CurrencyUtils.formatWithSymbol(remaining, currencySymbol);
 
             const progressBar = this.createProgressBar(budget.percentageUsed);
-            const remainingFormatted = CurrencyUtils.formatWithSymbol(
-                budget.remaining,
-                currencySymbol
-            );
-
+            const remainingText = config.formatRemaining(budget, remainingFormatted);
             const line =
-                chalk.green('🟢') +
+                config.statusColor(config.statusEmoji) +
                 ' ' +
                 budget.name.padEnd(EnhancedBudgetDisplayService.NAME_COLUMN_WIDTH) +
                 spentFormatted.padStart(12) +
                 ' / ' +
                 budgetFormatted.padStart(12) +
                 '  ' +
-                chalk.green(`${budget.percentageUsed.toFixed(0)}%`.padStart(5)) +
+                config.statusColor(`${budget.percentageUsed.toFixed(0)}%`.padStart(5)) +
                 '  ' +
-                chalk.green(progressBar) +
+                config.statusColor(progressBar) +
                 '  ' +
-                chalk.green(`${remainingFormatted} left`);
+                config.statusColor(remainingText);
 
             lines.push(line);
         });
@@ -269,12 +261,12 @@ export class EnhancedBudgetDisplayService {
         // Display statistics below all budgets if verbose
         if (verbose) {
             sorted.forEach(budget => {
-                lines.push(budget.name.toUpperCase());
                 const stats = this.formatBudgetStatistics(budget, currencySymbol);
                 if (stats) {
+                    lines.push(budget.name.toUpperCase());
                     lines.push(stats);
+                    lines.push('');
                 }
-                lines.push('');
             });
         }
 
@@ -317,7 +309,10 @@ export class EnhancedBudgetDisplayService {
     /**
      * Formats budget statistics for verbose output
      */
-    private formatBudgetStatistics(budget: EnhancedBudgetReportDto, currencySymbol: string): string {
+    private formatBudgetStatistics(
+        budget: EnhancedBudgetReportDto,
+        currencySymbol: string
+    ): string {
         const lines: string[] = [];
         const indent = '  '; // 2 spaces for indentation
 
@@ -326,12 +321,15 @@ export class EnhancedBudgetDisplayService {
             const { name, totalSpent, visitCount } = budget.transactionStats.topMerchant;
             const totalFormatted = CurrencyUtils.formatWithSymbol(totalSpent, currencySymbol);
             const visitText = visitCount === 1 ? 'visit' : 'visits';
-            lines.push(`${indent}📍 Top Merchant: ${name} (${totalFormatted}, ${visitCount} ${visitText})`);
+            lines.push(
+                `${indent}📍 Top Merchant: ${name} (${totalFormatted}, ${visitCount} ${visitText})`
+            );
         }
 
         // Spending Trend (if available)
         if (budget.transactionStats.spendingTrend) {
-            const { direction, difference, percentageChange } = budget.transactionStats.spendingTrend;
+            const { direction, difference, percentageChange } =
+                budget.transactionStats.spendingTrend;
 
             let trendEmoji = '➡️';
             let trendText = 'Stable';
@@ -347,7 +345,10 @@ export class EnhancedBudgetDisplayService {
                 trendColor = chalk.green;
             }
 
-            const diffFormatted = CurrencyUtils.formatWithSymbol(Math.abs(difference), currencySymbol);
+            const diffFormatted = CurrencyUtils.formatWithSymbol(
+                Math.abs(difference),
+                currencySymbol
+            );
             const pctFormatted = Math.abs(percentageChange).toFixed(1);
             const sign = difference >= 0 ? '+' : '-';
 

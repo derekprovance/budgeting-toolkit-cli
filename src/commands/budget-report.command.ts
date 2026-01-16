@@ -96,8 +96,10 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 daysInfo,
             };
 
-            const formattedReport =
-                this.enhancedBudgetDisplayService.formatEnhancedReport(reportData, verbose);
+            const formattedReport = this.enhancedBudgetDisplayService.formatEnhancedReport(
+                reportData,
+                verbose || false
+            );
             console.log(formattedReport);
         } catch (error) {
             spinner.fail(this.BUDGET_GEN_FAIL);
