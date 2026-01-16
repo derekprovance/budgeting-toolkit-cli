@@ -199,15 +199,21 @@ export class EnhancedBudgetDisplayService {
                 chalk.red(`+${remainingFormatted}`);
 
             lines.push(line);
+        });
 
-            // Add verbose statistics if enabled
-            if (verbose) {
+        lines.push('');
+
+        // Display statistics below all budgets if verbose
+        if (verbose) {
+            sorted.forEach(budget => {
+                lines.push(budget.name.toUpperCase());
                 const stats = this.formatBudgetStatistics(budget, currencySymbol);
                 if (stats) {
                     lines.push(stats);
                 }
-            }
-        });
+                lines.push('');
+            });
+        }
 
         lines.push('');
         return lines.join('\n');
@@ -256,15 +262,21 @@ export class EnhancedBudgetDisplayService {
                 chalk.green(`${remainingFormatted} left`);
 
             lines.push(line);
+        });
 
-            // Add verbose statistics if enabled
-            if (verbose) {
+        lines.push('');
+
+        // Display statistics below all budgets if verbose
+        if (verbose) {
+            sorted.forEach(budget => {
+                lines.push(budget.name.toUpperCase());
                 const stats = this.formatBudgetStatistics(budget, currencySymbol);
                 if (stats) {
                     lines.push(stats);
                 }
-            }
-        });
+                lines.push('');
+            });
+        }
 
         lines.push('');
         return lines.join('\n');
@@ -351,7 +363,7 @@ export class EnhancedBudgetDisplayService {
         );
         lines.push(`${indent}📊 3-Month Avg: ${threeMonthAvgFormatted}`);
 
-        return lines.length > 0 ? '\n' + lines.join('\n') : '';
+        return lines.join('\n');
     }
 
     /**
