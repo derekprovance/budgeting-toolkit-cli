@@ -97,28 +97,14 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             };
 
             const formattedReport =
-                this.enhancedBudgetDisplayService.formatEnhancedReport(reportData);
+                this.enhancedBudgetDisplayService.formatEnhancedReport(reportData, verbose);
             console.log(formattedReport);
-
-            // If verbose flag is set, show transaction details
-            if (verbose) {
-                await this.displayVerboseTransactions();
-            }
         } catch (error) {
             spinner.fail(this.BUDGET_GEN_FAIL);
             const err = error instanceof Error ? error : new Error(String(error));
             logger.error({ error: err.message }, 'Failed to generate budget report');
             throw err;
         }
-    }
-
-    /**
-     * Displays verbose transaction details for budgets
-     */
-    private async displayVerboseTransactions(): Promise<void> {
-        // Placeholder for verbose transaction display
-        // In the future, this could show detailed transaction lists per budget
-        logger.debug('Verbose flag set - transaction details available via --category flag');
     }
 
     /**

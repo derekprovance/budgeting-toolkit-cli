@@ -40,9 +40,10 @@ export class EnhancedBudgetDisplayService {
     /**
      * Formats the complete enhanced budget report
      * @param data Enhanced report data with all sections
+     * @param verbose Whether to show detailed information
      * @returns Formatted report string
      */
-    formatEnhancedReport(data: EnhancedReportData): string {
+    formatEnhancedReport(data: EnhancedReportData, verbose = false): string {
         const sections: string[] = [];
 
         // Header
@@ -54,13 +55,13 @@ export class EnhancedBudgetDisplayService {
 
         if (overBudgets.length > 0) {
             sections.push(
-                this.formatAttentionNeededSection(overBudgets, data.billComparison.currencySymbol)
+                this.formatAttentionNeededSection(overBudgets, data.billComparison.currencySymbol, verbose)
             );
         }
 
         if (onTrackBudgets.length > 0) {
             sections.push(
-                this.formatOnTrackSection(onTrackBudgets, data.billComparison.currencySymbol)
+                this.formatOnTrackSection(onTrackBudgets, data.billComparison.currencySymbol, verbose)
             );
         }
 
@@ -70,7 +71,7 @@ export class EnhancedBudgetDisplayService {
         }
 
         // Bills section
-        sections.push(this.formatBillsSection(data.billComparison));
+        sections.push(this.formatBillsSection(data.billComparison, verbose));
 
         // Unbudgeted expenses
         if (data.unbudgeted.length > 0) {
@@ -163,7 +164,8 @@ export class EnhancedBudgetDisplayService {
      */
     private formatAttentionNeededSection(
         budgets: EnhancedBudgetReportDto[],
-        currencySymbol: string
+        currencySymbol: string,
+        verbose = false
     ): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('ATTENTION NEEDED'));
@@ -197,6 +199,14 @@ export class EnhancedBudgetDisplayService {
                 chalk.red(`+${remainingFormatted}`);
 
             lines.push(line);
+
+            // Add verbose statistics if enabled
+            if (verbose) {
+                const stats = this.formatBudgetStatistics(budget, currencySymbol);
+                if (stats) {
+                    lines.push(stats);
+                }
+            }
         });
 
         lines.push('');
@@ -208,7 +218,8 @@ export class EnhancedBudgetDisplayService {
      */
     private formatOnTrackSection(
         budgets: EnhancedBudgetReportDto[],
-        currencySymbol: string
+        currencySymbol: string,
+        verbose = false
     ): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('ON TRACK'));
@@ -245,6 +256,14 @@ export class EnhancedBudgetDisplayService {
                 chalk.green(`${remainingFormatted} left`);
 
             lines.push(line);
+
+            // Add verbose statistics if enabled
+            if (verbose) {
+                const stats = this.formatBudgetStatistics(budget, currencySymbol);
+                if (stats) {
+                    lines.push(stats);
+                }
+            }
         });
 
         lines.push('');
@@ -284,9 +303,61 @@ export class EnhancedBudgetDisplayService {
     }
 
     /**
+     * Formats budget statistics for verbose output
+     */
+    private formatBudgetStatistics(budget: EnhancedBudgetReportDto, currencySymbol: string): string {
+        const lines: string[] = [];
+        const indent = '  '; // 2 spaces for indentation
+
+        // Top Merchant (if available)
+        if (budget.transactionStats.topMerchant) {
+            const { name, totalSpent, visitCount } = budget.transactionStats.topMerchant;
+            const totalFormatted = CurrencyUtils.formatWithSymbol(totalSpent, currencySymbol);
+            const visitText = visitCount === 1 ? 'visit' : 'visits';
+            lines.push(`${indent}📍 Top Merchant: ${name} (${totalFormatted}, ${visitCount} ${visitText})`);
+        }
+
+        // Spending Trend (if available)
+        if (budget.transactionStats.spendingTrend) {
+            const { direction, difference, percentageChange } = budget.transactionStats.spendingTrend;
+
+            let trendEmoji = '➡️';
+            let trendText = 'Stable';
+            let trendColor = chalk.gray;
+
+            if (direction === 'increasing') {
+                trendEmoji = '📈 ↑';
+                trendText = 'Increasing';
+                trendColor = chalk.red;
+            } else if (direction === 'decreasing') {
+                trendEmoji = '📉 ↓';
+                trendText = 'Decreasing';
+                trendColor = chalk.green;
+            }
+
+            const diffFormatted = CurrencyUtils.formatWithSymbol(Math.abs(difference), currencySymbol);
+            const pctFormatted = Math.abs(percentageChange).toFixed(1);
+            const sign = difference >= 0 ? '+' : '-';
+
+            lines.push(
+                `${indent}${trendEmoji} Trend: ${trendColor(`${trendText} vs last month (${sign}${diffFormatted}, ${sign}${pctFormatted}%)`)}`
+            );
+        }
+
+        // Historical Comparison (always available)
+        const threeMonthAvgFormatted = CurrencyUtils.formatWithSymbol(
+            budget.historicalComparison.threeMonthAvg,
+            currencySymbol
+        );
+        lines.push(`${indent}📊 3-Month Avg: ${threeMonthAvgFormatted}`);
+
+        return lines.length > 0 ? '\n' + lines.join('\n') : '';
+    }
+
+    /**
      * Formats the bills and recurring section
      */
-    private formatBillsSection(billComparison: BillComparisonDto): string {
+    private formatBillsSection(billComparison: BillComparisonDto, verbose = false): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'));
         lines.push('');
@@ -318,11 +389,11 @@ export class EnhancedBudgetDisplayService {
         lines.push(summaryLine);
         lines.push('');
 
-        // Show top 4 bills individually, group rest
-        const topBills = billComparison.bills.slice(0, 4);
-        const otherBills = billComparison.bills.slice(4);
+        // Determine how many bills to show individually
+        const billsToShow = verbose ? billComparison.bills : billComparison.bills.slice(0, 4);
+        const otherBills = verbose ? [] : billComparison.bills.slice(4);
 
-        topBills.forEach(bill => {
+        billsToShow.forEach(bill => {
             const predictedFormatted = CurrencyUtils.formatWithSymbol(
                 bill.predicted,
                 billComparison.currencySymbol
@@ -338,7 +409,7 @@ export class EnhancedBudgetDisplayService {
             lines.push(line);
         });
 
-        // Group remaining bills
+        // Only show "Others" grouping if not verbose and there are other bills
         if (otherBills.length > 0) {
             const otherActual = otherBills.reduce((sum, b) => sum + b.actual, 0);
             const otherPredicted = otherBills.reduce((sum, b) => sum + b.predicted, 0);
@@ -442,8 +513,8 @@ export class EnhancedBudgetDisplayService {
         lines.push('');
         lines.push(
             chalk.cyan('💡 TIP: ') +
-                'Use --details to see all transactions, or --category "Name" for\n' +
-                '   specific category breakdown'
+                'Use --verbose or -v to see all bills and budget statistics,\n' +
+                '   --details to see all transactions, or --category "Name" for specific breakdown'
         );
         lines.push('');
         lines.push(
