@@ -247,10 +247,45 @@ export class BillComparisonService implements IBillComparisonService {
 
             actualTotal += actualAmount;
 
-            // Predicted amount: full bill amount if due this month, 0 if not
+            // Predicted amount determination with defensive logic:
+            // 1. If bill is marked as due (has pay_dates) → use full bill amount
+            // 2. If bill is NOT marked as due BUT has actual transactions → use full bill amount (Firefly III bug workaround)
+            // 3. If bill is NOT marked as due AND has no transactions → use 0
             // (represents what's actually owed this month, not the monthly budget equivalent)
             const isDue = this.isBillDueThisMonth(bill, month, year);
-            const predictedAmount = isDue ? this.getBillAmount(bill) : 0;
+            const hasActualTransactions = billTransactions.length > 0;
+
+            // Defensive logic: If bill has transactions but pay_dates is empty,
+            // assume Firefly III bug and treat as due
+            let predictedAmount: number;
+            let usedFallbackLogic = false;
+
+            if (isDue) {
+                // Normal case: bill is marked as due in pay_dates
+                predictedAmount = this.getBillAmount(bill);
+            } else if (!isDue && hasActualTransactions) {
+                // Defensive case: pay_dates is empty but transactions exist
+                // This handles Firefly III bug where pay_dates may not be populated
+                predictedAmount = this.getBillAmount(bill);
+                usedFallbackLogic = true;
+
+                logger.warn(
+                    {
+                        billName: bill.attributes.name,
+                        billId,
+                        actualAmount,
+                        predictedAmount,
+                        transactionCount: billTransactions.length,
+                        payDates: bill.attributes.pay_dates,
+                        month,
+                        year,
+                    },
+                    'Bill has transactions but no pay_dates - using fallback logic to set expected amount'
+                );
+            } else {
+                // Normal case: bill is not due and has no transactions
+                predictedAmount = 0;
+            }
 
             predictedTotal += predictedAmount;
 
@@ -264,6 +299,7 @@ export class BillComparisonService implements IBillComparisonService {
                 predictedAmount,
                 transactionCount: billTransactions.length,
                 actualAmount,
+                usedFallbackLogic,
             });
 
             billDetails.push(
