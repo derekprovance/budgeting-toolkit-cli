@@ -47,7 +47,9 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * Analyzes transactions to identify additional income.
      * Implements domain-specific filtering logic.
      */
-    protected async analyzeTransactions(transactions: TransactionSplit[]): Promise<TransactionSplit[]> {
+    protected async analyzeTransactions(
+        transactions: TransactionSplit[]
+    ): Promise<TransactionSplit[]> {
         if (!transactions?.length) {
             this.logger.debug('No transactions provided for analysis');
             return [];
@@ -93,7 +95,9 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 5. Must not be disposable income (if configured)
      * 6. Must not be in excluded transactions list
      */
-    private async filterTransactions(transactions: TransactionSplit[]): Promise<TransactionSplit[]> {
+    private async filterTransactions(
+        transactions: TransactionSplit[]
+    ): Promise<TransactionSplit[]> {
         const results = await Promise.all(
             transactions.map(async transaction => {
                 const isDeposit = this.transactionClassificationService.isDeposit(transaction);
