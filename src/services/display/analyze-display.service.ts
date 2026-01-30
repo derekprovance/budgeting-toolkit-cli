@@ -81,7 +81,7 @@ export class AnalyzeDisplayService {
         // Unbudgeted Expenses section
         lines.push(
             this.formatExpenseItem(
-                'Unbudgeted Expenses',
+                'Additional Expenses',
                 data.unbudgetedExpenseTotal,
                 data.currencySymbol,
                 data.unbudgetedExpenses.length
