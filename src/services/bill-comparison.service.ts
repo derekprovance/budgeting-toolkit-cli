@@ -179,7 +179,7 @@ export class BillComparisonService implements IBillComparisonService {
         }
 
         if (isNaN(amount) || amount < 0) {
-            logger.warn(
+            logger.debug(
                 {
                     billId: bill.id,
                     billName: bill.attributes.name,
@@ -269,7 +269,7 @@ export class BillComparisonService implements IBillComparisonService {
                 predictedAmount = this.getBillAmount(bill);
                 usedFallbackLogic = true;
 
-                logger.warn(
+                logger.debug(
                     {
                         billName: bill.attributes.name,
                         billId,
