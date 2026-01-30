@@ -15,6 +15,7 @@ import { StringUtils } from '../utils/string.utils.js';
  * - It is not payroll
  * - It meets the minimum amount requirement (if specified)
  * - It is not disposable income (if configured)
+ * - It is not in the excluded transactions list
  *
  * Description matching is normalized to handle variations (case insensitive, trimmed, etc.)
  */
@@ -46,13 +47,13 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * Analyzes transactions to identify additional income.
      * Implements domain-specific filtering logic.
      */
-    protected analyzeTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+    protected async analyzeTransactions(transactions: TransactionSplit[]): Promise<TransactionSplit[]> {
         if (!transactions?.length) {
             this.logger.debug('No transactions provided for analysis');
             return [];
         }
 
-        const additionalIncome = this.filterTransactions(transactions);
+        const additionalIncome = await this.filterTransactions(transactions);
 
         if (!additionalIncome.length) {
             this.logger.debug('No additional income found after filtering');
@@ -90,18 +91,36 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 3. Must not be payroll
      * 4. Must meet minimum amount requirement
      * 5. Must not be disposable income (if configured)
+     * 6. Must not be in excluded transactions list
      */
-    private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
-        return transactions
-            .filter(t => this.transactionClassificationService.isDeposit(t))
-            .filter(this.hasValidDestinationAccount)
-            .filter(this.isNotPayroll)
-            .filter(t => Number(t.amount) > 0)
-            .filter(
-                t =>
+    private async filterTransactions(transactions: TransactionSplit[]): Promise<TransactionSplit[]> {
+        const results = await Promise.all(
+            transactions.map(async transaction => {
+                const isDeposit = this.transactionClassificationService.isDeposit(transaction);
+                const hasValidDestination = this.hasValidDestinationAccount(transaction);
+                const isNotPayroll = this.isNotPayroll(transaction);
+                const hasValidAmount = Number(transaction.amount) > 0;
+                const isNotDisposable =
                     !this.excludeDisposableIncome ||
-                    !this.transactionClassificationService.isDisposableIncome(t)
-            );
+                    !this.transactionClassificationService.isDisposableIncome(transaction);
+                const isNotExcluded =
+                    !(await this.transactionClassificationService.isExcludedTransaction(
+                        transaction.description,
+                        transaction.amount
+                    ));
+
+                return (
+                    isDeposit &&
+                    hasValidDestination &&
+                    isNotPayroll &&
+                    hasValidAmount &&
+                    isNotDisposable &&
+                    isNotExcluded
+                );
+            })
+        );
+
+        return transactions.filter((_, index) => results[index]);
     }
 
     /**

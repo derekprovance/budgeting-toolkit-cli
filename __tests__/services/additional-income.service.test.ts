@@ -501,6 +501,103 @@ describe('AdditionalIncomeService', () => {
             });
         });
 
+        describe('excluded transactions', () => {
+            it('should exclude transactions in excludedTransactions config', async () => {
+                const mockTransactions = [
+                    createMockTransaction({
+                        description: 'eCheck Deposit',
+                        amount: '7547.21',
+                    }),
+                    createMockTransaction({
+                        description: 'Regular Income',
+                        amount: '500.00',
+                    }),
+                ];
+
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                (
+                    mockTransactionClassificationService.isDisposableIncome as jest.Mock
+                ).mockReturnValue(false);
+                (
+                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
+                ).mockImplementation(
+                    async (description: string, amount: string) =>
+                        description === 'eCheck Deposit' && amount === '7547.21'
+                );
+
+                const result = await service.calculateAdditionalIncome(4, 2024);
+
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Regular Income');
+                }
+            });
+
+            it('should exclude transactions matching description only', async () => {
+                const mockTransactions = [
+                    createMockTransaction({
+                        description: 'Excluded Description',
+                        amount: '100.00',
+                    }),
+                    createMockTransaction({
+                        description: 'Valid Income',
+                        amount: '500.00',
+                    }),
+                ];
+
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                (
+                    mockTransactionClassificationService.isDisposableIncome as jest.Mock
+                ).mockReturnValue(false);
+                (
+                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
+                ).mockImplementation(
+                    async (description: string) => description === 'Excluded Description'
+                );
+
+                const result = await service.calculateAdditionalIncome(4, 2024);
+
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Valid Income');
+                }
+            });
+
+            it('should exclude transactions matching amount only', async () => {
+                const mockTransactions = [
+                    createMockTransaction({
+                        description: 'Some Income',
+                        amount: '999.99',
+                    }),
+                    createMockTransaction({
+                        description: 'Other Income',
+                        amount: '500.00',
+                    }),
+                ];
+
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+                mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+                (
+                    mockTransactionClassificationService.isDisposableIncome as jest.Mock
+                ).mockReturnValue(false);
+                (
+                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
+                ).mockImplementation(async (_, amount: string) => amount === '999.99');
+
+                const result = await service.calculateAdditionalIncome(4, 2024);
+
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Other Income');
+                }
+            });
+        });
+
         describe('account validation', () => {
             it('should handle all valid destination accounts', async () => {
                 const validAccounts = [
