@@ -97,10 +97,8 @@ export const createMockTransactionValidatorService =
  */
 export const createMockExcludedTransactionService = (): jest.Mocked<ExcludedTransactionService> => {
     return {
-        isExcluded: jest.fn().mockReturnValue(false),
-        addExclusion: jest.fn(),
-        removeExclusion: jest.fn(),
-        getExclusions: jest.fn().mockReturnValue([]),
+        getExcludedTransactions: jest.fn().mockResolvedValue([]),
+        isExcludedTransaction: jest.fn().mockResolvedValue(false),
     } as unknown as jest.Mocked<ExcludedTransactionService>;
 };
 
@@ -155,6 +153,10 @@ export const createMockFireflyClient = (): jest.Mocked<FireflyClientWithCerts> =
         budgets: {
             listBudget: jest.fn(),
             getBudget: jest.fn(),
+        },
+        tags: {
+            getTag: jest.fn(),
+            listTransactionByTag: jest.fn(),
         },
     } as unknown as jest.Mocked<FireflyClientWithCerts>;
 };

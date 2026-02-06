@@ -47,15 +47,13 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * Analyzes transactions to identify additional income.
      * Implements domain-specific filtering logic.
      */
-    protected async analyzeTransactions(
-        transactions: TransactionSplit[]
-    ): Promise<TransactionSplit[]> {
+    protected analyzeTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
         if (!transactions?.length) {
             this.logger.debug('No transactions provided for analysis');
             return [];
         }
 
-        const additionalIncome = await this.filterTransactions(transactions);
+        const additionalIncome = this.filterTransactions(transactions);
 
         if (!additionalIncome.length) {
             this.logger.debug('No additional income found after filtering');
@@ -95,36 +93,24 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 5. Must not be disposable income (if configured)
      * 6. Must not be in excluded transactions list
      */
-    private async filterTransactions(
-        transactions: TransactionSplit[]
-    ): Promise<TransactionSplit[]> {
-        const results = await Promise.all(
-            transactions.map(async transaction => {
-                const isDeposit = this.transactionClassificationService.isDeposit(transaction);
-                const hasValidDestination = this.hasValidDestinationAccount(transaction);
-                const isNotPayroll = this.isNotPayroll(transaction);
-                const hasValidAmount = Number(transaction.amount) > 0;
-                const isNotDisposable =
-                    !this.excludeDisposableIncome ||
-                    !this.transactionClassificationService.isDisposableIncome(transaction);
-                const isNotExcluded =
-                    !(await this.transactionClassificationService.isExcludedTransaction(
-                        transaction.description,
-                        transaction.amount
-                    ));
+    private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+        return transactions.filter(transaction => {
+            const isDeposit = this.transactionClassificationService.isDeposit(transaction);
+            const hasValidDestination = this.hasValidDestinationAccount(transaction);
+            const isNotPayroll = this.isNotPayroll(transaction);
+            const hasValidAmount = Number(transaction.amount) > 0;
+            const isNotDisposable =
+                !this.excludeDisposableIncome ||
+                !this.transactionClassificationService.isDisposableIncome(transaction);
 
-                return (
-                    isDeposit &&
-                    hasValidDestination &&
-                    isNotPayroll &&
-                    hasValidAmount &&
-                    isNotDisposable &&
-                    isNotExcluded
-                );
-            })
-        );
-
-        return transactions.filter((_, index) => results[index]);
+            return (
+                isDeposit &&
+                hasValidDestination &&
+                isNotPayroll &&
+                hasValidAmount &&
+                isNotDisposable
+            );
+        });
     }
 
     /**

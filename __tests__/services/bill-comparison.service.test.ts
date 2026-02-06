@@ -80,7 +80,6 @@ describe('BillComparisonService', () => {
             isDisposableIncome: jest.fn(),
             hasNoDestination: jest.fn(),
             isSupplementedByDisposable: jest.fn(),
-            isExcludedTransaction: jest.fn(),
             isDeposit: jest.fn(),
             hasACategory: jest.fn(),
         } as unknown as jest.Mocked<ITransactionClassificationService>;

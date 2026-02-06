@@ -2,7 +2,12 @@ import { BudgetReportService } from '../../src/services/budget-report.service.js
 import { BudgetService } from '../../src/services/core/budget.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
-import { BudgetRead, BudgetLimitRead, InsightGroup } from '@derekprovance/firefly-iii-sdk';
+import {
+    BudgetRead,
+    BudgetLimitRead,
+    InsightGroup,
+    TransactionSplit,
+} from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 
 jest.mock('../../src/services/core/budget.service');

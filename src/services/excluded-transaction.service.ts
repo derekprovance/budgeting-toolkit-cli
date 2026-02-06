@@ -4,6 +4,7 @@ import { IExcludedTransactionService } from './excluded-transaction.service.inte
 import { ILogger } from '../types/interface/logger.interface.js';
 import { ExcludedTransaction } from '../config/config.types.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
+import { StringUtils } from '../utils/string.utils.js';
 
 /**
  * Service for managing excluded transactions.
@@ -34,14 +35,15 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
         }));
     }
 
-    async isExcludedTransaction(description: string, amount: string): Promise<boolean> {
+    isExcludedTransaction(description: string, amount: string): boolean {
         const convertedAmount = this.convertCurrencyToFloat(amount);
 
         const isExcluded = this.excludedTransactions.some(transaction => {
             // Both description and amount must match
             if (transaction.description && transaction.amount) {
                 return (
-                    transaction.description === description &&
+                    StringUtils.normalizeForMatching(transaction.description) ===
+                        StringUtils.normalizeForMatching(description) &&
                     Math.abs(parseFloat(transaction.amount)) ===
                         Math.abs(parseFloat(convertedAmount))
                 );
@@ -49,7 +51,10 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
 
             // Only description needs to match
             if (transaction.description && !transaction.amount) {
-                return transaction.description === description;
+                return (
+                    StringUtils.normalizeForMatching(transaction.description) ===
+                    StringUtils.normalizeForMatching(description)
+                );
             }
 
             // Only amount needs to match

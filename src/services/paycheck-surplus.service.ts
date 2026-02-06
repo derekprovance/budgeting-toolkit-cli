@@ -36,11 +36,11 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
      * Analyzes transactions to calculate paycheck surplus.
      * Implements domain-specific logic for identifying and summing paychecks.
      */
-    protected async analyzeTransactions(
+    protected analyzeTransactions(
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): Promise<number> {
+    ): number {
         const paycheckCandidates = this.findPaychecks(transactions);
         const expectedPaycheckAmount = this.getExpectedPaycheckAmount();
         const totalPaycheckAmount = this.calculateTotalPaycheckAmount(paycheckCandidates);

@@ -13,5 +13,5 @@ export interface IExcludedTransactionService {
     /**
      * Checks if a transaction should be excluded based on description and amount
      */
-    isExcludedTransaction(description: string, amount: string): Promise<boolean>;
+    isExcludedTransaction(description: string, amount: string): boolean;
 }

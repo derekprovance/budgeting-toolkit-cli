@@ -31,11 +31,6 @@ export interface ITransactionClassificationService {
     isSupplementedByDisposable(tags: string[] | null | undefined): boolean;
 
     /**
-     * Checks if transaction is in the excluded transactions list
-     */
-    isExcludedTransaction(description: string, amount: string): Promise<boolean>;
-
-    /**
      * Checks if transaction is a deposit
      */
     isDeposit(transaction: TransactionSplit): boolean;

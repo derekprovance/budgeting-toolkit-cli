@@ -142,11 +142,11 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Tran
      * Returns the filtered list of disposable income tagged transactions.
      * The balance (after transfer deductions) is calculated by the caller.
      */
-    protected async analyzeTransactions(
+    protected analyzeTransactions(
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): Promise<TransactionSplit[]> {
+    ): TransactionSplit[] {
         const disposableIncomeTransactions = this.findDisposableIncome(transactions);
 
         this.logger.debug(
