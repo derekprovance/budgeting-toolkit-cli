@@ -49,8 +49,6 @@ describe('UnbudgetedExpenseService', () => {
             isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
             isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
-            isExcludedTransaction:
-                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
@@ -161,9 +159,6 @@ describe('UnbudgetedExpenseService', () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionClassificationService.isTransfer.mockReturnValue(false);
             (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
-            (
                 mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
             ).mockReturnValue(false);
             mockTransactionClassificationService.isBill.mockReturnValue(false);
@@ -174,37 +169,6 @@ describe('UnbudgetedExpenseService', () => {
             if (result.ok) {
                 expect(result.value).toHaveLength(1);
                 expect(result.value[0].description).toBe('Unbudgeted Expense');
-            }
-        });
-
-        it('should filter out excluded transactions', async () => {
-            const mockTransactions = [
-                createMockTransaction({
-                    description: 'Excluded Expense',
-                    source_id: TestAccount.PRIMARY,
-                }),
-                createMockTransaction({
-                    description: 'Valid Expense',
-                    source_id: TestAccount.PRIMARY,
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            mockTransactionClassificationService.isExcludedTransaction
-                .mockResolvedValueOnce(true)
-                .mockResolvedValueOnce(false);
-            (
-                mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
-            ).mockReturnValue(false);
-            mockTransactionClassificationService.isBill.mockReturnValue(false);
-
-            const result = await service.calculateUnbudgetedExpenses(4, 2024);
-
-            expect(result.ok).toBe(true);
-            if (result.ok) {
-                expect(result.value).toHaveLength(1);
-                expect(result.value[0].description).toBe('Valid Expense');
             }
         });
 
@@ -222,9 +186,6 @@ describe('UnbudgetedExpenseService', () => {
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
             mockTransactionClassificationService.isSupplementedByDisposable
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
@@ -256,9 +217,6 @@ describe('UnbudgetedExpenseService', () => {
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
             (
                 mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
             ).mockReturnValue(false);
@@ -293,9 +251,6 @@ describe('UnbudgetedExpenseService', () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
             (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
-            (
                 mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
             ).mockReturnValue(false);
             mockTransactionClassificationService.isBill.mockReturnValue(false);
@@ -323,9 +278,6 @@ describe('UnbudgetedExpenseService', () => {
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
             (
                 mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
             ).mockReturnValue(false);
@@ -366,9 +318,6 @@ describe('UnbudgetedExpenseService', () => {
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
             mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-            (
-                mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-            ).mockResolvedValue(false);
             (
                 mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
             ).mockReturnValue(false);
@@ -441,9 +390,6 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionClassificationService.isTransfer.mockReturnValue(true);
                 (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
-                (
                     mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
                 ).mockReturnValue(false);
                 mockTransactionClassificationService.isBill.mockReturnValue(false);
@@ -467,9 +413,6 @@ describe('UnbudgetedExpenseService', () => {
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-                (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
                 (
                     mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
                 ).mockReturnValue(false);
@@ -495,9 +438,6 @@ describe('UnbudgetedExpenseService', () => {
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-                (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
                 (
                     mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
                 ).mockReturnValue(false);
@@ -531,9 +471,6 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionClassificationService.isTransfer.mockReturnValue(false);
                 (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
-                (
                     mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
                 ).mockReturnValue(false);
                 mockTransactionClassificationService.isBill.mockReturnValue(false);
@@ -562,9 +499,6 @@ describe('UnbudgetedExpenseService', () => {
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionClassificationService.isTransfer.mockReturnValue(false);
                 (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
-                (
                     mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
                 ).mockReturnValue(false);
                 mockTransactionClassificationService.isBill.mockReturnValue(false);
@@ -587,9 +521,6 @@ describe('UnbudgetedExpenseService', () => {
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
                 mockTransactionClassificationService.isTransfer.mockReturnValue(false);
-                (
-                    mockTransactionClassificationService.isExcludedTransaction as jest.Mock
-                ).mockResolvedValue(false);
                 (
                     mockTransactionClassificationService.isSupplementedByDisposable as jest.Mock
                 ).mockReturnValue(false);

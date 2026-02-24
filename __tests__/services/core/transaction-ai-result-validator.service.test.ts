@@ -53,8 +53,8 @@ describe('TransactionAIResultValidator', () => {
                 .fn<(transaction: TransactionSplit) => boolean>()
                 .mockReturnValue(true),
             shouldSetBudget: jest
-                .fn<(transaction: TransactionSplit) => Promise<boolean>>()
-                .mockResolvedValue(true),
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockReturnValue(true),
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
         validator = new TransactionAIResultValidator(
@@ -352,7 +352,7 @@ describe('TransactionAIResultValidator', () => {
         });
 
         it('should not validate budget for transactions that cannot have budgets', async () => {
-            mockTransactionValidator.shouldSetBudget.mockResolvedValue(false);
+            mockTransactionValidator.shouldSetBudget.mockReturnValue(false);
 
             const result = await validator.validateAIResults(transaction, undefined, 'Food');
 

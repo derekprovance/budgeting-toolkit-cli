@@ -128,7 +128,7 @@ export class TransactionAIResultValidator {
         }
 
         // Check if budget should be validated for this transaction type
-        const shouldUpdateBudget = await this.transactionValidator.shouldSetBudget(transaction);
+        const shouldUpdateBudget = this.transactionValidator.shouldSetBudget(transaction);
 
         // Validate budget if provided and appropriate for transaction type
         let budget: BudgetRead | undefined;

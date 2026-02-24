@@ -8,6 +8,7 @@ import { logger as defaultLogger } from '../../logger.js';
 import { DateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
+import { ExcludedTransactionService } from '../excluded-transaction.service.js';
 
 class TransactionError extends Error {
     constructor(
@@ -19,7 +20,7 @@ class TransactionError extends Error {
     }
 }
 
-type TransactionCache = Map<string, TransactionRead[]>;
+type TransactionCache = Map<string, TransactionSplit[]>;
 type TransactionSplitIndex = Map<string, TransactionRead>;
 export class TransactionService implements ITransactionService {
     private readonly cache: TransactionCache;
@@ -27,6 +28,7 @@ export class TransactionService implements ITransactionService {
     private readonly logger: ILogger;
 
     constructor(
+        private readonly excludedTransactionService: ExcludedTransactionService,
         private readonly client: FireflyClientWithCerts,
         cacheImplementation: TransactionCache = new Map(),
         logger: ILogger = defaultLogger
@@ -46,7 +48,7 @@ export class TransactionService implements ITransactionService {
                 this.fetchTransactionsFromAPIByMonth(month, year)
             );
 
-            return this.flattenTransactions(transactions);
+            return transactions;
         } catch (error) {
             throw this.handleError('fetch transactions for month', month, error);
         }
@@ -77,7 +79,7 @@ export class TransactionService implements ITransactionService {
                 this.fetchTransactionsByTag(tag)
             );
 
-            return this.flattenTransactions(transactions);
+            return transactions;
         } catch (error) {
             throw this.handleError('fetch transactions by tag', tag, error);
         }
@@ -130,7 +132,7 @@ export class TransactionService implements ITransactionService {
                     },
                     'Unable to find Transaction ID for Split'
                 );
-                return;
+                return undefined;
             }
 
             const updatePayload: TransactionUpdate = {
@@ -169,6 +171,7 @@ export class TransactionService implements ITransactionService {
                 },
                 'Transaction update failed'
             );
+            return undefined;
         }
     }
 
@@ -191,35 +194,49 @@ export class TransactionService implements ITransactionService {
     private async getFromCacheOrFetch(
         key: string,
         fetchFn: () => Promise<TransactionRead[]>
-    ): Promise<TransactionRead[]> {
+    ): Promise<TransactionSplit[]> {
         const cached = this.cache.get(key);
         if (cached) {
             return cached;
         }
 
         const data = await fetchFn();
-        this.cache.set(key, data);
+
+        let transactions = this.flattenTransactions(data);
+        transactions = transactions.filter(
+            trx =>
+                !this.excludedTransactionService.isExcludedTransaction(trx.description, trx.amount)
+        );
+
+        this.cache.set(key, transactions);
         this.storeTransactionSplitInIndex(data);
-        return data;
+
+        return transactions;
     }
 
     private storeTransactionSplitInIndex(transactions: TransactionRead[]) {
         transactions.forEach(tx => {
             const splitTransactions = tx.attributes.transactions;
             splitTransactions.forEach(txSp => {
-                const indexKey = this.generateSplitTransactionKey(txSp);
+                const isExcluded = this.excludedTransactionService.isExcludedTransaction(
+                    txSp.description,
+                    txSp.amount
+                );
+                if (!isExcluded) {
+                    const indexKey = this.generateSplitTransactionKey(txSp);
 
-                if (this.splitTransactionIdx.has(indexKey)) {
-                    this.logger.debug(
-                        {
-                            transactionId: txSp.transaction_journal_id,
-                            description: txSp.description,
-                        },
-                        'Duplicate transaction found in index'
-                    );
+                    if (this.splitTransactionIdx.has(indexKey)) {
+                        this.logger.debug(
+                            {
+                                transactionId: txSp.transaction_journal_id,
+                                description: txSp.description,
+                            },
+                            'Duplicate transaction found in index'
+                        );
+                    }
+
+                    this.splitTransactionIdx.set(this.generateSplitTransactionKey(txSp), tx);
                 }
-
-                this.splitTransactionIdx.set(this.generateSplitTransactionKey(txSp), tx);
             });
         });
     }
@@ -256,7 +273,10 @@ export class TransactionService implements ITransactionService {
     }
 
     private generateSplitTransactionKey(tx: TransactionSplit): string {
-        return `${tx.description}-${tx.date}-${tx.transaction_journal_id}`;
+        const journalId = tx.transaction_journal_id ?? 'unknown';
+        const description = tx.description ?? 'unknown';
+        const date = tx.date ?? 'unknown';
+        return `${description}-${date}-${journalId}`;
     }
 
     private handleError(

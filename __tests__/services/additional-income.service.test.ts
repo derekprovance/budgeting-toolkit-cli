@@ -49,8 +49,6 @@ describe('AdditionalIncomeService', () => {
             isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
             isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
-            isExcludedTransaction:
-                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<ITransactionClassificationService>;

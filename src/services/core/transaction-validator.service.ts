@@ -30,29 +30,17 @@ export class TransactionValidatorService {
     /**
      * Validates if a transaction should have a budget set
      * @param transaction The transaction to validate
-     * @returns A promise that resolves to true if the transaction should have a budget, false otherwise
+     * @returns True if the transaction should have a budget, false otherwise
      */
-    async shouldSetBudget(transaction: TransactionSplit): Promise<boolean> {
-        const isExcludedTransaction =
-            await this.transactionClassificationService.isExcludedTransaction(
-                transaction.description,
-                transaction.amount
-            );
-
+    shouldSetBudget(transaction: TransactionSplit): boolean {
         const conditions = {
             notABill: !this.transactionClassificationService.isBill(transaction),
             notDisposableIncome:
                 !this.transactionClassificationService.isDisposableIncome(transaction),
-            notAnExcludedTransaction: !isExcludedTransaction,
             notADeposit: !this.transactionClassificationService.isDeposit(transaction),
         };
 
-        return (
-            conditions.notABill &&
-            conditions.notAnExcludedTransaction &&
-            conditions.notDisposableIncome &&
-            conditions.notADeposit
-        );
+        return conditions.notABill && conditions.notDisposableIncome && conditions.notADeposit;
     }
 
     /**

@@ -1,22 +1,14 @@
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
-import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { jest } from '@jest/globals';
 
 const DISPOSABLE_INCOME_TAG = 'Disposable Income';
 const PAYCHECK_TAG = 'Paycheck';
 
 describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
-    let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
-        mockExcludedTransactionService = {
-            isExcludedTransaction:
-                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
-        } as any;
         service = new TransactionClassificationService(
-            mockExcludedTransactionService,
             '5', // noNameExpenseAccountId
             DISPOSABLE_INCOME_TAG,
             PAYCHECK_TAG
@@ -127,28 +119,6 @@ describe('TransactionClassificationService', () => {
         });
     });
 
-    describe('isExcludedTransaction', () => {
-        it('should call excludedTransactionService.isExcludedTransaction', async () => {
-            mockExcludedTransactionService.isExcludedTransaction.mockResolvedValue(true);
-
-            const result = await service.isExcludedTransaction('test', '100.00');
-
-            expect(mockExcludedTransactionService.isExcludedTransaction).toHaveBeenCalledWith(
-                'test',
-                '100.00'
-            );
-            expect(result).toBe(true);
-        });
-
-        it('should return false when transaction is not excluded', async () => {
-            mockExcludedTransactionService.isExcludedTransaction.mockResolvedValue(false);
-
-            const result = await service.isExcludedTransaction('test', '100.00');
-
-            expect(result).toBe(false);
-        });
-    });
-
     describe('isDeposit', () => {
         it('should return true for deposit transactions', () => {
             const transaction = { type: 'deposit' } as TransactionSplit;
@@ -214,7 +184,6 @@ describe('TransactionClassificationService', () => {
         it('should support custom paycheck tag name', () => {
             const customPaycheckTag = 'Salary';
             const customService = new TransactionClassificationService(
-                mockExcludedTransactionService,
                 '5',
                 DISPOSABLE_INCOME_TAG,
                 customPaycheckTag
@@ -227,7 +196,6 @@ describe('TransactionClassificationService', () => {
         it('should not match wrong tag name for custom paycheck tag', () => {
             const customPaycheckTag = 'Salary';
             const customService = new TransactionClassificationService(
-                mockExcludedTransactionService,
                 '5',
                 DISPOSABLE_INCOME_TAG,
                 customPaycheckTag

@@ -79,7 +79,7 @@ export abstract class BaseTransactionAnalysisService<TResult> {
 
         // Step 4: Execute domain-specific analysis
         try {
-            const result = await this.analyzeTransactions(transactions, month, year);
+            const result = this.analyzeTransactions(transactions, month, year);
 
             this.logger.debug(
                 {
@@ -221,7 +221,7 @@ export abstract class BaseTransactionAnalysisService<TResult> {
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): Promise<TResult> | TResult;
+    ): TResult;
 
     /**
      * Operation name for logging and error messages.

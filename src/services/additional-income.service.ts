@@ -95,36 +95,16 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 5. Must not be disposable income (if configured)
      * 6. Must not be in excluded transactions list
      */
-    private async filterTransactions(
-        transactions: TransactionSplit[]
-    ): Promise<TransactionSplit[]> {
-        const results = await Promise.all(
-            transactions.map(async transaction => {
-                const isDeposit = this.transactionClassificationService.isDeposit(transaction);
-                const hasValidDestination = this.hasValidDestinationAccount(transaction);
-                const isNotPayroll = this.isNotPayroll(transaction);
-                const hasValidAmount = Number(transaction.amount) > 0;
-                const isNotDisposable =
-                    !this.excludeDisposableIncome ||
-                    !this.transactionClassificationService.isDisposableIncome(transaction);
-                const isNotExcluded =
-                    !(await this.transactionClassificationService.isExcludedTransaction(
-                        transaction.description,
-                        transaction.amount
-                    ));
-
-                return (
-                    isDeposit &&
-                    hasValidDestination &&
-                    isNotPayroll &&
-                    hasValidAmount &&
-                    isNotDisposable &&
-                    isNotExcluded
-                );
-            })
+    private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+        return transactions.filter(
+            transaction =>
+                this.transactionClassificationService.isDeposit(transaction) &&
+                this.hasValidDestinationAccount(transaction) &&
+                this.isNotPayroll(transaction) &&
+                Number(transaction.amount) > 0 &&
+                (!this.excludeDisposableIncome ||
+                    !this.transactionClassificationService.isDisposableIncome(transaction))
         );
-
-        return transactions.filter((_, index) => results[index]);
     }
 
     /**

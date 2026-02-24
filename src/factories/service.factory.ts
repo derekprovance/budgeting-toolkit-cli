@@ -34,19 +34,21 @@ import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budge
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
         const config = ConfigManager.getInstance().getConfig();
-        const transactionService = new TransactionService(apiClient);
         const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
         const userInputService = new UserInputService(config.api.firefly.url);
         const excludedTransactionService = new ExcludedTransactionService(
             config.transactions.excludedTransactions
         );
+
+        const transactionService = new TransactionService(excludedTransactionService, apiClient);
+
         const transactionClassificationService = new TransactionClassificationService(
-            excludedTransactionService,
             config.api.firefly.noNameExpenseAccountId,
             config.transactions.tags.disposableIncome,
             config.transactions.tags.paycheck
         );
+
         const transactionValidatorService = new TransactionValidatorService(
             transactionClassificationService
         );

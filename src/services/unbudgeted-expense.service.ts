@@ -45,10 +45,8 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * Analyzes transactions to identify unbudgeted expenses.
      * Implements domain-specific filtering logic.
      */
-    protected async analyzeTransactions(
-        transactions: TransactionSplit[]
-    ): Promise<TransactionSplit[]> {
-        const expenses = await this.filterExpenses(transactions);
+    protected analyzeTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+        const expenses = this.filterExpenses(transactions);
 
         this.logger.debug(
             {
@@ -72,20 +70,14 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      *    - If it's a transfer, check transfer criteria
      *    - Otherwise, check regular expense criteria
      */
-    private async filterExpenses(transactions: TransactionSplit[]) {
-        const results = await Promise.all(
-            transactions.map(async transaction => {
-                const isTransfer = this.transactionClassificationService.isTransfer(transaction);
-                const shouldCountExpense = await this.shouldCountExpense(transaction);
+    private filterExpenses(transactions: TransactionSplit[]) {
+        return transactions.filter(trx => {
+            const isTransfer = this.transactionClassificationService.isTransfer(trx);
 
-                return (
-                    (!isTransfer && shouldCountExpense) ||
-                    (shouldCountExpense && this.shouldCountTransfer(transaction))
-                );
-            })
-        );
-
-        return transactions.filter((_, index) => results[index]);
+            return isTransfer
+                ? this.shouldCountExpense(trx) && this.shouldCountTransfer(trx)
+                : this.shouldCountExpense(trx);
+        });
     }
 
     /**
@@ -110,7 +102,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * Checks if a transaction should be counted as an expense.
      * Checks regular expense criteria (bills are handled separately by BillComparisonService).
      */
-    private async shouldCountExpense(transaction: TransactionSplit): Promise<boolean> {
+    private shouldCountExpense(transaction: TransactionSplit): boolean {
         return this.isRegularExpenseTransaction(transaction);
     }
 
@@ -123,19 +115,12 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * 4. Must not be in excluded transactions list
      * 5. Must be from a valid expense account
      */
-    private async isRegularExpenseTransaction(transaction: TransactionSplit): Promise<boolean> {
-        const isExcludedTransaction =
-            await this.transactionClassificationService.isExcludedTransaction(
-                transaction.description,
-                transaction.amount
-            );
-
+    private isRegularExpenseTransaction(transaction: TransactionSplit): boolean {
         const conditions = {
             hasNoBudget: !transaction.budget_id,
             isNotBill: !this.transactionClassificationService.isBill(transaction),
             isNotDisposableSupplemented:
                 !this.transactionClassificationService.isSupplementedByDisposable(transaction.tags),
-            isNotExcludedTransaction: !isExcludedTransaction,
             isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
         };
 
@@ -152,7 +137,6 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
             conditions.hasNoBudget &&
             conditions.isNotBill &&
             conditions.isNotDisposableSupplemented &&
-            conditions.isNotExcludedTransaction &&
             conditions.isFromExpenseAccount
         );
     }
