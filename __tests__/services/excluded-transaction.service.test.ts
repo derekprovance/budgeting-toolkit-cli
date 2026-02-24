@@ -103,11 +103,8 @@ describe('ExcludedTransactionService', () => {
     });
 
     describe('isExcludedTransaction', () => {
-        it('should return true when both description and amount match', async () => {
-            const result = await service.isExcludedTransaction(
-                'VANGUARD BUY INVESTMENT',
-                '4400.00'
-            );
+        it('should return true when both description and amount match', () => {
+            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '4400.00');
             expect(result).toBe(true);
             expect(mockLogger.debug).toHaveBeenCalledWith(
                 { description: 'VANGUARD BUY INVESTMENT', amount: '4400.00' },
@@ -115,63 +112,48 @@ describe('ExcludedTransactionService', () => {
             );
         });
 
-        it('should return true when only description matches (no amount in config)', async () => {
-            const result = await service.isExcludedTransaction(
-                'Excluded Description Only',
-                '500.00'
-            );
+        it('should return true when only description matches (no amount in config)', () => {
+            const result = service.isExcludedTransaction('Excluded Description Only', '500.00');
             expect(result).toBe(true);
         });
 
-        it('should return true when only amount matches (no description in config)', async () => {
-            const result = await service.isExcludedTransaction('Any Description', '999.99');
+        it('should return true when only amount matches (no description in config)', () => {
+            const result = service.isExcludedTransaction('Any Description', '999.99');
             expect(result).toBe(true);
         });
 
-        it('should return false when description matches but amount does not', async () => {
-            const result = await service.isExcludedTransaction(
-                'VANGUARD BUY INVESTMENT',
-                '1000.00'
-            );
+        it('should return false when description matches but amount does not', () => {
+            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '1000.00');
             expect(result).toBe(false);
         });
 
-        it('should return false for non-matching description', async () => {
-            const result = await service.isExcludedTransaction('NON-MATCHING', '4400.00');
+        it('should return false for non-matching description', () => {
+            const result = service.isExcludedTransaction('NON-MATCHING', '4400.00');
             expect(result).toBe(false);
         });
 
-        it('should return false for non-matching amount', async () => {
-            const result = await service.isExcludedTransaction('CRT Management', '2000.00');
+        it('should return false for non-matching amount', () => {
+            const result = service.isExcludedTransaction('CRT Management', '2000.00');
             expect(result).toBe(false);
         });
 
-        it('should handle amount conversion with currency symbols', async () => {
-            const result = await service.isExcludedTransaction(
-                'VANGUARD BUY INVESTMENT',
-                '$4,400.00'
-            );
+        it('should handle amount conversion with currency symbols', () => {
+            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '$4,400.00');
             expect(result).toBe(true);
         });
 
-        it('should handle negative amounts with parentheses', async () => {
-            const result = await service.isExcludedTransaction(
-                'VANGUARD BUY INVESTMENT',
-                '($4,400.00)'
-            );
+        it('should handle negative amounts with parentheses', () => {
+            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '($4,400.00)');
             expect(result).toBe(true);
         });
 
-        it('should handle negative amounts with minus sign', async () => {
-            const result = await service.isExcludedTransaction(
-                'VANGUARD BUY INVESTMENT',
-                '-4400.00'
-            );
+        it('should handle negative amounts with minus sign', () => {
+            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '-4400.00');
             expect(result).toBe(true);
         });
 
-        it('should compare absolute values for amounts', async () => {
-            const result = await service.isExcludedTransaction('CRT Management', '-1047.66');
+        it('should compare absolute values for amounts', () => {
+            const result = service.isExcludedTransaction('CRT Management', '-1047.66');
             expect(result).toBe(true);
         });
     });

@@ -38,12 +38,6 @@ export class TransactionService implements ITransactionService {
         this.logger = logger;
     }
 
-    // REVIEW: Inconsistent error handling pattern across methods
-    // - Some methods throw TransactionError (getTransactionsByTag)
-    // - Others return undefined (updateTransaction)
-    // - Others return Result types (in analysis services)
-    // TODO: Standardize on Result type pattern for all methods
-
     /**
      * Retrieves transactions for a specific month, using cache when available
      */
@@ -138,9 +132,7 @@ export class TransactionService implements ITransactionService {
                     },
                     'Unable to find Transaction ID for Split'
                 );
-                throw new TransactionError(
-                    `Unable to find Transaction ID ${transaction.transaction_journal_id} for Split`
-                );
+                return undefined;
             }
 
             const updatePayload: TransactionUpdate = {
@@ -179,6 +171,7 @@ export class TransactionService implements ITransactionService {
                 },
                 'Transaction update failed'
             );
+            return undefined;
         }
     }
 
@@ -280,10 +273,10 @@ export class TransactionService implements ITransactionService {
     }
 
     private generateSplitTransactionKey(tx: TransactionSplit): string {
-        // TODO: Add input validation - required fields could be undefined
-        // If transaction_journal_id is undefined, the key becomes "undefined-undefined-undefined"
-        // Use nullish coalescing or validate inputs
-        return `${tx.description}-${tx.date}-${tx.transaction_journal_id}`;
+        const journalId = tx.transaction_journal_id ?? 'unknown';
+        const description = tx.description ?? 'unknown';
+        const date = tx.date ?? 'unknown';
+        return `${description}-${date}-${journalId}`;
     }
 
     private handleError(

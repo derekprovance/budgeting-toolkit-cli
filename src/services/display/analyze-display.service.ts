@@ -4,6 +4,7 @@ import { TransactionClassificationService } from '../core/transaction-classifica
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 
 /**
  * Service for formatting and displaying comprehensive budget analysis information
@@ -136,7 +137,7 @@ export class AnalyzeDisplayService {
             lines.push('');
 
             // Calculate tagged total for breakdown
-            const taggedTotal = this.calculateTransactionTotal(
+            const taggedTotal = TransactionCalculationUtils.calculateTransactionTotal(
                 data.disposableIncomeTransactions,
                 true
             );
@@ -149,7 +150,7 @@ export class AnalyzeDisplayService {
                 );
 
                 // Calculate transfer total
-                const transferTotal = this.calculateTransactionTotal(
+                const transferTotal = TransactionCalculationUtils.calculateTransactionTotal(
                     data.disposableIncomeTransfers,
                     false
                 );
@@ -399,23 +400,6 @@ export class AnalyzeDisplayService {
         const freqBadge = chalk.dim(`[${freq}]`);
 
         return `    ${bill.name.substring(0, 30).padEnd(30)} ${freqBadge.padEnd(15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
-    }
-
-    /**
-     * Calculates total amount from array of transactions
-     * @param transactions Transaction array
-     * @param useAbsolute Whether to use absolute values (true for expenses)
-     * @returns Total amount
-     */
-    private calculateTransactionTotal(
-        transactions: TransactionSplit[],
-        useAbsolute: boolean = true
-    ): number {
-        return transactions.reduce((sum, t) => {
-            const amount = parseFloat(t.amount);
-            const value = isNaN(amount) ? 0 : amount;
-            return sum + (useAbsolute ? Math.abs(value) : value);
-        }, 0);
     }
 
     /**

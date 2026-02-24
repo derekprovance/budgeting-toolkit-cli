@@ -94,23 +94,15 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 6. Must not be in excluded transactions list
      */
     private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
-        return transactions.filter(transaction => {
-            const isDeposit = this.transactionClassificationService.isDeposit(transaction);
-            const hasValidDestination = this.hasValidDestinationAccount(transaction);
-            const isNotPayroll = this.isNotPayroll(transaction);
-            const hasValidAmount = Number(transaction.amount) > 0;
-            const isNotDisposable =
-                !this.excludeDisposableIncome ||
-                !this.transactionClassificationService.isDisposableIncome(transaction);
-
-            return (
-                isDeposit &&
-                hasValidDestination &&
-                isNotPayroll &&
-                hasValidAmount &&
-                isNotDisposable
-            );
-        });
+        return transactions.filter(
+            transaction =>
+                this.transactionClassificationService.isDeposit(transaction) &&
+                this.hasValidDestinationAccount(transaction) &&
+                this.isNotPayroll(transaction) &&
+                Number(transaction.amount) > 0 &&
+                (!this.excludeDisposableIncome ||
+                    !this.transactionClassificationService.isDisposableIncome(transaction))
+        );
     }
 
     /**

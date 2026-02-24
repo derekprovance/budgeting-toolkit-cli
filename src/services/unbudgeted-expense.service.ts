@@ -73,12 +73,10 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
     private filterExpenses(transactions: TransactionSplit[]) {
         return transactions.filter(trx => {
             const isTransfer = this.transactionClassificationService.isTransfer(trx);
-            const shouldCountExpense = this.shouldCountExpense(trx);
 
-            return (
-                (!isTransfer && shouldCountExpense) ||
-                (shouldCountExpense && this.shouldCountTransfer(trx))
-            );
+            return isTransfer
+                ? this.shouldCountExpense(trx) && this.shouldCountTransfer(trx)
+                : this.shouldCountExpense(trx);
         });
     }
 

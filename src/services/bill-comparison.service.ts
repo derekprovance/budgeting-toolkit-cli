@@ -4,7 +4,7 @@ import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.d
 import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
 import { BillService } from './core/bill.service.js';
-import { TransactionService } from './core/transaction.service.js';
+import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { Result } from '../types/result.type.js';
 import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
@@ -12,7 +12,7 @@ import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.
 export class BillComparisonService implements IBillComparisonService {
     constructor(
         private readonly billService: BillService,
-        private readonly transactionService: TransactionService,
+        private readonly transactionService: ITransactionService,
         private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 

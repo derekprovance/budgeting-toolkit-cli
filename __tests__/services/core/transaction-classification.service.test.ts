@@ -1,6 +1,5 @@
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { jest } from '@jest/globals';
 
 const DISPOSABLE_INCOME_TAG = 'Disposable Income';
 const PAYCHECK_TAG = 'Paycheck';
@@ -9,10 +8,6 @@ describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
 
     beforeEach(() => {
-        mockExcludedTransactionService = {
-            isExcludedTransaction:
-                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
-        } as any;
         service = new TransactionClassificationService(
             '5', // noNameExpenseAccountId
             DISPOSABLE_INCOME_TAG,

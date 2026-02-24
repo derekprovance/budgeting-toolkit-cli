@@ -37,8 +37,12 @@ export const createMockLogger = (): jest.Mocked<ILogger> => {
 export const createMockTransactionService = (): jest.Mocked<TransactionService> => {
     return {
         getTransactionsForMonth: jest.fn(),
-        updateTransactionSplit: jest.fn(),
-        getTransaction: jest.fn(),
+        updateTransaction: jest.fn(),
+        getTransactionReadBySplit: jest.fn(),
+        getTransactionsByTag: jest.fn(),
+        tagExists: jest.fn(),
+        getMostRecentTransactionDate: jest.fn(),
+        clearCache: jest.fn(),
     } as unknown as jest.Mocked<TransactionService>;
 };
 
@@ -98,7 +102,7 @@ export const createMockTransactionValidatorService =
 export const createMockExcludedTransactionService = (): jest.Mocked<ExcludedTransactionService> => {
     return {
         getExcludedTransactions: jest.fn().mockResolvedValue([]),
-        isExcludedTransaction: jest.fn().mockResolvedValue(false),
+        isExcludedTransaction: jest.fn().mockReturnValue(false),
     } as unknown as jest.Mocked<ExcludedTransactionService>;
 };
 

@@ -99,12 +99,12 @@ describe('TransactionValidatorService', () => {
     });
 
     describe('shouldSetBudget', () => {
-        it('should return true when all conditions are met', async () => {
+        it('should return true when all conditions are met', () => {
             mockPropertyService.isBill.mockReturnValue(false);
             mockPropertyService.isDisposableIncome.mockReturnValue(false);
             mockPropertyService.isDeposit.mockReturnValue(false);
 
-            const result = await service.shouldSetBudget(mockTransaction as TransactionSplit);
+            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
 
             expect(result).toBe(true);
             expect(mockPropertyService.isBill).toHaveBeenCalledWith(mockTransaction);
@@ -113,32 +113,32 @@ describe('TransactionValidatorService', () => {
             expect(mockPropertyService.isDeposit).toHaveBeenCalledWith(mockTransaction);
         });
 
-        it('should return false when transaction is a bill', async () => {
+        it('should return false when transaction is a bill', () => {
             mockPropertyService.isBill.mockReturnValue(true);
             mockPropertyService.isDisposableIncome.mockReturnValue(false);
             mockPropertyService.isDeposit.mockReturnValue(false);
 
-            const result = await service.shouldSetBudget(mockTransaction as TransactionSplit);
+            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
 
             expect(result).toBe(false);
         });
 
-        it('should return false when transaction is disposable income', async () => {
+        it('should return false when transaction is disposable income', () => {
             mockPropertyService.isBill.mockReturnValue(false);
             mockPropertyService.isDisposableIncome.mockReturnValue(true);
             mockPropertyService.isDeposit.mockReturnValue(false);
 
-            const result = await service.shouldSetBudget(mockTransaction as TransactionSplit);
+            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
 
             expect(result).toBe(false);
         });
 
-        it('should return false when transaction is a deposit', async () => {
+        it('should return false when transaction is a deposit', () => {
             mockPropertyService.isBill.mockReturnValue(false);
             mockPropertyService.isDisposableIncome.mockReturnValue(false);
             mockPropertyService.isDeposit.mockReturnValue(true);
 
-            const result = await service.shouldSetBudget(mockTransaction as TransactionSplit);
+            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
 
             expect(result).toBe(false);
         });
