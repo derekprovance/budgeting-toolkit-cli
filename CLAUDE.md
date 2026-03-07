@@ -148,10 +148,11 @@ src/config/
 
 The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
-1. **analyze** (alias: `an`) - Calculates budget finalization report including:
-    - Additional income (deposits not from payroll)
-    - Unbudgeted expenses (bills/expenses not in budget)
-    - Paycheck surplus (actual vs expected paycheck amounts)
+1. **analyze** (alias: `an`) - Comprehensive cash flow and budget analysis including:
+    - Actual paycheck and additional income (deposits not from payroll)
+    - Bills paid and budgeted spending vs. allocation
+    - Unbudgeted expenses and disposable income
+    - True cash flow net impact calculation
 
 2. **report** (alias: `st`) - Shows current budget report for a given month
 

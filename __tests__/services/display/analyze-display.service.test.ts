@@ -81,8 +81,9 @@ describe('AnalyzeDisplayService', () => {
             currencyCode: 'USD',
             currencySymbol: '$',
         },
-        netImpact: 0,
-        skipPaycheck: false,
+        // netImpact = actualPaycheck + additionalIncomeTotal - billComparison.actualTotal - budgetSpent - unbudgetedExpenseTotal - disposableIncome
+        // = 5000 + 0 - 950 - 1500 - 0 - 0 = 2550
+        netImpact: 2550,
     });
 
     describe('formatAnalysisReport', () => {
@@ -97,15 +98,6 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('PAYCHECK ANALYSIS');
             expect(result).toContain('FINANCIAL SUMMARY');
             expect(result).toContain('RECOMMENDATIONS');
-        });
-
-        it('should skip paycheck section when skipPaycheck is true', () => {
-            const data = { ...createBasicReportData(), skipPaycheck: true };
-            const result = service.formatAnalysisReport(data, false);
-
-            expect(result).toContain('Budget Finalization Report');
-            expect(result).not.toContain('PAYCHECK ANALYSIS');
-            expect(result).toContain('FINANCIAL SUMMARY');
         });
 
         it('should include transaction details in verbose mode', () => {
@@ -156,10 +148,12 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 additionalIncomeTotal: 100,
+                actualPaycheck: 5200,
                 paycheckSurplus: 200,
-                budgetSurplus: 300,
+                budgetSpent: 1500,
                 billComparison: {
                     ...createBasicReportData().billComparison,
+                    actualTotal: 1050,
                     variance: 50,
                 },
                 unbudgetedExpenseTotal: 150,
@@ -168,24 +162,10 @@ describe('AnalyzeDisplayService', () => {
 
             // All labels should be padded to 30 characters
             expect(result).toContain('Additional Income:'.padEnd(30));
-            expect(result).toContain('Paycheck Variance:'.padEnd(30));
-            expect(result).toContain('Budget Surplus:'.padEnd(30));
-            expect(result).toContain('Bill Variance:'.padEnd(30));
+            expect(result).toContain('Paycheck:'.padEnd(30));
+            expect(result).toContain('Bills Paid:'.padEnd(30));
+            expect(result).toContain('Budget Spent:'.padEnd(30));
             expect(result).toContain('Unbudgeted Expenses:'.padEnd(30));
-        });
-
-        it('should align summary labels when paycheck is skipped', () => {
-            const data = {
-                ...createBasicReportData(),
-                skipPaycheck: true,
-                additionalIncomeTotal: 100,
-                budgetSurplus: 300,
-            };
-            const result = service.formatAnalysisReport(data, false);
-
-            expect(result).toContain('Additional Income:'.padEnd(30));
-            expect(result).not.toContain('Paycheck Variance:');
-            expect(result).toContain('Budget Surplus:'.padEnd(30));
         });
 
         it('should align disposable spending when present', () => {
@@ -478,18 +458,6 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('$300.00');
         });
 
-        it('should exclude paycheck variance from net position when skipped', () => {
-            const data = {
-                ...createBasicReportData(),
-                skipPaycheck: true,
-                additionalIncomeTotal: 100,
-                budgetSurplus: 300,
-            };
-            const result = service.formatAnalysisReport(data, false);
-
-            expect(result).toContain('FINANCIAL SUMMARY');
-            expect(result).not.toContain('Paycheck Variance:');
-        });
     });
 
     describe('Recommendations Section', () => {

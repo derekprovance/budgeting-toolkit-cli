@@ -34,7 +34,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
      * Executes the analyze command
      * @param params The month and year to perform the analysis
      */
-    async execute({ month, year, verbose, skipPaycheck = false }: BudgetDateParams): Promise<void> {
+    async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
         const spinner = ora(`Analyzing ${month}-${year}...`).start();
 
         // Validate command-specific configuration
@@ -55,9 +55,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             ] = await Promise.all([
                 this.additionalIncomeService.calculateAdditionalIncome(month, year),
                 this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
-                skipPaycheck
-                    ? Promise.resolve({ ok: true as const, value: 0 })
-                    : this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
+                this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
                 this.disposableIncomeService.calculateDisposableIncome(month, year),
                 this.disposableIncomeService.getDisposableIncomeTransfers(month, year),
                 this.disposableIncomeService.calculateDisposableIncomeBalance(month, year),
@@ -86,7 +84,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             }
 
             // Handle paycheck surplus result
-            if (!skipPaycheck && !paycheckSurplusResult.ok) {
+            if (!paycheckSurplusResult.ok) {
                 spinner.fail(this.BUDGET_FAIL_MSG);
                 console.error(
                     chalk.red('Error calculating paycheck surplus:'),
@@ -130,11 +128,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             // Extract values from Result types
             const additionalIncome = additionalIncomeResult.value;
             const unbudgetedExpenses = unbudgetedExpenseResult.value;
-            const paycheckSurplus = skipPaycheck
-                ? 0
-                : paycheckSurplusResult.ok
-                  ? paycheckSurplusResult.value
-                  : 0; // Fallback (should never reach due to error handling above)
+            const paycheckSurplus = paycheckSurplusResult.value;
             const disposableIncomeTransactions = disposableIncomeResult.value;
             const budgetResult = budgetSurplusResult.value;
             const billComparison = billComparisonResult.value;
@@ -158,15 +152,14 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 budgetSpent,
                 budgetSurplus,
                 billComparison,
-                skipPaycheck ? 0 : expectedMonthlyPaycheck,
-                skipPaycheck ? 0 : actualPaycheck,
-                skipPaycheck ? 0 : paycheckSurplus,
+                expectedMonthlyPaycheck,
+                actualPaycheck,
+                paycheckSurplus,
                 disposableIncomeTransactions,
                 disposableIncomeTransfers,
                 disposableIncomeBalance,
                 month,
-                year,
-                skipPaycheck
+                year
             );
 
             // Display the comprehensive report

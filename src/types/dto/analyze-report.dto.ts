@@ -36,9 +36,6 @@ export class AnalyzeReportDto {
         // Calculations
         public netImpact: number, // Total surplus/deficit from all sources
 
-        // Flags
-        public skipPaycheck: boolean, // Whether paycheck analysis was skipped
-
         // Metadata
         public month: number,
         public year: number,
@@ -64,8 +61,7 @@ export class AnalyzeReportDto {
         disposableIncomeTransfers: TransactionSplit[],
         disposableIncome: number,
         month: number,
-        year: number,
-        skipPaycheck: boolean = false
+        year: number
     ): AnalyzeReportDto {
         // Calculate totals
         const additionalIncomeTotal = additionalIncome.reduce((sum, t) => {
@@ -78,16 +74,14 @@ export class AnalyzeReportDto {
             return sum + Math.abs(isNaN(amount) ? 0 : amount);
         }, 0);
 
-        // Calculate net impact from all sources
-        // Positive factors: additional income, paycheck surplus (if enabled), budget surplus
-        // Negative factors: bill overspend, unbudgeted expenses, disposable income
-        // Note: Bill variance is subtracted (positive variance = overspent = reduces position)
-        // When variance is negative (underspent), subtracting it increases net position
+        // Calculate net impact: true cash flow
+        // Income: actual paycheck + additional income
+        // Expenses: bills paid + budget spent + unbudgeted + disposable
         const netImpact =
-            additionalIncomeTotal +
-            budgetSurplus +
-            (skipPaycheck ? 0 : paycheckSurplus) - // Conditional paycheck
-            billComparison.variance - // Positive reduces, negative increases
+            actualPaycheck +
+            additionalIncomeTotal -
+            billComparison.actualTotal -
+            budgetSpent -
             unbudgetedExpenseTotal -
             disposableIncome;
 
@@ -111,7 +105,6 @@ export class AnalyzeReportDto {
             disposableIncomeTransfers,
             disposableIncome,
             netImpact,
-            skipPaycheck,
             month,
             year,
             currencySymbol,

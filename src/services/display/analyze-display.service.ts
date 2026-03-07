@@ -22,7 +22,7 @@ export class AnalyzeDisplayService {
             ),
             this.formatIncomeSection(data, verbose),
             this.formatExpensesSection(data, verbose),
-            ...(data.skipPaycheck ? [] : [this.formatPaycheckSection(data)]),
+            this.formatPaycheckSection(data),
             this.formatSummarySection(data),
             this.formatRecommendations(data),
         ];
@@ -225,20 +225,11 @@ export class AnalyzeDisplayService {
             '',
             chalk.bold('  Total Adjustments:'),
             `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
-        ];
-
-        // Conditionally add Paycheck Variance
-        if (!data.skipPaycheck) {
-            lines.push(
-                `    ${this.getStatusIcon(data.paycheckSurplus, true)} ${'Paycheck Variance:'.padEnd(30)} ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
-            );
-        }
-
-        lines.push(
-            `    ${this.getStatusIcon(data.budgetSurplus, true)} ${'Budget Surplus:'.padEnd(30)} ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.billComparison.variance, true)} ${'Bill Variance:'.padEnd(30)} ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(data.actualPaycheck, true)} ${'Paycheck:'.padEnd(30)} ${this.formatNetImpact(data.actualPaycheck, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.billComparison.actualTotal, true)} ${'Bills Paid:'.padEnd(30)} ${this.formatNetImpact(-data.billComparison.actualTotal, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.budgetSpent, true)} ${'Budget Spent:'.padEnd(30)} ${this.formatNetImpact(-data.budgetSpent, data.currencySymbol, true)}`,
             `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`
-        );
+        ];
 
         if (data.disposableIncomeTransactions.length > 0) {
             lines.push(
@@ -251,7 +242,7 @@ export class AnalyzeDisplayService {
         const netPosition = data.netImpact;
 
         lines.push(
-            `    ${' '.repeat(32)} ${this.formatCurrency(netPosition, data.currencySymbol)} ${this.getStatusIcon(netPosition, true)}`
+            `    ${' '.repeat(32)} ${this.formatNetImpact(netPosition, data.currencySymbol, true)}`
         );
 
         return lines.join('\n');
