@@ -282,7 +282,8 @@ export class InteractiveTransactionUpdater {
     ): Promise<[CategoryProperties | undefined, BudgetRead | undefined]> {
         logger.debug({ description: transaction.description }, 'User chose the edit option');
 
-        const answers = await this.userInputService.shouldEditCategoryBudget();
+        const isDeposit = transaction.type === 'deposit';
+        const answers = await this.userInputService.shouldEditCategoryBudget(isDeposit);
 
         // Initialize with current values to preserve unedited attributes
         let newCategory: CategoryProperties | undefined = currentCategory;

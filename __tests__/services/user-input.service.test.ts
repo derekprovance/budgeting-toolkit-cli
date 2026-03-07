@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { CategorizeMode } from '../../src/types/enums.js';
+import { CategorizeMode, EditTransactionAttribute } from '../../src/types/enums.js';
 
 // Create mock functions first
 const mockExpand = jest.fn();
@@ -463,6 +463,148 @@ describe('UserInputService', () => {
                 expect.objectContaining({
                     message: expect.stringContaining(expectedHyperlink),
                 })
+            );
+        });
+    });
+
+    describe('Deposit-specific behavior', () => {
+        const mockDeposit: Partial<TransactionSplit> = {
+            type: 'deposit',
+            description: 'Paycheck Deposit',
+            category_name: 'Salary',
+            budget_name: undefined,
+        };
+
+        it('should show Budget: N/A for deposits instead of None', async () => {
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(
+                mockDeposit as TransactionSplit,
+                '5',
+                { category: 'Salary' }
+            );
+
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: expect.stringContaining('Budget: N/A'),
+                })
+            );
+        });
+
+        it('should not show "Update only the budget" option for deposits', async () => {
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+
+            const result = await service.askToUpdateTransaction(
+                mockDeposit as TransactionSplit,
+                '5',
+                { category: 'Salary' }
+            );
+
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    choices: expect.not.arrayContaining([
+                        expect.objectContaining({
+                            key: 'b',
+                            name: 'Update only the budget',
+                        }),
+                    ]),
+                })
+            );
+
+            // Should still have other options
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    choices: expect.arrayContaining([
+                        expect.objectContaining({
+                            key: 'a',
+                            name: 'Update all',
+                        }),
+                        expect.objectContaining({
+                            key: 'c',
+                            name: 'Update only the category',
+                        }),
+                    ]),
+                })
+            );
+        });
+
+        it('should allow all budget options for non-deposit transactions', async () => {
+            const mockBill: Partial<TransactionSplit> = {
+                type: 'withdrawal',
+                description: 'Grocery Store',
+                category_name: 'Food',
+                budget_name: 'Groceries',
+            };
+
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+
+            await service.askToUpdateTransaction(
+                mockBill as TransactionSplit,
+                '5',
+                { category: 'Food', budget: 'Groceries' }
+            );
+
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    choices: expect.arrayContaining([
+                        expect.objectContaining({
+                            key: 'b',
+                            name: 'Update only the budget',
+                        }),
+                    ]),
+                })
+            );
+        });
+    });
+
+    describe('shouldEditCategoryBudget', () => {
+        it('should include Modify Budget for non-deposit transactions', async () => {
+            mockCheckbox.mockResolvedValueOnce([EditTransactionAttribute.Category]);
+
+            await service.shouldEditCategoryBudget(false);
+
+            expect(mockCheckbox).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    choices: expect.arrayContaining([
+                        expect.objectContaining({
+                            name: 'Modify Category',
+                            value: EditTransactionAttribute.Category,
+                        }),
+                        expect.objectContaining({
+                            name: 'Modify Budget',
+                            value: EditTransactionAttribute.Budget,
+                        }),
+                    ]),
+                })
+            );
+        });
+
+        it('should exclude Modify Budget for deposits', async () => {
+            mockCheckbox.mockResolvedValueOnce([EditTransactionAttribute.Category]);
+
+            await service.shouldEditCategoryBudget(true);
+
+            expect(mockCheckbox).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    choices: expect.arrayContaining([
+                        expect.objectContaining({
+                            name: 'Modify Category',
+                            value: EditTransactionAttribute.Category,
+                        }),
+                    ]),
+                    // The choices array should have exactly 1 item for deposits
+                })
+            );
+
+            // Verify budget option is not in the choices
+            const callArgs = mockCheckbox.mock.calls[0][0];
+            expect(callArgs.choices).toHaveLength(1);
+            expect(callArgs.choices).not.toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        name: 'Modify Budget',
+                    }),
+                ])
             );
         });
     });

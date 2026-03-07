@@ -45,25 +45,32 @@ export class UserInputService {
         }
 
         const message = this.formatUpdateMessage(transaction, transactionId, changes);
+        const isDeposit = transaction.type === 'deposit';
 
-        return this.promptUser(message);
+        return this.promptUser(message, isDeposit);
     }
 
-    async shouldEditCategoryBudget(): Promise<string[]> {
+    async shouldEditCategoryBudget(isDeposit: boolean = false): Promise<string[]> {
+        const choices = [
+            {
+                name: 'Modify Category',
+                value: EditTransactionAttribute.Category,
+                description: 'Change the category suggested by AI',
+            },
+        ];
+
+        // Only allow budget modification for non-deposit transactions
+        if (!isDeposit) {
+            choices.push({
+                name: 'Modify Budget',
+                value: EditTransactionAttribute.Budget,
+                description: 'Change the budget suggested by AI',
+            });
+        }
+
         const answer = await checkbox({
             message: 'What do you want to edit?',
-            choices: [
-                {
-                    name: 'Modify Category',
-                    value: EditTransactionAttribute.Category,
-                    description: 'Change the category suggested by AI',
-                },
-                {
-                    name: 'Modify Budget',
-                    value: EditTransactionAttribute.Budget,
-                    description: 'Change the budget suggested by AI',
-                },
-            ],
+            choices,
         });
 
         return answer;
@@ -197,7 +204,7 @@ export class UserInputService {
         const changes: string[] = [];
 
         // Always show both fields for all modes - this gives users flexibility to manually set either field
-        // If AI has a suggestion, show as a change. Otherwise, just show current value.
+        // If AI has a suggestion, show as change. Otherwise, just show current value.
 
         // Category field
         if (options.category) {
@@ -220,7 +227,10 @@ export class UserInputService {
         }
 
         // Budget field
-        if (options.budget) {
+        if (transaction.type === 'deposit') {
+            // Deposits cannot have budgets in Firefly III - show N/A
+            changes.push(`${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`);
+        } else if (options.budget) {
             // AI has a suggestion - show as change
             changes.push(
                 this.formatChange(
@@ -291,7 +301,7 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    private async promptUser(message: string): Promise<CategorizeMode> {
+    private async promptUser(message: string, isDeposit: boolean = false): Promise<CategorizeMode> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
@@ -306,13 +316,15 @@ export class UserInputService {
             },
         ];
 
-        // Always offer both individual update options
+        // Only offer budget option for non-deposit transactions
         // This allows users to manually set fields via Edit even when AI didn't suggest a value
-        choices.push({
-            key: 'b',
-            name: 'Update only the budget',
-            value: CategorizeMode.Budget,
-        });
+        if (!isDeposit) {
+            choices.push({
+                key: 'b',
+                name: 'Update only the budget',
+                value: CategorizeMode.Budget,
+            });
+        }
 
         choices.push({
             key: 'c',
