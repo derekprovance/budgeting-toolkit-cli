@@ -148,6 +148,23 @@ describe('TransactionClassificationService', () => {
         });
     });
 
+    describe('hasBudget', () => {
+        it('should return true when transaction has budget_id', () => {
+            const transaction = { budget_id: '123' } as TransactionSplit;
+            expect(service.hasBudget(transaction)).toBe(true);
+        });
+
+        it('should return false when budget_id is undefined', () => {
+            const transaction = { budget_id: undefined } as TransactionSplit;
+            expect(service.hasBudget(transaction)).toBe(false);
+        });
+
+        it('should return false when budget_id is null', () => {
+            const transaction = { budget_id: null } as TransactionSplit;
+            expect(service.hasBudget(transaction)).toBe(false);
+        });
+    });
+
     describe('isPaycheck', () => {
         it('should return true when transaction has paycheck tag', () => {
             const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;

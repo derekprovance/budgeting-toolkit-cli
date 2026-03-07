@@ -9,7 +9,7 @@ export interface BudgetDateOptions {
 export interface CategorizeOptions {
     tag: string;
     mode: CategorizeMode;
-    includeClassified?: boolean;
+    force?: boolean;
     yes?: boolean;
     dryRun?: boolean;
 }

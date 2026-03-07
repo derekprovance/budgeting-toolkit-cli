@@ -10,21 +10,31 @@ export class TransactionValidatorService {
     /**
      * Validates if a transaction should be processed
      * @param transaction The transaction to validate
-     * @param processTransactionsWithCategories Whether to process transactions that already have categories
+     * @param force Whether to force processing of transactions that are fully classified
      * @returns True if the transaction should be processed, false otherwise
      */
-    shouldProcessTransaction(
-        transaction: TransactionSplit,
-        processTransactionsWithCategories: boolean
-    ): boolean {
+    shouldProcessTransaction(transaction: TransactionSplit, force: boolean): boolean {
         const conditions = {
             notATransfer: !this.transactionClassificationService.isTransfer(transaction),
             hasACategory: this.transactionClassificationService.hasACategory(transaction),
+            hasBudget: this.transactionClassificationService.hasBudget(transaction),
         };
 
-        return processTransactionsWithCategories
+        return force
             ? conditions.notATransfer
-            : conditions.notATransfer && !conditions.hasACategory;
+            : conditions.notATransfer && (!conditions.hasACategory || !conditions.hasBudget);
+    }
+
+    /**
+     * Checks if a transaction is a budget-only candidate (has category but no budget)
+     * @param transaction The transaction to check
+     * @returns True if transaction has category but no budget, false otherwise
+     */
+    isBudgetOnlyCandidate(transaction: TransactionSplit): boolean {
+        return (
+            this.transactionClassificationService.hasACategory(transaction) &&
+            !this.transactionClassificationService.hasBudget(transaction)
+        );
     }
 
     /**

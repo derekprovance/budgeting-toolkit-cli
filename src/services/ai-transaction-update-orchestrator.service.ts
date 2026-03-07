@@ -36,7 +36,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         private readonly aiValidator: TransactionAIResultValidator,
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: TransactionValidatorService,
-        private readonly processTransactionsWithCategories: boolean = false
+        private readonly force: boolean = false
     ) {}
 
     async updateTransactionsByTag(
@@ -63,7 +63,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
 
             const transactions = unfilteredTransactions.filter(t =>
-                this.validator.shouldProcessTransaction(t, this.processTransactionsWithCategories)
+                this.validator.shouldProcessTransaction(t, this.force)
             );
 
             if (!transactions.length) {
@@ -102,7 +102,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             }
 
             let budgets: BudgetRead[] | undefined;
-            if (updateMode !== CategorizeMode.Category) {
+            if (updateMode !== CategorizeMode.Category || !this.force) {
                 budgets = await this.budgetService.getBudgets();
             }
 
@@ -205,11 +205,35 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             'Getting AI results for transactions'
         );
 
-        const aiResults = await this.llmService.processTransactions(
-            transactions,
-            updateMode !== CategorizeMode.Budget ? categoryNames : undefined,
-            updateMode !== CategorizeMode.Category ? budgetNames : undefined
-        );
+        // Group B: has category, no budget — budget assignment only
+        const budgetOnlyTransactions = this.force
+            ? []
+            : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t));
+
+        // Group A: all others — full assignment per updateMode
+        const normalTransactions = transactions.filter(t => !budgetOnlyTransactions.includes(t));
+
+        const aiResults: AIResponse = {};
+
+        // Process Group A (existing behavior)
+        if (normalTransactions.length > 0) {
+            const groupAResults = await this.llmService.processTransactions(
+                normalTransactions,
+                updateMode !== CategorizeMode.Budget ? categoryNames : undefined,
+                updateMode !== CategorizeMode.Category ? budgetNames : undefined
+            );
+            Object.assign(aiResults, groupAResults);
+        }
+
+        // Process Group B (budget only, category preserved)
+        if (budgetOnlyTransactions.length > 0 && budgetNames) {
+            const groupBResults = await this.llmService.processTransactions(
+                budgetOnlyTransactions,
+                undefined, // don't reassign category
+                budgetNames
+            );
+            Object.assign(aiResults, groupBResults);
+        }
 
         if (Object.keys(aiResults).length !== transactions.length) {
             const error = new Error(

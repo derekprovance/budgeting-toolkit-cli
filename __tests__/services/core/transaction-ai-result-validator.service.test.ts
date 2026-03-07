@@ -387,5 +387,27 @@ describe('TransactionAIResultValidator', () => {
                 expect(result.value.category?.name).toBe("Children's Expenses");
             }
         });
+
+        it('should skip AI category suggestion if transaction already has category_id', async () => {
+            const transactionWithCategory: TransactionSplit = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Test Transaction',
+                amount: '100.00',
+                type: 'withdrawal',
+                category_id: '5',
+                category_name: 'Existing Category',
+            });
+
+            const result = await validator.validateAIResults(
+                transactionWithCategory,
+                'Groceries',
+                undefined
+            );
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.category).toBeUndefined();
+            }
+        });
     });
 });

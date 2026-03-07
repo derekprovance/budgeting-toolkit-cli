@@ -135,7 +135,7 @@ export class ServiceFactory {
 
     static async createAITransactionUpdateOrchestrator(
         apiClient: FireflyClientWithCerts,
-        includeClassified: boolean = false,
+        force: boolean = false,
         dryRun: boolean = false
     ): Promise<AITransactionUpdateOrchestrator> {
         const services = this.createServices(apiClient);
@@ -168,7 +168,7 @@ export class ServiceFactory {
             aiValidator,
             llmProcessingService,
             services.transactionValidatorService,
-            includeClassified
+            force
         );
     }
 }

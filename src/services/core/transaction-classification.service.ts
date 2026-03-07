@@ -40,6 +40,10 @@ export class TransactionClassificationService implements ITransactionClassificat
         return !(transaction.category_id === undefined || transaction.category_id === null);
     }
 
+    hasBudget(transaction: TransactionSplit): boolean {
+        return !(transaction.budget_id === undefined || transaction.budget_id === null);
+    }
+
     isPaycheck(transaction: TransactionSplit): boolean {
         if (!transaction.tags) {
             return false;

@@ -32,6 +32,7 @@ describe('TransactionValidatorService', () => {
         mockPropertyService = {
             isTransfer: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            hasBudget: jest.fn<(transaction: TransactionSplit) => boolean>(),
             isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
             isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
             isExcludedTransaction:
@@ -43,9 +44,10 @@ describe('TransactionValidatorService', () => {
     });
 
     describe('shouldProcessTransaction', () => {
-        it('should return true for non-transfer transactions when processTransactionsWithCategories is true', () => {
+        it('should return true for non-transfer transactions when force is true', () => {
             mockPropertyService.isTransfer.mockReturnValue(false);
             mockPropertyService.hasACategory.mockReturnValue(true);
+            mockPropertyService.hasBudget.mockReturnValue(true);
 
             const result = service.shouldProcessTransaction(
                 mockTransaction as TransactionSplit,
@@ -56,9 +58,10 @@ describe('TransactionValidatorService', () => {
             expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
         });
 
-        it('should return false for transfer transactions when processTransactionsWithCategories is true', () => {
+        it('should return false for transfer transactions when force is true', () => {
             mockPropertyService.isTransfer.mockReturnValue(true);
             mockPropertyService.hasACategory.mockReturnValue(true);
+            mockPropertyService.hasBudget.mockReturnValue(true);
 
             const result = service.shouldProcessTransaction(
                 mockTransaction as TransactionSplit,
@@ -69,7 +72,7 @@ describe('TransactionValidatorService', () => {
             expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
         });
 
-        it('should return true for non-transfer transactions without categories when processTransactionsWithCategories is false', () => {
+        it('should return true for non-transfer transactions without categories when force is false', () => {
             mockPropertyService.isTransfer.mockReturnValue(false);
             mockPropertyService.hasACategory.mockReturnValue(false);
 
@@ -83,9 +86,26 @@ describe('TransactionValidatorService', () => {
             expect(mockPropertyService.hasACategory).toHaveBeenCalledWith(mockTransaction);
         });
 
-        it('should return false for transactions with categories when processTransactionsWithCategories is false', () => {
+        it('should return true for transactions with category but no budget when force is false', () => {
             mockPropertyService.isTransfer.mockReturnValue(false);
             mockPropertyService.hasACategory.mockReturnValue(true);
+            mockPropertyService.hasBudget.mockReturnValue(false);
+
+            const result = service.shouldProcessTransaction(
+                mockTransaction as TransactionSplit,
+                false
+            );
+
+            expect(result).toBe(true);
+            expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
+            expect(mockPropertyService.hasACategory).toHaveBeenCalledWith(mockTransaction);
+            expect(mockPropertyService.hasBudget).toHaveBeenCalledWith(mockTransaction);
+        });
+
+        it('should return false for transactions with both category and budget when force is false', () => {
+            mockPropertyService.isTransfer.mockReturnValue(false);
+            mockPropertyService.hasACategory.mockReturnValue(true);
+            mockPropertyService.hasBudget.mockReturnValue(true);
 
             const result = service.shouldProcessTransaction(
                 mockTransaction as TransactionSplit,
@@ -95,6 +115,7 @@ describe('TransactionValidatorService', () => {
             expect(result).toBe(false);
             expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
             expect(mockPropertyService.hasACategory).toHaveBeenCalledWith(mockTransaction);
+            expect(mockPropertyService.hasBudget).toHaveBeenCalledWith(mockTransaction);
         });
     });
 
@@ -174,6 +195,37 @@ describe('TransactionValidatorService', () => {
 
         it('should return false when AI results do not contain transaction data', () => {
             const result = service.validateTransactionData(mockTransaction as TransactionSplit, {});
+
+            expect(result).toBe(false);
+        });
+    });
+
+    describe('isBudgetOnlyCandidate', () => {
+        it('should return true when transaction has category but no budget', () => {
+            mockPropertyService.hasACategory.mockReturnValue(true);
+            mockPropertyService.hasBudget.mockReturnValue(false);
+
+            const result = service.isBudgetOnlyCandidate(mockTransaction as TransactionSplit);
+
+            expect(result).toBe(true);
+            expect(mockPropertyService.hasACategory).toHaveBeenCalledWith(mockTransaction);
+            expect(mockPropertyService.hasBudget).toHaveBeenCalledWith(mockTransaction);
+        });
+
+        it('should return false when transaction has no category', () => {
+            mockPropertyService.hasACategory.mockReturnValue(false);
+            mockPropertyService.hasBudget.mockReturnValue(false);
+
+            const result = service.isBudgetOnlyCandidate(mockTransaction as TransactionSplit);
+
+            expect(result).toBe(false);
+        });
+
+        it('should return false when transaction has both category and budget', () => {
+            mockPropertyService.hasACategory.mockReturnValue(true);
+            mockPropertyService.hasBudget.mockReturnValue(true);
+
+            const result = service.isBudgetOnlyCandidate(mockTransaction as TransactionSplit);
 
             expect(result).toBe(false);
         });

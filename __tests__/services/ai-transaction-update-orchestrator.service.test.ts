@@ -168,6 +168,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             shouldSetBudget: jest.fn(),
             validateTransactionData: jest.fn(),
             categoryOrBudgetChanged: jest.fn(),
+            isBudgetOnlyCandidate: jest.fn(),
             transactionClassificationService: mockPropertyService,
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
@@ -306,8 +307,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockCategoryService.getCategories.mockResolvedValue(
                 mockCategories as CategoryProperties[]
             );
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
+            mockValidator.isBudgetOnlyCandidate.mockReturnValue(false);
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
@@ -318,7 +321,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             const result = await service.updateTransactionsByTag('test', CategorizeMode.Category);
 
             expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
-            expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
+            // In category-only mode with force=false, budgets are fetched to support budget-only candidates
+            expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.any(Object)
@@ -908,6 +912,127 @@ describe('AITransactionUpdateOrchestrator', () => {
             );
 
             consoleErrorSpy.mockRestore();
+        });
+
+        it('should route transactions with category but no budget to budget-only AI processing', async () => {
+            const tag = 'test-tag';
+            const updateMode = CategorizeMode.Both;
+
+            const transactionWithCategory = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Has category, no budget',
+                amount: '100.00',
+                category_id: '1',
+                category_name: 'Groceries',
+                budget_id: undefined,
+            });
+
+            const transactionNormal = createMockTransaction({
+                transaction_journal_id: '2',
+                description: 'Has neither',
+                amount: '200.00',
+                category_id: undefined,
+                budget_id: undefined,
+            });
+
+            const mockCategory: CategoryProperties = {
+                name: 'Test Category',
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
+            };
+
+            const mockBudget: BudgetRead = {
+                id: '1',
+                type: 'budget',
+                attributes: {
+                    name: 'Test Budget',
+                    active: true,
+                    order: 0,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                    spent: [],
+                    auto_budget_type: null,
+                    auto_budget_amount: null,
+                    auto_budget_period: null,
+                },
+            };
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([
+                transactionWithCategory,
+                transactionNormal,
+            ]);
+            mockValidator.shouldProcessTransaction.mockImplementation((t) => {
+                // Both should be processed (one as budget-only, one as normal)
+                return !mockPropertyService.isTransfer(t);
+            });
+            mockValidator.isBudgetOnlyCandidate.mockImplementation((t) => {
+                return t.transaction_journal_id === '1';
+            });
+            mockPropertyService.isTransfer.mockReturnValue(false);
+            mockCategoryService.getCategories.mockResolvedValue([mockCategory]);
+            mockBudgetService.getBudgets.mockResolvedValue([mockBudget]);
+
+            mockLLMService.processTransactions.mockImplementation(async (txns, cats, budgets) => {
+                // When called for budget-only transactions, categories should be undefined
+                if (txns.length === 1 && txns[0].transaction_journal_id === '1') {
+                    expect(cats).toBeUndefined();
+                    expect(budgets).toBeDefined();
+                }
+                return {
+                    '1': { budget: 'New Budget' },
+                    '2': { category: 'New Category', budget: 'New Budget' },
+                };
+            });
+
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
+                ok: true,
+                value: transactionNormal as any,
+            });
+
+            const result = await service.updateTransactionsByTag(tag, updateMode);
+
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
+            // Should call processTransactions twice: once for budget-only, once for normal
+            expect(mockLLMService.processTransactions).toHaveBeenCalledTimes(2);
+        });
+
+        it('should fetch budgets in category-only mode when budget-only transactions exist', async () => {
+            const tag = 'test-tag';
+            const updateMode = CategorizeMode.Category;
+
+            const transactionWithCategory = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Has category, no budget',
+                amount: '100.00',
+                category_id: '1',
+                category_name: 'Groceries',
+                budget_id: undefined,
+            });
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([
+                transactionWithCategory,
+            ]);
+            mockValidator.shouldProcessTransaction.mockReturnValue(true);
+            mockValidator.isBudgetOnlyCandidate.mockReturnValue(true);
+            mockCategoryService.getCategories.mockResolvedValue([]);
+            mockBudgetService.getBudgets.mockResolvedValue([]);
+
+            mockLLMService.processTransactions.mockResolvedValue({
+                '1': { budget: 'New Budget' },
+            });
+
+            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
+                ok: true,
+                value: transactionWithCategory as any,
+            });
+
+            const result = await service.updateTransactionsByTag(tag, updateMode);
+
+            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
+            // Should have fetched budgets even in category-only mode
+            expect(mockBudgetService.getBudgets).toHaveBeenCalled();
         });
     });
 });

@@ -281,8 +281,8 @@ Examples:
                 .default('both', 'categories and budgets')
         )
         .option(
-            '-i, --include-classified',
-            'process transactions that already have categories/budgets assigned'
+            '-f, --force',
+            'force AI to re-run on transactions that already have both a category and budget assigned'
         )
         .option('-n, --dry-run', 'preview proposed changes without applying them')
         .addHelpText(
@@ -295,7 +295,7 @@ Note: Requires ANTHROPIC_API_KEY environment variable for AI categorization.`
             `
 Examples:
   $ budgeting-toolkit categorize Import-2025-06-23              # categorize new transactions
-  $ budgeting-toolkit categorize Import-2025-06-23 -i           # include already categorized
+  $ budgeting-toolkit categorize Import-2025-06-23 -f           # categorize all transactions
   $ budgeting-toolkit categorize Import-2025-06-23 -n           # preview changes only
   $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only`
         )
@@ -315,7 +315,7 @@ Examples:
                 const aiTransactionUpdateOrchestrator =
                     await ServiceFactory.createAITransactionUpdateOrchestrator(
                         apiClient,
-                        opts.includeClassified,
+                        opts.force,
                         opts.dryRun
                     );
 

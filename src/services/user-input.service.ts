@@ -246,14 +246,14 @@ export class UserInputService {
      * Formats a single change for display (old value → new value)
      */
     private formatChange(field: string, oldValue: string | undefined, newValue: string): string {
-        return `${field}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}`;
+        return `${chalk.bold(field)}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}`;
     }
 
     /**
      * Formats a current value for display (no change indicator)
      */
     private formatCurrentValue(field: string, currentValue: string | undefined): string {
-        return `${field}: ${chalk.gray(currentValue || 'None')}`;
+        return `${chalk.bold(field)}: ${chalk.dim(currentValue || 'None')}`;
     }
 
     /**
@@ -283,7 +283,7 @@ export class UserInputService {
                 this.formatDescription(transaction.description, transactionId)
             )}"`,
             `${chalk.bold('Proposed changes:')}`,
-            ...changes.map(change => chalk.gray(`  • ${change}`)),
+            ...changes.map(change => `  • ${change}`),
             `\n${chalk.bold('Apply these changes?')}`,
         ].join('\n');
     }

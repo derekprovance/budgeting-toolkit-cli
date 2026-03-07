@@ -41,6 +41,11 @@ export interface ITransactionClassificationService {
     hasACategory(transaction: TransactionSplit): boolean;
 
     /**
+     * Checks if transaction has a budget assigned
+     */
+    hasBudget(transaction: TransactionSplit): boolean;
+
+    /**
      * Checks if transaction is tagged as a paycheck
      */
     isPaycheck(transaction: TransactionSplit): boolean;

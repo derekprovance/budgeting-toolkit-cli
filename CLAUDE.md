@@ -156,6 +156,11 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 2. **report** (alias: `st`) - Shows current budget report for a given month
 
 3. **categorize** (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions
+    - By default, processes uncategorized transactions and transactions with category but no budget
+    - Transactions with both category and budget are skipped unless `--force` is used
+    - Supports mode options: `--mode category` (category only), `--mode budget` (budget only), `--mode both` (default)
+    - Use `--force` (`-f`) to re-run AI on transactions that already have both category and budget
+    - Use `--dry-run` (`-n`) to preview changes without applying
 
 4. **split** (alias: `sp`) - Interactively splits a transaction into two parts:
     - Preserves metadata (category, budget, tags) on first split
