@@ -177,5 +177,36 @@ describe('CategorizeCommand', () => {
             );
             expect(mockDisplayService.formatError).toHaveBeenCalledWith(error);
         });
+
+        it('should display warning when some transactions fail to update', async () => {
+            const params = {
+                tag: 'test-tag',
+                updateMode: CategorizeMode.Both,
+            };
+
+            const results = {
+                status: CategorizeStatus.HAS_RESULTS,
+                transactionsUpdated: 8,
+                transactionErrors: 2,
+            };
+
+            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
+
+            // Mock console.log to verify output
+            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+            await command.execute(params);
+
+            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
+                params.tag,
+                params.updateMode
+            );
+            expect(consoleSpy).toHaveBeenCalledWith('\nUpdated 8 Transaction(s)!');
+            expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining('⚠️  Warning: 2 transaction(s) failed to update')
+            );
+
+            consoleSpy.mockRestore();
+        });
     });
 });

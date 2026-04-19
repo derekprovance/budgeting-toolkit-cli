@@ -16,6 +16,8 @@ import { InteractiveTransactionUpdater } from '../../src/services/interactive-tr
 import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { ILogger } from '../../src/types/interface/logger.interface.js';
+import { TransactionSplitService } from '../../src/services/transaction-split.service.js';
+import { SplitTransactionDisplayService } from '../../src/services/display/split-transaction-display.service.js';
 import { jest } from '@jest/globals';
 
 /**
@@ -116,6 +118,10 @@ export const createMockUserInputService = (): jest.Mocked<UserInputService> => {
         promptForBudget: jest.fn(),
         promptForEditChoices: jest.fn(),
         confirm: jest.fn(),
+        getSplitAmount: jest.fn(),
+        getCustomSplitText: jest.fn(),
+        confirmSplit: jest.fn(),
+        validateSplitAmount: jest.fn(),
     } as unknown as jest.Mocked<UserInputService>;
 };
 
@@ -139,6 +145,32 @@ export const createMockLLMAssignmentService = (): jest.Mocked<LLMAssignmentServi
         assignBudgets: jest.fn(),
     } as unknown as jest.Mocked<LLMAssignmentService>;
 };
+
+/**
+ * Creates a mocked TransactionSplitService
+ */
+export const createMockTransactionSplitService = (): jest.Mocked<TransactionSplitService> => {
+    return {
+        getTransaction: jest.fn(),
+        splitTransaction: jest.fn(),
+        validateSplitAmounts: jest.fn(),
+    } as unknown as jest.Mocked<TransactionSplitService>;
+};
+
+/**
+ * Creates a mocked SplitTransactionDisplayService
+ */
+export const createMockSplitTransactionDisplayService =
+    (): jest.Mocked<SplitTransactionDisplayService> => {
+        return {
+            formatHeader: jest.fn(),
+            formatOriginalTransaction: jest.fn(),
+            formatRemainder: jest.fn(),
+            formatSplitPreview: jest.fn(),
+            formatSuccess: jest.fn(),
+            formatError: jest.fn(),
+        } as unknown as jest.Mocked<SplitTransactionDisplayService>;
+    };
 
 /**
  * Creates a mocked FireflyClientWithCerts (API client)

@@ -44,6 +44,7 @@ Wait 1-2 minutes for initialization, then:
 3. Complete setup wizard
 
 **Default test credentials (Docker environment only):**
+
 - Email: `test@test.com`
 - Password: `thisisatestpassword`
 
@@ -77,19 +78,19 @@ npm run seed:docker
 
 This creates accounts, budgets, bills, and a full month of transactions that simulate a real end-of-month finalization:
 
-| Data | Detail |
-|---|---|
-| Asset account | Test Checking |
-| Revenue accounts | Test Employer, Test Side Income |
-| Expense accounts | Test Groceries Store, Test Dining, Test Netflix, Test Gas Station, Test Misc |
-| Budgets | Groceries ($500), Dining ($200), Entertainment ($100) |
-| Bills | Rent ($1,500/mo), Netflix ($15.99/mo) |
-| Paycheck deposit | $4,000 on the 1st (tagged `Paycheck`) |
-| Bill payments | Rent + Netflix paid |
-| Budgeted expenses | Groceries $355 · Dining $130 |
-| Unbudgeted expenses | Gas $55 · misc $30 |
-| Additional income | Freelance $350 mid-month |
-| Uncategorized | 1 transaction tagged `e2e-test` (for categorize dry-run) |
+| Data                | Detail                                                                       |
+| ------------------- | ---------------------------------------------------------------------------- |
+| Asset account       | Test Checking                                                                |
+| Revenue accounts    | Test Employer, Test Side Income                                              |
+| Expense accounts    | Test Groceries Store, Test Dining, Test Netflix, Test Gas Station, Test Misc |
+| Budgets             | Groceries ($500), Dining ($200), Entertainment ($100)                        |
+| Bills               | Rent ($1,500/mo), Netflix ($15.99/mo)                                        |
+| Paycheck deposit    | $4,000 on the 1st (tagged `Paycheck`)                                        |
+| Bill payments       | Rent + Netflix paid                                                          |
+| Budgeted expenses   | Groceries $355 · Dining $130                                                 |
+| Unbudgeted expenses | Gas $55 · misc $30                                                           |
+| Additional income   | Freelance $350 mid-month                                                     |
+| Uncategorized       | 1 transaction tagged `e2e-test` (for categorize dry-run)                     |
 
 The script also writes `scripts/e2e-config.yaml` with the real account IDs from the newly created accounts.
 
@@ -102,6 +103,7 @@ npm run test:e2e:docker
 ```
 
 This runs three CLI commands against the live Firefly III instance:
+
 1. `analyze` — validates full cash flow analysis (paycheck, bills, budget, unbudgeted, additional income)
 2. `report` — validates budget report rendering with spending visualizations
 3. `categorize --dry-run` — validates AI categorization pipeline against the `e2e-test` tagged transaction without mutating data
