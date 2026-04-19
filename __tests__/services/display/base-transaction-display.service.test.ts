@@ -412,8 +412,8 @@ describe('BaseTransactionDisplayService', () => {
 
             const result = service.listTransactionsWithHeader(transactions, 'Test');
 
-            expect(result).toContain('Amount: undefined100.00');
-            expect(result).toContain('Total Expenses: undefined100.00');
+            expect(result).toContain('Amount: 100.00');
+            expect(result).toContain('Total Expenses: 100.00');
         });
     });
 

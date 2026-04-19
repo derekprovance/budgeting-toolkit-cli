@@ -10,6 +10,9 @@ export class TransactionUtils {
      * @returns Total amount as a number
      */
     calculateTotal(transactions: TransactionSplit[]): number {
-        return transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
+        return transactions.reduce((sum, transaction) => {
+            const amount = parseFloat(transaction.amount);
+            return sum + (isNaN(amount) ? 0 : amount);
+        }, 0);
     }
 }

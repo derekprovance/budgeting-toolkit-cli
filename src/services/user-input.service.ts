@@ -4,6 +4,7 @@ import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
 import { CategorizeMode } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Interface for transaction update options
@@ -289,7 +290,7 @@ export class UserInputService {
         transactionId: string | undefined,
         changes: string[]
     ): string {
-        const rawAmount = parseFloat(transaction.amount);
+        const rawAmount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
         const formatted = CurrencyUtils.formatWithSymbol(rawAmount, transaction.currency_symbol ?? '');
         let amountDisplay: string;
         if (transaction.type === 'withdrawal') {

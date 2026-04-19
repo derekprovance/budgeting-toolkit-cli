@@ -69,6 +69,9 @@ describe('UserInputService', () => {
             description: 'Test Transaction',
             category_name: 'Old Category',
             budget_name: 'Old Budget',
+            amount: '34.99',
+            type: 'withdrawal',
+            currency_symbol: '$',
         };
 
         const mockTransactionId = '5';
@@ -217,6 +220,9 @@ describe('UserInputService', () => {
         it('should handle undefined current values', async () => {
             const mockTransactionWithoutValues: Partial<TransactionSplit> = {
                 description: 'Test Transaction',
+                amount: '50.00',
+                type: 'withdrawal',
+                currency_symbol: '$',
             };
 
             const newCategory = 'New Category';
@@ -244,6 +250,9 @@ describe('UserInputService', () => {
                 description: longDescription,
                 category_name: 'Old Category',
                 budget_name: 'Old Budget',
+                amount: '25.00',
+                type: 'withdrawal',
+                currency_symbol: '$',
             };
 
             (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
@@ -280,6 +289,9 @@ describe('UserInputService', () => {
                 description: 'Test Transaction',
                 category_name: 'Old Category',
                 budget_name: undefined,
+                amount: '34.99',
+                type: 'withdrawal',
+                currency_symbol: '$',
             };
 
             (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
@@ -319,11 +331,98 @@ describe('UserInputService', () => {
         });
     });
 
+    describe('Amount display in update prompt', () => {
+        it('should display withdrawal amount with negative sign', async () => {
+            const withdrawal: Partial<TransactionSplit> = {
+                description: 'Coffee Shop',
+                type: 'withdrawal',
+                amount: '4.50',
+                currency_symbol: '$',
+                category_name: 'Food',
+            };
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(withdrawal as TransactionSplit, '1', {
+                category: 'Dining',
+            });
+
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: expect.stringContaining('-$4.50'),
+                })
+            );
+        });
+
+        it('should display deposit amount with positive sign', async () => {
+            const deposit: Partial<TransactionSplit> = {
+                description: 'Salary',
+                type: 'deposit',
+                amount: '3000.00',
+                currency_symbol: '$',
+                category_name: 'Income',
+            };
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(deposit as TransactionSplit, '2', {
+                category: 'Salary',
+            });
+
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: expect.stringContaining('+$3000.00'),
+                })
+            );
+        });
+
+        it('should display transfer amount without sign', async () => {
+            const transfer: Partial<TransactionSplit> = {
+                description: 'Savings Transfer',
+                type: 'transfer',
+                amount: '500.00',
+                currency_symbol: '$',
+                category_name: 'Transfer',
+            };
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(transfer as TransactionSplit, '3', {
+                category: 'Transfer',
+            });
+
+            const callArgs = mockExpand.mock.calls[0][0];
+            expect(callArgs.message).toContain('$500.00');
+            expect(callArgs.message).not.toContain('-$500.00');
+            expect(callArgs.message).not.toContain('+$500.00');
+        });
+
+        it('should handle missing currency_symbol gracefully', async () => {
+            const transaction: Partial<TransactionSplit> = {
+                description: 'No Currency',
+                type: 'withdrawal',
+                amount: '10.00',
+                category_name: 'Misc',
+            };
+            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(transaction as TransactionSplit, '4', {
+                category: 'Other',
+            });
+
+            expect(mockExpand).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: expect.stringContaining('-10.00'),
+                })
+            );
+        });
+    });
+
     describe('Base URL and Transaction Link Functionality', () => {
         const mockTransaction: Partial<TransactionSplit> = {
             description: 'Test Transaction',
             category_name: 'Old Category',
             budget_name: 'Old Budget',
+            amount: '34.99',
+            type: 'withdrawal',
+            currency_symbol: '$',
         };
 
         it('should include hyperlink in description when transaction ID is provided', async () => {
@@ -375,6 +474,9 @@ describe('UserInputService', () => {
             const mockTransactionWithLongDesc: Partial<TransactionSplit> = {
                 description: longDescription,
                 category_name: 'Old Category',
+                amount: '25.00',
+                type: 'withdrawal',
+                currency_symbol: '$',
             };
             const transactionId = '456';
             const newCategory = 'New Category';
@@ -447,6 +549,9 @@ describe('UserInputService', () => {
             const specialDescTransaction: Partial<TransactionSplit> = {
                 description: 'Transaction with & < > " \' special chars',
                 category_name: 'Old Category',
+                amount: '15.00',
+                type: 'withdrawal',
+                currency_symbol: '$',
             };
             const transactionId = '999';
             const newCategory = 'New Category';
@@ -475,6 +580,8 @@ describe('UserInputService', () => {
             description: 'Paycheck Deposit',
             category_name: 'Salary',
             budget_name: undefined,
+            amount: '2500.00',
+            currency_symbol: '$',
         };
 
         it('should show Budget: N/A for deposits instead of None', async () => {
@@ -532,6 +639,8 @@ describe('UserInputService', () => {
                 description: 'Grocery Store',
                 category_name: 'Food',
                 budget_name: 'Groceries',
+                amount: '87.50',
+                currency_symbol: '$',
             };
 
             (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);

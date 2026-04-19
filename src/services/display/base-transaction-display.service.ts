@@ -2,6 +2,8 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { ITransactionClassificationService } from '../core/transaction-classification.service.interface.js';
 import { TransactionUtils } from '../../utils/transaction.utils.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
 
 export class BaseTransactionDisplayService {
     private readonly transactionUtils: TransactionUtils;
@@ -24,11 +26,11 @@ export class BaseTransactionDisplayService {
             transactions.forEach(transaction => {
                 lines.push(this.formatTransaction(transaction));
             });
-            lines.push(
-                chalk.yellow.bold(
-                    `Total Expenses: ${transactions[0]?.currency_symbol}${totalExpenses.toFixed(2)}`
-                )
+            const totalFormatted = CurrencyUtils.formatWithSymbol(
+                totalExpenses,
+                transactions[0]?.currency_symbol ?? ''
             );
+            lines.push(chalk.yellow.bold(`Total Expenses: ${totalFormatted}`));
         }
 
         return lines.join('\n');
@@ -36,9 +38,9 @@ export class BaseTransactionDisplayService {
 
     private formatTransaction(transaction: TransactionSplit): string {
         const type = this.getTransactionTypeIndicator(transaction);
-        const amount = parseFloat(transaction.amount);
+        const amount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
         const date = new Date(transaction.date).toLocaleDateString();
-        const amountStr = `${transaction.currency_symbol}${Math.abs(amount).toFixed(2)}`;
+        const amountStr = CurrencyUtils.formatWithSymbol(Math.abs(amount), transaction.currency_symbol ?? '');
 
         const lines = [
             `${type} ${chalk.white(transaction.description)}`,
@@ -61,9 +63,9 @@ export class BaseTransactionDisplayService {
      * @returns Formatted transaction line
      */
     formatBudgetTransaction(transaction: TransactionSplit, transactionId: string): string {
-        const amount = parseFloat(transaction.amount);
+        const amount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
         const date = new Date(transaction.date).toLocaleDateString();
-        const amountStr = `${transaction.currency_symbol}${Math.abs(amount).toFixed(2)}`;
+        const amountStr = CurrencyUtils.formatWithSymbol(Math.abs(amount), transaction.currency_symbol ?? '');
 
         // Truncate description at 60 characters
         const MAX_LENGTH = 60;
