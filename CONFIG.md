@@ -52,7 +52,7 @@ Use this quick reference to see what each command needs:
 
 - `expectedMonthlyPaycheck` - Expected monthly income
 - `validDestinationAccounts[]` - At least one account ID
-- `validExpenseAccounts[]` - At least one account ID
+- `validExpenseSourceAccounts[]` - At least one account ID
 
 **Recommended:**
 
@@ -126,12 +126,12 @@ validDestinationAccounts:
 **Default:** `[]`
 **Used by:** Additional income calculations
 
-#### validExpenseAccounts
+#### validExpenseSourceAccounts
 
-List of account IDs that should be checked for expenses.
+List of account IDs (asset accounts) that expenses source from. For withdrawals, this is the account the money is withdrawn FROM (e.g., checking account), not the merchant destination.
 
 ```yaml
-validExpenseAccounts:
+validExpenseSourceAccounts:
     - '3' # Credit Card
     - '4' # Debit Card
 ```
@@ -139,6 +139,8 @@ validExpenseAccounts:
 **Type:** `string[]`
 **Default:** `[]`
 **Used by:** Unbudgeted expense calculations
+
+**Important:** These should be asset-type accounts (checking, savings, credit cards) that money is withdrawn FROM, not expense-type merchant accounts.
 
 #### validTransfers
 

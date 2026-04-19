@@ -76,7 +76,7 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 **Account Configuration:**
 
 - `validDestinationAccounts` - Array of account IDs for valid income destinations
-- `validExpenseAccounts` - Array of account IDs for expense filtering
+- `validExpenseSourceAccounts` - Array of account IDs for expense source filtering (asset accounts that expenses source from)
 - `validTransfers` - Array of valid transfer configurations (source/destination pairs)
 
 **Transaction Configuration:**

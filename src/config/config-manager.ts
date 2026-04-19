@@ -13,7 +13,7 @@ import { ValidTransfer } from '../types/common.types.js';
  */
 interface YamlConfig {
     validDestinationAccounts?: string[];
-    validExpenseAccounts?: string[];
+    validExpenseSourceAccounts?: string[];
     validTransfers?: ValidTransfer[];
     disposableIncomeAccounts?: string[];
     excludedAdditionalIncomePatterns?: string[];
@@ -324,8 +324,8 @@ export class ConfigManager {
         if (yamlConfig.validDestinationAccounts) {
             config.accounts.validDestinationAccounts = yamlConfig.validDestinationAccounts;
         }
-        if (yamlConfig.validExpenseAccounts) {
-            config.accounts.validExpenseAccounts = yamlConfig.validExpenseAccounts;
+        if (yamlConfig.validExpenseSourceAccounts) {
+            config.accounts.validExpenseSourceAccounts = yamlConfig.validExpenseSourceAccounts;
         }
         if (yamlConfig.validTransfers) {
             config.accounts.validTransfers = yamlConfig.validTransfers;

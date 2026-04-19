@@ -52,7 +52,7 @@ describe('ConfigValidator', () => {
             },
             accounts: {
                 validDestinationAccounts: ['1'],
-                validExpenseAccounts: ['3'],
+                validExpenseSourceAccounts: ['3'],
                 validTransfers: [],
             },
             transactions: {

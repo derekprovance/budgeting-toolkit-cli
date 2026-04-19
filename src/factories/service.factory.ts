@@ -67,7 +67,7 @@ export class ServiceFactory {
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
             transactionClassificationService,
-            config.accounts.validExpenseAccounts,
+            config.accounts.validExpenseSourceAccounts,
             config.accounts.validTransfers
         );
         const budgetReport = new BudgetReportService(

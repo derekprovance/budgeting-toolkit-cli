@@ -43,6 +43,10 @@ Wait 1-2 minutes for initialization, then:
 2. Register new account (first user becomes admin)
 3. Complete setup wizard
 
+**Default test credentials (Docker environment only):**
+- Email: `test@test.com`
+- Password: `thisisatestpassword`
+
 ### 4. Generate API Token
 
 1. In Firefly: **Options** → **Profile** → **OAuth**
@@ -61,9 +65,66 @@ FIREFLY_API_TOKEN=<your_token_here>
 npm run start:dev -- report -m 1
 ```
 
-### 6. Import Test Data
+## E2E Testing
 
-Use the Data Importer at http://localhost:8081:
+### Seed Test Data
+
+Before running E2E tests, seed the Docker environment with realistic end-of-month test data:
+
+```bash
+npm run seed:docker
+```
+
+This creates accounts, budgets, bills, and a full month of transactions that simulate a real end-of-month finalization:
+
+| Data | Detail |
+|---|---|
+| Asset account | Test Checking |
+| Revenue accounts | Test Employer, Test Side Income |
+| Expense accounts | Test Groceries Store, Test Dining, Test Netflix, Test Gas Station, Test Misc |
+| Budgets | Groceries ($500), Dining ($200), Entertainment ($100) |
+| Bills | Rent ($1,500/mo), Netflix ($15.99/mo) |
+| Paycheck deposit | $4,000 on the 1st (tagged `Paycheck`) |
+| Bill payments | Rent + Netflix paid |
+| Budgeted expenses | Groceries $355 · Dining $130 |
+| Unbudgeted expenses | Gas $55 · misc $30 |
+| Additional income | Freelance $350 mid-month |
+| Uncategorized | 1 transaction tagged `e2e-test` (for categorize dry-run) |
+
+The script also writes `scripts/e2e-config.yaml` with the real account IDs from the newly created accounts.
+
+> **Re-run after `docker compose down -v`**: The seed script must be run again any time the Docker volumes are wiped, since account IDs change with each fresh database.
+
+### Run E2E Tests
+
+```bash
+npm run test:e2e:docker
+```
+
+This runs three CLI commands against the live Firefly III instance:
+1. `analyze` — validates full cash flow analysis (paycheck, bills, budget, unbudgeted, additional income)
+2. `report` — validates budget report rendering with spending visualizations
+3. `categorize --dry-run` — validates AI categorization pipeline against the `e2e-test` tagged transaction without mutating data
+
+To run E2E tests against your local `.env`:
+
+```bash
+npm run test:e2e
+```
+
+### Full E2E Workflow (first time)
+
+```bash
+docker compose up -d            # Start services
+# Complete Firefly setup at http://localhost:8080
+# Generate API token → add to .env.dev
+npm run seed:docker             # Create test data + write e2e-config.yaml
+npm run test:e2e:docker         # Run E2E tests
+```
+
+### 6. Import Custom Test Data
+
+For custom data beyond the seed script, use the Data Importer at http://localhost:8081:
 
 1. Configure connection:
     - Firefly URL: `http://firefly:8080`
@@ -254,7 +315,7 @@ expectedMonthlyPaycheck: 3500
 validDestinationAccounts:
     - '1' # Main Checking
     - '2' # Savings
-validExpenseAccounts:
+validExpenseSourceAccounts:
     - '3' # Credit Card
 excludedAdditionalIncomePatterns:
     - PAYROLL
@@ -272,21 +333,19 @@ docker compose up -d
 
 # 3. Setup Firefly (first time)
 # - Open http://localhost:8080
-# - Register admin account
-# - Generate API token
+# - Register admin account (test@test.com / thisisatestpassword for Docker)
+# - Generate API token (Options → Profile → OAuth → Personal Access Tokens)
 # - Add token to .env.dev
 
-# 4. Load test data (first time)
-# - Use Data Importer at http://localhost:8081
+# 4. Seed test data (first time, or after docker compose down -v)
+npm run seed:docker
 
-# 5. Test commands
-npm start:dev -- report -m 1
-npm start:dev -- analyze -m 1
-npm start:dev -- categorize Import-2024
+# 5. Run E2E tests
+npm run test:e2e:docker
 
 # 6. Make changes and test
 npm test
-npm start:dev -- analyze -m 1
+npm run start:dev -- analyze -m 1
 
 # 7. Stop when done
 docker compose stop

@@ -11,7 +11,12 @@
         "start:dev": "ENV_FILE=.env.dev tsx src/index.ts",
         "compile": "rm -Rf ./dist && tsc",
         "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+        "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
         "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+        "test:e2e": "bash scripts/e2e-test.sh",
+        "test:e2e:docker": "ENV_FILE=.env.dev bash scripts/e2e-test.sh",
+        "seed:docker": "ENV_FILE=.env.dev node --import tsx/esm scripts/seed-test-data.ts",
+        "db:dump": "docker compose exec db pg_dump -U firefly --clean --if-exists --no-owner --no-acl firefly > docker/db-init/01-seed.sql",
         "linter": "eslint . && prettier . --write",
         "prepack": "npm run compile",
         "dev:install": "npm pack && npm install -g *.tgz && rm -f *.tgz"

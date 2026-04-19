@@ -7,7 +7,7 @@ validDestinationAccounts:
     - '1' # Checking Account ID
     - '2' # Savings Account ID
 
-validExpenseAccounts:
+validExpenseSourceAccounts:
     - '3' # Credit Card Account ID
     - '4' # Debit Card Account ID
 

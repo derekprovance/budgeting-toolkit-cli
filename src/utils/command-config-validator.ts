@@ -31,12 +31,12 @@ export class CommandConfigValidator {
             );
         }
 
-        if (config.accounts.validExpenseAccounts.length === 0) {
+        if (config.accounts.validExpenseSourceAccounts.length === 0) {
             errors.push(
-                'validExpenseAccounts is required for analyze command.\n' +
+                'validExpenseSourceAccounts is required for analyze command.\n' +
                     '  Add to config.yaml:\n' +
-                    '    validExpenseAccounts:\n' +
-                    "      - '3'  # Your expense account ID from Firefly III"
+                    '    validExpenseSourceAccounts:\n' +
+                    "      - '3'  # Your expense source account ID (asset account) from Firefly III"
             );
         }
 
