@@ -7,7 +7,7 @@ import {
     MerchantInsight,
 } from '../types/dto/budget-report.dto.js';
 import { BudgetReportService } from './budget-report.service.js';
-import { BudgetService } from './core/budget.service.js';
+import { IBudgetService } from './core/budget.service.interface.js';
 import { TransactionService } from './core/transaction.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
@@ -20,7 +20,7 @@ import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 export class BudgetAnalyticsService {
     constructor(
         private readonly budgetReportService: BudgetReportService,
-        private readonly budgetService: BudgetService,
+        private readonly budgetService: IBudgetService,
         private readonly transactionService: TransactionService
     ) {}
 

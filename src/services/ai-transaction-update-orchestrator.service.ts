@@ -6,9 +6,9 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import ora from 'ora';
 import { logger } from '../logger.js';
-import { CategoryService } from './core/category.service.js';
+import { ICategoryService } from './core/category.service.interface.js';
 import { TransactionService } from './core/transaction.service.js';
-import { BudgetService } from './core/budget.service.js';
+import { IBudgetService } from './core/budget.service.interface.js';
 import { TransactionAIResultValidator } from './core/transaction-ai-result-validator.service.js';
 import {
     AIResponse,
@@ -18,7 +18,7 @@ import { CategorizeMode } from '../types/enums.js';
 import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 import { CategorizeStatus } from '../types/enums.js';
 import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
-import { TransactionValidatorService } from './core/transaction-validator.service.js';
+import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../types/result.type.js';
 
@@ -31,18 +31,18 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     constructor(
         private readonly transactionService: TransactionService,
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
-        private readonly categoryService: CategoryService,
-        private readonly budgetService: BudgetService,
+        private readonly categoryService: ICategoryService,
+        private readonly budgetService: IBudgetService,
         private readonly aiValidator: TransactionAIResultValidator,
         private readonly llmService: LLMTransactionProcessingService,
-        private readonly validator: TransactionValidatorService,
-        private readonly force: boolean = false
+        private readonly validator: ITransactionValidatorService,
+        private readonly force: boolean = false,
+        private readonly dryRun: boolean = false
     ) {}
 
     async updateTransactionsByTag(
         tag: string,
-        updateMode: CategorizeMode,
-        dryRun?: boolean
+        updateMode: CategorizeMode
     ): Promise<CategorizeStatusDto> {
         try {
             if (!(await this.transactionService.tagExists(tag))) {
@@ -50,7 +50,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         tag,
                         updateMode,
-                        dryRun,
+                        dryRun: this.dryRun,
                     },
                     'Tag does not exist'
                 );
@@ -71,7 +71,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         tag,
                         updateMode,
-                        dryRun,
+                        dryRun: this.dryRun,
                         totalTransactions: unfilteredTransactions.length,
                         filteredTransactions: transactions.length,
                     },
@@ -87,14 +87,11 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 {
                     tag,
                     updateMode,
-                    dryRun,
+                    dryRun: this.dryRun,
                     totalTransactions: transactions.length,
                 },
                 'Processing transactions'
             );
-
-            // Initialize validator with fresh data
-            await this.aiValidator.initialize();
 
             let categories: CategoryProperties[] | undefined;
             if (updateMode !== CategorizeMode.Budget) {
@@ -125,8 +122,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
                 const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
                     transactions,
-                    aiResults,
-                    dryRun
+                    aiResults
                 );
 
                 // Display validation errors to user
@@ -138,7 +134,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         tag,
                         updateMode,
-                        dryRun,
+                        dryRun: this.dryRun,
                         totalTransactions: transactions.length,
                         updatedTransactions: updatedTransactions.length,
                         validationErrors: errors.length,
@@ -162,7 +158,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 {
                     tag,
                     updateMode,
-                    dryRun,
+                    dryRun: this.dryRun,
                     error: ex instanceof Error ? ex.message : 'Unknown error',
                 },
                 'Failed to update transactions'
@@ -256,8 +252,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
     private async updateTransactionsWithAIResults(
         transactions: TransactionSplit[],
-        aiResults: Record<string, { category?: string; budget?: string }>,
-        dryRun: boolean | undefined
+        aiResults: Record<string, { category?: string; budget?: string }>
     ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
         const results: TransactionRead[] = [];
@@ -316,7 +311,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     skipped: skippedCount,
                     validationErrors: errorCount,
                 },
-                `${dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
+                `${this.dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
             );
 
             if (errorCount > 0) {

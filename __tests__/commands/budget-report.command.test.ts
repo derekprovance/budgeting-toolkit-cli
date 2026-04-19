@@ -89,9 +89,9 @@ describe('BudgetReportCommand', () => {
         } as unknown as jest.Mocked<EnhancedBudgetDisplayService>;
 
         budgetReportService = {
-            getCategorizedUnbudgetedTransactions: jest
+            getUntrackedTransactions: jest
                 .fn<(month: number, year: number) => Promise<any>>()
-                .mockResolvedValue({ unbudgeted: [], categorized: [] }),
+                .mockResolvedValue([]),
         } as unknown as jest.Mocked<BudgetReportService>;
 
         billComparisonService = {

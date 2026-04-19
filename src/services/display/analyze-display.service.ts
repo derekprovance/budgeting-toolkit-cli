@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { TransactionClassificationService } from '../core/transaction-classification.service.js';
+import { ITransactionClassificationService } from '../core/transaction-classification.service.interface.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
@@ -10,7 +10,7 @@ import { TransactionCalculationUtils } from '../../utils/transaction-calculation
  * Service for formatting and displaying comprehensive budget analysis information
  */
 export class AnalyzeDisplayService {
-    constructor(private transactionClassificationService: TransactionClassificationService) {}
+    constructor(private transactionClassificationService: ITransactionClassificationService) {}
 
     /**
      * Formats the complete analysis report with all sections

@@ -6,21 +6,15 @@ import {
     TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import {
-    DateRangeService,
-    IDateRangeService,
-} from '../../types/interface/date-range.service.interface.js';
+import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
+import { IBudgetService } from './budget.service.interface.js';
 
-export class BudgetService {
-    private readonly dateRangeService: IDateRangeService;
-
+export class BudgetService implements IBudgetService {
     constructor(
         private readonly client: FireflyClientWithCerts,
-        dateRangeService: IDateRangeService = new DateRangeService()
-    ) {
-        this.dateRangeService = dateRangeService;
-    }
+        private readonly dateRangeService: IDateRangeService
+    ) {}
 
     async getBudgets(): Promise<BudgetRead[]> {
         const budgets = await this.fetchBudgets();

@@ -83,7 +83,9 @@ export function parseAssignmentResponse(
     try {
         const rawParsed: unknown = JSON.parse(responseText);
         if (rawParsed === null || typeof rawParsed !== 'object' || Array.isArray(rawParsed)) {
-            throw new Error(`Expected a JSON object, got ${rawParsed === null ? 'null' : typeof rawParsed}`);
+            throw new Error(
+                `Expected a JSON object, got ${rawParsed === null ? 'null' : typeof rawParsed}`
+            );
         }
         parsed = rawParsed as Record<string, unknown>;
     } catch (error) {

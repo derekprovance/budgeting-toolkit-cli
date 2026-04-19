@@ -60,8 +60,7 @@ describe('CategorizeCommand', () => {
 
             expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
-                params.updateMode,
-                false
+                params.updateMode
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
@@ -86,8 +85,7 @@ describe('CategorizeCommand', () => {
 
             expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
-                params.updateMode,
-                false
+                params.updateMode
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
@@ -117,8 +115,7 @@ describe('CategorizeCommand', () => {
 
             expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
-                params.updateMode,
-                false
+                params.updateMode
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,
@@ -151,8 +148,7 @@ describe('CategorizeCommand', () => {
 
             expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
                 params.tag,
-                params.updateMode,
-                true
+                params.updateMode
             );
             expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
                 params.tag,

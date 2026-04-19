@@ -1,4 +1,4 @@
-import { BudgetService } from './core/budget.service.js';
+import { IBudgetService } from './core/budget.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
 import { logger } from '../logger.js';
 import { Result } from '../types/result.type.js';
@@ -21,7 +21,7 @@ export interface BudgetSurplusResult {
  * - Negative value = deficit (over budget)
  */
 export class BudgetSurplusService {
-    constructor(private readonly budgetService: BudgetService) {}
+    constructor(private readonly budgetService: IBudgetService) {}
 
     /**
      * Calculates budget surplus or deficit for a given month and year.

@@ -8,8 +8,6 @@ import { DisposableIncomeService } from '../services/disposable-income.service.j
 import { BudgetSurplusService } from '../services/budget-surplus.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { AnalyzeReportDto } from '../types/dto/analyze-report.dto.js';
-import { CommandConfigValidator } from '../utils/command-config-validator.js';
-import { ConfigManager } from '../config/config-manager.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -27,7 +25,8 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
         private readonly disposableIncomeService: DisposableIncomeService,
         private readonly budgetSurplusService: BudgetSurplusService,
         private readonly billComparisonService: BillComparisonService,
-        private readonly analyzeDisplayService: AnalyzeDisplayService
+        private readonly analyzeDisplayService: AnalyzeDisplayService,
+        private readonly expectedMonthlyPaycheck: number = 0
     ) {}
 
     /**
@@ -36,10 +35,6 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
      */
     async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
         const spinner = ora(`Analyzing ${month}-${year}...`).start();
-
-        // Validate command-specific configuration
-        const config = ConfigManager.getInstance().getConfig();
-        CommandConfigValidator.validateAnalyzeCommand(config);
 
         try {
             // Fetch all analysis data in parallel
@@ -138,11 +133,8 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
             const budgetSpent = budgetResult.totalSpent;
             const budgetSurplus = budgetResult.surplus;
 
-            // Get expected paycheck from config
-            const expectedMonthlyPaycheck = config.transactions.expectedMonthlyPaycheck || 0;
-
             // Calculate actual paycheck
-            const actualPaycheck = expectedMonthlyPaycheck + paycheckSurplus;
+            const actualPaycheck = this.expectedMonthlyPaycheck + paycheckSurplus;
 
             // Build comprehensive report DTO
             const reportData = AnalyzeReportDto.create(
@@ -152,7 +144,7 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 budgetSpent,
                 budgetSurplus,
                 billComparison,
-                expectedMonthlyPaycheck,
+                this.expectedMonthlyPaycheck,
                 actualPaycheck,
                 paycheckSurplus,
                 disposableIncomeTransactions,

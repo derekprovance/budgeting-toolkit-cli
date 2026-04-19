@@ -5,7 +5,7 @@ import {
     TransactionRead,
 } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service.js';
-import { TransactionValidatorService } from './core/transaction-validator.service.js';
+import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import { TransactionAIResultValidator } from './core/transaction-ai-result-validator.service.js';
 import { UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
@@ -25,7 +25,7 @@ export interface AIResults {
 export class InteractiveTransactionUpdater {
     constructor(
         private readonly transactionService: TransactionService,
-        private readonly validator: TransactionValidatorService,
+        private readonly validator: ITransactionValidatorService,
         private readonly aiValidator: TransactionAIResultValidator,
         private readonly userInputService: UserInputService,
         private readonly dryRun: boolean = false

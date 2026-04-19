@@ -1,19 +1,17 @@
 import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
-import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
-import { BudgetService } from './core/budget.service.js';
+import { IBudgetService } from './core/budget.service.interface.js';
 import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
 import { logger } from '../logger.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionClassificationService } from './core/transaction-classification.service.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { Result } from '../types/result.type.js';
 import { BudgetError, BudgetErrorFactory, BudgetErrorType } from '../types/error/budget.error.js';
-import { EmojiUtils } from '../utils/emoji.utils.js';
 
 export class BudgetReportService implements IBudgetReportService {
     constructor(
-        private budgetService: BudgetService,
-        private readonly transactionClassificationService: TransactionClassificationService
+        private budgetService: IBudgetService,
+        private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 
     /**
@@ -121,25 +119,5 @@ export class BudgetReportService implements IBudgetReportService {
         });
 
         return transactions;
-    }
-
-    /**
-     * Gets unbudgeted transactions with category emoji indicators
-     * Used for display with visual categorization
-     * @param month Month (1-12)
-     * @param year Year
-     * @returns Categorized unbudgeted transactions with emoji
-     */
-    async getCategorizedUnbudgetedTransactions(
-        month: number,
-        year: number
-    ): Promise<CategorizedUnbudgetedDto[]> {
-        const unbudgeted = await this.getUntrackedTransactions(month, year);
-
-        return unbudgeted.map(transaction => ({
-            transaction,
-            categoryEmoji: EmojiUtils.getCategoryEmoji(transaction.category_name || undefined),
-            categoryName: transaction.category_name || undefined,
-        }));
     }
 }

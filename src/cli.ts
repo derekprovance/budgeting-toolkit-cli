@@ -202,6 +202,10 @@ Examples:
         )
         .action(async (opts: BudgetDateOptions) => {
             try {
+                const configManager = ConfigManager.getInstance(configPath);
+                const config = configManager.getConfig();
+                CommandConfigValidator.validateAnalyzeCommand(config);
+
                 const command = new AnalyzeCommand(
                     services.additionalIncomeService,
                     services.unbudgetedExpenseService,
@@ -209,7 +213,8 @@ Examples:
                     services.disposableIncomeService,
                     services.budgetSurplusService,
                     services.billComparisonService,
-                    services.analyzeDisplayService
+                    services.analyzeDisplayService,
+                    config.transactions.expectedMonthlyPaycheck || 0
                 );
                 await command.execute({
                     month: opts.month!,

@@ -1,8 +1,8 @@
 import { CategoryProperties, BudgetRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { Result, TransactionValidationError } from '../../types/result.type.js';
-import { TransactionValidatorService } from './transaction-validator.service.js';
-import { CategoryService } from './category.service.js';
-import { BudgetService } from './budget.service.js';
+import { ITransactionValidatorService } from './transaction-validator.service.interface.js';
+import { ICategoryService } from './category.service.interface.js';
+import { IBudgetService } from './budget.service.interface.js';
 import { logger } from '../../logger.js';
 import { StringUtils } from '../../utils/string.utils.js';
 
@@ -19,11 +19,29 @@ export class TransactionAIResultValidator {
     private categoryLookup: Map<string, CategoryProperties> = new Map();
     private budgetLookup: Map<string, BudgetRead> = new Map();
 
-    constructor(
-        private readonly categoryService: CategoryService,
-        private readonly budgetService: BudgetService,
-        private readonly transactionValidator: TransactionValidatorService
+    private constructor(
+        private readonly categoryService: ICategoryService,
+        private readonly budgetService: IBudgetService,
+        private readonly transactionValidator: ITransactionValidatorService
     ) {}
+
+    /**
+     * Creates and initializes a TransactionAIResultValidator instance.
+     * Loads categories and budgets from services during construction.
+     */
+    static async create(
+        categoryService: ICategoryService,
+        budgetService: IBudgetService,
+        transactionValidator: ITransactionValidatorService
+    ): Promise<TransactionAIResultValidator> {
+        const instance = new TransactionAIResultValidator(
+            categoryService,
+            budgetService,
+            transactionValidator
+        );
+        await instance.initialize();
+        return instance;
+    }
 
     /**
      * Initializes lookup maps for categories and budgets.
@@ -31,7 +49,7 @@ export class TransactionAIResultValidator {
      * Uses O(1) map lookups instead of O(n) array.find() for better performance.
      * Map keys are normalized (lowercase, trimmed) for case-insensitive matching.
      */
-    async initialize(): Promise<void> {
+    private async initialize(): Promise<void> {
         const [categories, budgets] = await Promise.all([
             this.categoryService.getCategories(),
             this.budgetService.getBudgets(),
@@ -244,12 +262,5 @@ export class TransactionAIResultValidator {
         return Array.from(this.budgetLookup.values())
             .map(b => b.attributes.name)
             .sort();
-    }
-
-    /**
-     * Refreshes the lookup maps with latest data from services
-     */
-    async refresh(): Promise<void> {
-        await this.initialize();
     }
 }

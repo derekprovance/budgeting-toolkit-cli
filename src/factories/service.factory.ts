@@ -26,7 +26,7 @@ import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionSplitService } from '../services/transaction-split.service.js';
 import { DisposableIncomeService } from '../services/disposable-income.service.js';
 import { BudgetSurplusService } from '../services/budget-surplus.service.js';
-import { DateRangeService } from '../types/interface/date-range.service.interface.js';
+import { DateRangeService } from '../services/core/date-range.service.js';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budget-display.service.js';
@@ -34,14 +34,19 @@ import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budge
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
         const config = ConfigManager.getInstance().getConfig();
-        const budgetService = new BudgetService(apiClient);
+        const dateRangeService = new DateRangeService();
+        const budgetService = new BudgetService(apiClient, dateRangeService);
         const categoryService = new CategoryService(apiClient);
         const userInputService = new UserInputService(config.api.firefly.url);
         const excludedTransactionService = new ExcludedTransactionService(
             config.transactions.excludedTransactions
         );
 
-        const transactionService = new TransactionService(excludedTransactionService, apiClient);
+        const transactionService = new TransactionService(
+            excludedTransactionService,
+            apiClient,
+            dateRangeService
+        );
 
         const transactionClassificationService = new TransactionClassificationService(
             config.api.firefly.noNameExpenseAccountId,
@@ -83,7 +88,6 @@ export class ServiceFactory {
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
         );
-        const dateRangeService = new DateRangeService();
         const billService = new BillService(apiClient, dateRangeService);
         const billComparisonService = new BillComparisonService(
             billService,
@@ -144,8 +148,8 @@ export class ServiceFactory {
         const llmAssignmentService = new LLMAssignmentService(claudeClient);
         const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
-        // Create AI validator service (will be initialized by orchestrator)
-        const aiValidator = new TransactionAIResultValidator(
+        // Create AI validator service using factory method
+        const aiValidator = await TransactionAIResultValidator.create(
             services.categoryService,
             services.budgetService,
             services.transactionValidatorService
@@ -168,7 +172,8 @@ export class ServiceFactory {
             aiValidator,
             llmProcessingService,
             services.transactionValidatorService,
-            force
+            force,
+            dryRun
         );
     }
 }

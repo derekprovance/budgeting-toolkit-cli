@@ -23,8 +23,7 @@ export class CategorizeCommand implements Command<void, UpdateTransactionsParams
         try {
             const results = await this.aiTransactionUpdateOrchestrator.updateTransactionsByTag(
                 tag,
-                updateMode,
-                dryRun
+                updateMode
             );
 
             if (results.status === CategorizeStatus.NO_TAG) {

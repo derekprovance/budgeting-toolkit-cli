@@ -1,7 +1,8 @@
 import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
+import { ICategoryService } from './category.service.interface.js';
 
-export class CategoryService {
+export class CategoryService implements ICategoryService {
     constructor(private readonly client: FireflyClientWithCerts) {}
 
     async getCategories(): Promise<CategoryProperties[]> {

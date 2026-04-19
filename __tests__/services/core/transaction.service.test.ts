@@ -10,6 +10,7 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
+import { IDateRangeService } from '../../../src/types/interface/date-range.service.interface.js';
 import {
     createMockExcludedTransactionService,
     createMockFireflyClient,
@@ -19,14 +20,22 @@ describe('TransactionService', () => {
     let service: TransactionService;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
+    let mockDateRangeService: jest.Mocked<IDateRangeService>;
 
     beforeEach(() => {
         resetMockLogger();
         mockExcludedTransactionService = createMockExcludedTransactionService();
         mockApiClient = createMockFireflyClient();
+        mockDateRangeService = {
+            getDateRange: jest.fn().mockReturnValue({
+                startDate: new Date('2024-01-01'),
+                endDate: new Date('2024-01-31'),
+            }),
+        } as jest.Mocked<IDateRangeService>;
         service = new TransactionService(
             mockExcludedTransactionService,
             mockApiClient,
+            mockDateRangeService,
             new Map(),
             mockLogger
         );
@@ -891,6 +900,7 @@ describe('TransactionService', () => {
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
                 mockApiClient,
+                mockDateRangeService,
                 mockCache
             );
 
@@ -1061,6 +1071,7 @@ describe('TransactionService', () => {
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
                 mockApiClient,
+                mockDateRangeService,
                 mockCache
             );
 
@@ -1095,6 +1106,7 @@ describe('TransactionService', () => {
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
                 mockApiClient,
+                mockDateRangeService,
                 mockCache
             );
 
@@ -1116,6 +1128,7 @@ describe('TransactionService', () => {
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
                 mockApiClient,
+                mockDateRangeService,
                 mockCache
             );
 

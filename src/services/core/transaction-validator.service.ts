@@ -1,10 +1,11 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { TransactionClassificationService } from './transaction-classification.service.js';
+import { ITransactionClassificationService } from './transaction-classification.service.interface.js';
 import { logger } from '../../logger.js';
+import { ITransactionValidatorService } from './transaction-validator.service.interface.js';
 
-export class TransactionValidatorService {
+export class TransactionValidatorService implements ITransactionValidatorService {
     constructor(
-        private readonly transactionClassificationService: TransactionClassificationService
+        private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 
     /**

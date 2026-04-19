@@ -8,6 +8,8 @@ import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budge
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
+import { EmojiUtils } from '../utils/emoji.utils.js';
+import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
 
 /**
  * Command for displaying enhanced budget report with insights and categorized sections
@@ -53,13 +55,24 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             // Fetch all data in parallel
             spinner.text = 'Fetching enhanced budget data...';
-            const [enhancedBudgets, topExpenses, billComparisonResult, categorizedUnbudgeted] =
+            const [enhancedBudgets, topExpenses, billComparisonResult, untrackedTransactions] =
                 await Promise.all([
                     this.budgetAnalyticsService.getEnhancedBudgetReport(month, year, 1),
                     this.budgetAnalyticsService.getTopExpenses(month, year, 5),
                     this.billComparisonService.calculateBillComparison(month, year),
-                    this.budgetReportService.getCategorizedUnbudgetedTransactions(month, year),
+                    this.budgetReportService.getUntrackedTransactions(month, year),
                 ]);
+
+            // Map untracked transactions with emoji indicators
+            const categorizedUnbudgeted: CategorizedUnbudgetedDto[] = untrackedTransactions.map(
+                transaction => ({
+                    transaction,
+                    categoryEmoji: EmojiUtils.getCategoryEmoji(
+                        transaction.category_name || undefined
+                    ),
+                    categoryName: transaction.category_name || undefined,
+                })
+            );
 
             if (!billComparisonResult.ok) {
                 spinner.warn('Warning: Bill comparison data unavailable');

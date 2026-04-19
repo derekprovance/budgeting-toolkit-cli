@@ -37,7 +37,7 @@ describe('TransactionAIResultValidator', () => {
         } as BudgetRead,
     ];
 
-    beforeEach(() => {
+    beforeEach(async () => {
         mockCategoryService = {
             getCategories: jest
                 .fn<() => Promise<CategoryProperties[]>>()
@@ -57,7 +57,7 @@ describe('TransactionAIResultValidator', () => {
                 .mockReturnValue(true),
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
-        validator = new TransactionAIResultValidator(
+        validator = await TransactionAIResultValidator.create(
             mockCategoryService,
             mockBudgetService,
             mockTransactionValidator
@@ -65,34 +65,26 @@ describe('TransactionAIResultValidator', () => {
     });
 
     describe('initialize', () => {
-        it('should load categories and budgets into lookup maps', async () => {
-            await validator.initialize();
-
+        it('should load categories and budgets into lookup maps', () => {
             expect(mockCategoryService.getCategories).toHaveBeenCalled();
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
         });
 
-        it('should create case-insensitive category lookups', async () => {
-            await validator.initialize();
-
+        it('should create case-insensitive category lookups', () => {
             expect(validator.getCategoryByName('Groceries')).toBeDefined();
             expect(validator.getCategoryByName('groceries')).toBeDefined();
             expect(validator.getCategoryByName('GROCERIES')).toBeDefined();
             expect(validator.getCategoryByName(' Groceries ')).toBeDefined();
         });
 
-        it('should create case-insensitive budget lookups', async () => {
-            await validator.initialize();
-
+        it('should create case-insensitive budget lookups', () => {
             expect(validator.getBudgetByName('Food')).toBeDefined();
             expect(validator.getBudgetByName('food')).toBeDefined();
             expect(validator.getBudgetByName('FOOD')).toBeDefined();
             expect(validator.getBudgetByName(' Food ')).toBeDefined();
         });
 
-        it('should handle categories with special characters', async () => {
-            await validator.initialize();
-
+        it('should handle categories with special characters', () => {
             const result1 = validator.getCategoryByName('Bills & Utilities');
             const result2 = validator.getCategoryByName('bills & utilities');
             const result3 = validator.getCategoryByName('BILLS & UTILITIES');
@@ -105,9 +97,7 @@ describe('TransactionAIResultValidator', () => {
             expect(result3?.name).toBe('Bills & Utilities');
         });
 
-        it('should handle categories with apostrophes', async () => {
-            await validator.initialize();
-
+        it('should handle categories with apostrophes', () => {
             const result1 = validator.getCategoryByName("Children's Expenses");
             const result2 = validator.getCategoryByName("children's expenses");
             const result3 = validator.getCategoryByName("CHILDREN'S EXPENSES");
@@ -120,10 +110,6 @@ describe('TransactionAIResultValidator', () => {
     });
 
     describe('getCategoryByName', () => {
-        beforeEach(async () => {
-            await validator.initialize();
-        });
-
         it('should return category for exact match', () => {
             const category = validator.getCategoryByName('Groceries');
             expect(category).toBeDefined();
@@ -161,10 +147,6 @@ describe('TransactionAIResultValidator', () => {
     });
 
     describe('getBudgetByName', () => {
-        beforeEach(async () => {
-            await validator.initialize();
-        });
-
         it('should return budget for exact match', () => {
             const budget = validator.getBudgetByName('Food');
             expect(budget).toBeDefined();
@@ -196,10 +178,6 @@ describe('TransactionAIResultValidator', () => {
     });
 
     describe('getAvailableCategoryNames', () => {
-        beforeEach(async () => {
-            await validator.initialize();
-        });
-
         it('should return actual category names (not normalized)', () => {
             const names = validator.getAvailableCategoryNames();
             expect(names).toContain('Groceries');
@@ -215,10 +193,6 @@ describe('TransactionAIResultValidator', () => {
     });
 
     describe('getAvailableBudgetNames', () => {
-        beforeEach(async () => {
-            await validator.initialize();
-        });
-
         it('should return actual budget names (not normalized)', () => {
             const names = validator.getAvailableBudgetNames();
             expect(names).toContain('Food');

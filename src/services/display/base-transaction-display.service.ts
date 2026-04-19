@@ -1,13 +1,13 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
-import { TransactionClassificationService } from '../core/transaction-classification.service.js';
+import { ITransactionClassificationService } from '../core/transaction-classification.service.interface.js';
 import { TransactionUtils } from '../../utils/transaction.utils.js';
 
 export class BaseTransactionDisplayService {
     private readonly transactionUtils: TransactionUtils;
 
     constructor(
-        private readonly transactionClassificationService: TransactionClassificationService,
+        private readonly transactionClassificationService: ITransactionClassificationService,
         private readonly baseUrl: string = '',
         transactionUtils: TransactionUtils = new TransactionUtils()
     ) {

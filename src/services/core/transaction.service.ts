@@ -5,10 +5,10 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../../logger.js';
-import { DateRangeService } from '../../types/interface/date-range.service.interface.js';
+import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
-import { ExcludedTransactionService } from '../excluded-transaction.service.js';
+import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
 
 class TransactionError extends Error {
     constructor(
@@ -28,8 +28,9 @@ export class TransactionService implements ITransactionService {
     private readonly logger: ILogger;
 
     constructor(
-        private readonly excludedTransactionService: ExcludedTransactionService,
+        private readonly excludedTransactionService: IExcludedTransactionService,
         private readonly client: FireflyClientWithCerts,
+        private readonly dateRangeService: IDateRangeService,
         cacheImplementation: TransactionCache = new Map(),
         logger: ILogger = defaultLogger
     ) {
@@ -253,8 +254,7 @@ export class TransactionService implements ITransactionService {
         month: number,
         year: number
     ): Promise<TransactionRead[]> {
-        const dateRangeService = new DateRangeService();
-        const range = dateRangeService.getDateRange(month, year);
+        const range = this.dateRangeService.getDateRange(month, year);
         const response = await this.client.transactions.listTransaction(
             undefined, // xTraceId
             undefined, // limit
