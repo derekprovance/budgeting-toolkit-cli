@@ -68,7 +68,7 @@ export const createCli = (configPath?: string): Command => {
     // (init command doesn't require configuration)
     program
         .command('init')
-        .description('Initialize configuration files in ~/.budgeting/')
+        .description('Initialize configuration files in ~/.budget/')
         .option('--force', 'overwrite existing configuration files')
         .addHelpText(
             'after',
@@ -78,8 +78,8 @@ Examples:
   $ budgeting-toolkit init --force      # overwrite existing files
 
 This command creates:
-  - ~/.budgeting/config.yaml  (budget configuration)
-  - ~/.budgeting/.env         (API credentials)
+  - ~/.budget/config.yaml  (budget configuration)
+  - ~/.budget/.env         (API credentials)
         `
         )
         .action(async (opts: { force?: boolean }) => {
@@ -153,16 +153,16 @@ This command creates:
 
             if (usingCwdFiles) {
                 console.log(
-                    '\nNote: Files in the current directory take priority over ~/.budgeting/'
+                    '\nNote: Files in the current directory take priority over ~/.budget/'
                 );
                 console.log('      You can:');
-                console.log('      - Move/delete local config files to use ~/.budgeting/ instead');
+                console.log('      - Move/delete local config files to use ~/.budget/ instead');
                 console.log('      - Or update values in the current directory files');
                 console.log(
-                    '      - Or use --config flag to override: btk --config ~/.budgeting/config.yaml'
+                    '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
                 );
             } else {
-                console.log('\nRun "btk init" to create configuration files in ~/.budgeting/');
+                console.log('\nRun "btk init" to create configuration files in ~/.budget/');
             }
 
             console.log('\nSee example file: .env.example\n');

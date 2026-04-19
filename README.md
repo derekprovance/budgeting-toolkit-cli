@@ -57,13 +57,13 @@ Use the interactive `init` command to create configuration files (recommended):
 npm start -- init
 ```
 
-This creates configuration files in `~/.budgeting/` and guides you through setting API credentials.
+This creates configuration files in `~/.budget/` and guides you through setting API credentials.
 
 Alternatively, manually set up configuration files:
 
 ```bash
-cp .env.example ~/.budgeting/.env
-cp config.yaml.example ~/.budgeting/config.yaml
+cp .env.example ~/.budget/.env
+cp config.yaml.example ~/.budget/config.yaml
 # Edit both files with your settings
 ```
 
@@ -73,7 +73,7 @@ The application searches for configuration files in this priority order:
 
 1. **CLI flag** (highest priority): `--config /path/to/config.yaml`
 2. **Current directory**: `./config.yaml` and `./.env`
-3. **Home directory** (recommended): `~/.budgeting/config.yaml` and `~/.budgeting/.env`
+3. **Home directory** (recommended): `~/.budget/config.yaml` and `~/.budget/.env`
 4. **Defaults**: Built-in defaults if no config file found
 
 **Example:** Using a custom config path
@@ -130,7 +130,7 @@ npm start -- init --force
 **Features:**
 - Prompts for Firefly III API URL and token
 - Prompts for Anthropic API key
-- Creates configuration files in `~/.budgeting/`
+- Creates configuration files in `~/.budget/`
 - Validates input before saving
 - Shows next steps after completion
 

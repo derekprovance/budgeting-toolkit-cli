@@ -372,19 +372,19 @@ qZXQ
 
         it('should return correct default config directory', () => {
             const configDir = ConfigManager.getDefaultConfigDir();
-            expect(configDir).toMatch(/\.budgeting$/);
+            expect(configDir).toMatch(/\.budget$/);
             expect(configDir).toContain(process.env.HOME || process.env.USERPROFILE);
         });
 
         it('should return correct default config path', () => {
             const configPath = ConfigManager.getDefaultConfigPath();
-            expect(configPath).toMatch(/\.budgeting[/\\]config\.yaml$/);
+            expect(configPath).toMatch(/\.budget[/\\]config\.yaml$/);
             expect(configPath).toContain(process.env.HOME || process.env.USERPROFILE);
         });
 
         it('should return correct default env path', () => {
             const envPath = ConfigManager.getDefaultEnvPath();
-            expect(envPath).toMatch(/\.budgeting[/\\]\.env$/);
+            expect(envPath).toMatch(/\.budget[/\\]\.env$/);
             expect(envPath).toContain(process.env.HOME || process.env.USERPROFILE);
         });
 
@@ -423,7 +423,7 @@ qZXQ
         it('should fallback to home directory config as third priority', () => {
             // Mock: CLI and current dir don't exist, home dir exists
             const homeDir = process.env.HOME || process.env.USERPROFILE;
-            const homePath = `${homeDir}/.budgeting/config.yaml`;
+            const homePath = `${homeDir}/.budget/config.yaml`;
 
             mockExistsSync.mockImplementation((filePath: string) => {
                 if (typeof filePath === 'string') {
@@ -478,7 +478,7 @@ qZXQ
 
         it('should prefer home directory over defaults when no CLI path provided', () => {
             const homeDir = process.env.HOME || process.env.USERPROFILE;
-            const homePath = `${homeDir}/.budgeting/config.yaml`;
+            const homePath = `${homeDir}/.budget/config.yaml`;
 
             mockExistsSync.mockImplementation((filePath: string) => {
                 if (typeof filePath === 'string') {

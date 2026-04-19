@@ -131,11 +131,11 @@ export class ConfigManager {
     }
 
     /**
-     * Gets the default config directory path (~/.budgeting)
-     * @returns Absolute path to ~/.budgeting directory
+     * Gets the default config directory path (~/.budget)
+     * @returns Absolute path to ~/.budget directory
      */
     static getDefaultConfigDir(): string {
-        return path.join(os.homedir(), '.budgeting');
+        return path.join(os.homedir(), '.budget');
     }
 
     /**
@@ -158,7 +158,7 @@ export class ConfigManager {
      * Resolves the config file path by searching multiple locations in priority order:
      * 1. CLI flag --config path (if provided)
      * 2. Current working directory: ./config.yaml
-     * 3. User home directory: ~/.budgeting/config.yaml
+     * 3. User home directory: ~/.budget/config.yaml
      * 4. null (use defaults if no config file found)
      *
      * @param customPath Optional custom path from CLI flag
