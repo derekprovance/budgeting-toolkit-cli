@@ -19,7 +19,6 @@ import { InteractiveTransactionUpdater } from '../services/interactive-transacti
 import { ConfigManager } from '../config/config-manager.js';
 import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
 import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
-import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { BillService } from '../services/core/bill.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
@@ -29,7 +28,7 @@ import { BudgetSurplusService } from '../services/budget-surplus.service.js';
 import { DateRangeService } from '../services/core/date-range.service.js';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
-import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budget-display.service.js';
+import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 
 export class ServiceFactory {
     static createServices(apiClient: FireflyClientWithCerts) {
@@ -84,7 +83,6 @@ export class ServiceFactory {
             config.api.firefly.url
         );
         const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
-        const budgetDisplayService = new BudgetDisplayService(baseTransactionDisplayService);
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
         );
@@ -108,7 +106,9 @@ export class ServiceFactory {
             transactionService
         );
         const budgetInsightService = new BudgetInsightService();
-        const enhancedBudgetDisplayService = new EnhancedBudgetDisplayService();
+        const budgetDisplayService = new BudgetDisplayService(
+            config.api.firefly.url
+        );
 
         return {
             transactionService,
@@ -124,7 +124,6 @@ export class ServiceFactory {
             transactionValidatorService,
             baseTransactionDisplayService,
             analyzeDisplayService,
-            budgetDisplayService,
             splitTransactionDisplayService,
             billService,
             billComparisonService,
@@ -133,7 +132,7 @@ export class ServiceFactory {
             budgetSurplusService,
             budgetAnalyticsService,
             budgetInsightService,
-            enhancedBudgetDisplayService,
+            budgetDisplayService,
         };
     }
 

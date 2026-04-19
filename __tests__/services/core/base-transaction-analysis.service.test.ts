@@ -10,12 +10,7 @@ jest.mock('../../../src/logger.js');
 
 // Create a concrete implementation for testing
 class TestAnalysisService extends BaseTransactionAnalysisService<number> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    protected analyzeTransactions(
-        transactions: TransactionSplit[],
-        month: number,
-        year: number
-    ): number {
+    protected analyzeTransactions(transactions: TransactionSplit[]): number {
         return transactions.length;
     }
 

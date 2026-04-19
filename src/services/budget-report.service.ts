@@ -1,4 +1,4 @@
-import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
+import { BudgetLimitDto } from '../types/dto/budget-limit.dto.js';
 import { IBudgetService } from './core/budget.service.interface.js';
 import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
@@ -25,7 +25,7 @@ export class BudgetReportService implements IBudgetReportService {
     async getBudgetReport(
         month: number,
         year: number
-    ): Promise<Result<BudgetReportDto[], BudgetError>> {
+    ): Promise<Result<BudgetLimitDto[], BudgetError>> {
         const operation = 'getBudgetReport';
 
         // Validate date
@@ -51,7 +51,7 @@ export class BudgetReportService implements IBudgetReportService {
             ]);
 
             // Build report from fetched data
-            const budgetReports: BudgetReportDto[] = budgets.map(budget => {
+            const budgetReports: BudgetLimitDto[] = budgets.map(budget => {
                 const budgetName = budget.attributes.name;
                 const budgetId = budget.id;
 

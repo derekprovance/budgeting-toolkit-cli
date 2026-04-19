@@ -1,11 +1,11 @@
-import { EnhancedBudgetReportDto } from '../types/dto/enhanced-budget-report.dto.js';
+import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
 import { TopExpenseDto } from '../types/dto/top-expense.dto.js';
 import {
-    BudgetReportDto,
+    BudgetLimitDto,
     HistoricalComparisonDto,
     TransactionStats,
     MerchantInsight,
-} from '../types/dto/budget-report.dto.js';
+} from '../types/dto/budget-limit.dto.js';
 import { BudgetReportService } from './budget-report.service.js';
 import { IBudgetService } from './core/budget.service.interface.js';
 import { TransactionService } from './core/transaction.service.js';
@@ -15,7 +15,7 @@ import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 
 /**
  * Service for aggregating and analyzing budget data with historical context
- * Provides enhanced budget reports with statistics and trends
+ * Provides budget reports with statistics and trends
  */
 export class BudgetAnalyticsService {
     constructor(
@@ -25,19 +25,19 @@ export class BudgetAnalyticsService {
     ) {}
 
     /**
-     * Gets enhanced budget report with historical context and statistics
+     * Gets budget report with historical context and statistics
      * Fetches current month data plus historical months for comparison
      * @param month Current month (1-12)
      * @param year Current year
      * @param historyMonths Number of months back to compare (default: 1)
-     * @returns Enhanced budget reports with all calculated fields
+     * @returns Budget reports with all calculated fields
      */
-    async getEnhancedBudgetReport(
+    async getBudgetReport(
         month: number,
         year: number,
         historyMonths: number = 1
-    ): Promise<EnhancedBudgetReportDto[]> {
-        logger.debug({ month, year, historyMonths }, 'Fetching enhanced budget report');
+    ): Promise<BudgetReportDto[]> {
+        logger.debug({ month, year, historyMonths }, 'Fetching budget report');
 
         try {
             // Get current month budget data
@@ -48,7 +48,7 @@ export class BudgetAnalyticsService {
             const currentBudgets = currentResult.value;
 
             // Fetch historical months data in parallel
-            const historicalData: Map<string, BudgetReportDto[]> = new Map();
+            const historicalData: Map<string, BudgetLimitDto[]> = new Map();
             const historicalPromises = [];
 
             for (let i = 1; i <= historyMonths; i++) {
@@ -100,13 +100,13 @@ export class BudgetAnalyticsService {
                 })
             );
 
-            logger.debug({ count: enhanced.length }, 'Enhanced budget report generated');
+            logger.debug({ count: enhanced.length }, 'Budget report generated');
             return enhanced;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             logger.error(
                 { error: err.message, month, year },
-                'Failed to get enhanced budget report'
+                'Failed to get budget report'
             );
             throw err;
         }
@@ -144,7 +144,7 @@ export class BudgetAnalyticsService {
                 description: t.description || `Transaction ${index + 1}`,
                 amount: Math.abs(parseFloat(t.amount)),
                 budgetName: t.budget_name || 'Unbudgeted',
-                date: t.date || new Date().toISOString().split('T')[0],
+                date: (t.date || new Date().toISOString()).split('T')[0],
                 transactionId: t.transaction_journal_id || '',
                 currencySymbol: t.currency_symbol || '$',
             }));
@@ -244,7 +244,7 @@ export class BudgetAnalyticsService {
         budgetId: string,
         budgetAmount: number,
         currentSpent: number,
-        historicalData: Map<string, BudgetReportDto[]>
+        historicalData: Map<string, BudgetLimitDto[]>
     ): HistoricalComparisonDto {
         try {
             const historicalValues: number[] = [];

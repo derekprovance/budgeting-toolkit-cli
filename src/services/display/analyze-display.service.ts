@@ -82,7 +82,7 @@ export class AnalyzeDisplayService {
         // Unbudgeted Expenses section
         lines.push(
             this.formatExpenseItem(
-                'Additional Expenses',
+                'Unbudgeted Expenses',
                 data.unbudgetedExpenseTotal,
                 data.currencySymbol,
                 data.unbudgetedExpenses.length
@@ -121,7 +121,7 @@ export class AnalyzeDisplayService {
             `    Actual:       ${this.formatCurrency(data.billComparison.actualTotal, data.currencySymbol)}`
         );
         lines.push(
-            `    Variance:     ${this.formatNetImpact(-data.billComparison.variance, data.currencySymbol, true)}`
+            `    Variance:     ${this.formatNetImpact(data.billComparison.variance, data.currencySymbol, false)}`
         );
 
         if (verbose && data.billComparison.bills.length > 0) {
@@ -160,7 +160,7 @@ export class AnalyzeDisplayService {
                 );
                 lines.push(`    ${chalk.dim('────────────────────────')}`);
                 lines.push(
-                    `    Net:          ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, true)}`
+                    `    Net:          ${this.formatNetImpact(data.disposableIncome, data.currencySymbol, true)}`
                 );
             } else {
                 // Original single-line format when no transfers
@@ -242,7 +242,7 @@ export class AnalyzeDisplayService {
         const netPosition = data.netImpact;
 
         lines.push(
-            `    ${' '.repeat(32)} ${this.formatNetImpact(netPosition, data.currencySymbol, true)}`
+            `    ${'Net Cash Flow:'.padEnd(30)} ${this.formatNetImpact(netPosition, data.currencySymbol, true)}`
         );
 
         return lines.join('\n');

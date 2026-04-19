@@ -226,6 +226,7 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('Unbudgeted Expenses');
             expect(result).toContain('$250.00');
             expect(result).toContain('[2 transactions]');
+            expect(result).not.toContain('Additional Expenses');
         });
 
         it('should include budget allocation subsection', () => {
@@ -456,6 +457,17 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('FINANCIAL SUMMARY');
             expect(result).toContain('Total Adjustments:');
             expect(result).toContain('$300.00');
+        });
+
+        it('should display net cash flow label in summary section', () => {
+            const data = {
+                ...createBasicReportData(),
+                netImpact: 2550,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Net Cash Flow:');
+            expect(result).toContain('$2550.00');
         });
     });
 

@@ -4,7 +4,7 @@ import { BudgetReportService } from '../../src/services/budget-report.service.js
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { BudgetService } from '../../src/services/core/budget.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
+import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
 
 // Mock the services
 jest.mock('../../src/services/budget-report.service.js');
@@ -17,7 +17,7 @@ describe('BudgetAnalyticsService', () => {
     let transactionService: jest.Mocked<TransactionService>;
     let budgetService: jest.Mocked<BudgetService>;
 
-    const mockBudget: BudgetReportDto = {
+    const mockBudget: BudgetLimitDto = {
         budgetId: 'budget-1',
         budgetName: 'Groceries',
         amount: 500,
@@ -49,7 +49,7 @@ describe('BudgetAnalyticsService', () => {
         );
     });
 
-    describe('getEnhancedBudgetReport', () => {
+    describe('getBudgetReport', () => {
         it('should return enhanced budget report with current month data', async () => {
             const mockBudgets: BudgetReportDto[] = [mockBudget];
 
@@ -61,7 +61,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([mockTransaction] as any);
 
-            const result = await service.getEnhancedBudgetReport(1, 2024, 0);
+            const result = await service.getBudgetReport(1, 2024, 0);
 
             expect(result).toBeDefined();
             expect(Array.isArray(result)).toBe(true);
@@ -79,7 +79,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([mockTransaction] as any);
 
-            await service.getEnhancedBudgetReport(3, 2024, 2);
+            await service.getBudgetReport(3, 2024, 2);
 
             // Should be called 3 times: current month + 2 historical months
             expect(budgetReportService.getBudgetReport).toHaveBeenCalledTimes(3);
@@ -89,14 +89,12 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should throw error when budget report service fails', async () => {
-            budgetReportService.getBudgetReport = jest
-                .fn()
-                .mockResolvedValue({
-                    ok: false,
-                    error: { message: 'API error', userMessage: 'Failed' },
-                });
+            budgetReportService.getBudgetReport = jest.fn().mockResolvedValue({
+                ok: false,
+                error: { message: 'API error', userMessage: 'Failed' },
+            });
 
-            await expect(service.getEnhancedBudgetReport(1, 2024, 0)).rejects.toThrow('API error');
+            await expect(service.getBudgetReport(1, 2024, 0)).rejects.toThrow('API error');
         });
 
         it('should calculate percentage used correctly', async () => {
@@ -113,7 +111,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([mockTransaction] as any);
 
-            const result = await service.getEnhancedBudgetReport(1, 2024, 0);
+            const result = await service.getBudgetReport(1, 2024, 0);
 
             expect(result[0].percentageUsed).toBe(60);
         });
@@ -132,7 +130,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([mockTransaction] as any);
 
-            const result = await service.getEnhancedBudgetReport(1, 2024, 0);
+            const result = await service.getBudgetReport(1, 2024, 0);
 
             expect(result[0].status).toBe('over');
         });
@@ -146,7 +144,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([mockTransaction] as any);
 
-            const result = await service.getEnhancedBudgetReport(1, 2024, 0);
+            const result = await service.getBudgetReport(1, 2024, 0);
 
             // amount (500) + spent (-200) = 300
             expect(result[0].remaining).toBe(300);

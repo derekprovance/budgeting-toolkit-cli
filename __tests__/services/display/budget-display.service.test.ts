@@ -1,344 +1,673 @@
 import { BudgetDisplayService } from '../../../src/services/display/budget-display.service.js';
-import { BaseTransactionDisplayService } from '../../../src/services/display/base-transaction-display.service.js';
-import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
-import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
-import { BudgetReport } from '../../../src/types/interface/budget-report.interface.js';
+import { BudgetReportDto } from '../../../src/types/dto/budget-report.dto.js';
+import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 // Mock chalk to return the input string (disable styling for tests)
 jest.mock('chalk', () => ({
     default: {
-        redBright: (str: string) => str,
-        cyan: (str: string) => str,
-        yellow: (str: string) => str,
-        gray: (str: string) => str,
-        bold: (str: string) => str,
-        green: (str: string) => str,
         red: (str: string) => str,
-        cyanBright: (str: string) => str,
-        white: (str: string) => str,
+        green: (str: string) => str,
+        gray: (str: string) => str,
+        cyan: (str: string) => str,
+        bold: (str: string) => str,
     },
 }));
 
-jest.mock('../../../src/services/display/base-transaction-display.service');
-jest.mock('../../../src/services/core/transaction-classification.service');
-jest.mock('../../../src/services/excluded-transaction.service');
-
 describe('BudgetDisplayService', () => {
     let service: BudgetDisplayService;
-    let baseTransactionDisplayService: jest.Mocked<BaseTransactionDisplayService>;
-    let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
-    let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
-        excludedTransactionService =
-            new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
-        transactionClassificationService = new TransactionClassificationService(
-            excludedTransactionService
-        ) as jest.Mocked<TransactionClassificationService>;
-        baseTransactionDisplayService = new BaseTransactionDisplayService(
-            transactionClassificationService
-        ) as jest.Mocked<BaseTransactionDisplayService>;
-
-        // Mock the displayService methods
-        baseTransactionDisplayService.listTransactionsWithHeader = jest
-            .fn<(transactions: TransactionSplit[], description: string) => string>()
-            .mockReturnValue('=== Unbudgeted Transactions ===\n\nNo transactions found');
-        baseTransactionDisplayService.formatBudgetTransaction = jest
-            .fn<(transaction: TransactionSplit, transactionId: string) => string>()
-            .mockReturnValue('  $100.00  Test Transaction  1/15/2025');
-
-        service = new BudgetDisplayService(baseTransactionDisplayService);
+        service = new BudgetDisplayService();
     });
 
-    describe('formatHeader', () => {
-        it('should format header with current month info', () => {
-            const result = service.formatHeader(5, 2024, 15, 50, new Date('2024-05-15'));
-            expect(result).toContain('Budget Report');
-            expect(result).toContain('May 2024');
-            expect(result).toContain('15 days remaining');
-            expect(result).toContain('Last Updated: 2024-05-15');
-        });
+    describe('formatReport - Bills Section', () => {
+        it('should show top 4 bills when verbose=false', () => {
+            const mockBill = (name: string, actual: number, predicted: number) => ({
+                id: name.replace(/\s/g, '_'),
+                name,
+                actual,
+                predicted,
+                frequency: 'monthly' as const,
+            });
 
-        it('should format header without current month info', () => {
-            const result = service.formatHeader(5, 2024);
-            expect(result).toContain('Budget Report');
-            expect(result).toContain('May 2024');
-            expect(result).not.toContain('days remaining');
-            expect(result).not.toContain('Last Updated');
-        });
-    });
-
-    describe('formatBudgetItem', () => {
-        const mockStatus: BudgetReport = {
-            name: 'Test Budget',
-            amount: 1000,
-            spent: -500,
-        };
-
-        it('should format budget item for current month', () => {
-            const result = service.formatBudgetItem(mockStatus, 20, true, 15, 30);
-            expect(result).toContain('Test Budget');
-            expect(result).toContain('$500.00');
-            expect(result).toContain('$1,000.00');
-            expect(result).toContain('50.0%');
-            expect(result).toContain('Remaining: $500.00');
-        });
-
-        it('should format budget item for non-current month', () => {
-            const result = service.formatBudgetItem(mockStatus, 20, false);
-            expect(result).toContain('Test Budget');
-            expect(result).toContain('$500.00');
-            expect(result).toContain('$1,000.00');
-            expect(result).toContain('50.0%');
-            expect(result).toContain('Remaining: $500.00');
-        });
-    });
-
-    describe('formatSummary', () => {
-        it('should format summary for current month', () => {
-            const result = service.formatSummary(500, 1000, 20, true, 15, 30);
-            expect(result).toContain('TOTAL');
-            expect(result).toContain('$500.00');
-            expect(result).toContain('$1,000.00');
-            expect(result).toContain('50.0%');
-        });
-
-        it('should format summary for non-current month', () => {
-            const result = service.formatSummary(500, 1000, 20, false);
-            expect(result).toContain('TOTAL');
-            expect(result).toContain('$500.00');
-            expect(result).toContain('$1,000.00');
-            expect(result).toContain('50.0%');
-        });
-    });
-
-    describe('getSpendRateWarning', () => {
-        it('should return warning when spend rate is too high', () => {
-            const result = service.getSpendRateWarning(80, 30);
-            expect(result).toContain('Warning: Current spend rate is higher than ideal');
-        });
-
-        it('should return null when spend rate is acceptable', () => {
-            const result = service.getSpendRateWarning(30, 40);
-            expect(result).toBeNull();
-        });
-    });
-
-    describe('formatBillComparisonSection', () => {
-        const mockComparison = {
-            predictedTotal: 1000,
-            actualTotal: 950,
-            variance: -50,
-            bills: [
-                { id: '1', name: 'Electric', predicted: 150, actual: 140, frequency: 'monthly' },
-                { id: '2', name: 'Water', predicted: 50, actual: 60, frequency: 'monthly' },
-                { id: '3', name: 'Internet', predicted: 80, actual: 0, frequency: 'monthly' },
-            ],
-            currencyCode: 'USD',
-            currencySymbol: '$',
-        };
-
-        it('should format bill comparison without verbose flag', () => {
-            const result = service.formatBillComparisonSection(mockComparison, false);
-            expect(result).toContain('=== Bill Comparison ===');
-            expect(result).toContain('$1000.00');
-            expect(result).toContain('$950.00');
-            expect(result).toContain('Variance:');
-            expect(result).toContain('Under $50.00');
-            expect(result).not.toContain('Bill Details:');
-            expect(result).not.toContain('Electric');
-            expect(result).not.toContain('Water');
-        });
-
-        it('should format bill comparison with verbose flag showing bill details', () => {
-            const result = service.formatBillComparisonSection(mockComparison, true);
-            expect(result).toContain('=== Bill Comparison ===');
-            expect(result).toContain('$1000.00');
-            expect(result).toContain('$950.00');
-            expect(result).toContain('Bill Details:');
-            expect(result).toContain('Electric');
-            expect(result).toContain('$140.00');
-            expect(result).toContain('predicted: $150.00');
-            expect(result).toContain('Water');
-            expect(result).toContain('$60.00');
-            expect(result).toContain('predicted: $50.00');
-            expect(result).not.toContain('Internet');
-        });
-
-        it('should handle positive variance (over budget)', () => {
-            const overBudgetComparison = {
-                ...mockComparison,
-                actualTotal: 1100,
-                variance: 100,
-            };
-            const result = service.formatBillComparisonSection(overBudgetComparison, false);
-            expect(result).toContain('Over $100.00');
-        });
-
-        it('should handle no bills configured', () => {
-            const noBillsComparison = {
-                predictedTotal: 0,
-                actualTotal: 0,
-                variance: 0,
-                bills: [],
-                currencyCode: 'USD',
+            const billComparison: BillComparisonDto = {
+                predictedTotal: 2000,
+                actualTotal: 1950,
+                variance: -50,
+                bills: [
+                    mockBill('Electric', 120, 115),
+                    mockBill('Internet', 89.99, 89.99),
+                    mockBill('Water', 45, 40),
+                    mockBill('Phone', 75, 75),
+                    mockBill('Gym', 50, 50),
+                    mockBill('Streaming', 45, 50),
+                ],
                 currencySymbol: '$',
+                currencyCode: 'USD',
             };
-            const result = service.formatBillComparisonSection(noBillsComparison);
-            expect(result).toContain('No bills configured');
+
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison,
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, false);
+
+            // Should contain top 4 bills
+            expect(result).toContain('Electric');
+            expect(result).toContain('Internet');
+            expect(result).toContain('Water');
+            expect(result).toContain('Phone');
+
+            // Should contain "Others" grouping
+            expect(result).toContain('Others (2)');
         });
 
-        it('should only show bills with actual amounts > 0 when verbose', () => {
-            const result = service.formatBillComparisonSection(mockComparison, true);
+        it('should show all bills when verbose=true', () => {
+            const mockBill = (name: string, actual: number, predicted: number) => ({
+                id: name.replace(/\s/g, '_'),
+                name,
+                actual,
+                predicted,
+                frequency: 'monthly' as const,
+            });
+
+            const billComparison: BillComparisonDto = {
+                predictedTotal: 2000,
+                actualTotal: 1950,
+                variance: -50,
+                bills: [
+                    mockBill('Electric', 120, 115),
+                    mockBill('Internet', 89.99, 89.99),
+                    mockBill('Water', 45, 40),
+                    mockBill('Phone', 75, 75),
+                    mockBill('Gym', 50, 50),
+                    mockBill('Streaming', 45, 50),
+                ],
+                currencySymbol: '$',
+                currencyCode: 'USD',
+            };
+
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison,
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, true);
+
+            // Should contain all bills
             expect(result).toContain('Electric');
+            expect(result).toContain('Internet');
             expect(result).toContain('Water');
-            expect(result).not.toContain('Internet');
+            expect(result).toContain('Phone');
+            expect(result).toContain('Gym');
+            expect(result).toContain('Streaming');
+
+            // Should NOT contain "Others" grouping in verbose mode
+            expect(result).not.toContain('Others (2)');
+        });
+
+        it('should not show Others grouping when fewer than 5 bills', () => {
+            const mockBill = (name: string, actual: number, predicted: number) => ({
+                id: name.replace(/\s/g, '_'),
+                name,
+                actual,
+                predicted,
+                frequency: 'monthly' as const,
+            });
+
+            const billComparison: BillComparisonDto = {
+                predictedTotal: 300,
+                actualTotal: 290,
+                variance: -10,
+                bills: [
+                    mockBill('Electric', 120, 115),
+                    mockBill('Internet', 89.99, 89.99),
+                    mockBill('Water', 45, 40),
+                ],
+                currencySymbol: '$',
+                currencyCode: 'USD',
+            };
+
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison,
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, false);
+
+            // Should show all bills (less than 4)
+            expect(result).toContain('Electric');
+            expect(result).toContain('Internet');
+            expect(result).toContain('Water');
+
+            // Should NOT contain "Others" grouping
+            expect(result).not.toContain('Others');
         });
     });
 
-    describe('formatBudgetTransactions', () => {
-        const mockTransaction1: TransactionSplit = {
-            description: 'Transaction 1',
-            amount: '100.00',
-            currency_symbol: '$',
-            date: '2025-01-15T00:00:00Z',
-            transaction_journal_id: '123',
-        } as TransactionSplit;
-
-        const mockTransaction2: TransactionSplit = {
-            description: 'Transaction 2',
-            amount: '75.00',
-            currency_symbol: '$',
-            date: '2025-01-20T00:00:00Z',
-            transaction_journal_id: '456',
-        } as TransactionSplit;
-
-        it('should return empty string when no transactions provided', () => {
-            const result = service.formatBudgetTransactions([], 'Groceries');
-            expect(result).toBe('');
-        });
-
-        it('should format budget transaction list with header', () => {
-            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock)
-                .mockReturnValueOnce('  $100.00  Transaction 1  1/15/2025')
-                .mockReturnValueOnce('  $75.00  Transaction 2  1/20/2025');
-
-            const result = service.formatBudgetTransactions(
-                [mockTransaction1, mockTransaction2],
-                'Groceries'
-            );
-
-            expect(result).toContain('Transactions for Groceries:');
-            expect(result).toContain('  $100.00  Transaction 1  1/15/2025');
-            expect(result).toContain('  $75.00  Transaction 2  1/20/2025');
-        });
-
-        it('should display single transaction', () => {
-            (
-                baseTransactionDisplayService.formatBudgetTransaction as jest.Mock
-            ).mockReturnValueOnce('  $100.00  Transaction 1  1/15/2025');
-
-            const result = service.formatBudgetTransactions([mockTransaction1], 'Groceries');
-
-            expect(result).toContain('Transactions for Groceries:');
-            expect(result).toContain('  $100.00  Transaction 1  1/15/2025');
-        });
-
-        it('should delegate formatting to BaseTransactionDisplayService', () => {
-            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock).mockReturnValue(
-                'formatted'
-            );
-
-            service.formatBudgetTransactions([mockTransaction1, mockTransaction2], 'Bills');
-
-            expect(baseTransactionDisplayService.formatBudgetTransaction).toHaveBeenCalledWith(
-                mockTransaction1,
-                '123'
-            );
-            expect(baseTransactionDisplayService.formatBudgetTransaction).toHaveBeenCalledWith(
-                mockTransaction2,
-                '456'
-            );
-        });
-
-        it('should skip transactions without journal ID', () => {
-            const transactionWithoutId = {
-                ...mockTransaction1,
-                transaction_journal_id: undefined,
+    describe('formatReport - Budget Statistics (Verbose)', () => {
+        it('should include budget statistics when verbose=true and data available', () => {
+            const budget: BudgetReportDto = {
+                budgetId: 'test-1',
+                name: 'Groceries',
+                amount: 500,
+                spent: -450,
+                status: 'over',
+                percentageUsed: 90,
+                remaining: 50,
+                historicalComparison: {
+                    previousMonthSpent: 400,
+                    threeMonthAvg: 425,
+                },
+                transactionStats: {
+                    count: 15,
+                    average: 30,
+                    topMerchant: {
+                        name: 'Whole Foods',
+                        visitCount: 5,
+                        totalSpent: 150,
+                    },
+                    spendingTrend: {
+                        direction: 'increasing',
+                        difference: 50,
+                        percentageChange: 12.5,
+                    },
+                },
             };
 
-            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock).mockReturnValue(
-                'formatted'
-            );
-
-            const result = service.formatBudgetTransactions([transactionWithoutId], 'Test');
-
-            expect(baseTransactionDisplayService.formatBudgetTransaction).not.toHaveBeenCalled();
-            expect(result).toContain('Transactions for Test:');
-            // Header should be present but no transaction lines
-            const lines = result.split('\n');
-            expect(lines).toHaveLength(1);
-        });
-
-        it('should handle mixed transactions with and without IDs', () => {
-            const transactionWithoutId = {
-                ...mockTransaction1,
-                transaction_journal_id: undefined,
+            const reportData = {
+                budgets: [budget],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
             };
 
-            (
-                baseTransactionDisplayService.formatBudgetTransaction as jest.Mock
-            ).mockReturnValueOnce('  $75.00  Transaction 2  1/20/2025');
+            const result = service.formatReport(reportData, true);
 
-            const result = service.formatBudgetTransactions(
-                [transactionWithoutId, mockTransaction2],
-                'Test'
-            );
-
-            expect(result).toContain('Transactions for Test:');
-            expect(result).toContain('  $75.00  Transaction 2  1/20/2025');
-            // Only one transaction should be formatted
-            expect(baseTransactionDisplayService.formatBudgetTransaction).toHaveBeenCalledTimes(1);
+            // Should include statistics
+            expect(result).toContain('Whole Foods');
+            expect(result).toContain('Increasing');
+            expect(result).toContain('Avg Spending');
+            expect(result).toContain('$425');
         });
 
-        it('should use budget name in header', () => {
-            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock).mockReturnValue(
-                'formatted'
-            );
+        it('should not include statistics when verbose=false', () => {
+            const budget: BudgetReportDto = {
+                budgetId: 'test-1',
+                name: 'Groceries',
+                amount: 500,
+                spent: -450,
+                status: 'over',
+                percentageUsed: 90,
+                remaining: 50,
+                historicalComparison: {
+                    previousMonthSpent: 400,
+                    threeMonthAvg: 425,
+                },
+                transactionStats: {
+                    count: 15,
+                    average: 30,
+                    topMerchant: {
+                        name: 'Whole Foods',
+                        visitCount: 5,
+                        totalSpent: 150,
+                    },
+                },
+            };
 
-            const result1 = service.formatBudgetTransactions([mockTransaction1], 'Groceries');
-            expect(result1).toContain('Transactions for Groceries:');
+            const reportData = {
+                budgets: [budget],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
 
-            const result2 = service.formatBudgetTransactions([mockTransaction1], 'Utilities');
-            expect(result2).toContain('Transactions for Utilities:');
+            const result = service.formatReport(reportData, false);
+
+            // Should contain budget name but not detailed statistics
+            expect(result).toContain('Groceries');
+            expect(result).not.toContain('Whole Foods');
         });
 
-        it('should preserve transaction order', () => {
-            (baseTransactionDisplayService.formatBudgetTransaction as jest.Mock)
-                .mockReturnValueOnce('  $100.00  Transaction 1  1/15/2025')
-                .mockReturnValueOnce('  $75.00  Transaction 2  1/20/2025')
-                .mockReturnValueOnce('  $50.00  Transaction 3  1/25/2025');
+        it('should handle missing topMerchant gracefully', () => {
+            const budget: BudgetReportDto = {
+                budgetId: 'test-1',
+                name: 'Entertainment',
+                amount: 200,
+                spent: -100,
+                status: 'on-track',
+                percentageUsed: 50,
+                remaining: 100,
+                historicalComparison: {
+                    previousMonthSpent: 120,
+                    threeMonthAvg: 110,
+                },
+                transactionStats: {
+                    count: 5,
+                    average: 20,
+                    // No topMerchant
+                },
+            };
 
-            const transaction3: TransactionSplit = {
-                description: 'Transaction 3',
-                amount: '50.00',
+            const reportData = {
+                budgets: [budget],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, true);
+
+            // Should contain Avg Spending
+            expect(result).toContain('Avg Spending');
+            expect(result).toContain('$110');
+
+            // Should not contain "Top Merchant" line since it's missing
+            const topMerchantLine = result.split('\n').find(line => line.includes('Top Merchant'));
+            expect(topMerchantLine).toBeUndefined();
+        });
+
+        it('should handle missing spendingTrend gracefully', () => {
+            const budget: BudgetReportDto = {
+                budgetId: 'test-1',
+                name: 'Utilities',
+                amount: 300,
+                spent: -250,
+                status: 'on-track',
+                percentageUsed: 83.3,
+                remaining: 50,
+                historicalComparison: {
+                    previousMonthSpent: 260,
+                    threeMonthAvg: 255,
+                },
+                transactionStats: {
+                    count: 3,
+                    average: 83.33,
+                    // No spendingTrend
+                },
+            };
+
+            const reportData = {
+                budgets: [budget],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, true);
+
+            // Should contain Avg Spending
+            expect(result).toContain('Avg Spending');
+
+            // Should not contain "Trend" line since it's missing
+            const trendLine = result.split('\n').find(line => line.includes('Trend'));
+            expect(trendLine).toBeUndefined();
+        });
+
+        it('should show decreasing trend with correct emoji', () => {
+            const budget: BudgetReportDto = {
+                budgetId: 'test-1',
+                name: 'Dining',
+                amount: 200,
+                spent: -100,
+                status: 'on-track',
+                percentageUsed: 50,
+                remaining: 100,
+                historicalComparison: {
+                    previousMonthSpent: 150,
+                    threeMonthAvg: 125,
+                },
+                transactionStats: {
+                    count: 8,
+                    average: 12.5,
+                    spendingTrend: {
+                        direction: 'decreasing',
+                        difference: -50,
+                        percentageChange: -33.3,
+                    },
+                },
+            };
+
+            const reportData = {
+                budgets: [budget],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, true);
+
+            // Should contain decreasing trend with emoji
+            expect(result).toContain('Decreasing');
+            expect(result).toContain('vs last month');
+        });
+
+        it('should show stable trend with correct emoji', () => {
+            const budget: BudgetReportDto = {
+                budgetId: 'test-1',
+                name: 'Subscriptions',
+                amount: 100,
+                spent: -95,
+                status: 'on-track',
+                percentageUsed: 95,
+                remaining: 5,
+                historicalComparison: {
+                    previousMonthSpent: 95,
+                    threeMonthAvg: 95,
+                },
+                transactionStats: {
+                    count: 5,
+                    average: 19,
+                    spendingTrend: {
+                        direction: 'stable',
+                        difference: 0,
+                        percentageChange: 0,
+                    },
+                },
+            };
+
+            const reportData = {
+                budgets: [budget],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, true);
+
+            // Should contain stable trend
+            expect(result).toContain('Stable');
+        });
+    });
+
+    describe('formatReport - Footer Tip', () => {
+        it('should mention verbose flag in footer', () => {
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = service.formatReport(reportData, false);
+
+            // Should mention verbose or -v flag
+            expect(result).toMatch(/--verbose|--v|-v/);
+        });
+    });
+
+    describe('formatReport - Unbudgeted Transactions', () => {
+        it('should truncate descriptions longer than 60 characters without ellipsis', () => {
+            const baseUrl = 'http://firefly.local';
+            const serviceWithUrl = new BudgetDisplayService(baseUrl);
+
+            const longDesc = 'A'.repeat(80);
+            const mockTransaction = {
+                transaction_journal_id: 'txn-123',
+                description: longDesc,
+                amount: '-55.99',
+                date: '2025-04-12',
                 currency_symbol: '$',
-                date: '2025-01-25T00:00:00Z',
-                transaction_journal_id: '789',
-            } as TransactionSplit;
+            };
 
-            const result = service.formatBudgetTransactions(
-                [mockTransaction1, mockTransaction2, transaction3],
-                'Test'
-            );
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [
+                    {
+                        transaction: mockTransaction,
+                        categoryEmoji: '📊',
+                    },
+                ],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
 
+            const result = serviceWithUrl.formatReport(reportData, false);
+
+            // Find the line with this transaction
             const lines = result.split('\n');
-            expect(lines[0]).toContain('Transactions for Test:');
-            expect(lines[1]).toContain('Transaction 1');
-            expect(lines[2]).toContain('Transaction 2');
-            expect(lines[3]).toContain('Transaction 3');
+            const transactionLine = lines.find(line => line.includes('📊'));
+
+            expect(transactionLine).toBeDefined();
+
+            // Should contain first 60 chars of description
+            expect(transactionLine).toContain('A'.repeat(60));
+            // Should not contain chars beyond 60
+            expect(transactionLine).not.toContain('A'.repeat(61));
+            // Verify no ellipsis was added
+            expect(transactionLine).not.toContain('...');
+        });
+
+        it('should wrap descriptions in OSC 8 hyperlinks when baseUrl and transaction_journal_id are present', () => {
+            const baseUrl = 'http://firefly.local';
+            const serviceWithUrl = new BudgetDisplayService(baseUrl);
+
+            const transactionId = 'txn-456';
+            const mockTransaction = {
+                transaction_journal_id: transactionId,
+                description: 'Simple Transaction',
+                amount: '-25.00',
+                date: '2025-04-12',
+                currency_symbol: '$',
+            };
+
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [
+                    {
+                        transaction: mockTransaction,
+                        categoryEmoji: '🛒',
+                    },
+                ],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = serviceWithUrl.formatReport(reportData, false);
+
+            // Should contain the expected hyperlink format (OSC 8 escape sequence)
+            const expectedLink = `http://firefly.local/transactions/show/${transactionId}`;
+            expect(result).toContain(`\x1B]8;;${expectedLink}\x1B\\`);
+        });
+
+        it('should not add hyperlinks when baseUrl is empty', () => {
+            const serviceNoUrl = new BudgetDisplayService();
+
+            const mockTransaction = {
+                transaction_journal_id: 'txn-789',
+                description: 'Test Transaction',
+                amount: '-10.00',
+                date: '2025-04-12',
+                currency_symbol: '$',
+            };
+
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [
+                    {
+                        transaction: mockTransaction,
+                        categoryEmoji: '📱',
+                    },
+                ],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = serviceNoUrl.formatReport(reportData, false);
+
+            // Should not contain OSC 8 escape sequences
+            expect(result).not.toContain('\x1B]8;;');
+        });
+
+        it('should not add hyperlinks when transaction_journal_id is undefined', () => {
+            const baseUrl = 'http://firefly.local';
+            const serviceWithUrl = new BudgetDisplayService(baseUrl);
+
+            const mockTransaction = {
+                transaction_journal_id: undefined,
+                description: 'No ID Transaction',
+                amount: '-15.00',
+                date: '2025-04-12',
+                currency_symbol: '$',
+            };
+
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison: {
+                    predictedTotal: 0,
+                    actualTotal: 0,
+                    variance: 0,
+                    bills: [],
+                    currencySymbol: '$',
+                    currencyCode: 'USD',
+                },
+                unbudgeted: [
+                    {
+                        transaction: mockTransaction,
+                        categoryEmoji: '💳',
+                    },
+                ],
+                insights: [],
+                month: 1,
+                year: 2025,
+                isCurrentMonth: false,
+            };
+
+            const result = serviceWithUrl.formatReport(reportData, false);
+
+            // Should not contain OSC 8 escape sequences since there's no transaction ID
+            expect(result).not.toContain('\x1B]8;;');
         });
     });
 });

@@ -4,7 +4,7 @@ import { logger } from '../logger.js';
 import ora from 'ora';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
-import { EnhancedBudgetDisplayService } from '../services/display/enhanced-budget-display.service.js';
+import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
@@ -12,7 +12,7 @@ import { EmojiUtils } from '../utils/emoji.utils.js';
 import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
 
 /**
- * Command for displaying enhanced budget report with insights and categorized sections
+ * Command for displaying budget report with insights and categorized sections
  */
 export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     private readonly BUDGET_GEN_FAIL = 'Failed to generate budget report';
@@ -20,7 +20,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     constructor(
         private readonly budgetAnalyticsService: BudgetAnalyticsService,
         private readonly budgetInsightService: BudgetInsightService,
-        private readonly enhancedBudgetDisplayService: EnhancedBudgetDisplayService,
+        private readonly budgetDisplayService: BudgetDisplayService,
         private readonly budgetReportService: BudgetReportService,
         private readonly billComparisonService: BillComparisonService,
         private readonly transactionService: TransactionService
@@ -54,10 +54,10 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             }
 
             // Fetch all data in parallel
-            spinner.text = 'Fetching enhanced budget data...';
-            const [enhancedBudgets, topExpenses, billComparisonResult, untrackedTransactions] =
+            spinner.text = 'Fetching budget data...';
+            const [budgets, topExpenses, billComparisonResult, untrackedTransactions] =
                 await Promise.all([
-                    this.budgetAnalyticsService.getEnhancedBudgetReport(month, year, 1),
+                    this.budgetAnalyticsService.getBudgetReport(month, year, 1),
                     this.budgetAnalyticsService.getTopExpenses(month, year, 5),
                     this.billComparisonService.calculateBillComparison(month, year),
                     this.budgetReportService.getUntrackedTransactions(month, year),
@@ -86,7 +86,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             // Generate insights from budget data
             const insights = this.budgetInsightService.generateInsights(
-                enhancedBudgets,
+                budgets,
                 billComparisonResult.ok
                     ? billComparisonResult.value
                     : this.createEmptyBillComparison()
@@ -94,9 +94,9 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             spinner.succeed('Budget report generated');
 
-            // Format and display the enhanced report
+            // Format and display the report
             const reportData = {
-                budgets: enhancedBudgets,
+                budgets: budgets,
                 topExpenses,
                 billComparison: billComparisonResult.ok
                     ? billComparisonResult.value
@@ -109,7 +109,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 daysInfo,
             };
 
-            const formattedReport = this.enhancedBudgetDisplayService.formatEnhancedReport(
+            const formattedReport = this.budgetDisplayService.formatReport(
                 reportData,
                 verbose || false
             );

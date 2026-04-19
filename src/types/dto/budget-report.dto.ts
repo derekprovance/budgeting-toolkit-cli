@@ -1,32 +1,37 @@
-export interface HistoricalComparisonDto {
-    previousMonthSpent: number;
-    threeMonthAvg: number;
-}
+import { BudgetLimitDto, HistoricalComparisonDto, TransactionStats } from './budget-limit.dto.js';
 
-export interface TransactionStats {
-    count: number;
-    average: number;
-    topMerchant?: MerchantInsight;
-    spendingTrend?: SpendingTrend;
-}
+/**
+ * Budget report DTO with calculated fields for display
+ * Extends the base BudgetLimitDto with status, percentage, and remaining amount
+ */
+export interface BudgetReportDto extends BudgetLimitDto {
+    /**
+     * Budget status based on spending
+     * - 'over': spent amount exceeds budget limit
+     * - 'on-track': spent amount between 85-100% of budget
+     * - 'under': spent amount below 85% of budget
+     */
+    status: 'over' | 'on-track' | 'under';
 
-export interface MerchantInsight {
-    name: string;
-    visitCount: number;
-    totalSpent: number;
-}
+    /**
+     * Percentage of budget that has been spent (0-100+)
+     * Calculated as: (Math.abs(spent) / amount) * 100
+     */
+    percentageUsed: number;
 
-export interface SpendingTrend {
-    direction: 'increasing' | 'decreasing' | 'stable';
-    difference: number;
-    percentageChange: number;
-}
+    /**
+     * Amount remaining in budget (can be negative if over budget)
+     * Calculated as: amount + spent (since spent is typically negative)
+     */
+    remaining: number;
 
-export interface BudgetReportDto {
-    budgetId: string;
-    name: string;
-    amount: number;
-    spent: number;
-    historicalComparison?: HistoricalComparisonDto;
-    transactionStats?: TransactionStats;
+    /**
+     * Historical comparison data (required, unlike optional in BudgetLimitDto)
+     */
+    historicalComparison: HistoricalComparisonDto;
+
+    /**
+     * Transaction statistics (required, unlike optional in BudgetLimitDto)
+     */
+    transactionStats: TransactionStats;
 }

@@ -2,7 +2,7 @@ import { BUSINESS_CONSTANTS } from './business-constants.js';
 
 /**
  * Utility class for emoji selection based on status, variance, and categories
- * Provides consistent emoji indicators for the enhanced report display
+ * Provides consistent emoji indicators for the report display
  */
 export class EmojiUtils {
     /**

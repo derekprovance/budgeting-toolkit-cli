@@ -1,18 +1,18 @@
 import { BudgetReportCommand } from '../../src/commands/budget-report.command.js';
 import { BudgetAnalyticsService } from '../../src/services/budget-analytics.service.js';
 import { BudgetInsightService } from '../../src/services/budget-insight.service.js';
-import { EnhancedBudgetDisplayService } from '../../src/services/display/enhanced-budget-display.service.js';
+import { BudgetDisplayService } from '../../src/services/display/budget-display.service.js';
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
-import { EnhancedBudgetReportDto } from '../../src/types/dto/enhanced-budget-report.dto.js';
+import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
 
 // Mock services
 jest.mock('../../src/services/budget-analytics.service');
 jest.mock('../../src/services/budget-insight.service');
-jest.mock('../../src/services/display/enhanced-budget-display.service');
+jest.mock('../../src/services/display/budget-display.service');
 jest.mock('../../src/services/budget-report.service');
 jest.mock('../../src/services/bill-comparison.service');
 jest.mock('../../src/services/core/transaction.service');
@@ -21,13 +21,13 @@ describe('BudgetReportCommand', () => {
     let command: BudgetReportCommand;
     let budgetAnalyticsService: jest.Mocked<BudgetAnalyticsService>;
     let budgetInsightService: jest.Mocked<BudgetInsightService>;
-    let enhancedBudgetDisplayService: jest.Mocked<EnhancedBudgetDisplayService>;
+    let budgetDisplayService: jest.Mocked<BudgetDisplayService>;
     let budgetReportService: jest.Mocked<BudgetReportService>;
     let billComparisonService: jest.Mocked<BillComparisonService>;
     let transactionService: jest.Mocked<TransactionService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
 
-    const mockEnhancedBudgets: EnhancedBudgetReportDto[] = [
+    const mockBudgets: BudgetReportDto[] = [
         {
             budgetId: '1',
             name: 'Test Budget 1',
@@ -60,15 +60,15 @@ describe('BudgetReportCommand', () => {
 
         // Setup service mocks
         budgetAnalyticsService = {
-            getEnhancedBudgetReport: jest
+            getBudgetReport: jest
                 .fn<
                     (
                         month: number,
                         year: number,
                         historyMonths: number
-                    ) => Promise<EnhancedBudgetReportDto[]>
+                    ) => Promise<BudgetReportDto[]>
                 >()
-                .mockResolvedValue(mockEnhancedBudgets),
+                .mockResolvedValue(mockBudgets),
             getTopExpenses: jest
                 .fn<(month: number, year: number, limit: number) => Promise<any>>()
                 .mockResolvedValue([]),
@@ -77,16 +77,16 @@ describe('BudgetReportCommand', () => {
         budgetInsightService = {
             generateInsights: jest
                 .fn<
-                    (budgets: EnhancedBudgetReportDto[], billComparison: BillComparisonDto) => any[]
+                    (budgets: BudgetReportDto[], billComparison: BillComparisonDto) => any[]
                 >()
                 .mockReturnValue([]),
         } as unknown as jest.Mocked<BudgetInsightService>;
 
-        enhancedBudgetDisplayService = {
-            formatEnhancedReport: jest
+        budgetDisplayService = {
+            formatReport: jest
                 .fn<(reportData: any, verbose?: boolean) => string>()
                 .mockReturnValue('Formatted Enhanced Report'),
-        } as unknown as jest.Mocked<EnhancedBudgetDisplayService>;
+        } as unknown as jest.Mocked<BudgetDisplayService>;
 
         budgetReportService = {
             getUntrackedTransactions: jest
@@ -110,7 +110,7 @@ describe('BudgetReportCommand', () => {
         command = new BudgetReportCommand(
             budgetAnalyticsService,
             budgetInsightService,
-            enhancedBudgetDisplayService,
+            budgetDisplayService,
             budgetReportService,
             billComparisonService,
             transactionService
@@ -132,7 +132,7 @@ describe('BudgetReportCommand', () => {
                 year: currentDate.getFullYear(),
             });
 
-            expect(budgetAnalyticsService.getEnhancedBudgetReport).toHaveBeenCalledWith(
+            expect(budgetAnalyticsService.getBudgetReport).toHaveBeenCalledWith(
                 currentDate.getMonth() + 1,
                 currentDate.getFullYear(),
                 1
@@ -143,7 +143,7 @@ describe('BudgetReportCommand', () => {
                 5
             );
             expect(budgetInsightService.generateInsights).toHaveBeenCalled();
-            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalled();
+            expect(budgetDisplayService.formatReport).toHaveBeenCalled();
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
             expect(transactionService.getMostRecentTransactionDate).toHaveBeenCalled();
             expect(consoleLogSpy).toHaveBeenCalled();
@@ -162,9 +162,9 @@ describe('BudgetReportCommand', () => {
                 year: prevYear,
             });
 
-            expect(budgetAnalyticsService.getEnhancedBudgetReport).toHaveBeenCalled();
+            expect(budgetAnalyticsService.getBudgetReport).toHaveBeenCalled();
             expect(budgetAnalyticsService.getTopExpenses).toHaveBeenCalled();
-            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalled();
+            expect(budgetDisplayService.formatReport).toHaveBeenCalled();
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
             expect(consoleLogSpy).toHaveBeenCalled();
         });
@@ -177,7 +177,7 @@ describe('BudgetReportCommand', () => {
             });
 
             expect(budgetInsightService.generateInsights).toHaveBeenCalledWith(
-                mockEnhancedBudgets,
+                mockBudgets,
                 mockBillComparison
             );
         });
@@ -190,7 +190,7 @@ describe('BudgetReportCommand', () => {
                 verbose: true,
             });
 
-            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalledWith(
+            expect(budgetDisplayService.formatReport).toHaveBeenCalledWith(
                 expect.any(Object),
                 true
             );
@@ -203,7 +203,7 @@ describe('BudgetReportCommand', () => {
                 year: currentDate.getFullYear(),
             });
 
-            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalledWith(
+            expect(budgetDisplayService.formatReport).toHaveBeenCalledWith(
                 expect.any(Object),
                 false
             );
@@ -217,7 +217,7 @@ describe('BudgetReportCommand', () => {
                 verbose: false,
             });
 
-            expect(enhancedBudgetDisplayService.formatEnhancedReport).toHaveBeenCalledWith(
+            expect(budgetDisplayService.formatReport).toHaveBeenCalledWith(
                 expect.any(Object),
                 false
             );

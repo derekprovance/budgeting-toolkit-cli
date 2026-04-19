@@ -4,6 +4,7 @@ import { ITransactionClassificationService } from '../core/transaction-classific
 import { TransactionUtils } from '../../utils/transaction.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 
 export class BaseTransactionDisplayService {
     private readonly transactionUtils: TransactionUtils;
@@ -40,7 +41,10 @@ export class BaseTransactionDisplayService {
         const type = this.getTransactionTypeIndicator(transaction);
         const amount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
         const date = new Date(transaction.date).toLocaleDateString();
-        const amountStr = CurrencyUtils.formatWithSymbol(Math.abs(amount), transaction.currency_symbol ?? '');
+        const amountStr = CurrencyUtils.formatWithSymbol(
+            Math.abs(amount),
+            transaction.currency_symbol ?? ''
+        );
 
         const lines = [
             `${type} ${chalk.white(transaction.description)}`,
@@ -57,7 +61,7 @@ export class BaseTransactionDisplayService {
 
     /**
      * Formats a transaction for budget verbose listing with clickable link
-     * Truncates description at 60 characters with ellipsis
+     * Truncates description at 60 characters without ellipsis
      * @param transaction Transaction split to format
      * @param transactionId Transaction ID for linking
      * @returns Formatted transaction line
@@ -65,18 +69,19 @@ export class BaseTransactionDisplayService {
     formatBudgetTransaction(transaction: TransactionSplit, transactionId: string): string {
         const amount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
         const date = new Date(transaction.date).toLocaleDateString();
-        const amountStr = CurrencyUtils.formatWithSymbol(Math.abs(amount), transaction.currency_symbol ?? '');
+        const amountStr = CurrencyUtils.formatWithSymbol(
+            Math.abs(amount),
+            transaction.currency_symbol ?? ''
+        );
 
-        // Truncate description at 60 characters
-        const MAX_LENGTH = 60;
-        const truncated =
-            transaction.description.length > MAX_LENGTH
-                ? transaction.description.substring(0, 57) + '...'
-                : transaction.description;
+        // Truncate description at 60 characters without ellipsis
+        const truncated = transaction.description.substring(0, 60).padEnd(60);
 
         // Create ANSI hyperlink for entire description
-        const link = `${this.baseUrl}/transactions/show/${transactionId}`;
-        const clickableDescription = `\x1B]8;;${link}\x1B\\${truncated}\x1B]8;;\x1B\\`;
+        const link = this.baseUrl
+            ? `${this.baseUrl}/transactions/show/${transactionId}`
+            : undefined;
+        const clickableDescription = DisplayFormatterUtils.createHyperlink(truncated, link);
 
         return `  ${chalk.yellow(amountStr.padStart(12))}  ${chalk.white(clickableDescription)}  ${chalk.dim(date)}`;
     }

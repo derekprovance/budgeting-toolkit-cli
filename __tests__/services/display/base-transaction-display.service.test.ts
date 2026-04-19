@@ -419,6 +419,11 @@ describe('BaseTransactionDisplayService', () => {
 
     describe('formatBudgetTransaction', () => {
         it('should format transaction with clickable link', () => {
+            const serviceWithBaseUrl = new BaseTransactionDisplayService(
+                mockTransactionClassificationService,
+                'http://firefly.local'
+            );
+
             const transaction = createMockTransaction({
                 description: 'Walmart Supercenter',
                 amount: '100.00',
@@ -427,7 +432,7 @@ describe('BaseTransactionDisplayService', () => {
                 transaction_journal_id: '123',
             });
 
-            const result = service.formatBudgetTransaction(transaction, '123');
+            const result = serviceWithBaseUrl.formatBudgetTransaction(transaction, '123');
 
             expect(result).toContain('$100.00');
             expect(result).toContain('Walmart Supercenter');
@@ -438,18 +443,23 @@ describe('BaseTransactionDisplayService', () => {
         });
 
         it('should include transaction ID in hyperlink', () => {
+            const serviceWithBaseUrl = new BaseTransactionDisplayService(
+                mockTransactionClassificationService,
+                'http://firefly.local'
+            );
+
             const transaction = createMockTransaction({
                 description: 'Test Transaction',
                 amount: '50.00',
                 currency_symbol: '$',
             });
 
-            const result = service.formatBudgetTransaction(transaction, 'abc123');
+            const result = serviceWithBaseUrl.formatBudgetTransaction(transaction, 'abc123');
 
-            expect(result).toContain('transactions/show/abc123');
+            expect(result).toContain('http://firefly.local/transactions/show/abc123');
         });
 
-        it('should truncate long descriptions at 60 characters', () => {
+        it('should truncate long descriptions at 60 characters without ellipsis', () => {
             const longDesc = 'A'.repeat(70);
             const transaction = createMockTransaction({
                 description: longDesc,
@@ -459,8 +469,10 @@ describe('BaseTransactionDisplayService', () => {
 
             const result = service.formatBudgetTransaction(transaction, '123');
 
-            expect(result).toContain('A'.repeat(57) + '...');
-            expect(result).not.toContain(longDesc);
+            // Should have exactly 60 'A' characters, no ellipsis
+            expect(result).toContain('A'.repeat(60));
+            expect(result).not.toContain('A'.repeat(61));
+            expect(result).not.toContain('...');
         });
 
         it('should not truncate descriptions under 60 characters', () => {
@@ -569,7 +581,7 @@ describe('BaseTransactionDisplayService', () => {
             expect(result).toContain('http://firefly.local/transactions/show/123');
         });
 
-        it('should work with empty base URL', () => {
+        it('should not include hyperlink with empty base URL', () => {
             const transaction = createMockTransaction({
                 description: 'Test',
                 amount: '100.00',
@@ -578,7 +590,10 @@ describe('BaseTransactionDisplayService', () => {
 
             const result = service.formatBudgetTransaction(transaction, '123');
 
-            expect(result).toContain('/transactions/show/123');
+            // Without a base URL, no hyperlink escape sequences should be present
+            expect(result).not.toContain('\x1B]8;;');
+            // But description should still be present
+            expect(result).toContain('Test');
         });
 
         it('should format date correctly', () => {

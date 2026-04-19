@@ -253,7 +253,7 @@ Examples:
                 const command = new BudgetReportCommand(
                     services.budgetAnalyticsService,
                     services.budgetInsightService,
-                    services.enhancedBudgetDisplayService,
+                    services.budgetDisplayService,
                     services.budgetReport,
                     services.billComparisonService,
                     services.transactionService

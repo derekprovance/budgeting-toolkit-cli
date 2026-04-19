@@ -1,7 +1,7 @@
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { BudgetService } from '../../src/services/core/budget.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
-import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
+import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
 import {
     BudgetRead,
     BudgetLimitRead,
@@ -86,13 +86,13 @@ describe('BudgetReportService', () => {
                     name: 'Budget 1',
                     amount: 100.0,
                     spent: 50.0,
-                } as BudgetReportDto);
+                } as BudgetLimitDto);
                 expect(result.value[1]).toEqual({
                     budgetId: '2',
                     name: 'Budget 2',
                     amount: 200.0,
                     spent: 150.0,
-                } as BudgetReportDto);
+                } as BudgetLimitDto);
             }
         });
 
@@ -120,7 +120,7 @@ describe('BudgetReportService', () => {
                     name: 'Budget 1',
                     amount: 0.0,
                     spent: 0.0,
-                } as BudgetReportDto);
+                } as BudgetLimitDto);
             }
         });
 

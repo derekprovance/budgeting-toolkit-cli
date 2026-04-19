@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { BudgetInsightService } from '../../src/services/budget-insight.service.js';
-import { EnhancedBudgetReportDto } from '../../src/types/dto/enhanced-budget-report.dto.js';
+import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 
 describe('BudgetInsightService', () => {
@@ -21,7 +21,7 @@ describe('BudgetInsightService', () => {
 
     describe('generateInsights', () => {
         it('should generate warning for over-budget categories', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Groceries',
@@ -46,7 +46,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should identify highest overspend when multiple budgets are over', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Groceries',
@@ -81,7 +81,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should generate info for high frequency transactions', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Groceries',
@@ -109,7 +109,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should not generate info for high frequency if spent is zero', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Unused',
@@ -135,7 +135,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should generate success for well under budget', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Savings',
@@ -158,7 +158,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should not generate success for under budget with zero spend', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Unused',
@@ -180,7 +180,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should generate warning for significant bill variance', () => {
-            const budgets: EnhancedBudgetReportDto[] = [];
+            const budgets: BudgetReportDto[] = [];
             const billComparison: BillComparisonDto = {
                 predictedTotal: 1000,
                 actualTotal: 1300,
@@ -199,7 +199,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should not generate warning for positive variance', () => {
-            const budgets: EnhancedBudgetReportDto[] = [];
+            const budgets: BudgetReportDto[] = [];
             const billComparison: BillComparisonDto = {
                 predictedTotal: 1000,
                 actualTotal: 900,
@@ -216,7 +216,7 @@ describe('BudgetInsightService', () => {
         });
 
         it('should sort insights by priority', () => {
-            const budgets: EnhancedBudgetReportDto[] = [
+            const budgets: BudgetReportDto[] = [
                 {
                     budgetId: 'budget-1',
                     budgetName: 'Over Budget',

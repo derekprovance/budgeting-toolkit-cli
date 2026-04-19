@@ -5,6 +5,7 @@ import { CategorizeMode } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
+import { DisplayFormatterUtils } from '../utils/display-formatter.utils.js';
 
 /**
  * Interface for transaction update options
@@ -277,9 +278,11 @@ export class UserInputService {
                 ? `${description.substring(0, this.DESCRIPTION_TRUNCATE_LENGTH)}...`
                 : description;
 
-        return transactionId
-            ? `\x1B]8;;${this.getTransactionLink(transactionId)}\x1B\\${truncatedDescription}\x1B]8;;\x1B\\`
-            : truncatedDescription;
+        const url =
+            this.baseUrl && transactionId
+                ? this.getTransactionLink(transactionId)
+                : undefined;
+        return DisplayFormatterUtils.createHyperlink(truncatedDescription, url);
     }
 
     /**
@@ -291,7 +294,10 @@ export class UserInputService {
         changes: string[]
     ): string {
         const rawAmount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
-        const formatted = CurrencyUtils.formatWithSymbol(rawAmount, transaction.currency_symbol ?? '');
+        const formatted = CurrencyUtils.formatWithSymbol(
+            rawAmount,
+            transaction.currency_symbol ?? ''
+        );
         let amountDisplay: string;
         if (transaction.type === 'withdrawal') {
             amountDisplay = chalk.red(`-${formatted}`);

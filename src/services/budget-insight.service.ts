@@ -1,4 +1,4 @@
-import { EnhancedBudgetReportDto } from '../types/dto/enhanced-budget-report.dto.js';
+import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../types/dto/bill-comparison.dto.js';
 import { BudgetInsight } from '../types/dto/budget-insight.dto.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
@@ -12,12 +12,12 @@ export class BudgetInsightService {
     /**
      * Generates spending insights from budget, bill, and transaction data
      * Applies simple rules to identify patterns and issues
-     * @param budgets Enhanced budget report data
+     * @param budgets Budget report data
      * @param billComparison Bill comparison data
      * @returns Array of insights sorted by priority
      */
     generateInsights(
-        budgets: EnhancedBudgetReportDto[],
+        budgets: BudgetReportDto[],
         billComparison: BillComparisonDto
     ): BudgetInsight[] {
         const insights: BudgetInsight[] = [];

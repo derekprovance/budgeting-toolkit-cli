@@ -95,4 +95,17 @@ export class DisplayFormatterUtils {
             return amount < 0 ? chalk.green('✓') : chalk.red('⚠');
         }
     }
+
+    /**
+     * Wraps text in an OSC 8 ANSI hyperlink escape sequence
+     * Returns plain text if no URL is provided
+     *
+     * @param text The visible text to display
+     * @param url Optional URL for the hyperlink
+     * @returns Text wrapped in OSC 8 escape sequence, or plain text if no URL
+     */
+    static createHyperlink(text: string, url?: string): string {
+        if (!url) return text;
+        return `\x1B]8;;${url}\x1B\\${text}\x1B]8;;\x1B\\`;
+    }
 }
