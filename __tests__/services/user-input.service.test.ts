@@ -13,6 +13,8 @@ const mockConfirm = jest.fn();
 // Mock chalk to return the input string (disable styling for tests)
 jest.unstable_mockModule('chalk', () => ({
     default: {
+        red: (str: string) => str,
+        green: (str: string) => str,
         redBright: (str: string) => str,
         cyan: (str: string) => str,
         yellow: (str: string) => str,

@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
 import { CategorizeMode } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
+import { CurrencyUtils } from '../utils/currency.utils.js';
 
 /**
  * Interface for transaction update options
@@ -288,10 +289,21 @@ export class UserInputService {
         transactionId: string | undefined,
         changes: string[]
     ): string {
+        const rawAmount = parseFloat(transaction.amount);
+        const formatted = CurrencyUtils.formatWithSymbol(rawAmount, transaction.currency_symbol ?? '');
+        let amountDisplay: string;
+        if (transaction.type === 'withdrawal') {
+            amountDisplay = chalk.red(`-${formatted}`);
+        } else if (transaction.type === 'deposit') {
+            amountDisplay = chalk.green(`+${formatted}`);
+        } else {
+            amountDisplay = chalk.dim(formatted);
+        }
+
         return [
             `${chalk.bold('\nTransaction:')} "${chalk.yellow(
                 this.formatDescription(transaction.description, transactionId)
-            )}"`,
+            )}" ${amountDisplay}`,
             `${chalk.bold('Proposed changes:')}`,
             ...changes.map(change => `  • ${change}`),
             `\n${chalk.bold('Apply these changes?')}`,
