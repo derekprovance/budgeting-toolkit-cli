@@ -234,11 +234,7 @@ describe('AnalyzeReportDto', () => {
         });
 
         it('should calculate additionalIncomeTotal from transaction amounts', () => {
-            const additionalIncome = [
-                { amount: '100.50' },
-                { amount: '250.75' },
-                { amount: '50' },
-            ];
+            const additionalIncome = [{ amount: '100.50' }, { amount: '250.75' }, { amount: '50' }];
 
             const dto = AnalyzeReportDto.create(
                 additionalIncome,
@@ -264,11 +260,7 @@ describe('AnalyzeReportDto', () => {
         });
 
         it('should calculate unbudgetedExpenseTotal from transaction amounts', () => {
-            const unbudgetedExpenses = [
-                { amount: '-75' },
-                { amount: '-125' },
-                { amount: '-100' },
-            ];
+            const unbudgetedExpenses = [{ amount: '-75' }, { amount: '-125' }, { amount: '-100' }];
 
             const dto = AnalyzeReportDto.create(
                 [],

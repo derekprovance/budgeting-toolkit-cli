@@ -1,4 +1,4 @@
-import { AppConfig } from './config.types.js';
+import { AppConfig, LOG_LEVELS } from './config.types.js';
 import { Result, ValidationError } from '../types/result.type.js';
 import { CertificateValidator } from '../utils/certificate-validator.js';
 
@@ -75,9 +75,8 @@ export class ConfigValidator {
     }
 
     private validateLoggingConfig(config: AppConfig, errors: string[]): void {
-        const validLogLevels = ['trace', 'debug', 'info', 'warn', 'error', 'silent'];
-        if (!validLogLevels.includes(config.logging.level)) {
-            errors.push(`logging.level must be one of: ${validLogLevels.join(', ')}`);
+        if (!LOG_LEVELS.includes(config.logging.level)) {
+            errors.push(`logging.level must be one of: ${LOG_LEVELS.join(', ')}`);
         }
     }
 

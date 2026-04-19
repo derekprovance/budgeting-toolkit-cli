@@ -962,11 +962,11 @@ describe('AITransactionUpdateOrchestrator', () => {
                 transactionWithCategory,
                 transactionNormal,
             ]);
-            mockValidator.shouldProcessTransaction.mockImplementation((t) => {
+            mockValidator.shouldProcessTransaction.mockImplementation(t => {
                 // Both should be processed (one as budget-only, one as normal)
                 return !mockPropertyService.isTransfer(t);
             });
-            mockValidator.isBudgetOnlyCandidate.mockImplementation((t) => {
+            mockValidator.isBudgetOnlyCandidate.mockImplementation(t => {
                 return t.transaction_journal_id === '1';
             });
             mockPropertyService.isTransfer.mockReturnValue(false);

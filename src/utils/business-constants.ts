@@ -3,6 +3,20 @@
  * These values control budget status determination, insights generation, and variance reporting
  */
 
+interface BusinessConstantsShape {
+    BUDGET: {
+        ON_TRACK_THRESHOLD: number;
+        WELL_UNDER_THRESHOLD: number;
+    };
+    TRANSACTIONS: {
+        HIGH_FREQUENCY_COUNT: number;
+    };
+    VARIANCE: {
+        CRITICAL_VARIANCE_PERCENT: number;
+        WARNING_VARIANCE_PERCENT: number;
+    };
+}
+
 export const BUSINESS_CONSTANTS = {
     /**
      * Budget spending thresholds (percentage of budget used)
@@ -35,4 +49,4 @@ export const BUSINESS_CONSTANTS = {
         CRITICAL_VARIANCE_PERCENT: 20,
         WARNING_VARIANCE_PERCENT: 10,
     },
-} as const;
+} as const satisfies BusinessConstantsShape;

@@ -457,7 +457,6 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('Total Adjustments:');
             expect(result).toContain('$300.00');
         });
-
     });
 
     describe('Recommendations Section', () => {

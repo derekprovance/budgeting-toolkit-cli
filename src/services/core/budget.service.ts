@@ -28,47 +28,53 @@ export class BudgetService {
     }
 
     async getBudgetExpenseInsights(month: number, year: number): Promise<InsightGroup> {
-        try {
-            DateUtils.validateMonthYear(month, year);
-            const range = this.dateRangeService.getDateRange(month, year);
+        DateUtils.validateMonthYear(month, year);
+        const range = this.dateRangeService.getDateRange(month, year);
 
-            const results = await this.client.insight.insightExpenseBudget(
+        let results: InsightGroup | undefined;
+        try {
+            results = await this.client.insight.insightExpenseBudget(
                 range.startDate.toISOString().split('T')[0],
                 range.endDate.toISOString().split('T')[0]
             );
-            if (!results) {
-                throw new Error('Failed to fetch expense insights for budget');
-            }
-            return results;
         } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(
-                    `Failed to get budget expense insights for month ${month}: ${error.message}`
-                );
-            }
-            throw new Error(`Failed to get budget expense insights for month ${month}`);
+            throw new Error(
+                `Failed to get budget expense insights for month ${month}: ${error instanceof Error ? error.message : String(error)}`,
+                { cause: error }
+            );
         }
+
+        if (!results) {
+            throw new Error(
+                `Failed to get budget expense insights for month ${month}: API returned empty response`
+            );
+        }
+        return results;
     }
 
     async getBudgetLimits(month: number, year: number): Promise<BudgetLimitRead[]> {
-        try {
-            DateUtils.validateMonthYear(month, year);
-            const range = this.dateRangeService.getDateRange(month, year);
+        DateUtils.validateMonthYear(month, year);
+        const range = this.dateRangeService.getDateRange(month, year);
 
-            const results = await this.client.budgets.listBudgetLimit(
+        let results: Awaited<ReturnType<typeof this.client.budgets.listBudgetLimit>> | undefined;
+        try {
+            results = await this.client.budgets.listBudgetLimit(
                 range.startDate.toISOString().split('T')[0],
                 range.endDate.toISOString().split('T')[0]
             );
-            if (!results || !results.data) {
-                throw new Error('Failed to fetch expense insights for budget');
-            }
-            return results.data;
         } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(`Failed to get budget limits for month ${month}: ${error.message}`);
-            }
-            throw new Error(`Failed to get budget limits for month ${month}`);
+            throw new Error(
+                `Failed to get budget limits for month ${month}: ${error instanceof Error ? error.message : String(error)}`,
+                { cause: error }
+            );
         }
+
+        if (!results?.data) {
+            throw new Error(
+                `Failed to get budget limits for month ${month}: API returned empty response`
+            );
+        }
+        return results.data;
     }
 
     async getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]> {

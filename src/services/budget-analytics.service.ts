@@ -96,7 +96,7 @@ export class BudgetAnalyticsService {
                         remaining: remaining,
                         historicalComparison: historical,
                         transactionStats: stats,
-                    } as EnhancedBudgetReportDto;
+                    };
                 })
             );
 

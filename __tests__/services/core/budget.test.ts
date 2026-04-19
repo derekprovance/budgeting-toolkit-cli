@@ -118,7 +118,7 @@ describe('BudgetService', () => {
             (mockApiClient.insight.insightExpenseBudget as jest.Mock).mockResolvedValue(null);
 
             await expect(budgetService.getBudgetExpenseInsights(3, 2024)).rejects.toThrow(
-                'Failed to fetch expense insights for budget'
+                'Failed to get budget expense insights for month 3: API returned empty response'
             );
         });
 
@@ -185,7 +185,7 @@ describe('BudgetService', () => {
             (mockApiClient.budgets.listBudgetLimit as jest.Mock).mockResolvedValue(null);
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
-                'Failed to fetch expense insights for budget'
+                'Failed to get budget limits for month 3: API returned empty response'
             );
         });
 

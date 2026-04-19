@@ -66,8 +66,8 @@ export class BudgetReportService implements IBudgetReportService {
                     budgetId: budgetId,
                     name: budgetName,
                     amount: budgetLimit ? Number(budgetLimit.attributes.amount) : 0.0,
-                    spent: insight ? insight.difference_float : 0.0,
-                } as BudgetReportDto;
+                    spent: insight ? (insight.difference_float ?? 0.0) : 0.0,
+                };
             });
 
             logger.debug(

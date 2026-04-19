@@ -7,7 +7,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CertificateValidator } from './src/utils/certificate-validator.js';
 import { createCustomAxiosInstance } from './src/utils/custom-fetch.js';
-import axios from 'axios';
 
 const validator = new CertificateValidator();
 
@@ -28,7 +27,9 @@ console.log('================================\n');
 console.log('1️⃣ Configuration Check:');
 console.log(`   CLIENT_CERT_PATH: ${CERT_PATH ? '✅ Set' : '❌ Not set'} (${CERT_PATH || 'N/A'})`);
 console.log(`   CLIENT_CERT_PASSWORD: ${CERT_PASSWORD ? '✅ Set' : '⚠️  Not set'}`);
-console.log(`   CLIENT_CERT_CA_PATH: ${CA_PATH ? '✅ Set' : 'ℹ️  Not set (optional)'} (${CA_PATH || 'N/A'})`);
+console.log(
+    `   CLIENT_CERT_CA_PATH: ${CA_PATH ? '✅ Set' : 'ℹ️  Not set (optional)'} (${CA_PATH || 'N/A'})`
+);
 console.log(`   FIREFLY_API_URL: ${API_URL ? '✅ Set' : '❌ Not set'}`);
 console.log(`   FIREFLY_API_TOKEN: ${API_TOKEN ? '✅ Set' : '❌ Not set'}`);
 
@@ -45,7 +46,7 @@ console.log(`   Certificate file: ${fileExists ? '✅ Found' : '❌ Not found'} 
 if (fileExists) {
     const stats = fs.statSync(certPath);
     console.log(`   File size: ${stats.size} bytes`);
-    console.log(`   Readable: ${(stats.mode & fs.constants.R_OK) ? '✅ Yes' : '❌ No'}`);
+    console.log(`   Readable: ${stats.mode & fs.constants.R_OK ? '✅ Yes' : '❌ No'}`);
     console.log(`   Modified: ${stats.mtime.toISOString()}`);
 }
 
@@ -63,14 +64,14 @@ if (validationResult.errors.length === 0) {
     console.log('   ✅ No errors detected');
 } else {
     console.log('   ❌ Errors found:');
-    validationResult.errors.forEach((error) => {
+    validationResult.errors.forEach(error => {
         console.log(`      • ${error.split('\n').join('\n        ')}`);
     });
 }
 
 if (validationResult.warnings.length > 0) {
     console.log('   ⚠️  Warnings:');
-    validationResult.warnings.forEach((warning) => {
+    validationResult.warnings.forEach(warning => {
         console.log(`      • ${warning.split('\n').join('\n        ')}`);
     });
 }
@@ -113,7 +114,7 @@ try {
 // 5. Test axios instance creation
 console.log('\n5️⃣ Axios Instance Creation Test:');
 try {
-    const axiosInstance = createCustomAxiosInstance({
+    createCustomAxiosInstance({
         caCertPath: CA_PATH,
         clientCertPath: CERT_PATH,
         clientCertPassword: CERT_PASSWORD,
@@ -145,11 +146,13 @@ if (API_URL && API_TOKEN) {
             console.log(`   API Version: ${response.data.version || 'Unknown'}`);
         }
     } catch (error) {
-        const err = error as any;
+        const err = error as { response?: { status?: number }; code?: string; message?: string };
         if (err.response?.status === 401) {
             console.log('   ❌ Authentication failed (401): Check FIREFLY_API_TOKEN');
         } else if (err.response?.status === 403) {
-            console.log('   ❌ Authorization failed (403): Token may not have required permissions');
+            console.log(
+                '   ❌ Authorization failed (403): Token may not have required permissions'
+            );
         } else if (err.code === 'CERT_HAS_EXPIRED') {
             console.log('   ❌ Certificate has expired');
         } else if (err.code === 'ERR_TLS_CERT_ALTNAME_INVALID') {
@@ -157,7 +160,7 @@ if (API_URL && API_TOKEN) {
         } else if (err.code === 'ECONNREFUSED') {
             console.log(`   ❌ Connection refused: Check API_URL (${API_URL})`);
         } else {
-            console.log(`   ❌ Connection error: ${err.message || JSON.stringify(err)}`);
+            console.log(`   ❌ Connection error: ${err.message || JSON.stringify(error)}`);
         }
     }
 } else {

@@ -228,7 +228,7 @@ export class AnalyzeDisplayService {
             `    ${this.getStatusIcon(data.actualPaycheck, true)} ${'Paycheck:'.padEnd(30)} ${this.formatNetImpact(data.actualPaycheck, data.currencySymbol, true)}`,
             `    ${this.getStatusIcon(-data.billComparison.actualTotal, true)} ${'Bills Paid:'.padEnd(30)} ${this.formatNetImpact(-data.billComparison.actualTotal, data.currencySymbol, true)}`,
             `    ${this.getStatusIcon(-data.budgetSpent, true)} ${'Budget Spent:'.padEnd(30)} ${this.formatNetImpact(-data.budgetSpent, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`
+            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
         ];
 
         if (data.disposableIncomeTransactions.length > 0) {

@@ -79,46 +79,53 @@ export function parseAssignmentResponse(
 ): string[] {
     const fieldName = type === 'category' ? 'categories' : 'budgets';
 
+    let parsed: Record<string, unknown>;
     try {
-        const parsed = JSON.parse(responseText);
-        const results = parsed[fieldName];
-
-        if (!Array.isArray(results)) {
-            throw new Error(`Response does not contain a ${fieldName} array`);
+        const rawParsed: unknown = JSON.parse(responseText);
+        if (rawParsed === null || typeof rawParsed !== 'object' || Array.isArray(rawParsed)) {
+            throw new Error(`Expected a JSON object, got ${rawParsed === null ? 'null' : typeof rawParsed}`);
         }
-
-        if (results.length !== expectedCount) {
-            throw new Error(`Expected ${expectedCount} ${fieldName}, got ${results.length}`);
-        }
-
-        // Create normalized lookup map for case-insensitive matching
-        const normalizedOptions = new Map<string, string>();
-        for (const option of validOptions) {
-            const normalized = StringUtils.normalizeForMatching(option);
-            normalizedOptions.set(normalized, option);
-        }
-
-        // Validate and normalize results
-        const validatedResults: string[] = [];
-        for (let i = 0; i < results.length; i++) {
-            const result = results[i];
-            const normalized = StringUtils.normalizeForMatching(result);
-
-            if (normalizedOptions.has(normalized)) {
-                // Use the exact category/budget name from the system
-                validatedResults.push(normalizedOptions.get(normalized)!);
-            } else {
-                throw new Error(
-                    `Invalid ${type} at index ${i}: "${result}" (normalized: "${normalized}"). ` +
-                        `Available options include: ${validOptions.slice(0, 5).join(', ')}${validOptions.length > 5 ? '...' : ''}`
-                );
-            }
-        }
-
-        return validatedResults;
+        parsed = rawParsed as Record<string, unknown>;
     } catch (error) {
         throw new Error(
-            `Failed to parse ${type} assignment response: ${error instanceof Error ? error.message : String(error)}`
+            `Failed to parse ${type} assignment response: ${error instanceof Error ? error.message : String(error)}`,
+            { cause: error }
         );
     }
+
+    const results = parsed[fieldName];
+
+    if (!Array.isArray(results)) {
+        throw new Error(`Response does not contain a ${fieldName} array`);
+    }
+
+    if (results.length !== expectedCount) {
+        throw new Error(`Expected ${expectedCount} ${fieldName}, got ${results.length}`);
+    }
+
+    // Create normalized lookup map for case-insensitive matching
+    const normalizedOptions = new Map<string, string>();
+    for (const option of validOptions) {
+        const normalized = StringUtils.normalizeForMatching(option);
+        normalizedOptions.set(normalized, option);
+    }
+
+    // Validate and normalize results
+    const validatedResults: string[] = [];
+    for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const normalized = StringUtils.normalizeForMatching(result);
+
+        if (normalizedOptions.has(normalized)) {
+            // Use the exact category/budget name from the system
+            validatedResults.push(normalizedOptions.get(normalized)!);
+        } else {
+            throw new Error(
+                `Invalid ${type} at index ${i}: "${result}" (normalized: "${normalized}"). ` +
+                    `Available options include: ${validOptions.slice(0, 5).join(', ')}${validOptions.length > 5 ? '...' : ''}`
+            );
+        }
+    }
+
+    return validatedResults;
 }

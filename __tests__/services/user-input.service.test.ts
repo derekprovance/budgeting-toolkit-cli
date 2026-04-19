@@ -478,11 +478,9 @@ describe('UserInputService', () => {
         it('should show Budget: N/A for deposits instead of None', async () => {
             (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
 
-            await service.askToUpdateTransaction(
-                mockDeposit as TransactionSplit,
-                '5',
-                { category: 'Salary' }
-            );
+            await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
+                category: 'Salary',
+            });
 
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -494,11 +492,9 @@ describe('UserInputService', () => {
         it('should not show "Update only the budget" option for deposits', async () => {
             (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
 
-            const result = await service.askToUpdateTransaction(
-                mockDeposit as TransactionSplit,
-                '5',
-                { category: 'Salary' }
-            );
+            await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
+                category: 'Salary',
+            });
 
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -538,11 +534,10 @@ describe('UserInputService', () => {
 
             (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
 
-            await service.askToUpdateTransaction(
-                mockBill as TransactionSplit,
-                '5',
-                { category: 'Food', budget: 'Groceries' }
-            );
+            await service.askToUpdateTransaction(mockBill as TransactionSplit, '5', {
+                category: 'Food',
+                budget: 'Groceries',
+            });
 
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({

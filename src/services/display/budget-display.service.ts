@@ -359,14 +359,12 @@ export class BudgetDisplayService {
             const diffFormatted = this.formatCurrency(Math.abs(trend.difference));
             const percFormatted = trend.percentageChange.toFixed(1);
 
-            let trendText = '';
-            if (trend.direction === 'increasing') {
-                trendText = chalk.red(`↑ Increasing (+${diffFormatted}, +${percFormatted}%)`);
-            } else if (trend.direction === 'decreasing') {
-                trendText = chalk.green(`↓ Decreasing (-${diffFormatted}, ${percFormatted}%)`);
-            } else {
-                trendText = chalk.gray(`→ Stable (${diffFormatted}, ${percFormatted}%)`);
-            }
+            const trendText =
+                trend.direction === 'increasing'
+                    ? chalk.red(`↑ Increasing (+${diffFormatted}, +${percFormatted}%)`)
+                    : trend.direction === 'decreasing'
+                      ? chalk.green(`↓ Decreasing (-${diffFormatted}, ${percFormatted}%)`)
+                      : chalk.gray(`→ Stable (${diffFormatted}, ${percFormatted}%)`);
 
             lines.push(chalk.dim('    Spending vs Last Month: ') + trendText);
         }
@@ -415,14 +413,12 @@ export class BudgetDisplayService {
         const projectedFormatted = this.formatCurrency(projected);
         const differenceFormatted = this.formatCurrency(Math.abs(difference));
 
-        let statusText = '';
-        if (Math.abs(difference) < 1) {
-            statusText = chalk.green('On track');
-        } else if (difference > 0) {
-            statusText = chalk.red(`Over by ${differenceFormatted}`);
-        } else {
-            statusText = chalk.cyan(`Under by ${differenceFormatted}`);
-        }
+        const statusText =
+            Math.abs(difference) < 1
+                ? chalk.green('On track')
+                : difference > 0
+                  ? chalk.red(`Over by ${differenceFormatted}`)
+                  : chalk.cyan(`Under by ${differenceFormatted}`);
 
         return (
             chalk.dim(`                 Pace: ${dailyRateFormatted}/day → Projected: `) +
@@ -448,14 +444,12 @@ export class BudgetDisplayService {
         const diffFormatted = this.formatCurrency(Math.abs(difference));
         const prevFormatted = this.formatCurrency(previousSpent);
 
-        let indicator = '';
-        if (Math.abs(difference) < 1) {
-            indicator = chalk.gray('→ No change');
-        } else if (difference > 0) {
-            indicator = chalk.red(`↑${diffFormatted}, +${percentageChange.toFixed(1)}%`);
-        } else {
-            indicator = chalk.cyan(`↓${diffFormatted}, ${percentageChange.toFixed(1)}%`);
-        }
+        const indicator =
+            Math.abs(difference) < 1
+                ? chalk.gray('→ No change')
+                : difference > 0
+                  ? chalk.red(`↑${diffFormatted}, +${percentageChange.toFixed(1)}%`)
+                  : chalk.cyan(`↓${diffFormatted}, ${percentageChange.toFixed(1)}%`);
 
         return chalk.dim(`                 vs Last Month: ${prevFormatted} `) + indicator;
     }

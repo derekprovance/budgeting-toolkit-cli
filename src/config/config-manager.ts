@@ -51,6 +51,11 @@ interface YamlConfig {
 }
 
 /**
+ * Utility type for recursive partial objects used in config merging.
+ */
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
+
+/**
  * Centralized Configuration Manager (Singleton)
  *
  * Provides a unified interface for all application configuration.
@@ -249,7 +254,7 @@ export class ConfigManager {
      */
     private loadConfiguration(): AppConfig {
         // Start with defaults (deep clone to avoid mutation)
-        const config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as AppConfig;
+        const config = structuredClone<AppConfig>(DEFAULT_CONFIG);
 
         // Apply environment variables (overrides defaults)
         this.applyEnvironmentVariables(config);
@@ -368,12 +373,7 @@ export class ConfigManager {
     /**
      * Deep merges source object into target, only overwriting defined values
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private deepMerge<T extends Record<string, any>>(
-        target: T,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        source: any
-    ): void {
+    private deepMerge<T extends object>(target: T, source: DeepPartial<T>): void {
         for (const [key, value] of Object.entries(source)) {
             if (value === undefined) {
                 continue;
@@ -382,16 +382,16 @@ export class ConfigManager {
             if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
                 // Recursively merge nested objects
                 if (target[key as keyof T] && typeof target[key as keyof T] === 'object') {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    this.deepMerge(target[key as keyof T] as any, value);
+                    this.deepMerge(
+                        target[key as keyof T] as Record<string, unknown>,
+                        value as DeepPartial<Record<string, unknown>>
+                    );
                 } else {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (target as any)[key] = value;
+                    (target as Record<string, unknown>)[key] = value;
                 }
             } else {
                 // Direct assignment for primitives and arrays
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (target as any)[key] = value;
+                (target as Record<string, unknown>)[key] = value;
             }
         }
     }
@@ -413,7 +413,8 @@ export class ConfigManager {
             return (yaml.load(fileContents) as YamlConfig) || null;
         } catch (error) {
             throw new Error(
-                `Failed to parse YAML configuration at ${configPath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to parse YAML configuration at ${configPath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                { cause: error }
             );
         }
     }

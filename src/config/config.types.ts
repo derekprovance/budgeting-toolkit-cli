@@ -120,8 +120,15 @@ export interface CircuitBreakerConfig {
 }
 
 /**
+ * Single source of truth for valid log levels.
+ * The tuple is `as const` so its element type is a union of string literals.
+ */
+export const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'silent'] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
+/**
  * Logging Configuration
  */
 export interface LoggingConfig {
-    level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'silent';
+    level: LogLevel;
 }
