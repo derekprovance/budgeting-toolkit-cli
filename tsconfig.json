@@ -8,8 +8,7 @@
         "strict": true,
         "esModuleInterop": true,
         "resolveJsonModule": true,
-        "isolatedModules": true,
-        "baseUrl": "."
+        "isolatedModules": true
     },
     "include": ["src/**/*"],
     "exclude": ["**/*.test.ts", "__tests__/**/*"]
