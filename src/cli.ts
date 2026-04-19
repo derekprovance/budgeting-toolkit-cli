@@ -152,9 +152,7 @@ This command creates:
                 (loadedEnvPath && loadedEnvPath.startsWith(process.cwd()));
 
             if (usingCwdFiles) {
-                console.log(
-                    '\nNote: Files in the current directory take priority over ~/.budget/'
-                );
+                console.log('\nNote: Files in the current directory take priority over ~/.budget/');
                 console.log('      You can:');
                 console.log('      - Move/delete local config files to use ~/.budget/ instead');
                 console.log('      - Or update values in the current directory files');

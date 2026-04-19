@@ -104,10 +104,7 @@ export class BudgetAnalyticsService {
             return enhanced;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            logger.error(
-                { error: err.message, month, year },
-                'Failed to get budget report'
-            );
+            logger.error({ error: err.message, month, year }, 'Failed to get budget report');
             throw err;
         }
     }

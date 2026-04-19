@@ -279,9 +279,7 @@ export class UserInputService {
                 : description;
 
         const url =
-            this.baseUrl && transactionId
-                ? this.getTransactionLink(transactionId)
-                : undefined;
+            this.baseUrl && transactionId ? this.getTransactionLink(transactionId) : undefined;
         return DisplayFormatterUtils.createHyperlink(truncatedDescription, url);
     }
 

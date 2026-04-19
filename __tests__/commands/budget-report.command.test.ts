@@ -76,9 +76,7 @@ describe('BudgetReportCommand', () => {
 
         budgetInsightService = {
             generateInsights: jest
-                .fn<
-                    (budgets: BudgetReportDto[], billComparison: BillComparisonDto) => any[]
-                >()
+                .fn<(budgets: BudgetReportDto[], billComparison: BillComparisonDto) => any[]>()
                 .mockReturnValue([]),
         } as unknown as jest.Mocked<BudgetInsightService>;
 

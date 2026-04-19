@@ -29,26 +29,19 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 
 **Important:** For integration testing during development, always use `npm start` instead of `./budget.sh` to avoid compilation delays and ensure latest code changes are tested.
 
-### Docker Development
-
-- See `DOCKER.md` for Docker environment setup
-- Docker uses `.env.dev` for environment configuration
-- `npm run start:dev -- [command]` - Run with Docker environment (loads `.env.dev`)
-- Or use `npm start` if `.env` is symlinked to `.env.dev`
-
 ### Testing
 
 - `npm test` - Run all tests with ESM configuration
 - `npm run test:coverage` - Run tests with coverage report
 - `npm run test:watch` - Run tests in watch mode
-- Jest config: `jest.config.mjs` with ESM support via experimental VM modules
-- Test files require: `import { jest } from '@jest/globals'` for mocking
 
 ### Code Quality
 
 - `npm run linter` - Run ESLint and Prettier (lint + format)
-- ESLint config: `eslint.config.mts` (already ESM) with TypeScript, Node.js globals, and Prettier integration
-- Prettier integration for consistent code formatting
+
+### Docker Development
+
+- See `DOCKER.md` for Docker environment setup and `npm run start:dev` usage
 
 ## Configuration System
 
@@ -78,22 +71,14 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 - `validDestinationAccounts` - Array of account IDs for valid income destinations
 - `validExpenseSourceAccounts` - Array of account IDs for expense source filtering (asset accounts that expenses source from)
 - `validTransfers` - Array of valid transfer configurations (source/destination pairs)
+- `disposableIncomeAccounts` - Array of account IDs for discretionary/disposable spending accounts (e.g., a credit card for personal expenses); used by `DisposableIncomeService` for surplus calculations
 
 **Transaction Configuration:**
 
 - `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations
 - `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude (e.g., "PAYROLL")
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
-- `excludedTransactions` - Array of transactions to globally exclude:
-    ```yaml
-    excludedTransactions:
-        - description: 'VANGUARD BUY INVESTMENT'
-          amount: '4400.00'
-          reason: 'Investment purchase'
-        - description: 'Excluded Description Only' # Matches any amount
-        - amount: '999.99' # Matches any description
-          reason: 'Specific amount to exclude'
-    ```
+- `excludedTransactions` - Array of transactions to globally exclude; each entry requires `description` with optional `amount` and `reason` fields
 
 **Transaction Tags Configuration:**
 
@@ -121,99 +106,52 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 
 - `FIREFLY_API_URL` - Firefly III API endpoint
 - `FIREFLY_API_TOKEN` - API authentication token
-- `ANTHROPIC_API_KEY` - Claude AI API key
 
 **Optional:**
 
+- `ANTHROPIC_API_KEY` - Claude AI API key (required only for `categorize` command)
 - `LOG_LEVEL` - Logging level (trace, debug, info, warn, error, silent)
 - `CLIENT_CERT_CA_PATH` - CA certificate path for mTLS
 - `CLIENT_CERT_PATH` - Client certificate path for mTLS
 - `CLIENT_CERT_PASSWORD` - Certificate password
-- `EXPECTED_MONTHLY_PAYCHECK` - Fallback for paycheck amount
-
-### Configuration Files Structure
-
-```
-src/config/
-├── config-manager.ts         # Singleton configuration manager
-├── config.types.ts           # TypeScript type definitions
-├── config.defaults.ts        # Default values
-├── config.validator.ts       # Validation logic
-└── llm.config.ts            # LLM client configuration helper
-```
 
 ## Architecture Overview
 
 ### Command Pattern Architecture
 
-The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
+The CLI uses a command pattern with five main commands defined in `src/cli.ts`:
 
-1. **analyze** (alias: `an`) - Comprehensive cash flow and budget analysis including:
+1. **init** - Initialize configuration files in `~/.budget/` (`config.yaml` and `.env`). Runs before API configuration is loaded; supports `--force` to overwrite existing files.
+
+2. **analyze** (alias: `an`) - Comprehensive cash flow and budget analysis including:
     - Actual paycheck and additional income (deposits not from payroll)
     - Bills paid and budgeted spending vs. allocation
     - Unbudgeted expenses and disposable income
     - True cash flow net impact calculation
 
-2. **report** (alias: `st`) - Shows current budget report for a given month
+3. **report** (alias: `st`) - Shows current budget report for a given month
 
-3. **categorize** (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions
+4. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
     - By default, processes uncategorized transactions and transactions with category but no budget
     - Transactions with both category and budget are skipped unless `--force` is used
     - Supports mode options: `--mode category` (category only), `--mode budget` (budget only), `--mode both` (default)
     - Use `--force` (`-f`) to re-run AI on transactions that already have both category and budget
     - Use `--dry-run` (`-n`) to preview changes without applying
 
-4. **split** (alias: `sp`) - Interactively splits a transaction into two parts:
-    - Preserves metadata (category, budget, tags) on first split
-    - Leaves second split uncategorized for manual assignment
-    - Validates split amounts with floating-point precision handling
-    - Supports custom descriptions for each split
+5. **split** `<transaction-id>` (alias: `sp`) - Interactively splits a transaction into two parts. Preserves metadata (category, budget, tags) on the first split; leaves the second split uncategorized for manual assignment in Firefly III. Validates split amounts within 0.01 floating-point tolerance.
 
 ### Service Layer Architecture
 
-**Core Services** (`src/services/core/`):
+Services are organized by role and all wired in `ServiceFactory.createServices()` (`src/factories/service.factory.ts`):
 
-- `TransactionService` - Firefly III transaction API operations
-- `BudgetService` - Budget API operations
-- `CategoryService` - Category API operations
-- `TransactionClassificationService` - Transaction classification logic (deposit, bill, transfer, etc.)
-- `TransactionValidatorService` - Transaction validation
+- **Core Services** (`src/services/core/`): Firefly III API wrappers (transactions, budgets, categories) and transaction utilities (classification, validation).
+- **Business Logic Services** (`src/services/`): Analyzers and utilities (additional income, unbudgeted expenses, paycheck surplus, transaction splitting, excluded transaction filtering, AI orchestration).
+- **AI Services** (`src/services/ai/`): Claude integration with structured prompts and transaction mapping.
+- **Display Services** (`src/services/display/`): CLI output formatting for reports, analysis, and status messages.
 
-**Business Logic Services** (`src/services/`):
+**Pattern:** Business logic analysis services extend `BaseTransactionAnalysisService`, which provides a template method: validate date range → fetch transactions → call `analyzeTransactions()` → return results. Examples: `AdditionalIncomeService`, `UnbudgetedExpenseService`, `PaycheckSurplusService`, `DisposableIncomeService`.
 
-- `AdditionalIncomeService` - Finds additional income (non-payroll deposits)
-- `UnbudgetedExpenseService` - Finds expenses not covered by budget
-- `PaycheckSurplusService` - Calculates paycheck surplus/deficit
-- `ExcludedTransactionService` - Manages transaction exclusions via YAML configuration
-- `AITransactionUpdateOrchestrator` - Orchestrates AI-powered transaction updates
-- `InteractiveTransactionUpdater` - Handles transaction updates with interactive user workflow
-- `UserInputService` - Handles user interactions, prompts, and multiple-choice inputs
-- `TransactionSplitService` - Splits transactions into multiple parts with metadata preservation
-
-**AI Services** (`src/services/ai/`):
-
-- `LLMAssignmentService` - Unified service for Claude-powered category and budget assignment
-- `LLMTransactionProcessingService` - Orchestrates AI processing and coordinates with ClaudeClient
-- **AI Utilities** (`src/services/ai/utils/`):
-    - `prompt-templates.ts` - Structured prompt generation with function calling schemas
-    - `transaction-mapper.ts` - Maps Firefly III transactions to LLM-friendly format
-
-**Display Services** (`src/services/display/`):
-
-- `BaseTransactionDisplayService` - Base service for formatting transaction lists with type indicators
-- `BudgetDisplayService` - Formats budget reports with spending visualizations
-- `AnalyzeDisplayService` - Formats analyze budget output with recommendations
-- `CategorizeDisplayService` - Formats status messages for categorize command
-- `SplitTransactionDisplayService` - Formats split transaction previews and status messages
-
-### Dependency Injection
-
-Services are created and wired together in `ServiceFactory.createServices()`. The factory:
-
-- Retrieves configuration from `ConfigManager.getInstance().getConfig()`
-- Injects configuration values into service constructors
-- Services never load configuration themselves
-- Clear dependency graph visible in constructor signatures
+**Configuration:** All services receive configuration via constructor injection (never load themselves). Configuration comes from `ConfigManager` singleton, with priority: YAML > environment variables > defaults.
 
 ### Transaction Classification System
 
@@ -243,17 +181,8 @@ The `TransactionSplitService` provides functionality for splitting transactions 
 **Validation:**
 
 - Split amounts must sum to original amount within 0.01 epsilon (floating-point tolerance)
-- Each split must be at least 0.01 (1 cent minimum)
-- Amounts limited to 2 decimal places for currency precision
+- Each split must be at least 0.01; amounts limited to 2 decimal places
 - Transaction must not already be split (single-split transactions only)
-
-**User Workflow:**
-
-1. View original transaction details
-2. Enter first split amount (remainder auto-calculated)
-3. Optionally add custom text to each split description
-4. Preview split before confirmation
-5. Confirm to execute the split
 
 ### AI Integration
 
@@ -272,49 +201,11 @@ Claude AI integration through `@anthropic-ai/sdk`:
 - **Validation**: AI responses validated against available options before applying
 - **Dry-run mode**: Test AI suggestions without making changes
 
-#### Case-Insensitive Matching
-
-The LLM assignment service uses case-insensitive, whitespace-tolerant matching for categories and budgets:
-
-- **Normalization Strategy**: All category/budget names are normalized using `StringUtils.normalizeForMatching()` (trim + lowercase)
-- **AI Response Handling**: AI responses are normalized before validation in `parseAssignmentResponse()`
-- **Validator Service**: `TransactionAIResultValidator` uses normalized lookup maps for O(1) performance
-- **Preserved Casing**: Actual category/budget names (with original casing) are applied to transactions
-- **Special Characters**: Whitespace variations and special characters (e.g., "Bills & Utilities", "Children's Expenses") are preserved
-
-**Example Matches:**
-
-- AI suggests `"groceries"` → matches `"Groceries"` category
-- AI suggests `" BILLS & UTILITIES "` → matches `"Bills & Utilities"` category
-- AI suggests `"food"` → matches `"Food"` budget
-
-**Implementation Files:**
-
-- `src/utils/string.utils.ts` - Normalization utility (`normalizeForMatching()`)
-- `src/services/ai/utils/prompt-templates.ts` - AI response parsing with normalization
-- `src/services/core/transaction-ai-result-validator.service.ts` - Case-insensitive lookup maps
-
-### User Interface and Workflow
-
-Enhanced user experience with `@inquirer/prompts`:
-
-- Multiple-choice prompts for transaction updates (approve all, budget only, category only, edit, abort)
-- Interactive editing workflow with category and budget selection dropdowns
-- Do-while loop implementation for iterative user input
-- Hyperlink support for transaction references in terminal output
-- Colored output with `chalk` for better readability
-
 ## Key Files and Patterns
 
-### Configuration Loading
+### Adding New Configuration
 
-- `src/config/config-manager.ts` - Unified configuration manager (singleton)
-- `src/config/config.types.ts` - Complete type definitions
-- `src/config/config.defaults.ts` - Default values
-- `src/config/config.validator.ts` - Startup validation
-- `src/config.ts` - Re-exports for convenience
-
-**Adding new configuration:**
+To add a new configuration key:
 
 1. Add type to `config.types.ts`
 2. Add default to `config.defaults.ts`
@@ -324,19 +215,13 @@ Enhanced user experience with `@inquirer/prompts`:
 
 ### Service Creation
 
-- `src/factories/service.factory.ts` - Central service factory
-- All services should be instantiated here for consistent DI
-- Recent additions: `UserInputService` and `InteractiveTransactionUpdater` integration
+- `src/factories/service.factory.ts` - Central service factory; all new services must be instantiated and returned here for consistent dependency injection
 
 ### Error Handling
 
 - Structured logging via Pino logger (`src/logger.ts`)
 - Services throw descriptive errors with context
 - Commands catch and log errors before exiting
-- **Error Collection**: `InteractiveTransactionUpdater` collects errors during batch operations
-    - Errors are tracked and reported via `getErrors()` method
-    - Error statistics are included in update results
-    - Users are notified of failed transactions with counts
 
 ### Logging Best Practices
 
@@ -350,26 +235,11 @@ Enhanced user experience with `@inquirer/prompts`:
 
 ### Transaction Filtering
 
-Services like `AdditionalIncomeService` use a filtering pattern:
-
-1. Get all transactions for month
-2. Apply business logic filters (`.filter()` chains)
-3. Return filtered results
-
-Follow this pattern for new transaction analysis services.
-
-### User Interaction Patterns
-
-The `UserInputService` provides standardized user interaction patterns:
-
-1. **Transaction Update Workflow**: Uses `expand` prompts for multiple options
-2. **Edit Mode**: Uses `checkbox` for selecting what to edit, `select` dropdowns for choices
-3. **Do-While Loops**: Implemented for iterative user input until satisfaction
-4. **Validation**: Input validation with graceful error handling and retry logic
+Transaction analysis services follow a consistent pattern: fetch transactions for the month, apply business logic filters via `.filter()` chains, and return results.
 
 ### Testing
 
 - Comprehensive test coverage in `__tests__/` directories
-- Mock Firefly III API responses in test data
 - Test both success and error scenarios
 - Services are tested independently with mocked dependencies
+- Test files: `import { jest } from '@jest/globals'` for mocking (ESM requirement)

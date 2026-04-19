@@ -185,10 +185,8 @@ export class BudgetDisplayService {
             sectionTitle: 'ATTENTION NEEDED',
             statusColor: chalk.red,
             statusEmoji: '🔴',
-            formatRemaining: (budget: BudgetReportDto, formatted: string) =>
-                `${formatted} over`,
-            getRemainingAmount: (budget: BudgetReportDto) =>
-                Math.abs(budget.spent) - budget.amount,
+            formatRemaining: (budget: BudgetReportDto, formatted: string) => `${formatted} over`,
+            getRemainingAmount: (budget: BudgetReportDto) => Math.abs(budget.spent) - budget.amount,
         });
     }
 
@@ -204,8 +202,7 @@ export class BudgetDisplayService {
             sectionTitle: 'ON TRACK',
             statusColor: chalk.green,
             statusEmoji: '🟢',
-            formatRemaining: (budget: BudgetReportDto, formatted: string) =>
-                `${formatted} left`,
+            formatRemaining: (budget: BudgetReportDto, formatted: string) => `${formatted} left`,
             getRemainingAmount: (budget: BudgetReportDto) => budget.remaining,
         });
     }
@@ -317,10 +314,7 @@ export class BudgetDisplayService {
     /**
      * Formats budget statistics for verbose output
      */
-    private formatBudgetStatistics(
-        budget: BudgetReportDto,
-        currencySymbol: string
-    ): string {
+    private formatBudgetStatistics(budget: BudgetReportDto, currencySymbol: string): string {
         const lines: string[] = [];
         const indent = '  '; // 2 spaces for indentation
 
@@ -549,10 +543,7 @@ export class BudgetDisplayService {
     private formatFooterTip(): string {
         const lines: string[] = [];
         lines.push(
-            DisplayFormatterUtils.createHorizontalLine(
-                '─',
-                BudgetDisplayService.SECTION_WIDTH
-            )
+            DisplayFormatterUtils.createHorizontalLine('─', BudgetDisplayService.SECTION_WIDTH)
         );
         lines.push('');
         lines.push(
@@ -560,10 +551,7 @@ export class BudgetDisplayService {
         );
         lines.push('');
         lines.push(
-            DisplayFormatterUtils.createHorizontalLine(
-                '─',
-                BudgetDisplayService.SECTION_WIDTH
-            )
+            DisplayFormatterUtils.createHorizontalLine('─', BudgetDisplayService.SECTION_WIDTH)
         );
         lines.push('');
 
