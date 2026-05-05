@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "8.0.0",
+    "version": "8.0.1",
     "type": "module",
     "main": "./dist/index.js",
     "exports": {
@@ -38,7 +38,7 @@
     ],
     "dependencies": {
         "@anthropic-ai/sdk": "^0.90.0",
-        "@derekprovance/firefly-iii-sdk": "6.4.8",
+        "@derekprovance/firefly-iii-sdk": "6.5.5",
         "@inquirer/prompts": "^8.4.2",
         "axios": "^1.15.1",
         "chalk": "^5.x.x",
