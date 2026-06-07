@@ -36,6 +36,15 @@ export class CategorizeCommand implements Command<void, UpdateTransactionsParams
                 return;
             }
 
+            if (results.status === CategorizeStatus.PROCESSING_FAILED) {
+                console.log(
+                    this.displayService.formatError(
+                        new Error(results.error?.trim() || 'Processing failed')
+                    )
+                );
+                return;
+            }
+
             const prefix = dryRun ? '[DRYRUN] ' : '';
             console.log(`\n${prefix}Updated ${results.transactionsUpdated} Transaction(s)!`);
 

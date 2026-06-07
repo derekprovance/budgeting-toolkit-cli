@@ -25,4 +25,8 @@ export const logger = pino({
     timestamp: false,
     messageKey: 'message',
     base: null,
+    serializers: {
+        err: pino.stdSerializers.err,
+        error: pino.stdSerializers.err,
+    },
 });

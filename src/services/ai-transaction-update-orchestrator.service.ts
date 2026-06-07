@@ -21,6 +21,7 @@ import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transact
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../types/result.type.js';
+import { isCertificateError } from '../utils/error-detection.utils.js';
 
 interface TransactionError {
     transaction: TransactionSplit;
@@ -154,6 +155,12 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 throw aiError;
             }
         } catch (ex) {
+            // Re-throw certificate/network errors so the command layer can display
+            // actionable remediation guidance with the full error context
+            if (isCertificateError(ex)) {
+                throw ex;
+            }
+
             logger.error(
                 {
                     tag,
