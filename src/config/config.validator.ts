@@ -90,8 +90,12 @@ export class ConfigValidator {
 
         const validator = new CertificateValidator();
 
-        // Validate client certificate
-        const clientResult = validator.validateCertificate(certs.clientCertPath, 'client');
+        // Validate client certificate (with password if provided)
+        const clientResult = validator.validateCertificate(
+            certs.clientCertPath,
+            'client',
+            certs.clientCertPassword
+        );
         errors.push(...clientResult.errors);
         warnings.push(...clientResult.warnings);
 

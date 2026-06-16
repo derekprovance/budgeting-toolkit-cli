@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import { X509Certificate } from 'crypto';
+import { execSync } from 'child_process';
 
 export interface CertificateValidationResult {
     errors: string[];
@@ -14,7 +15,11 @@ export class CertificateValidator {
     /**
      * Validate a certificate file with comprehensive checks
      */
-    validateCertificate(certPath: string, certType: 'client' | 'ca'): CertificateValidationResult {
+    validateCertificate(
+        certPath: string,
+        certType: 'client' | 'ca',
+        certPassword?: string
+    ): CertificateValidationResult {
         const errors: string[] = [];
         const warnings: string[] = [];
 
@@ -27,7 +32,7 @@ export class CertificateValidator {
 
         // Determine certificate format and validate accordingly
         if (this.isP12Certificate(certPath)) {
-            const p12Error = this.validateP12Certificate(certPath, certType);
+            const p12Error = this.validateP12Certificate(certPath, certType, certPassword);
             if (p12Error) errors.push(p12Error);
         } else if (this.isPemCertificate(certPath)) {
             const pemResult = this.validatePemCertificate(certPath, certType);
@@ -164,9 +169,9 @@ export class CertificateValidator {
     }
 
     /**
-     * Validate P12/PFX certificate (basic structure check only)
+     * Validate P12/PFX certificate (includes password validation)
      */
-    private validateP12Certificate(certPath: string, certType: string): string | null {
+    private validateP12Certificate(certPath: string, certType: string, certPassword?: string): string | null {
         try {
             const buffer = fs.readFileSync(certPath);
 
@@ -188,12 +193,45 @@ export class CertificateValidator {
                 );
             }
 
+            // Validate password if provided
+            if (certPassword !== undefined) {
+                const passwordError = this.validateP12Password(certPath, certPassword);
+                if (passwordError) {
+                    return passwordError;
+                }
+            }
+
             return null; // Valid P12 structure
         } catch (error) {
             return (
                 `${this.capitalize(certType)} certificate could not be validated: ${certPath}\n` +
                 `  Error: ${(error as Error).message}`
             );
+        }
+    }
+
+    /**
+     * Validate P12 password by attempting to decrypt it
+     */
+    private validateP12Password(certPath: string, password: string): string | null {
+        try {
+            // Try to decrypt the P12 file with the provided password
+            execSync(`openssl pkcs12 -in "${certPath}" -passin pass:${password} -noout 2>&1`, {
+                encoding: 'utf-8',
+                stdio: 'pipe',
+            });
+            return null; // Password is correct
+        } catch (error) {
+            // If openssl command fails, the password is likely incorrect
+            if ((error as any).status === 1) {
+                return (
+                    `${certPath}: Invalid CLIENT_CERT_PASSWORD\n` +
+                    `  The password provided does not match the P12/PFX certificate\n` +
+                    `  Suggestion: Verify CLIENT_CERT_PASSWORD in your .env file is correct, or set it to empty if the certificate has no password`
+                );
+            }
+            // Other errors - don't fail validation for other issues
+            return null;
         }
     }
 
