@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { X509Certificate } from 'crypto';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 
 export interface CertificateValidationResult {
     errors: string[];
@@ -215,22 +215,30 @@ export class CertificateValidator {
      */
     private validateP12Password(certPath: string, password: string): string | null {
         try {
-            // Try to decrypt the P12 file with the provided password
-            execSync(`openssl pkcs12 -in "${certPath}" -passin pass:${password} -noout 2>&1`, {
+            // Use spawnSync with arguments array to avoid shell interpretation of password
+            const result = spawnSync('openssl', ['pkcs12', '-in', certPath, '-passin', `pass:${password}`, '-noout'], {
                 encoding: 'utf-8',
                 stdio: 'pipe',
             });
-            return null; // Password is correct
-        } catch (error) {
-            // If openssl command fails, the password is likely incorrect
-            if ((error as any).status === 1) {
+
+            // openssl exits with status 0 on success
+            if (result.status === 0) {
+                return null; // Password is correct
+            }
+
+            // Status 1 typically means MAC verify error (wrong password)
+            if (result.status === 1) {
                 return (
                     `${certPath}: Invalid CLIENT_CERT_PASSWORD\n` +
                     `  The password provided does not match the P12/PFX certificate\n` +
                     `  Suggestion: Verify CLIENT_CERT_PASSWORD in your .env file is correct, or set it to empty if the certificate has no password`
                 );
             }
-            // Other errors - don't fail validation for other issues
+
+            // Other errors - don't fail validation
+            return null;
+        } catch (error) {
+            // spawnSync shouldn't throw, but handle just in case
             return null;
         }
     }
