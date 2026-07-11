@@ -276,7 +276,7 @@ qZXQ
 
         it('should load configuration from YAML file when it exists', () => {
             const yamlConfig = {
-                validDestinationAccounts: ['account-1', 'account-2'],
+                incomeDestinationAccounts: ['account-1', 'account-2'],
                 expectedMonthlyPaycheck: 5000,
             };
 
@@ -287,7 +287,7 @@ qZXQ
             const configManager = ConfigManager.getInstance();
             const config = configManager.getConfig();
 
-            expect(config.accounts.validDestinationAccounts).toEqual(['account-1', 'account-2']);
+            expect(config.accounts.incomeDestinationAccounts).toEqual(['account-1', 'account-2']);
             expect(config.transactions.expectedMonthlyPaycheck).toBe(5000);
         });
 

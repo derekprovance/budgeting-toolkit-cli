@@ -12,9 +12,9 @@ import { ValidTransfer } from '../types/common.types.js';
  * YAML configuration file structure (maps to AppConfig)
  */
 interface YamlConfig {
-    validDestinationAccounts?: string[];
-    validExpenseSourceAccounts?: string[];
-    validTransfers?: ValidTransfer[];
+    incomeDestinationAccounts?: string[];
+    expenseSourceAccounts?: string[];
+    expenseTransfers?: ValidTransfer[];
     disposableIncomeAccounts?: string[];
     excludedAdditionalIncomePatterns?: string[];
     excludeDisposableIncome?: boolean;
@@ -321,14 +321,14 @@ export class ConfigManager {
         }
 
         // Accounts Configuration
-        if (yamlConfig.validDestinationAccounts) {
-            config.accounts.validDestinationAccounts = yamlConfig.validDestinationAccounts;
+        if (yamlConfig.incomeDestinationAccounts) {
+            config.accounts.incomeDestinationAccounts = yamlConfig.incomeDestinationAccounts;
         }
-        if (yamlConfig.validExpenseSourceAccounts) {
-            config.accounts.validExpenseSourceAccounts = yamlConfig.validExpenseSourceAccounts;
+        if (yamlConfig.expenseSourceAccounts) {
+            config.accounts.expenseSourceAccounts = yamlConfig.expenseSourceAccounts;
         }
-        if (yamlConfig.validTransfers) {
-            config.accounts.validTransfers = yamlConfig.validTransfers;
+        if (yamlConfig.expenseTransfers) {
+            config.accounts.expenseTransfers = yamlConfig.expenseTransfers;
         }
         if (yamlConfig.disposableIncomeAccounts) {
             config.accounts.disposableIncomeAccounts = yamlConfig.disposableIncomeAccounts;

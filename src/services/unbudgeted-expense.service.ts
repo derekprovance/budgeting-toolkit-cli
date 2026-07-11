@@ -144,7 +144,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
     /**
      * Checks if an account is a valid expense source account.
      *
-     * Uses configuration from YAML file (validExpenseSourceAccounts) with fallback to defaults.
+     * Uses configuration from YAML file (expenseSourceAccounts) with fallback to defaults.
      */
     private isExpenseAccount(accountId: string | null): boolean {
         if (!accountId) {

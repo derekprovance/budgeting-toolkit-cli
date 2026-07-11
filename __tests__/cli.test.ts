@@ -4,7 +4,6 @@ import { createCli } from '../src/cli.js';
 // Mock external modules
 jest.mock('../src/config/config-manager.js');
 jest.mock('../src/factories/service.factory.js');
-jest.mock('../src/commands/init.command.js');
 jest.mock('../src/api/firefly-client-with-certs.js');
 jest.mock('../src/commands/analyze.command.js');
 jest.mock('../src/commands/budget-report.command.js');
@@ -34,14 +33,6 @@ describe('CLI', () => {
     });
 
     describe('command registration', () => {
-        it('should register init command', () => {
-            const cli = createCli();
-            const initCmd = cli.commands.find(cmd => cmd.name() === 'init');
-
-            expect(initCmd).toBeDefined();
-            expect(initCmd?.description()).toContain('Initialize configuration');
-        });
-
         it('should register analyze command', () => {
             const cli = createCli();
             const analyzeCmd = cli.commands.find(cmd => cmd.name() === 'analyze');
@@ -74,14 +65,14 @@ describe('CLI', () => {
             expect(splitCmd?.aliases()).toContain('sp');
         });
 
-        it('should have exactly 5 main commands registered', () => {
+        it('should have exactly 4 main commands registered', () => {
             const cli = createCli();
             const commandNames = cli.commands.map(cmd => cmd.name());
 
             expect(commandNames).toEqual(
-                expect.arrayContaining(['init', 'analyze', 'report', 'categorize', 'split'])
+                expect.arrayContaining(['analyze', 'report', 'categorize', 'split'])
             );
-            expect(commandNames.length).toBe(5);
+            expect(commandNames.length).toBe(4);
         });
     });
 
@@ -189,16 +180,6 @@ describe('CLI', () => {
         });
     });
 
-    describe('init command', () => {
-        it('should have --force option', () => {
-            const cli = createCli();
-            const initCmd = cli.commands.find(cmd => cmd.name() === 'init');
-            const forceOption = initCmd?.options.find(opt => opt.long === '--force');
-
-            expect(forceOption).toBeDefined();
-        });
-    });
-
     describe('config error handling', () => {
         it('should exit gracefully on config load errors', () => {
             // The CLI is created with mocked ConfigManager that returns valid config by default
@@ -213,9 +194,9 @@ describe('CLI', () => {
             const cli = createCli();
             const commands = cli.commands.map(cmd => cmd.name());
 
-            expect(commands.length).toBe(5);
+            expect(commands.length).toBe(4);
             commands.forEach(cmdName => {
-                expect(cmdName).toMatch(/init|analyze|report|categorize|split/);
+                expect(cmdName).toMatch(/analyze|report|categorize|split/);
             });
         });
     });

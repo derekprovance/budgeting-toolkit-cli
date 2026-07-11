@@ -7,7 +7,6 @@ import { AnalyzeCommand } from './commands/analyze.command.js';
 import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
-import { InitCommand } from './commands/init.command.js';
 import { ServiceFactory } from './factories/service.factory.js';
 import {
     BudgetDateOptions,
@@ -64,34 +63,7 @@ export const createCli = (configPath?: string): Command => {
         .option('-v, --verbose', 'enable verbose logging')
         .option('-c, --config <path>', 'path to config.yaml file');
 
-    // Register init command BEFORE trying to initialize API client
-    // (init command doesn't require configuration)
-    program
-        .command('init')
-        .description('Initialize configuration files in ~/.budget/')
-        .option('--force', 'overwrite existing configuration files')
-        .addHelpText(
-            'after',
-            `
-Examples:
-  $ budgeting-toolkit init              # interactive setup
-  $ budgeting-toolkit init --force      # overwrite existing files
-
-This command creates:
-  - ~/.budget/config.yaml  (budget configuration)
-  - ~/.budget/.env         (API credentials)
-        `
-        )
-        .action(async (opts: { force?: boolean }) => {
-            try {
-                const command = new InitCommand();
-                await command.execute({ force: opts.force });
-            } catch (error) {
-                handleError(error, 'initializing configuration');
-            }
-        });
-
-    // Now try to initialize API client and services for other commands
+    // Try to initialize API client and services for other commands
     let apiClient: FireflyClientWithCerts;
     let services: ReturnType<typeof ServiceFactory.createServices>;
 
@@ -160,7 +132,9 @@ This command creates:
                     '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
                 );
             } else {
-                console.log('\nRun "btk init" to create configuration files in ~/.budget/');
+                console.log(
+                    '\nCopy config.yaml.example and .env.example to ~/.budget/ to get started.'
+                );
             }
 
             console.log('\nSee example file: .env.example\n');
@@ -169,7 +143,9 @@ This command creates:
                 'Failed to initialize API client:',
                 error instanceof Error ? error.message : String(error)
             );
-            console.log('\nRun "btk init" to create configuration files or check your config.\n');
+            console.log(
+                '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
+            );
         }
 
         process.exit(1);

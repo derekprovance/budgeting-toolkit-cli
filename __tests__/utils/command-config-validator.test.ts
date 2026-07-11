@@ -41,9 +41,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: ['1'],
-                    validExpenseSourceAccounts: ['3'],
-                    validTransfers: [],
+                    incomeDestinationAccounts: ['1'],
+                    expenseSourceAccounts: ['3'],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: 5000,
@@ -91,9 +91,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: ['1'],
-                    validExpenseSourceAccounts: ['3'],
-                    validTransfers: [],
+                    incomeDestinationAccounts: ['1'],
+                    expenseSourceAccounts: ['3'],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: undefined,
@@ -129,7 +129,7 @@ describe('CommandConfigValidator', () => {
             expect(errorOutput).toContain('config.yaml');
         });
 
-        it('should exit when validDestinationAccounts is empty', () => {
+        it('should exit when incomeDestinationAccounts is empty', () => {
             const config: AppConfig = {
                 api: {
                     firefly: {
@@ -145,9 +145,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: [],
-                    validExpenseSourceAccounts: ['3'],
-                    validTransfers: [],
+                    incomeDestinationAccounts: [],
+                    expenseSourceAccounts: ['3'],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: 5000,
@@ -179,10 +179,10 @@ describe('CommandConfigValidator', () => {
             );
             expect(mockConsoleError).toHaveBeenCalled();
             const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
-            expect(errorOutput).toContain('validDestinationAccounts is required');
+            expect(errorOutput).toContain('incomeDestinationAccounts is required');
         });
 
-        it('should exit when validExpenseSourceAccounts is empty', () => {
+        it('should exit when expenseSourceAccounts is empty', () => {
             const config: AppConfig = {
                 api: {
                     firefly: {
@@ -198,9 +198,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: ['1'],
-                    validExpenseSourceAccounts: [],
-                    validTransfers: [],
+                    incomeDestinationAccounts: ['1'],
+                    expenseSourceAccounts: [],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: 5000,
@@ -232,7 +232,7 @@ describe('CommandConfigValidator', () => {
             );
             expect(mockConsoleError).toHaveBeenCalled();
             const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
-            expect(errorOutput).toContain('validExpenseSourceAccounts is required');
+            expect(errorOutput).toContain('expenseSourceAccounts is required');
         });
 
         it('should report multiple validation errors at once', () => {
@@ -251,9 +251,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: [],
-                    validExpenseSourceAccounts: [],
-                    validTransfers: [],
+                    incomeDestinationAccounts: [],
+                    expenseSourceAccounts: [],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: undefined,
@@ -285,8 +285,8 @@ describe('CommandConfigValidator', () => {
             );
             const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
             expect(errorOutput).toContain('expectedMonthlyPaycheck is required');
-            expect(errorOutput).toContain('validDestinationAccounts is required');
-            expect(errorOutput).toContain('validExpenseSourceAccounts is required');
+            expect(errorOutput).toContain('incomeDestinationAccounts is required');
+            expect(errorOutput).toContain('expenseSourceAccounts is required');
             expect(errorOutput).toContain('CONFIG.md');
         });
     });
@@ -308,9 +308,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: [],
-                    validExpenseSourceAccounts: [],
-                    validTransfers: [],
+                    incomeDestinationAccounts: [],
+                    expenseSourceAccounts: [],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: undefined,
@@ -358,9 +358,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 accounts: {
-                    validDestinationAccounts: [],
-                    validExpenseSourceAccounts: [],
-                    validTransfers: [],
+                    incomeDestinationAccounts: [],
+                    expenseSourceAccounts: [],
+                    expenseTransfers: [],
                 },
                 transactions: {
                     expectedMonthlyPaycheck: undefined,

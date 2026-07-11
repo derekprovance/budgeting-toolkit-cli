@@ -63,7 +63,7 @@ describe('DisposableIncomeService', () => {
             mockTransactionService,
             mockTransactionClassificationService,
             [], // disposableIncomeAccounts - empty for existing tests
-            [] // validDestinationAccounts - empty for existing tests
+            [] // incomeDestinationAccounts - empty for existing tests
         );
     });
 
@@ -247,7 +247,7 @@ describe('DisposableIncomeService', () => {
                 mockTransactionService,
                 mockTransactionClassificationService,
                 ['6'], // disposableIncomeAccounts
-                ['1'] // validDestinationAccounts
+                ['1'] // incomeDestinationAccounts
             );
 
             const transactions = [createMockTransaction({ amount: '-250.00' })];
@@ -487,7 +487,7 @@ describe('DisposableIncomeService', () => {
                 mockTransactionService,
                 mockTransactionClassificationService,
                 ['6'], // disposableIncomeAccounts
-                ['1'] // validDestinationAccounts
+                ['1'] // incomeDestinationAccounts
             );
 
             const transfers = [

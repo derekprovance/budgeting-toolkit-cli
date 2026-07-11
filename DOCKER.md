@@ -314,10 +314,11 @@ Match configuration to your test data:
 
 ```yaml
 expectedMonthlyPaycheck: 3500
-validDestinationAccounts:
+incomeDestinationAccounts:
     - '1' # Main Checking
     - '2' # Savings
-validExpenseSourceAccounts:
+expenseSourceAccounts:
+    - '1' # Main Checking (debit purchases)
     - '3' # Credit Card
 excludedAdditionalIncomePatterns:
     - PAYROLL

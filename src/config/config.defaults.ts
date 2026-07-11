@@ -30,9 +30,9 @@ export const DEFAULT_CONFIG: AppConfig = {
         },
     },
     accounts: {
-        validDestinationAccounts: [],
-        validExpenseSourceAccounts: [],
-        validTransfers: [],
+        incomeDestinationAccounts: [],
+        expenseSourceAccounts: [],
+        expenseTransfers: [],
         disposableIncomeAccounts: [],
     },
     transactions: {

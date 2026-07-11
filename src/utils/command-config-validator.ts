@@ -22,20 +22,20 @@ export class CommandConfigValidator {
             );
         }
 
-        if (config.accounts.validDestinationAccounts.length === 0) {
+        if (config.accounts.incomeDestinationAccounts.length === 0) {
             errors.push(
-                'validDestinationAccounts is required for analyze command.\n' +
+                'incomeDestinationAccounts is required for analyze command.\n' +
                     '  Add to config.yaml:\n' +
-                    '    validDestinationAccounts:\n' +
+                    '    incomeDestinationAccounts:\n' +
                     "      - '1'  # Your checking account ID from Firefly III"
             );
         }
 
-        if (config.accounts.validExpenseSourceAccounts.length === 0) {
+        if (config.accounts.expenseSourceAccounts.length === 0) {
             errors.push(
-                'validExpenseSourceAccounts is required for analyze command.\n' +
+                'expenseSourceAccounts is required for analyze command.\n' +
                     '  Add to config.yaml:\n' +
-                    '    validExpenseSourceAccounts:\n' +
+                    '    expenseSourceAccounts:\n' +
                     "      - '3'  # Your expense source account ID (asset account) from Firefly III"
             );
         }

@@ -51,9 +51,9 @@ describe('ConfigValidator', () => {
                 },
             },
             accounts: {
-                validDestinationAccounts: ['1'],
-                validExpenseSourceAccounts: ['3'],
-                validTransfers: [],
+                incomeDestinationAccounts: ['1'],
+                expenseSourceAccounts: ['3'],
+                expenseTransfers: [],
             },
             transactions: {
                 expectedMonthlyPaycheck: 5000,

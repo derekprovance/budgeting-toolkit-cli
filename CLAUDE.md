@@ -68,9 +68,9 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 
 **Account Configuration:**
 
-- `validDestinationAccounts` - Array of account IDs for valid income destinations
-- `validExpenseSourceAccounts` - Array of account IDs for expense source filtering (asset accounts that expenses source from)
-- `validTransfers` - Array of valid transfer configurations (source/destination pairs)
+- `incomeDestinationAccounts` - Array of account IDs that are valid deposit destinations for income
+- `expenseSourceAccounts` - Array of account IDs (asset accounts) that withdrawals must source from to count as expenses. Independent of `incomeDestinationAccounts` (checks the opposite side of different transaction types) — the same account ID often belongs in both lists
+- `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses
 - `disposableIncomeAccounts` - Array of account IDs for discretionary/disposable spending accounts (e.g., a credit card for personal expenses); used by `DisposableIncomeService` for surplus calculations
 
 **Transaction Configuration:**
@@ -119,26 +119,24 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 
 ### Command Pattern Architecture
 
-The CLI uses a command pattern with five main commands defined in `src/cli.ts`:
+The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
-1. **init** - Initialize configuration files in `~/.budget/` (`config.yaml` and `.env`). Runs before API configuration is loaded; supports `--force` to overwrite existing files.
-
-2. **analyze** (alias: `an`) - Comprehensive cash flow and budget analysis including:
+1. **analyze** (alias: `an`) - Comprehensive cash flow and budget analysis including:
     - Actual paycheck and additional income (deposits not from payroll)
     - Bills paid and budgeted spending vs. allocation
     - Unbudgeted expenses and disposable income
     - True cash flow net impact calculation
 
-3. **report** (alias: `st`) - Shows current budget report for a given month
+2. **report** (alias: `st`) - Shows current budget report for a given month
 
-4. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
+3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
     - By default, processes uncategorized transactions and transactions with category but no budget
     - Transactions with both category and budget are skipped unless `--force` is used
     - Supports mode options: `--mode category` (category only), `--mode budget` (budget only), `--mode both` (default)
     - Use `--force` (`-f`) to re-run AI on transactions that already have both category and budget
     - Use `--dry-run` (`-n`) to preview changes without applying
 
-5. **split** `<transaction-id>` (alias: `sp`) - Interactively splits a transaction into two parts. Preserves metadata (category, budget, tags) on the first split; leaves the second split uncategorized for manual assignment in Firefly III. Validates split amounts within 0.01 floating-point tolerance.
+4. **split** `<transaction-id>` (alias: `sp`) - Interactively splits a transaction into two parts. Preserves metadata (category, budget, tags) on the first split; leaves the second split uncategorized for manual assignment in Firefly III. Validates split amounts within 0.01 floating-point tolerance.
 
 ### Service Layer Architecture
 

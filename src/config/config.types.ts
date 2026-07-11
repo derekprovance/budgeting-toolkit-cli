@@ -53,9 +53,9 @@ export interface ClaudeApiConfig {
  * Account Configuration for transaction filtering
  */
 export interface AccountsConfig {
-    validDestinationAccounts: string[];
-    validExpenseSourceAccounts: string[];
-    validTransfers: ValidTransfer[];
+    incomeDestinationAccounts: string[];
+    expenseSourceAccounts: string[];
+    expenseTransfers: ValidTransfer[];
     disposableIncomeAccounts: string[];
 }
 

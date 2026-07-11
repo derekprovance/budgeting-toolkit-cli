@@ -25,10 +25,7 @@ git clone https://github.com/derekprovance/budgeting-toolkit-cli.git
 cd budgeting-toolkit-cli
 npm install
 
-# Interactive setup (recommended)
-npm start -- init
-
-# Or manual configuration
+# Configuration
 cp .env.example .env
 cp config.yaml.example config.yaml
 # Edit .env with your API credentials
@@ -51,15 +48,7 @@ See [Configuration](#configuration) below for setup details.
 
 ### Setup
 
-Use the interactive `init` command to create configuration files (recommended):
-
-```bash
-npm start -- init
-```
-
-This creates configuration files in `~/.budget/` and guides you through setting API credentials.
-
-Alternatively, manually set up configuration files:
+Set up configuration files:
 
 ```bash
 cp .env.example ~/.budget/.env
@@ -109,33 +98,10 @@ See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) fo
 
 | Command | Purpose | Example | Key Config |
 |---------|---------|---------|------------|
-| **`init`** | Interactive setup wizard for configuration | `npm start -- init` | - |
 | **`categorize <tag>`** | AI-powered transaction categorization | `./budget.sh categorize Import-2025-06-23` | `ANTHROPIC_API_KEY` |
 | `report` | Current budget status for a month | `./budget.sh report -m 8 -y 2024` | - |
 | `analyze` | Budget surplus/deficit analysis | `./budget.sh analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
 | `split <id>` | Interactive transaction splitting | `./budget.sh split 123` | - |
-
-### Init Command
-
-Interactive setup wizard for creating configuration files:
-
-```bash
-# Run the setup wizard (guided walk-through)
-npm start -- init
-
-# Force overwrite existing files
-npm start -- init --force
-```
-
-**Features:**
-- Prompts for Firefly III API URL and token
-- Prompts for Anthropic API key
-- Creates configuration files in `~/.budget/`
-- Validates input before saving
-- Shows next steps after completion
-
-**Options:**
-- `--force` - Overwrite existing configuration files without asking
 
 ### Common Options
 

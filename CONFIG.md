@@ -51,8 +51,8 @@ Use this quick reference to see what each command needs:
 **Required:**
 
 - `expectedMonthlyPaycheck` - Expected monthly income
-- `validDestinationAccounts[]` - At least one account ID
-- `validExpenseSourceAccounts[]` - At least one account ID
+- `incomeDestinationAccounts[]` - At least one account ID
+- `expenseSourceAccounts[]` - At least one account ID
 
 **Recommended:**
 
@@ -112,12 +112,12 @@ expectedMonthlyPaycheck: 5000.00
 **Default:** `undefined`
 **Used by:** Analyze command
 
-#### validDestinationAccounts
+#### incomeDestinationAccounts
 
-List of account IDs that are valid destinations for income.
+List of account IDs that are valid destinations for income. Checked against the `destination_id` of **deposit** transactions only.
 
 ```yaml
-validDestinationAccounts:
+incomeDestinationAccounts:
     - '1' # Checking Account
     - '2' # Savings Account
 ```
@@ -126,14 +126,14 @@ validDestinationAccounts:
 **Default:** `[]`
 **Used by:** Additional income calculations
 
-#### validExpenseSourceAccounts
+#### expenseSourceAccounts
 
-List of account IDs (asset accounts) that expenses source from. For withdrawals, this is the account the money is withdrawn FROM (e.g., checking account), not the merchant destination.
+List of account IDs (asset accounts) that expenses source from. Checked against the `source_id` of **withdrawal** transactions only — this is the account the money is withdrawn FROM (e.g., checking account), not the merchant destination.
 
 ```yaml
-validExpenseSourceAccounts:
-    - '3' # Credit Card
-    - '4' # Debit Card
+expenseSourceAccounts:
+    - '1' # Checking Account
+    - '4' # Credit Card
 ```
 
 **Type:** `string[]`
@@ -142,12 +142,14 @@ validExpenseSourceAccounts:
 
 **Important:** These should be asset-type accounts (checking, savings, credit cards) that money is withdrawn FROM, not expense-type merchant accounts.
 
-#### validTransfers
+**Note on overlap:** `incomeDestinationAccounts` and `expenseSourceAccounts` are independent checks on different transaction fields (deposit destination vs. withdrawal source) — they are not two separate pools of accounts. The same account ID commonly belongs in both lists. For example, Checking Account `'1'` above appears in both because paychecks deposit into it *and* debit purchases withdraw from it.
+
+#### expenseTransfers
 
 Transfers that should be counted as unbudgeted expenses.
 
 ```yaml
-validTransfers:
+expenseTransfers:
     - source: '5' # Remote Investment Account
       destination: '1' # Checking Account
 ```
@@ -424,9 +426,9 @@ If validation fails, you'll see:
 ```yaml
 # config.yaml (minimal)
 expectedMonthlyPaycheck: 5000.00
-validDestinationAccounts:
+incomeDestinationAccounts:
     - '1'
-validExpenseAccounts:
+expenseSourceAccounts:
     - '3'
 
 firefly:
@@ -439,15 +441,15 @@ firefly:
 # config.yaml (advanced)
 expectedMonthlyPaycheck: 5500.00
 
-validDestinationAccounts:
+incomeDestinationAccounts:
     - '1' # Checking
     - '2' # Savings
 
-validExpenseAccounts:
+expenseSourceAccounts:
+    - '1' # Checking (debit purchases also withdraw from here)
     - '3' # Credit Card
-    - '4' # Debit Card
 
-validTransfers:
+expenseTransfers:
     - source: '10'
       destination: '1'
 

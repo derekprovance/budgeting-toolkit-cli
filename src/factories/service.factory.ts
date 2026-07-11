@@ -59,15 +59,15 @@ export class ServiceFactory {
         const additionalIncomeService = new AdditionalIncomeService(
             transactionService,
             transactionClassificationService,
-            config.accounts.validDestinationAccounts,
+            config.accounts.incomeDestinationAccounts,
             config.transactions.excludedAdditionalIncomePatterns,
             config.transactions.excludeDisposableIncome
         );
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
             transactionClassificationService,
-            config.accounts.validExpenseSourceAccounts,
-            config.accounts.validTransfers
+            config.accounts.expenseSourceAccounts,
+            config.accounts.expenseTransfers
         );
         const budgetReport = new BudgetReportService(
             budgetService,
@@ -97,7 +97,7 @@ export class ServiceFactory {
             transactionService,
             transactionClassificationService,
             config.accounts.disposableIncomeAccounts,
-            config.accounts.validDestinationAccounts
+            config.accounts.incomeDestinationAccounts
         );
         const budgetSurplusService = new BudgetSurplusService(budgetService);
         const budgetAnalyticsService = new BudgetAnalyticsService(
