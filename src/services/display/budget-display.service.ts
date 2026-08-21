@@ -2,7 +2,11 @@ import chalk from 'chalk';
 import { BudgetReportDto } from '../../types/dto/budget-report.dto.js';
 import { TopExpenseDto } from '../../types/dto/top-expense.dto.js';
 import { BudgetInsight } from '../../types/dto/budget-insight.dto.js';
-import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
+import {
+    BillComparisonDto,
+    getTopBills,
+    getRemainingBills,
+} from '../../types/dto/bill-comparison.dto.js';
 import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
@@ -22,9 +26,6 @@ interface ReportData {
     isCurrentMonth: boolean;
     daysInfo?: {
         daysLeft: number;
-        percentageLeft: number;
-        currentDay: number;
-        totalDays: number;
     };
 }
 
@@ -35,6 +36,7 @@ interface ReportData {
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
     private static readonly NAME_COLUMN_WIDTH = 25;
+    private static readonly AMOUNT_COLUMN_WIDTH = 12;
     private static readonly SECTION_WIDTH = 79;
     private static readonly DESCRIPTION_MAX_LENGTH = 60;
 
@@ -109,10 +111,6 @@ export class BudgetDisplayService {
      * Formats the overview section with summary and status
      */
     private formatOverviewSection(data: ReportData): string {
-        const monthName = new Date(data.year, data.month - 1).toLocaleString('default', {
-            month: 'long',
-        });
-
         const totalSpent = Math.abs(data.budgets.reduce((sum, b) => sum + b.spent, 0));
         const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
         const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
@@ -121,7 +119,7 @@ export class BudgetDisplayService {
         const statusEmoji = EmojiUtils.getStatusEmoji(percentageUsed, isOverBudget);
 
         const header = DisplayFormatterUtils.createBoxHeader(
-            `BUDGET REPORT - ${monthName.toUpperCase()} ${data.year}`
+            `BUDGET REPORT - ${DisplayFormatterUtils.formatMonthYear(data.month, data.year).toUpperCase()}`
         );
 
         const lines: string[] = [header, ''];
@@ -160,13 +158,12 @@ export class BudgetDisplayService {
                 data.daysInfo.daysLeft > 0
                     ? (totalBudget - totalSpent) / data.daysInfo.daysLeft
                     : 0;
-            const dailyFormatted = CurrencyUtils.formatWithSymbol(
-                Math.max(0, dailyBudget),
-                data.billComparison.currencySymbol
-            );
-            lines.push(
-                `${chalk.bold('Daily Budget:')}     ${dailyBudget > 0 ? dailyFormatted : chalk.red('$0.00 (budget exhausted)')}`
-            );
+            const symbol = data.billComparison.currencySymbol;
+            const dailyFormatted =
+                dailyBudget > 0
+                    ? CurrencyUtils.formatWithSymbol(dailyBudget, symbol)
+                    : chalk.red(`${CurrencyUtils.formatWithSymbol(0, symbol)} (budget exhausted)`);
+            lines.push(`${chalk.bold('Daily Budget:')}     ${dailyFormatted}`);
         }
 
         lines.push('');
@@ -328,43 +325,12 @@ export class BudgetDisplayService {
             );
         }
 
-        // Spending Trend (if available)
-        if (budget.transactionStats.spendingTrend) {
-            const { direction, difference, percentageChange } =
-                budget.transactionStats.spendingTrend;
-
-            let trendEmoji = '➡️';
-            let trendText = 'Stable';
-            let trendColor = chalk.gray;
-
-            if (direction === 'increasing') {
-                trendEmoji = '📈 ↑';
-                trendText = 'Increasing';
-                trendColor = chalk.red;
-            } else if (direction === 'decreasing') {
-                trendEmoji = '📉 ↓';
-                trendText = 'Decreasing';
-                trendColor = chalk.green;
-            }
-
-            const diffFormatted = CurrencyUtils.formatWithSymbol(
-                Math.abs(difference),
-                currencySymbol
-            );
-            const pctFormatted = Math.abs(percentageChange).toFixed(1);
-            const sign = difference >= 0 ? '+' : '-';
-
-            lines.push(
-                `${indent}${trendEmoji} Trend: ${trendColor(`${trendText} vs last month (${sign}${diffFormatted}, ${sign}${pctFormatted}%)`)}`
-            );
-        }
-
         // Historical Comparison (always available)
-        const threeMonthAvgFormatted = CurrencyUtils.formatWithSymbol(
-            budget.historicalComparison.threeMonthAvg,
+        const averageSpentFormatted = CurrencyUtils.formatWithSymbol(
+            budget.historicalComparison.averageSpent,
             currencySymbol
         );
-        lines.push(`${indent}📊 Avg Spending: ${threeMonthAvgFormatted}`);
+        lines.push(`${indent}📊 Avg Spending: ${averageSpentFormatted}`);
 
         return lines.join('\n');
     }
@@ -395,18 +361,20 @@ export class BudgetDisplayService {
             billComparison.currencySymbol
         );
 
-        const summaryLine =
-            `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ` +
-            (billComparison.variance > 0
-                ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
-                : chalk.green(`${varianceEmoji} -${varianceFormatted}`));
+        const varianceDisplay =
+            billComparison.variance === 0
+                ? chalk.white(`${varianceEmoji} ${varianceFormatted}`)
+                : billComparison.variance > 0
+                  ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
+                  : chalk.green(`${varianceEmoji} -${varianceFormatted}`);
+        const summaryLine = `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}`;
 
         lines.push(summaryLine);
         lines.push('');
 
-        // Determine how many bills to show individually
-        const billsToShow = verbose ? billComparison.bills : billComparison.bills.slice(0, 4);
-        const otherBills = verbose ? [] : billComparison.bills.slice(4);
+        // Determine how many bills to show individually (top bills by actual spend)
+        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
+        const otherBills = verbose ? [] : getRemainingBills(billComparison);
 
         billsToShow.forEach(bill => {
             const predictedFormatted = CurrencyUtils.formatWithSymbol(
@@ -420,7 +388,7 @@ export class BudgetDisplayService {
             const variance = bill.actual - bill.predicted;
             const varianceEmoji = EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
 
-            const line = `${varianceEmoji} ${bill.name.padEnd(25)} ${actualFormatted.padStart(12)}  (expected ${predictedFormatted})`;
+            const line = `${varianceEmoji} ${bill.name.padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH)} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${predictedFormatted})`;
             lines.push(line);
         });
 
@@ -443,9 +411,10 @@ export class BudgetDisplayService {
                 billComparison.currencySymbol
             );
 
-            const line = `${otherVarianceEmoji} Others (${otherBills.length})${' '.repeat(
-                20 - String(otherBills.length).length
-            )}${otherActualFormatted.padStart(12)}  (expected ${otherPredictedFormatted})`;
+            // Same shape as the per-bill rows so the amount column lines up
+            const line = `${otherVarianceEmoji} ${`Others (${otherBills.length})`.padEnd(
+                BudgetDisplayService.NAME_COLUMN_WIDTH
+            )} ${otherActualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${otherPredictedFormatted})`;
 
             lines.push(line);
         }
@@ -466,7 +435,7 @@ export class BudgetDisplayService {
 
         const url =
             this.baseUrl && transactionId
-                ? `${this.baseUrl}/transactions/show/${transactionId}`
+                ? DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId)
                 : undefined;
         return DisplayFormatterUtils.createHyperlink(truncated, url);
     }
@@ -527,8 +496,7 @@ export class BudgetDisplayService {
         lines.push('');
 
         insights.forEach(insight => {
-            const iconColor = this.getInsightColor(insight.type);
-            const icon = this.getInsightIcon(insight.type);
+            const { color: iconColor, icon } = BudgetDisplayService.INSIGHT_STYLES[insight.type];
             const line = iconColor(`${icon} ${insight.message}`);
             lines.push(line);
         });
@@ -580,36 +548,16 @@ export class BudgetDisplayService {
     }
 
     /**
-     * Gets color for insight type
+     * Color and icon for each insight type. Keyed by the union so a new
+     * insight type is a compile error rather than a silent fallback.
      */
-    private getInsightColor(type: string): (s: string) => string {
-        switch (type) {
-            case 'warning':
-                return chalk.yellow;
-            case 'success':
-                return chalk.green;
-            case 'alert':
-                return chalk.red;
-            case 'info':
-            default:
-                return chalk.cyan;
-        }
-    }
-
-    /**
-     * Gets icon for insight type
-     */
-    private getInsightIcon(type: string): string {
-        switch (type) {
-            case 'warning':
-                return '⚠';
-            case 'success':
-                return '✓';
-            case 'alert':
-                return '🔴';
-            case 'info':
-            default:
-                return '•';
-        }
-    }
+    private static readonly INSIGHT_STYLES: Record<
+        BudgetInsight['type'],
+        { color: (s: string) => string; icon: string }
+    > = {
+        warning: { color: chalk.yellow, icon: '⚠' },
+        success: { color: chalk.green, icon: '✓' },
+        alert: { color: chalk.red, icon: '🔴' },
+        info: { color: chalk.cyan, icon: '•' },
+    };
 }

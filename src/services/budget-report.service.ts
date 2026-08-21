@@ -28,16 +28,15 @@ export class BudgetReportService implements IBudgetReportService {
     ): Promise<Result<BudgetLimitDto[], BudgetError>> {
         const operation = 'getBudgetReport';
 
-        // Validate date
-        try {
-            DateUtils.validateMonthYear(month, year);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
-
-            return Result.err(
-                BudgetErrorFactory.create(BudgetErrorType.INVALID_DATE, month, year, operation, err)
-            );
+        const dateValidation = DateUtils.validateMonthYearResult(
+            month,
+            year,
+            operation,
+            (m, y, op, err) =>
+                BudgetErrorFactory.create(BudgetErrorType.INVALID_DATE, m, y, op, err)
+        );
+        if (!dateValidation.ok) {
+            return Result.err(dateValidation.error);
         }
 
         logger.debug({ month, year }, 'Fetching budget report');

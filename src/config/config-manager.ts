@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as os from 'os';
 import dotenv from 'dotenv';
-import { AppConfig, ExcludedTransaction } from './config.types.js';
+import { AppConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
 import { ValidTransfer } from '../types/common.types.js';
@@ -30,24 +30,7 @@ interface YamlConfig {
         noNameExpenseAccountId?: string;
     };
 
-    llm?: {
-        maxTokens?: number;
-        batchSize?: number;
-        maxConcurrent?: number;
-        temperature?: number;
-        model?: string;
-        retryDelayMs?: number;
-        maxRetryDelayMs?: number;
-        rateLimit?: {
-            maxTokensPerMinute?: number;
-            refillInterval?: number;
-        };
-        circuitBreaker?: {
-            failureThreshold?: number;
-            resetTimeout?: number;
-            halfOpenTimeout?: number;
-        };
-    };
+    llm?: DeepPartial<LLMConfig>;
 }
 
 /**
@@ -71,6 +54,10 @@ type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } 
 export class ConfigManager {
     private static instance: ConfigManager | undefined;
     private static configFilePath: string | null = null;
+    /** The configPath argument passed on first initialization (for mismatch detection) */
+    private static initConfigPathArg: string | undefined;
+    /** Resolved .env path, captured statically so it survives a validation throw */
+    private static resolvedEnvPath: string | null = null;
     private config: AppConfig;
     private loadedEnvPath: string | null = null;
 
@@ -90,13 +77,36 @@ export class ConfigManager {
 
     /**
      * Gets the singleton ConfigManager instance
-     * @param configPath Optional path to config file (only used on first initialization)
+     * @param configPath Optional path to config file (only honored on first initialization).
+     * Passing a different path after initialization throws — silently using the
+     * wrong config for financial data would be far worse than a loud error.
      */
     static getInstance(configPath?: string): ConfigManager {
-        if (!ConfigManager.instance) {
-            ConfigManager.instance = new ConfigManager(configPath);
+        if (ConfigManager.instance) {
+            if (configPath !== undefined && configPath !== ConfigManager.initConfigPathArg) {
+                throw new Error(
+                    'ConfigManager already initialized with a different config path; ' +
+                        '--config must be handled before first use'
+                );
+            }
+            return ConfigManager.instance;
         }
+
+        ConfigManager.initConfigPathArg = configPath;
+        ConfigManager.instance = new ConfigManager(configPath);
         return ConfigManager.instance;
+    }
+
+    /**
+     * Gets the config/env paths resolved during initialization — populated even
+     * when the constructor later throws on validation, so error reporting can
+     * show which files were loaded.
+     */
+    static getResolvedPaths(): { configPath: string | null; envPath: string | null } {
+        return {
+            configPath: ConfigManager.configFilePath,
+            envPath: ConfigManager.resolvedEnvPath,
+        };
     }
 
     /**
@@ -128,6 +138,8 @@ export class ConfigManager {
     static resetInstance(): void {
         ConfigManager.instance = undefined;
         ConfigManager.configFilePath = null;
+        ConfigManager.initConfigPathArg = undefined;
+        ConfigManager.resolvedEnvPath = null;
     }
 
     /**
@@ -139,7 +151,7 @@ export class ConfigManager {
     }
 
     /**
-     * Gets the default config file path (~/.budgeting/config.yaml)
+     * Gets the default config file path (~/.budget/config.yaml)
      * @returns Absolute path to default config.yaml
      */
     static getDefaultConfigPath(): string {
@@ -147,7 +159,7 @@ export class ConfigManager {
     }
 
     /**
-     * Gets the default .env file path (~/.budgeting/.env)
+     * Gets the default .env file path (~/.budget/.env)
      * @returns Absolute path to default .env
      */
     static getDefaultEnvPath(): string {
@@ -184,7 +196,7 @@ export class ConfigManager {
             return cwdPath;
         }
 
-        // Priority 3: User home directory ~/.budgeting/config.yaml
+        // Priority 3: User home directory ~/.budget/config.yaml
         const homePath = ConfigManager.getDefaultConfigPath();
         if (fs.existsSync(homePath)) {
             return homePath;
@@ -192,7 +204,7 @@ export class ConfigManager {
 
         // Priority 4: No config file found (use defaults)
         console.warn(
-            'No config.yaml found. Using defaults. Run "budgeting-toolkit init" to create configuration.'
+            'No config.yaml found. Using defaults. Copy config.yaml.example to ~/.budget/config.yaml to create configuration.'
         );
         return null;
     }
@@ -201,7 +213,7 @@ export class ConfigManager {
      * Loads the .env file into process.env from multiple possible locations:
      * 1. ENV_FILE environment variable (if set)
      * 2. Current working directory: ./.env
-     * 3. User home directory: ~/.budgeting/.env
+     * 3. User home directory: ~/.budget/.env
      *
      * Uses dotenv.config which silently ignores missing files (quiet: true)
      * Tracks which .env file was loaded in this.loadedEnvPath
@@ -214,6 +226,7 @@ export class ConfigManager {
                 quiet: true,
             });
             this.loadedEnvPath = process.env.ENV_FILE;
+            ConfigManager.resolvedEnvPath = process.env.ENV_FILE;
             return;
         }
 
@@ -226,10 +239,11 @@ export class ConfigManager {
                 quiet: true,
             });
             this.loadedEnvPath = cwdEnv;
+            ConfigManager.resolvedEnvPath = cwdEnv;
             return;
         }
 
-        // Priority 3: User home directory ~/.budgeting/.env
+        // Priority 3: User home directory ~/.budget/.env
         const homeEnv = ConfigManager.getDefaultEnvPath();
         if (fs.existsSync(homeEnv)) {
             dotenv.config({
@@ -237,6 +251,7 @@ export class ConfigManager {
                 quiet: true,
             });
             this.loadedEnvPath = homeEnv;
+            ConfigManager.resolvedEnvPath = homeEnv;
             return;
         }
 
@@ -339,10 +354,10 @@ export class ConfigManager {
             config.transactions.excludedAdditionalIncomePatterns =
                 yamlConfig.excludedAdditionalIncomePatterns;
         }
-        if (yamlConfig.excludeDisposableIncome !== undefined) {
+        if (yamlConfig.excludeDisposableIncome != null) {
             config.transactions.excludeDisposableIncome = yamlConfig.excludeDisposableIncome;
         }
-        if (yamlConfig.expectedMonthlyPaycheck !== undefined) {
+        if (yamlConfig.expectedMonthlyPaycheck != null) {
             config.transactions.expectedMonthlyPaycheck = yamlConfig.expectedMonthlyPaycheck;
         }
         if (yamlConfig.excludedTransactions) {
@@ -351,10 +366,10 @@ export class ConfigManager {
 
         // Tags Configuration
         if (yamlConfig.tags) {
-            if (yamlConfig.tags.disposableIncome !== undefined) {
+            if (yamlConfig.tags.disposableIncome != null) {
                 config.transactions.tags.disposableIncome = yamlConfig.tags.disposableIncome;
             }
-            if (yamlConfig.tags.paycheck !== undefined) {
+            if (yamlConfig.tags.paycheck != null) {
                 config.transactions.tags.paycheck = yamlConfig.tags.paycheck;
             }
         }
@@ -375,7 +390,8 @@ export class ConfigManager {
      */
     private deepMerge<T extends object>(target: T, source: DeepPartial<T>): void {
         for (const [key, value] of Object.entries(source)) {
-            if (value === undefined) {
+            // Empty YAML scalars parse to null — never let them clobber defaults
+            if (value === undefined || value === null) {
                 continue;
             }
 

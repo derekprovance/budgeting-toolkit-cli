@@ -318,6 +318,41 @@ qZXQ
 
             expect(config.transactions.expectedMonthlyPaycheck).toBe(6000);
         });
+
+        it('should keep defaults when YAML scalars are empty (parsed as null)', () => {
+            // `model:` with no value parses to null — must not clobber the default
+            const yamlConfig = {
+                expectedMonthlyPaycheck: null,
+                excludeDisposableIncome: null,
+                tags: { disposableIncome: null },
+                llm: { model: null, maxTokens: null },
+            };
+
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue(yamlConfig);
+
+            const config = ConfigManager.getInstance().getConfig();
+
+            expect(config.llm.model).toBeTruthy();
+            expect(config.llm.maxTokens).toBeGreaterThan(0);
+            // Default is undefined — a null YAML scalar must not turn it into null
+            expect(config.transactions.expectedMonthlyPaycheck).toBeUndefined();
+            expect(typeof config.transactions.excludeDisposableIncome).toBe('boolean');
+            expect(config.transactions.tags.disposableIncome).toBe('Disposable Income');
+        });
+
+        it('should preserve legitimate falsy YAML values like false', () => {
+            const yamlConfig = { excludeDisposableIncome: false };
+
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue(yamlConfig);
+
+            const config = ConfigManager.getInstance().getConfig();
+
+            expect(config.transactions.excludeDisposableIncome).toBe(false);
+        });
     });
 
     describe('Singleton pattern', () => {
@@ -342,6 +377,50 @@ qZXQ
             const instance2 = ConfigManager.getInstance();
 
             expect(instance1).not.toBe(instance2);
+        });
+
+        it('should return the same instance when the same path is passed again', () => {
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+
+            const instance1 = ConfigManager.getInstance('/test/path/config.yaml');
+            const instance2 = ConfigManager.getInstance('/test/path/config.yaml');
+            const instance3 = ConfigManager.getInstance();
+
+            expect(instance1).toBe(instance2);
+            expect(instance1).toBe(instance3);
+        });
+
+        it('should throw when a different config path is passed after initialization', () => {
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+
+            ConfigManager.getInstance('/test/path/a.yaml');
+
+            expect(() => ConfigManager.getInstance('/test/path/b.yaml')).toThrow(
+                /already initialized with a different config path/
+            );
+        });
+    });
+
+    describe('Resolved paths on validation failure', () => {
+        it('should expose resolved paths even when the constructor throws', () => {
+            // Missing required env vars → validation throws in the constructor
+            delete process.env.FIREFLY_API_URL;
+            delete process.env.FIREFLY_API_TOKEN;
+
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+
+            expect(() => ConfigManager.getInstance('/test/path/config.yaml')).toThrow(
+                /Configuration validation failed/
+            );
+
+            // The friendly error path in cli.ts depends on this surviving the throw
+            expect(ConfigManager.getResolvedPaths().configPath).toBe('/test/path/config.yaml');
         });
     });
 

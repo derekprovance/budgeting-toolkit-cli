@@ -18,8 +18,10 @@ export interface CertificateConfig {
  * @returns An axios instance with certificate support
  */
 export function createCustomAxiosInstance(config: CertificateConfig): AxiosInstance {
-    if (!config.clientCertPath) {
-        logger.debug('No client certificate configured, using default axios');
+    // A CA-only setup (private CA, no mTLS) still needs a custom agent so the
+    // CA is trusted — only bail out when neither certificate is configured
+    if (!config.clientCertPath && !config.caCertPath) {
+        logger.debug('No certificates configured, using default axios');
         return axios.create();
     }
 
@@ -28,7 +30,7 @@ export function createCustomAxiosInstance(config: CertificateConfig): AxiosInsta
         if (config.caCertPath && !fs.existsSync(config.caCertPath)) {
             throw new Error(`CA certificate not found: ${config.caCertPath}`);
         }
-        if (!fs.existsSync(config.clientCertPath)) {
+        if (config.clientCertPath && !fs.existsSync(config.clientCertPath)) {
             throw new Error(`Client certificate not found: ${config.clientCertPath}`);
         }
 
@@ -66,24 +68,26 @@ export function createCustomAxiosInstance(config: CertificateConfig): AxiosInsta
             agentOptions.ca = fs.readFileSync(config.caCertPath);
         }
 
-        // Handle P12/PFX format client certificates
-        if (config.clientCertPath.endsWith('.p12') || config.clientCertPath.endsWith('.pfx')) {
-            agentOptions.pfx = fs.readFileSync(config.clientCertPath);
-            if (config.clientCertPassword) {
-                agentOptions.passphrase = config.clientCertPassword;
-            }
-        } else {
-            // Handle PEM format certificates
-            agentOptions.cert = fs.readFileSync(config.clientCertPath);
-            // Assume key file has same name with .key extension if not specified
-            const keyPath = config.clientCertPath.replace(/\.(pem|crt)$/, '.key');
-            if (fs.existsSync(keyPath)) {
-                agentOptions.key = fs.readFileSync(keyPath);
+        if (config.clientCertPath) {
+            // Handle P12/PFX format client certificates
+            if (config.clientCertPath.endsWith('.p12') || config.clientCertPath.endsWith('.pfx')) {
+                agentOptions.pfx = fs.readFileSync(config.clientCertPath);
+                if (config.clientCertPassword) {
+                    agentOptions.passphrase = config.clientCertPassword;
+                }
+            } else {
+                // Handle PEM format certificates
+                agentOptions.cert = fs.readFileSync(config.clientCertPath);
+                // Assume key file has same name with .key extension if not specified
+                const keyPath = config.clientCertPath.replace(/\.(pem|crt)$/, '.key');
+                if (fs.existsSync(keyPath)) {
+                    agentOptions.key = fs.readFileSync(keyPath);
+                }
             }
         }
 
         // Create and return axios instance with HTTPS agent
-        logger.debug('Creating axios instance with client certificate support');
+        logger.debug('Creating axios instance with certificate support');
         return axios.create({
             httpsAgent: new Agent(agentOptions),
             timeout: 30000,

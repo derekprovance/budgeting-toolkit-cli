@@ -21,11 +21,6 @@ export interface ITransactionClassificationService {
     isDisposableIncome(transaction: TransactionSplit): boolean;
 
     /**
-     * Checks if destination account matches the "no name" expense account
-     */
-    hasNoDestination(destinationId: string | null): boolean;
-
-    /**
      * Checks if transaction is supplemented by disposable income
      */
     isSupplementedByDisposable(tags: string[] | null | undefined): boolean;

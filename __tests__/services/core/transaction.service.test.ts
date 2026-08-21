@@ -30,6 +30,8 @@ describe('TransactionService', () => {
             getDateRange: jest.fn().mockReturnValue({
                 startDate: new Date('2024-01-01'),
                 endDate: new Date('2024-01-31'),
+                startDateString: '2024-01-01',
+                endDateString: '2024-01-31',
             }),
         } as jest.Mocked<IDateRangeService>;
         service = new TransactionService(
@@ -894,25 +896,6 @@ describe('TransactionService', () => {
     });
 
     describe('Cache Management', () => {
-        it('should clear the transaction cache', () => {
-            const mockCache = new Map();
-            const mockSplitIndex = new Map();
-            const serviceWithCache = new TransactionService(
-                mockExcludedTransactionService,
-                mockApiClient,
-                mockDateRangeService,
-                mockCache
-            );
-
-            // @ts-expect-error - accessing private property for test
-            serviceWithCache.splitTransactionIdx = mockSplitIndex;
-
-            serviceWithCache.clearCache();
-
-            expect(mockCache.size).toBe(0);
-            expect(mockSplitIndex.size).toBe(0);
-        });
-
         it('should return cached data on subsequent calls (cache hit)', async () => {
             const mockTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
@@ -972,6 +955,51 @@ describe('TransactionService', () => {
             // Second call should not make API call
             await service.getTransactionsByTag('test-tag');
             expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledTimes(1);
+        });
+
+        it('should share one API fetch across concurrent callers (no stampede)', async () => {
+            const mockTransaction: TransactionSplit = {
+                transaction_journal_id: '1',
+                description: 'Test Transaction',
+                date: '2024-01-15',
+                type: 'withdrawal' as TransactionTypeProperty,
+            } as TransactionSplit;
+
+            const mockTransactionRead: TransactionRead = {
+                id: '1',
+                attributes: {
+                    transactions: [mockTransaction],
+                },
+            } as TransactionRead;
+
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [mockTransactionRead],
+            } as TransactionArray);
+
+            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+
+            // Fire concurrent requests before any has resolved (analyze command pattern)
+            const results = await Promise.all([
+                service.getTransactionsForMonth(1, 2024),
+                service.getTransactionsForMonth(1, 2024),
+                service.getTransactionsForMonth(1, 2024),
+            ]);
+
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
+            expect(results[0]).toEqual(results[1]);
+            expect(results[1]).toEqual(results[2]);
+        });
+
+        it('should not cache failed fetches', async () => {
+            (mockApiClient.transactions.listTransaction as jest.Mock)
+                .mockRejectedValueOnce(new Error('network down'))
+                .mockResolvedValueOnce({ data: [] } as unknown as TransactionArray);
+
+            await expect(service.getTransactionsForMonth(1, 2024)).rejects.toThrow();
+
+            // Retry after failure should hit the API again and succeed
+            await expect(service.getTransactionsForMonth(1, 2024)).resolves.toEqual([]);
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(2);
         });
 
         it('should use different cache keys for different months', async () => {
@@ -1118,27 +1146,6 @@ describe('TransactionService', () => {
             // Verify split index is populated
             const indexedTransaction = serviceWithCache.getTransactionReadBySplit(mockTransaction);
             expect(indexedTransaction).toEqual(mockTransactionRead);
-        });
-    });
-
-    describe('clearCache', () => {
-        it('should clear the transaction cache', () => {
-            const mockCache = new Map();
-            const mockSplitIndex = new Map();
-            const serviceWithCache = new TransactionService(
-                mockExcludedTransactionService,
-                mockApiClient,
-                mockDateRangeService,
-                mockCache
-            );
-
-            // @ts-expect-error - accessing private property for test
-            serviceWithCache.splitTransactionIdx = mockSplitIndex;
-
-            serviceWithCache.clearCache();
-
-            expect(mockCache.size).toBe(0);
-            expect(mockSplitIndex.size).toBe(0);
         });
     });
 });

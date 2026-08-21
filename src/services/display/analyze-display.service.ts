@@ -41,10 +41,7 @@ export class AnalyzeDisplayService {
      * Formats the month header
      */
     private formatMonthHeader(month: number, year: number): string {
-        const monthName = Intl.DateTimeFormat('en', { month: 'long' }).format(
-            new Date(year, month - 1)
-        );
-        return `${chalk.bold(monthName + ' ' + year)}`;
+        return chalk.bold(DisplayFormatterUtils.formatMonthYear(month, year));
     }
 
     /**
@@ -382,15 +379,17 @@ export class AnalyzeDisplayService {
     private formatBillDetail(bill: BillDetailDto, symbol: string): string {
         const variance = bill.actual - bill.predicted;
         const varianceColor = variance > 0 ? chalk.red : chalk.green;
+        // formatCurrency renders the absolute value, so the sign must be explicit
+        const sign = variance >= 0 ? '+' : '-';
         const formattedVariance = varianceColor(
-            `(${variance > 0 ? '+' : ''}${this.formatCurrency(variance, symbol)})`
+            `(${sign}${this.formatCurrency(variance, symbol)})`
         );
 
         // Format frequency with capitalization
         const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);
         const freqBadge = chalk.dim(`[${freq}]`);
 
-        return `    ${bill.name.substring(0, 30).padEnd(30)} ${freqBadge.padEnd(15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
+        return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
     }
 
     /**

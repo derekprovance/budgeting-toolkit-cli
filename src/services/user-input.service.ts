@@ -25,6 +25,14 @@ export class UserInputService {
     constructor(private baseUrl: string) {}
 
     /**
+     * Computes the remainder for the second split, rounded to cents to avoid
+     * floating-point drift.
+     */
+    static remainderAmount(originalAmount: number, firstSplitAmount: number): number {
+        return parseFloat((originalAmount - firstSplitAmount).toFixed(2));
+    }
+
+    /**
      * Asks the user whether to update a transaction with new category and/or budget
      * @param transaction The transaction to potentially update
      * @param transactionId The transaction ID for linking
@@ -130,30 +138,22 @@ export class UserInputService {
         currentValue?: string,
         aiSuggestion?: string
     ): Promise<string | undefined> {
+        // AI suggestion takes precedence when a value is both current and suggested
+        const toChoice = (name: string) => {
+            let label = name;
+            if (name === aiSuggestion) {
+                label = `${name} ${chalk.cyan('(AI suggested)')}`;
+            } else if (name === currentValue) {
+                label = `${name} ${chalk.green('(current)')}`;
+            }
+            return { value: name, name: label };
+        };
+
         return await search({
             message,
             source: async input => {
                 if (!input) {
-                    // Show all values with appropriate labels
-                    const choices = values.map(name => {
-                        const isAI = name === aiSuggestion;
-                        const isCurrent = name === currentValue;
-
-                        let label = name;
-                        if (isAI && isCurrent) {
-                            // Same value for both - only show AI label
-                            label = `${name} ${chalk.cyan('(AI suggested)')}`;
-                        } else if (isCurrent) {
-                            label = `${name} ${chalk.green('(current)')}`;
-                        } else if (isAI) {
-                            label = `${name} ${chalk.cyan('(AI suggested)')}`;
-                        }
-
-                        return {
-                            value: name,
-                            name: label,
-                        };
-                    });
+                    const choices = values.map(toChoice);
 
                     // Sort: current first, then AI suggestion, then alphabetical
                     choices.sort((a, b) => {
@@ -169,26 +169,9 @@ export class UserInputService {
 
                 // Filter based on user input (case-insensitive)
                 const searchLower = input.toLowerCase();
-                const filtered = values.filter(name => name.toLowerCase().includes(searchLower));
-
-                return filtered.map(name => {
-                    const isAI = name === aiSuggestion;
-                    const isCurrent = name === currentValue;
-
-                    let label = name;
-                    if (isAI && isCurrent) {
-                        label = `${name} ${chalk.cyan('(AI suggested)')}`;
-                    } else if (isCurrent) {
-                        label = `${name} ${chalk.green('(current)')}`;
-                    } else if (isAI) {
-                        label = `${name} ${chalk.cyan('(AI suggested)')}`;
-                    }
-
-                    return {
-                        value: name,
-                        name: label,
-                    };
-                });
+                return values
+                    .filter(name => name.toLowerCase().includes(searchLower))
+                    .map(toChoice);
             },
         });
     }
@@ -374,7 +357,7 @@ export class UserInputService {
      * Returns the link to show a transaction to the user
      */
     private getTransactionLink(transactionId: string | undefined) {
-        return `${this.baseUrl}/transactions/show/${transactionId}`;
+        return DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId ?? '');
     }
 
     /**
@@ -435,7 +418,7 @@ export class UserInputService {
         }
 
         // Validate minimum second split amount (at least 1 cent)
-        const secondSplitAmount = parseFloat((originalAmount - amount).toFixed(2));
+        const secondSplitAmount = UserInputService.remainderAmount(originalAmount, amount);
         if (secondSplitAmount < 0.01) {
             return `Second split would be too small (${currencySymbol}${secondSplitAmount.toFixed(2)}). Please enter a smaller amount.`;
         }

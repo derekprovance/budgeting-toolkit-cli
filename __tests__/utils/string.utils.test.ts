@@ -98,28 +98,6 @@ describe('StringUtils', () => {
         });
     });
 
-    describe('containsNormalized', () => {
-        it('should match case-insensitively', () => {
-            expect(StringUtils.containsNormalized('HELLO WORLD', 'hello')).toBe(true);
-            expect(StringUtils.containsNormalized('hello world', 'WORLD')).toBe(true);
-        });
-
-        it('should match with special characters', () => {
-            expect(StringUtils.containsNormalized('My-String_Test', 'string')).toBe(true);
-            expect(StringUtils.containsNormalized('test@example.com', 'example')).toBe(true);
-        });
-
-        it('should match with normalized spaces', () => {
-            expect(StringUtils.containsNormalized('HELLO_WORLD', 'hello world')).toBe(true);
-            expect(StringUtils.containsNormalized('hello-world', 'hello world')).toBe(true);
-        });
-
-        it('should not match when needle not in haystack', () => {
-            expect(StringUtils.containsNormalized('hello', 'world')).toBe(false);
-            expect(StringUtils.containsNormalized('test', 'testing')).toBe(false);
-        });
-    });
-
     describe('matchesAnyPattern', () => {
         it('should match against any pattern', () => {
             expect(StringUtils.matchesAnyPattern('PAYROLL_2024', ['payroll', 'salary'])).toBe(true);

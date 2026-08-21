@@ -7,10 +7,48 @@ import { CurrencyUtils } from './currency.utils.js';
  */
 export class DisplayFormatterUtils {
     /**
-     * Formats currency with symbol
+     * Formats currency with symbol.
+     *
+     * Note: renders the ABSOLUTE value — callers that need to convey direction
+     * must add the sign themselves (or use {@link formatNetImpact}).
      */
     static formatCurrency(amount: number, symbol: string): string {
         return CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
+    }
+
+    /**
+     * Pads a string to a visible width, ignoring ANSI escape codes.
+     * Plain `padEnd`/`padStart` count escape sequences as characters, so
+     * padding a colored string is silently a no-op.
+     *
+     * @param text Text that may contain ANSI color codes
+     * @param width Target visible width
+     * @param side Which side to pad (default: 'end')
+     */
+    static padVisible(text: string, width: number, side: 'start' | 'end' = 'end'): string {
+        const visibleLength = stripAnsi(text).length;
+        const padding = ' '.repeat(Math.max(0, width - visibleLength));
+        return side === 'end' ? text + padding : padding + text;
+    }
+
+    /**
+     * Formats a month/year as "January 2025".
+     * Locale is pinned so reports read identically on every machine.
+     */
+    static formatMonthYear(month: number, year: number): string {
+        const monthName = new Intl.DateTimeFormat('en', { month: 'long' }).format(
+            new Date(year, month - 1)
+        );
+        return `${monthName} ${year}`;
+    }
+
+    /**
+     * Builds a Firefly III transaction URL, tolerating a trailing slash on the
+     * configured base URL.
+     */
+    static transactionUrl(baseUrl: string, transactionId: string): string {
+        if (!baseUrl) return '';
+        return `${baseUrl.replace(/\/+$/, '')}/transactions/show/${transactionId}`;
     }
 
     /**
@@ -39,7 +77,10 @@ export class DisplayFormatterUtils {
      */
     static createSectionHeader(title: string, width: number = 45): string {
         const topBorder = '┌' + '─'.repeat(width) + '┐';
-        const middleLine = '│ ' + chalk.bold(title) + ' '.repeat(width - title.length - 1) + '│';
+        // ANSI-aware like createBoxHeader, and never negative for long titles
+        const titleLength = stripAnsi(title).length;
+        const middleLine =
+            '│ ' + chalk.bold(title) + ' '.repeat(Math.max(0, width - titleLength - 1)) + '│';
         const bottomBorder = '└' + '─'.repeat(width) + '┘';
 
         return `${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;

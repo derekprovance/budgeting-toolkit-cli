@@ -43,18 +43,6 @@ export class StringUtils {
     }
 
     /**
-     * Checks if a string contains another string using normalized comparison.
-     * Case-insensitive and handles special characters.
-     *
-     * @example
-     * StringUtils.containsNormalized("My-String", "string") // true
-     * StringUtils.containsNormalized("HELLO_WORLD", "hello world") // true
-     */
-    static containsNormalized(haystack: string, needle: string): boolean {
-        return this.normalize(haystack).includes(this.normalize(needle));
-    }
-
-    /**
      * Checks if a string matches any of the provided patterns using normalized comparison.
      *
      * @example

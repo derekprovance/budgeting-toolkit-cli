@@ -40,68 +40,6 @@ describe('ExcludedTransactionService', () => {
         service = new ExcludedTransactionService(mockExcludedTransactions, mockLogger);
     });
 
-    describe('getExcludedTransactions', () => {
-        it('should return all excluded transactions from config', async () => {
-            const result = await service.getExcludedTransactions();
-
-            expect(result).toEqual([
-                {
-                    description: 'VANGUARD BUY INVESTMENT',
-                    amount: '4400.00',
-                    reason: 'Investment purchase',
-                },
-                {
-                    description: 'CRT Management',
-                    amount: '1047.66',
-                    reason: 'Management fee',
-                },
-                {
-                    description: 'Excluded Description Only',
-                    amount: undefined,
-                    reason: 'Excluded from processing',
-                },
-                {
-                    description: undefined,
-                    amount: '999.99',
-                    reason: 'Excluded by amount only',
-                },
-            ]);
-
-            expect(mockLogger.trace).toHaveBeenCalledWith(
-                { count: 4 },
-                'Returning excluded transactions from configuration'
-            );
-        });
-
-        it('should return empty array when no excluded transactions configured', async () => {
-            const emptyService = new ExcludedTransactionService([], mockLogger);
-            const result = await emptyService.getExcludedTransactions();
-
-            expect(result).toEqual([]);
-            expect(mockLogger.trace).toHaveBeenCalledWith(
-                { count: 0 },
-                'Returning excluded transactions from configuration'
-            );
-        });
-
-        it('should use default reason when not provided', async () => {
-            const transactionWithoutReason: ExcludedTransaction[] = [
-                {
-                    description: 'Test',
-                    amount: '100.00',
-                },
-            ];
-
-            const testService = new ExcludedTransactionService(
-                transactionWithoutReason,
-                mockLogger
-            );
-            const result = await testService.getExcludedTransactions();
-
-            expect(result[0].reason).toBe('Excluded from processing');
-        });
-    });
-
     describe('isExcludedTransaction', () => {
         it('should return true when both description and amount match', () => {
             const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '4400.00');
@@ -158,64 +96,21 @@ describe('ExcludedTransactionService', () => {
         });
     });
 
-    describe('convertCurrencyToFloat', () => {
-        let convertCurrencyToFloat: (amount: string) => string;
-
-        beforeEach(() => {
-            // Access the private method through the prototype and bind it to the service instance
-            convertCurrencyToFloat = (
-                service as unknown as {
-                    convertCurrencyToFloat: (amount: string) => string;
-                }
-            ).convertCurrencyToFloat.bind(service);
+    describe('malformed amounts', () => {
+        it('should not throw on empty amounts and treat them as non-matching', () => {
+            expect(() => service.isExcludedTransaction('Any Description', '')).not.toThrow();
+            expect(service.isExcludedTransaction('Any Description', '')).toBe(false);
         });
 
-        it('should convert currency string to float', () => {
-            const result = convertCurrencyToFloat('$4,400.00');
-            expect(result).toBe('4400.00');
+        it('should not throw on unparseable amounts and treat them as non-matching', () => {
+            expect(() => service.isExcludedTransaction('Any Description', 'abc')).not.toThrow();
+            expect(service.isExcludedTransaction('Any Description', 'abc')).toBe(false);
         });
 
-        it('should handle negative amounts with parentheses', () => {
-            const result = convertCurrencyToFloat('($4,400.00)');
-            expect(result).toBe('-4400.00');
-        });
-
-        it('should handle negative amounts with minus sign', () => {
-            const result = convertCurrencyToFloat('-$4,400.00');
-            expect(result).toBe('-4400.00');
-        });
-
-        it('should handle different currency symbols', () => {
-            expect(convertCurrencyToFloat('€4,400.00')).toBe('4400.00');
-            expect(convertCurrencyToFloat('£4,400.00')).toBe('4400.00');
-            expect(convertCurrencyToFloat('¥4,400.00')).toBe('4400.00');
-        });
-
-        it('should handle amounts without currency symbols', () => {
-            const result = convertCurrencyToFloat('4400.00');
-            expect(result).toBe('4400.00');
-        });
-
-        it('should handle amounts with commas', () => {
-            const result = convertCurrencyToFloat('1,234,567.89');
-            expect(result).toBe('1234567.89');
-        });
-
-        it('should round to 2 decimal places', () => {
-            const result = convertCurrencyToFloat('100.126');
-            expect(result).toBe('100.13');
-        });
-
-        it('should throw error for invalid amount format', () => {
-            expect(() => convertCurrencyToFloat('invalid')).toThrow('Invalid amount format');
-        });
-
-        it('should throw error for empty amount', () => {
-            expect(() => convertCurrencyToFloat('')).toThrow('Amount cannot be empty');
-        });
-
-        it('should throw error for amount with letters', () => {
-            expect(() => convertCurrencyToFloat('$123abc')).toThrow('Invalid amount format');
+        it('should still match description-only rules when the amount is malformed', () => {
+            expect(service.isExcludedTransaction('Excluded Description Only', 'garbage')).toBe(
+                true
+            );
         });
     });
 });

@@ -48,6 +48,35 @@ const validateYear = (value: string): number => {
     return year;
 };
 
+/**
+ * Adds the shared month/year options to a command
+ */
+const withDateOptions = (command: Command): Command =>
+    command
+        .addOption(
+            new Option('-m, --month <month>', 'target month (1-12)')
+                .argParser(validateMonth)
+                .default(getCurrentMonth(), 'current month')
+        )
+        .addOption(
+            new Option('-y, --year <year>', 'target year')
+                .argParser(validateYear)
+                .default(getCurrentYear(), 'current year')
+        );
+
+/**
+ * Exits with usage guidance when a required positional argument is blank.
+ * (Commander already rejects a missing argument; this catches whitespace.)
+ */
+const requireArg = (value: string, name: string, usage: string, example: string): void => {
+    if (!value || value.trim() === '') {
+        console.error(`❌ Error: ${name} is required and cannot be empty`);
+        console.log(`\nUsage: ${usage}`);
+        console.log(`Example: ${example}`);
+        process.exit(1);
+    }
+};
+
 const handleError = (error: unknown, operation: string): never => {
     logger.error({ err: error }, `Error ${operation}:`);
     process.exit(1);
@@ -60,7 +89,7 @@ export const createCli = (configPath?: string): Command => {
         .name('budgeting-toolkit')
         .description(packageJson.description)
         .version(packageJson.version)
-        .option('-v, --verbose', 'enable verbose logging')
+        .option('-v, --verbose', 'show detailed transaction breakdowns in reports')
         .option('-c, --config <path>', 'path to config.yaml file');
 
     // Try to initialize API client and services for other commands
@@ -70,6 +99,10 @@ export const createCli = (configPath?: string): Command => {
     try {
         const configManager = ConfigManager.getInstance(configPath);
         const config = configManager.getConfig();
+
+        // Apply the configured log level now that configuration is loaded
+        // (the logger initializes from LOG_LEVEL/'info' at import time)
+        logger.level = config.logging.level;
 
         // Create Firefly client with properly formatted config
         apiClient = new FireflyClientWithCerts({
@@ -84,14 +117,15 @@ export const createCli = (configPath?: string): Command => {
     } catch (error) {
         const isValidationError =
             error instanceof Error && error.message.includes('Configuration validation failed');
-        const configManager = ConfigManager.getInstance(configPath);
+        // Never re-enter getInstance here: when the constructor threw, a second
+        // call would throw the identical error and skip this friendly output.
+        // The resolved paths are captured statically before validation runs.
+        const { configPath: loadedConfigPath, envPath: loadedEnvPath } =
+            ConfigManager.getResolvedPaths();
 
         if (isValidationError) {
             // Show detailed validation error with file paths
             console.log('\n[!] Configuration validation failed\n');
-
-            const loadedConfigPath = configManager.getLoadedConfigPath();
-            const loadedEnvPath = configManager.getLoadedEnvPath();
 
             console.log('Loaded files:');
             console.log(`  config.yaml: ${loadedConfigPath ? loadedConfigPath : '(none found)'}`);
@@ -151,20 +185,12 @@ export const createCli = (configPath?: string): Command => {
         process.exit(1);
     }
 
-    program
-        .command('analyze')
-        .alias('an')
-        .description('Budget analysis with surplus/deficit variance')
-        .addOption(
-            new Option('-m, --month <month>', 'target month (1-12)')
-                .argParser(validateMonth)
-                .default(getCurrentMonth(), 'current month')
-        )
-        .addOption(
-            new Option('-y, --year <year>', 'target year')
-                .argParser(validateYear)
-                .default(getCurrentYear(), 'current year')
-        )
+    withDateOptions(
+        program
+            .command('analyze')
+            .alias('an')
+            .description('Budget analysis with surplus/deficit variance')
+    )
         .addHelpText(
             'after',
             `
@@ -200,27 +226,19 @@ Examples:
             }
         });
 
-    program
-        .command('report')
-        .alias('st')
-        .description('Display current budget report and spending analysis')
-        .addOption(
-            new Option('-m, --month <month>', 'target month (1-12)')
-                .argParser(validateMonth)
-                .default(getCurrentMonth(), 'current month')
-        )
-        .addOption(
-            new Option('-y, --year <year>', 'target year')
-                .argParser(validateYear)
-                .default(getCurrentYear(), 'current year')
-        )
+    withDateOptions(
+        program
+            .command('report')
+            .alias('st')
+            .description('Display current budget report and spending analysis')
+    )
         .addHelpText(
             'after',
             `
 Examples:
   $ budgeting-toolkit report                      # current month report
   $ budgeting-toolkit report -m 8                 # August report
-  $ budgeting-toolkit rp                          # current month (using alias)`
+  $ budgeting-toolkit st                          # current month (using alias)`
         )
         .action(async (opts: BudgetDateOptions) => {
             try {
@@ -271,12 +289,12 @@ Examples:
   $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only`
         )
         .action(async (tag: string, opts: CategorizeOptions) => {
-            if (!tag || tag.trim() === '') {
-                console.error('❌ Error: Tag parameter is required and cannot be empty');
-                console.log('\nUsage: budgeting-toolkit categorize <tag> [options]');
-                console.log('Example: budgeting-toolkit categorize Import-2025-06-23');
-                process.exit(1);
-            }
+            requireArg(
+                tag,
+                'Tag parameter',
+                'budgeting-toolkit categorize <tag> [options]',
+                'budgeting-toolkit categorize Import-2025-06-23'
+            );
 
             try {
                 // Validate command-specific configuration (including ANTHROPIC_API_KEY)
@@ -285,7 +303,7 @@ Examples:
 
                 const aiTransactionUpdateOrchestrator =
                     await ServiceFactory.createAITransactionUpdateOrchestrator(
-                        apiClient,
+                        services,
                         opts.force,
                         opts.dryRun
                     );
@@ -333,12 +351,12 @@ Behavior:
                     yes?: boolean;
                 }
             ) => {
-                if (!transactionId || transactionId.trim() === '') {
-                    console.error('❌ Error: Transaction ID is required');
-                    console.log('\nUsage: budgeting-toolkit split <transaction-id> [options]');
-                    console.log('Example: budgeting-toolkit split 4361');
-                    process.exit(1);
-                }
+                requireArg(
+                    transactionId,
+                    'Transaction ID',
+                    'budgeting-toolkit split <transaction-id> [options]',
+                    'budgeting-toolkit split 4361'
+                );
 
                 try {
                     const command = new SplitTransactionCommand(

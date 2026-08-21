@@ -1,4 +1,5 @@
-import { BudgetDateParams, DateRangeDto } from '../types/common.types.js';
+import { Result } from '../types/result.type.js';
+import { logger } from '../logger.js';
 
 export class DateUtils {
     static validateMonthYear(month: number, year: number): void {
@@ -10,16 +11,25 @@ export class DateUtils {
         }
     }
 
-    static validateBudgetDateParams(params: BudgetDateParams): void {
-        this.validateMonthYear(params.month, params.year);
-    }
-
-    static validateDateRange(range: DateRangeDto): void {
-        if (!(range.startDate instanceof Date) || !(range.endDate instanceof Date)) {
-            throw new Error('Start and end dates must be valid Date objects');
-        }
-        if (range.startDate > range.endDate) {
-            throw new Error('Start date must be before or equal to end date');
+    /**
+     * Validates month/year and wraps a failure in the caller's error type.
+     *
+     * @param errorFactory Builds the domain error from the validation failure
+     * @returns Result.ok when valid, Result.err(errorFactory(...)) otherwise
+     */
+    static validateMonthYearResult<E>(
+        month: number,
+        year: number,
+        operation: string,
+        errorFactory: (month: number, year: number, operation: string, error: Error) => E
+    ): Result<void, E> {
+        try {
+            DateUtils.validateMonthYear(month, year);
+            return Result.ok(undefined);
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
+            return Result.err(errorFactory(month, year, operation, err));
         }
     }
 }

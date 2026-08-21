@@ -3,6 +3,7 @@ import { logger } from '../logger.js';
 import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
 import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { BillService } from './core/bill.service.js';
 import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
@@ -30,16 +31,14 @@ export class BillComparisonService implements IBillComparisonService {
     ): Promise<Result<BillComparisonDto, BillError>> {
         const operation = 'calculateBillComparison';
 
-        // Validate date
-        try {
-            DateUtils.validateMonthYear(month, year);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
-
-            return Result.err(
-                BillErrorFactory.create(BillErrorType.INVALID_DATE, month, year, operation, err)
-            );
+        const dateValidation = DateUtils.validateMonthYearResult(
+            month,
+            year,
+            operation,
+            (m, y, op, err) => BillErrorFactory.create(BillErrorType.INVALID_DATE, m, y, op, err)
+        );
+        if (!dateValidation.ok) {
+            return Result.err(dateValidation.error);
         }
 
         try {
@@ -125,26 +124,6 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Gets the top N bills by actual amount spent
-     * @param comparison Bill comparison data
-     * @param limit Number of bills to return (default: 4)
-     * @returns Top N bills sorted by actual amount descending
-     */
-    getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
-        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(0, limit);
-    }
-
-    /**
-     * Gets the remaining bills after top N
-     * @param comparison Bill comparison data
-     * @param limit Number of top bills (default: 4)
-     * @returns Remaining bills (those not in top N)
-     */
-    getRemainingBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
-        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(limit);
-    }
-
-    /**
      * Check if a bill has a payment date within the requested month and year.
      * Verifies that the pay_dates actually fall within the specified month/year.
      */
@@ -220,10 +199,7 @@ export class BillComparisonService implements IBillComparisonService {
             // Use bill_id or subscription_id
             const billId = transaction.bill_id ?? transaction.subscription_id;
             if (billId) {
-                if (!billTransactionMap.has(billId)) {
-                    billTransactionMap.set(billId, []);
-                }
-                billTransactionMap.get(billId)!.push(transaction);
+                billTransactionMap.getOrInsert(billId, []).push(transaction);
 
                 logger.debug({
                     transactionDesc: transaction.description,
@@ -241,9 +217,11 @@ export class BillComparisonService implements IBillComparisonService {
             const frequency = bill.attributes.repeat_freq ?? 'monthly';
 
             // Calculate actual amount for this bill (sum of all transactions)
-            const actualAmount = billTransactions.reduce((sum, t) => {
-                return sum + Math.abs(parseFloat(t.amount));
-            }, 0);
+            const actualAmount = TransactionCalculationUtils.calculateTransactionTotal(
+                billTransactions,
+                true,
+                logger
+            );
 
             actualTotal += actualAmount;
 

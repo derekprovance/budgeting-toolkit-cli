@@ -13,7 +13,7 @@ AI-powered command-line interface for Firefly III Personal Finance Manager with 
 
 ### Prerequisites
 
-- Node.js v24.x or later
+- Node.js v26.x or later
 - Firefly III instance with API access
 - Anthropic API key (for `categorize` command only)
 
@@ -87,7 +87,7 @@ The `.env` file must contain your API credentials:
 `config.yaml` contains application settings. **All fields are optional** with sensible defaults defined in `src/config/config.defaults.ts`.
 
 **Key defaults:**
-- LLM model: `claude-sonnet-4-5`
+- LLM model: `claude-sonnet-5`
 - Temperature: `0.2`
 - Batch size: `10`
 - Tags: `Disposable Income`, `Paycheck`

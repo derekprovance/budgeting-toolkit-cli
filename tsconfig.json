@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "target": "ES2022",
+        "target": "ES2024",
+        "lib": ["ESNext"],
         "module": "nodenext",
         "moduleResolution": "nodenext",
         "outDir": "./dist",
@@ -8,7 +9,8 @@
         "strict": true,
         "esModuleInterop": true,
         "resolveJsonModule": true,
-        "isolatedModules": true
+        "isolatedModules": true,
+        "skipLibCheck": true
     },
     "include": ["src/**/*"],
     "exclude": ["**/*.test.ts", "__tests__/**/*"]

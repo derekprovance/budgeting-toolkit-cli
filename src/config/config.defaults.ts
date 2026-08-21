@@ -46,13 +46,10 @@ export const DEFAULT_CONFIG: AppConfig = {
         },
     },
     llm: {
-        model: 'claude-sonnet-4-5',
-        temperature: 0.2,
+        model: 'claude-sonnet-5',
         maxTokens: 2000,
         batchSize: 10,
         maxConcurrent: 3,
-        retryDelayMs: 1500,
-        maxRetryDelayMs: 32000,
         rateLimit: {
             maxTokensPerMinute: 50000,
             refillInterval: 60000,
@@ -60,7 +57,6 @@ export const DEFAULT_CONFIG: AppConfig = {
         circuitBreaker: {
             failureThreshold: 5,
             resetTimeout: 60000,
-            halfOpenTimeout: 30000,
         },
     },
     logging: {

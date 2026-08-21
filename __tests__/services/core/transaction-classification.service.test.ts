@@ -81,20 +81,6 @@ describe('TransactionClassificationService', () => {
         });
     });
 
-    describe('hasNoDestination', () => {
-        it('should return true when destination is NO_NAME', () => {
-            expect(service.hasNoDestination('5')).toBe(true);
-        });
-
-        it('should return false when destination is not NO_NAME', () => {
-            expect(service.hasNoDestination('other')).toBe(false);
-        });
-
-        it('should return false when destination is null', () => {
-            expect(service.hasNoDestination(null)).toBe(false);
-        });
-    });
-
     describe('isSupplementedByDisposable', () => {
         it('should return true when tags include Disposable Income', () => {
             const tags = [DISPOSABLE_INCOME_TAG, 'other'];

@@ -24,6 +24,8 @@ describe('BudgetService', () => {
             getDateRange: jest.fn().mockReturnValue({
                 startDate: new Date('2024-01-01'),
                 endDate: new Date('2024-01-31'),
+                startDateString: '2024-01-01',
+                endDateString: '2024-01-31',
             }),
         } as unknown as jest.Mocked<IDateRangeService>;
         budgetService = new BudgetService(mockApiClient, mockDateRangeService);

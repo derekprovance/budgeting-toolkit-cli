@@ -36,7 +36,7 @@ describe('BudgetReportCommand', () => {
             status: 'under',
             percentageUsed: 50,
             remaining: 500,
-            historicalComparison: { previousMonthSpent: 400, threeMonthAvg: 450 },
+            historicalComparison: { previousMonthSpent: 400, averageSpent: 450 },
             transactionStats: { count: 5, average: 100 },
         },
         {
@@ -47,7 +47,7 @@ describe('BudgetReportCommand', () => {
             status: 'on-track',
             percentageUsed: 50,
             remaining: 1000,
-            historicalComparison: { previousMonthSpent: 900, threeMonthAvg: 950 },
+            historicalComparison: { previousMonthSpent: 900, averageSpent: 950 },
             transactionStats: { count: 8, average: 125 },
         },
     ];

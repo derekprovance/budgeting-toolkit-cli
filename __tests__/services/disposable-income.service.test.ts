@@ -88,9 +88,9 @@ describe('DisposableIncomeService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.length).toBe(2);
-                expect(result.value[0].description).toBe('Transaction 1');
-                expect(result.value[1].description).toBe('Transaction 2');
+                expect(result.value.transactions.length).toBe(2);
+                expect(result.value.transactions[0].description).toBe('Transaction 1');
+                expect(result.value.transactions[1].description).toBe('Transaction 2');
             }
 
             expect(mockTransactionService.getTransactionsForMonth).toHaveBeenCalledWith(5, 2024);
@@ -116,9 +116,9 @@ describe('DisposableIncomeService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.length).toBe(2);
-                expect(result.value[0].description).toBe('Disposable 1');
-                expect(result.value[1].description).toBe('Disposable 2');
+                expect(result.value.transactions.length).toBe(2);
+                expect(result.value.transactions[0].description).toBe('Disposable 1');
+                expect(result.value.transactions[1].description).toBe('Disposable 2');
             }
 
             expect(mockTransactionClassificationService.isDisposableIncome).toHaveBeenCalledTimes(
@@ -137,7 +137,7 @@ describe('DisposableIncomeService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.length).toBe(0);
+                expect(result.value.transactions.length).toBe(0);
             }
         });
 
@@ -235,7 +235,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
 
             // Act
-            const result = await service.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await service.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - should only use tag-based calculation
             expect(result).toBe(100.0); // No deduction
@@ -270,7 +271,8 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - $250 - $50 = $200
             expect(result).toBe(200.0);
@@ -305,7 +307,8 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - No deduction because destination is not valid
             expect(result).toBe(100.0);
@@ -340,7 +343,8 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - No deduction because source is not disposable account
             expect(result).toBe(100.0);
@@ -375,7 +379,8 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - Math.max(0, 100 - 150) = 0
             expect(result).toBe(0);
@@ -428,7 +433,8 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - $500 - ($100 + $50 + $75) = $275
             expect(result).toBe(275.0);
@@ -473,14 +479,15 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.balance : NaN;
 
             // Assert - Invalid transfers should be skipped
             expect(result).toBe(100.0); // No deduction
         });
     });
 
-    describe('getDisposableIncomeTransfers', () => {
+    describe('transfers in analysis', () => {
         it('should return qualifying transfers when configured', async () => {
             // Arrange
             const serviceWithConfig = new DisposableIncomeService(
@@ -511,7 +518,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
 
             // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert
             expect(result.length).toBe(2);
@@ -535,7 +543,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
 
             // Act
-            const result = await service.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await service.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert - should return empty due to no config
             expect(result.length).toBe(0);
@@ -572,7 +581,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
 
             // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert - only first transfer should be included
             expect(result.length).toBe(1);
@@ -609,7 +619,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
 
             // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert - only first transfer should be included
             expect(result.length).toBe(1);
@@ -653,7 +664,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isTransfer.mockReturnValue(true);
 
             // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert - only valid transfer should be included
             expect(result.length).toBe(1);
@@ -692,7 +704,8 @@ describe('DisposableIncomeService', () => {
                 .mockReturnValueOnce(true);
 
             // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert - only transfer should be included
             expect(result.length).toBe(1);
@@ -711,7 +724,8 @@ describe('DisposableIncomeService', () => {
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const analysisResult = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+            const result = analysisResult.ok ? analysisResult.value.transfers : [];
 
             // Assert
             expect(result.length).toBe(0);
@@ -730,10 +744,14 @@ describe('DisposableIncomeService', () => {
                 new Error('API connection failed')
             );
 
-            // Act & Assert
-            await expect(serviceWithConfig.getDisposableIncomeTransfers(5, 2024)).rejects.toThrow(
-                'API connection failed'
-            );
+            // Act
+            const result = await serviceWithConfig.calculateDisposableIncome(5, 2024);
+
+            // Assert
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.message).toContain('API connection failed');
+            }
         });
     });
 });

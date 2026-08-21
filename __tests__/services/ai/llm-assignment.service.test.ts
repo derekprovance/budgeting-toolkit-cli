@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import Anthropic from '@anthropic-ai/sdk';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import {
     LLMAssignmentService,
@@ -51,7 +52,7 @@ describe('LLMAssignmentService', () => {
             getFunctionSchema: jest.fn().mockReturnValue({
                 name: 'assign_categories',
                 description: 'Assign categories',
-                parameters: {},
+                input_schema: { type: 'object', properties: {}, required: [] },
             }),
             parseAssignmentResponse: jest.fn().mockImplementation(() => {
                 throw new Error('parseAssignmentResponse mock not configured for this test');
@@ -60,7 +61,11 @@ describe('LLMAssignmentService', () => {
         } as jest.Mocked<LLMAssignmentDependencies>;
 
         // Create service with mock dependencies
-        service = new LLMAssignmentService(mockClaudeClient, mockDeps);
+        service = new LLMAssignmentService(
+            mockClaudeClient,
+            { batchSize: 10, maxConcurrent: 3 },
+            mockDeps
+        );
 
         // Setup test data
         mockTransactions = [
@@ -150,11 +155,11 @@ describe('LLMAssignmentService', () => {
 
                 expect(result).toEqual(['Groceries', 'Healthcare', 'Groceries']);
                 expect(mockLogger.debug).toHaveBeenCalledWith(
-                    {
+                    expect.objectContaining({
                         type: 'category',
                         transactionCount: 3,
                         optionCount: 4,
-                    },
+                    }),
                     'Starting category assignment'
                 );
             });
@@ -180,14 +185,14 @@ describe('LLMAssignmentService', () => {
                     [{ role: 'user', content: 'User prompt' }],
                     {
                         systemPrompt: 'System prompt',
-                        functions: [
+                        tools: [
                             {
                                 name: 'assign_categories',
                                 description: 'Assign categories',
-                                parameters: {},
+                                input_schema: { type: 'object', properties: {}, required: [] },
                             },
                         ],
-                        function_call: { name: 'assign_categories' },
+                        toolChoice: { type: 'tool', name: 'assign_categories' },
                     }
                 );
             });
@@ -288,8 +293,8 @@ describe('LLMAssignmentService', () => {
 
                 expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
                 expect(mockLogger.warn).toHaveBeenCalledWith(
-                    { error: 'API Error', type: 'category', transactionCount: 3 },
-                    'category assignment failed, returning defaults'
+                    expect.objectContaining({ error: 'API Error', type: 'category' }),
+                    'category assignment chunk failed, using defaults for this chunk'
                 );
             });
 
@@ -354,41 +359,59 @@ describe('LLMAssignmentService', () => {
                 expect(result).toEqual(['(no category)', 'Healthcare', 'Groceries']);
             });
 
-            it('should throw on API key error (critical error)', async () => {
-                mockClaudeClient.chat = jest
-                    .fn()
-                    .mockRejectedValue(new Error('Invalid API key provided'));
+            it('should throw on authentication error (critical error)', async () => {
+                const authError = Object.assign(
+                    Object.create(Anthropic.AuthenticationError.prototype) as Error,
+                    { message: 'Invalid API key provided' }
+                );
+                mockClaudeClient.chat = jest.fn().mockRejectedValue(authError);
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
                 ).rejects.toThrow('Invalid API key provided');
 
                 expect(mockLogger.error).toHaveBeenCalledWith(
-                    {
+                    expect.objectContaining({
                         error: 'Invalid API key provided',
                         type: 'category',
-                        transactionCount: 3,
-                    },
-                    'Critical authentication error in category assignment'
+                    }),
+                    'Critical error in category assignment'
                 );
             });
 
-            it('should throw on authentication error (critical error)', async () => {
+            it('should throw on permission error (critical error)', async () => {
+                const permError = Object.assign(
+                    Object.create(Anthropic.PermissionDeniedError.prototype) as Error,
+                    { message: 'forbidden' }
+                );
+                mockClaudeClient.chat = jest.fn().mockRejectedValue(permError);
+
+                await expect(
+                    service.assign('category', mockTransactions, validCategories)
+                ).rejects.toThrow('forbidden');
+            });
+
+            it('should throw on bad request (critical error)', async () => {
+                const badRequest = Object.assign(
+                    Object.create(Anthropic.BadRequestError.prototype) as Error,
+                    { message: 'invalid model' }
+                );
+                mockClaudeClient.chat = jest.fn().mockRejectedValue(badRequest);
+
+                await expect(
+                    service.assign('budget', mockTransactions, validBudgets)
+                ).rejects.toThrow('invalid model');
+            });
+
+            it('should degrade (not throw) on plain errors mentioning auth words', async () => {
+                // String matching is gone: only typed SDK errors are critical
                 mockClaudeClient.chat = jest
                     .fn()
                     .mockRejectedValue(new Error('authentication failed'));
 
-                await expect(
-                    service.assign('category', mockTransactions, validCategories)
-                ).rejects.toThrow('authentication failed');
-            });
+                const result = await service.assign('category', mockTransactions, validCategories);
 
-            it('should throw on unauthorized error (critical error)', async () => {
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('unauthorized'));
-
-                await expect(
-                    service.assign('budget', mockTransactions, validBudgets)
-                ).rejects.toThrow('unauthorized');
+                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
             });
         });
 
@@ -419,17 +442,19 @@ describe('LLMAssignmentService', () => {
 
                 mockClaudeClient.chat = jest.fn().mockResolvedValue(
                     JSON.stringify({
-                        categories: Array(100).fill('Groceries'),
+                        categories: Array(10).fill('Groceries'),
                     })
                 );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue(
-                    Array(100).fill('Groceries')
+                (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
+                    (_type, _resp, count) => Array(count as number).fill('Groceries')
                 );
 
                 const result = await service.assign('category', manyTransactions, validCategories);
 
                 expect(result).toHaveLength(100);
                 expect(mockDeps.mapTransactionForLLM).toHaveBeenCalledTimes(100);
+                // 100 transactions at batchSize 10 → 10 chunked requests
+                expect(mockClaudeClient.chat).toHaveBeenCalledTimes(10);
             });
 
             it('should handle transactions with missing optional fields', async () => {
@@ -473,6 +498,78 @@ describe('LLMAssignmentService', () => {
 
                 expect(result).toEqual(['Groceries', 'Groceries', 'Groceries']);
             });
+        });
+    });
+
+    describe('batching', () => {
+        const makeTransactions = (count: number) =>
+            Array(count)
+                .fill(null)
+                .map((_, i) =>
+                    createMockTransaction({
+                        transaction_journal_id: String(i),
+                        description: `Transaction ${i}`,
+                    })
+                );
+
+        it('should chunk 25 transactions into 3 requests of 10/10/5, preserving order', async () => {
+            const transactions = makeTransactions(25);
+
+            // Each chat call resolves with the chunk index so ordering is provable
+            let call = 0;
+            mockClaudeClient.chat = jest.fn().mockImplementation(async () => String(call++));
+            (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
+                (_type, resp, count) => Array(count as number).fill(`chunk-${resp as string}`)
+            );
+
+            const result = await service.assign('category', transactions, validCategories);
+
+            expect(mockClaudeClient.chat).toHaveBeenCalledTimes(3);
+            expect(result).toHaveLength(25);
+            expect(result.slice(0, 10)).toEqual(Array(10).fill('chunk-0'));
+            expect(result.slice(10, 20)).toEqual(Array(10).fill('chunk-1'));
+            expect(result.slice(20)).toEqual(Array(5).fill('chunk-2'));
+
+            // getUserPrompt received the per-chunk slices: 10, 10, 5
+            const promptCalls = (mockDeps.getUserPrompt as jest.Mock).mock.calls;
+            expect(promptCalls.map(c => (c[1] as unknown[]).length)).toEqual([10, 10, 5]);
+        });
+
+        it('should degrade only the failing chunk to the sentinel', async () => {
+            const transactions = makeTransactions(25);
+
+            let call = 0;
+            mockClaudeClient.chat = jest.fn().mockImplementation(async () => {
+                const index = call++;
+                if (index === 1) {
+                    throw new Error('connection reset');
+                }
+                return 'ok';
+            });
+            (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
+                (_type, _resp, count) => Array(count as number).fill('Groceries')
+            );
+
+            const result = await service.assign('category', transactions, validCategories);
+
+            expect(result).toHaveLength(25);
+            expect(result.slice(0, 10)).toEqual(Array(10).fill('Groceries'));
+            expect(result.slice(10, 20)).toEqual(Array(10).fill('(no category)'));
+            expect(result.slice(20)).toEqual(Array(5).fill('Groceries'));
+        });
+
+        it('should abort the whole run when any chunk hits a critical error', async () => {
+            const transactions = makeTransactions(25);
+
+            const authError = Object.assign(
+                Object.create(Anthropic.AuthenticationError.prototype) as Error,
+                { message: 'invalid key' }
+            );
+            mockClaudeClient.chat = jest.fn().mockRejectedValue(authError);
+
+            await expect(service.assign('category', transactions, validCategories)).rejects.toThrow(
+                'invalid key'
+            );
         });
     });
 

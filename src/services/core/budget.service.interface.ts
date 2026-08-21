@@ -10,9 +10,4 @@ export interface IBudgetService {
     getBudgetExpenseInsights(month: number, year: number): Promise<InsightGroup>;
     getBudgetLimits(month: number, year: number): Promise<BudgetLimitRead[]>;
     getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]>;
-    getTransactionsForBudget(
-        budgetId: string,
-        month: number,
-        year: number
-    ): Promise<TransactionSplit[]>;
 }

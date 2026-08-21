@@ -383,5 +383,28 @@ describe('TransactionAIResultValidator', () => {
                 expect(result.value.category).toBeUndefined();
             }
         });
+
+        it('should apply AI category over an existing category_id when force is set', async () => {
+            const transactionWithCategory: TransactionSplit = createMockTransaction({
+                transaction_journal_id: '1',
+                description: 'Test Transaction',
+                amount: '100.00',
+                type: 'withdrawal',
+                category_id: '5',
+                category_name: 'Existing Category',
+            });
+
+            const result = await validator.validateAIResults(
+                transactionWithCategory,
+                'Groceries',
+                undefined,
+                true
+            );
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.category?.name).toBe('Groceries');
+            }
+        });
     });
 });

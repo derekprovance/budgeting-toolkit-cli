@@ -171,7 +171,11 @@ export class CertificateValidator {
     /**
      * Validate P12/PFX certificate (includes password validation)
      */
-    private validateP12Certificate(certPath: string, certType: string, certPassword?: string): string | null {
+    private validateP12Certificate(
+        certPath: string,
+        certType: string,
+        certPassword?: string
+    ): string | null {
         try {
             const buffer = fs.readFileSync(certPath);
 
@@ -216,10 +220,14 @@ export class CertificateValidator {
     private validateP12Password(certPath: string, password: string): string | null {
         try {
             // Use spawnSync with arguments array to avoid shell interpretation of password
-            const result = spawnSync('openssl', ['pkcs12', '-in', certPath, '-passin', `pass:${password}`, '-noout'], {
-                encoding: 'utf-8',
-                stdio: 'pipe',
-            });
+            const result = spawnSync(
+                'openssl',
+                ['pkcs12', '-in', certPath, '-passin', `pass:${password}`, '-noout'],
+                {
+                    encoding: 'utf-8',
+                    stdio: 'pipe',
+                }
+            );
 
             // openssl exits with status 0 on success
             if (result.status === 0) {
@@ -237,7 +245,7 @@ export class CertificateValidator {
 
             // Other errors - don't fail validation
             return null;
-        } catch (error) {
+        } catch {
             // spawnSync shouldn't throw, but handle just in case
             return null;
         }

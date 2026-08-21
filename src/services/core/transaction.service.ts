@@ -9,6 +9,7 @@ import { IDateRangeService } from '../../types/interface/date-range.service.inte
 import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
 import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 
 class TransactionError extends Error {
     constructor(
@@ -20,7 +21,7 @@ class TransactionError extends Error {
     }
 }
 
-type TransactionCache = Map<string, TransactionSplit[]>;
+type TransactionCache = Map<string, Promise<TransactionSplit[]>>;
 type TransactionSplitIndex = Map<string, TransactionRead>;
 export class TransactionService implements ITransactionService {
     private readonly cache: TransactionCache;
@@ -124,7 +125,7 @@ export class TransactionService implements ITransactionService {
         );
 
         try {
-            const transactionRead = await this.getTransactionReadBySplit(transaction);
+            const transactionRead = this.getTransactionReadBySplit(transaction);
             if (!transactionRead?.id) {
                 this.logger.error(
                     {
@@ -184,35 +185,39 @@ export class TransactionService implements ITransactionService {
         return result;
     }
 
-    /**
-     * Clears the transaction cache
-     */
-    clearCache(): void {
-        this.cache.clear();
-        this.splitTransactionIdx.clear();
-    }
-
-    private async getFromCacheOrFetch(
+    private getFromCacheOrFetch(
         key: string,
         fetchFn: () => Promise<TransactionRead[]>
     ): Promise<TransactionSplit[]> {
-        const cached = this.cache.get(key);
-        if (cached) {
-            return cached;
+        // Cache the in-flight promise, not the resolved value: concurrent callers
+        // with the same key (e.g. the analyze command's parallel services) share
+        // one API fetch instead of stampeding.
+        const inflight = this.cache.get(key);
+        if (inflight) {
+            return inflight;
         }
 
-        const data = await fetchFn();
+        const promise = (async () => {
+            const data = await fetchFn();
 
-        let transactions = this.flattenTransactions(data);
-        transactions = transactions.filter(
-            trx =>
-                !this.excludedTransactionService.isExcludedTransaction(trx.description, trx.amount)
-        );
+            const transactions = TransactionCalculationUtils.flattenTransactions(data).filter(
+                trx =>
+                    !this.excludedTransactionService.isExcludedTransaction(
+                        trx.description,
+                        trx.amount
+                    )
+            );
 
-        this.cache.set(key, transactions);
-        this.storeTransactionSplitInIndex(data);
+            this.storeTransactionSplitInIndex(data);
 
-        return transactions;
+            return transactions;
+        })();
+
+        this.cache.set(key, promise);
+        // Don't cache failures — let the next caller retry
+        promise.catch(() => this.cache.delete(key));
+
+        return promise;
     }
 
     private storeTransactionSplitInIndex(transactions: TransactionRead[]) {
@@ -259,17 +264,13 @@ export class TransactionService implements ITransactionService {
             undefined, // xTraceId
             undefined, // limit
             undefined, // page
-            range.startDate.toISOString().split('T')[0],
-            range.endDate.toISOString().split('T')[0]
+            range.startDateString,
+            range.endDateString
         );
         if (!response || !response.data) {
             throw new Error(`Failed to fetch transactions for month: ${month}`);
         }
         return response.data;
-    }
-
-    private flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
-        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
     }
 
     private generateSplitTransactionKey(tx: TransactionSplit): string {

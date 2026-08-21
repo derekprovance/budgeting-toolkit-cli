@@ -1,4 +1,3 @@
-import { ExcludedTransactionDto } from '../types/common.types.js';
 import { logger as defaultLogger } from '../logger.js';
 import { IExcludedTransactionService } from './excluded-transaction.service.interface.js';
 import { ILogger } from '../types/interface/logger.interface.js';
@@ -22,21 +21,10 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
         this.logger = logger;
     }
 
-    async getExcludedTransactions(): Promise<ExcludedTransactionDto[]> {
-        this.logger.trace(
-            { count: this.excludedTransactions.length },
-            'Returning excluded transactions from configuration'
-        );
-
-        return this.excludedTransactions.map(transaction => ({
-            description: transaction.description,
-            amount: transaction.amount,
-            reason: transaction.reason || 'Excluded from processing',
-        }));
-    }
-
     isExcludedTransaction(description: string, amount: string): boolean {
-        const convertedAmount = this.convertCurrencyToFloat(amount);
+        // NaN never equals anything, so an unparseable amount simply fails
+        // amount-based matches instead of aborting the whole transaction fetch
+        const convertedAmount = TransactionCalculationUtils.parseAmountSafe(amount, NaN);
 
         const isExcluded = this.excludedTransactions.some(transaction => {
             // Both description and amount must match
@@ -44,8 +32,7 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
                 return (
                     StringUtils.normalizeForMatching(transaction.description) ===
                         StringUtils.normalizeForMatching(description) &&
-                    Math.abs(parseFloat(transaction.amount)) ===
-                        Math.abs(parseFloat(convertedAmount))
+                    Math.abs(parseFloat(transaction.amount)) === Math.abs(convertedAmount)
                 );
             }
 
@@ -59,10 +46,7 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
 
             // Only amount needs to match
             if (!transaction.description && transaction.amount) {
-                return (
-                    Math.abs(parseFloat(transaction.amount)) ===
-                    Math.abs(parseFloat(convertedAmount))
-                );
+                return Math.abs(parseFloat(transaction.amount)) === Math.abs(convertedAmount);
             }
 
             return false;
@@ -73,9 +57,5 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
         }
 
         return isExcluded;
-    }
-
-    private convertCurrencyToFloat(amount: string): string {
-        return TransactionCalculationUtils.convertCurrencyToFloat(amount);
     }
 }

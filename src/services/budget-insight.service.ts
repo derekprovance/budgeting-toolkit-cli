@@ -81,8 +81,8 @@ export class BudgetInsightService {
             });
         }
 
-        // Rule 5: Significant bill variance
-        if (billComparison.variance > 0) {
+        // Rule 4: Significant bill variance (predictedTotal of 0 would yield Infinity%)
+        if (billComparison.predictedTotal > 0 && billComparison.variance > 0) {
             const percentageOver = (billComparison.variance / billComparison.predictedTotal) * 100;
             if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.CRITICAL_VARIANCE_PERCENT) {
                 insights.push({

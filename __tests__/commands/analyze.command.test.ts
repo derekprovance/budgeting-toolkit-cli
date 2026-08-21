@@ -2,7 +2,10 @@ import { AnalyzeCommand } from '../../src/commands/analyze.command.js';
 import { AdditionalIncomeService } from '../../src/services/additional-income.service.js';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
-import { DisposableIncomeService } from '../../src/services/disposable-income.service.js';
+import {
+    DisposableIncomeService,
+    DisposableIncomeAnalysis,
+} from '../../src/services/disposable-income.service.js';
 import {
     BudgetSurplusService,
     BudgetSurplusResult,
@@ -71,14 +74,11 @@ describe('AnalyzeCommand', () => {
 
         disposableIncomeService = {
             calculateDisposableIncome: jest
-                .fn<() => Promise<Result<TransactionSplit[], TransactionAnalysisError>>>()
-                .mockResolvedValue({ ok: true, value: [mockTransaction] }),
-            getDisposableIncomeTransfers: jest
-                .fn<() => Promise<TransactionSplit[]>>()
-                .mockResolvedValue([]),
-            calculateDisposableIncomeBalance: jest
-                .fn<() => Promise<number>>()
-                .mockResolvedValue(150.0),
+                .fn<() => Promise<Result<DisposableIncomeAnalysis, TransactionAnalysisError>>>()
+                .mockResolvedValue({
+                    ok: true,
+                    value: { transactions: [mockTransaction], transfers: [], balance: 150.0 },
+                }),
         } as unknown as jest.Mocked<DisposableIncomeService>;
 
         const mockBudgetSurplusResult: BudgetSurplusResult = {
@@ -144,14 +144,6 @@ describe('AnalyzeCommand', () => {
             );
             expect(paycheckSurplusService.calculatePaycheckSurplus).toHaveBeenCalledWith(5, 2024);
             expect(disposableIncomeService.calculateDisposableIncome).toHaveBeenCalledWith(5, 2024);
-            expect(disposableIncomeService.getDisposableIncomeTransfers).toHaveBeenCalledWith(
-                5,
-                2024
-            );
-            expect(disposableIncomeService.calculateDisposableIncomeBalance).toHaveBeenCalledWith(
-                5,
-                2024
-            );
             expect(budgetSurplusService.calculateBudgetSurplus).toHaveBeenCalledWith(5, 2024);
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalledWith(5, 2024);
             expect(consoleLogSpy).toHaveBeenCalled();
@@ -173,10 +165,8 @@ describe('AnalyzeCommand', () => {
             });
             disposableIncomeService.calculateDisposableIncome.mockResolvedValueOnce({
                 ok: true,
-                value: [],
+                value: { transactions: [], transfers: [], balance: 0 },
             });
-            disposableIncomeService.getDisposableIncomeTransfers.mockResolvedValueOnce([]);
-            disposableIncomeService.calculateDisposableIncomeBalance.mockResolvedValueOnce(0);
             const emptyBudgetSurplusResult: BudgetSurplusResult = {
                 totalAllocated: 0,
                 totalSpent: 0,
@@ -208,14 +198,6 @@ describe('AnalyzeCommand', () => {
             );
             expect(paycheckSurplusService.calculatePaycheckSurplus).toHaveBeenCalledWith(5, 2024);
             expect(disposableIncomeService.calculateDisposableIncome).toHaveBeenCalledWith(5, 2024);
-            expect(disposableIncomeService.getDisposableIncomeTransfers).toHaveBeenCalledWith(
-                5,
-                2024
-            );
-            expect(disposableIncomeService.calculateDisposableIncomeBalance).toHaveBeenCalledWith(
-                5,
-                2024
-            );
             expect(budgetSurplusService.calculateBudgetSurplus).toHaveBeenCalledWith(5, 2024);
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalledWith(5, 2024);
             expect(consoleLogSpy).toHaveBeenCalled();

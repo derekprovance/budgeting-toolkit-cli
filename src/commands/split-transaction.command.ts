@@ -85,8 +85,10 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
                 ? this.validateAndParseSplitAmount(amount, originalAmount, currencySymbol)
                 : await this.userInputService.getSplitAmount(originalAmount, currencySymbol);
 
-            // Use toFixed to avoid floating-point precision errors
-            const secondSplitAmount = parseFloat((originalAmount - firstSplitAmount).toFixed(2));
+            const secondSplitAmount = UserInputService.remainderAmount(
+                originalAmount,
+                firstSplitAmount
+            );
 
             // Show remainder
             console.log(this.displayService.formatRemainder(secondSplitAmount, currencySymbol));

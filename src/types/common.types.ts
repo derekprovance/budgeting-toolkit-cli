@@ -5,12 +5,9 @@
 export interface DateRangeDto {
     startDate: Date;
     endDate: Date;
-}
-
-export interface ExcludedTransactionDto {
-    description: string;
-    reason: string;
-    amount?: string;
+    /** YYYY-MM-DD built from local date parts — safe to send to the API regardless of timezone */
+    startDateString: string;
+    endDateString: string;
 }
 
 export interface ValidTransfer {

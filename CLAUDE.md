@@ -92,11 +92,9 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 **LLM Configuration:**
 
 - `llm.model` - Claude model name
-- `llm.temperature` - Temperature setting (0-1)
 - `llm.maxTokens` - Max tokens per request
 - `llm.batchSize` - Batch processing size
 - `llm.maxConcurrent` - Max concurrent requests
-- `llm.retryDelayMs` / `llm.maxRetryDelayMs` - Retry configuration
 - `llm.rateLimit.*` - Rate limiting settings
 - `llm.circuitBreaker.*` - Circuit breaker configuration
 
@@ -132,6 +130,7 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
     - By default, processes uncategorized transactions and transactions with category but no budget
     - Transactions with both category and budget are skipped unless `--force` is used
+    - `--force` also lets the AI category replace an existing one (without it, an existing `category_id` is preserved)
     - Supports mode options: `--mode category` (category only), `--mode budget` (budget only), `--mode both` (default)
     - Use `--force` (`-f`) to re-run AI on transactions that already have both category and budget
     - Use `--dry-run` (`-n`) to preview changes without applying
@@ -187,15 +186,15 @@ The `TransactionSplitService` provides functionality for splitting transactions 
 Claude AI integration through `@anthropic-ai/sdk`:
 
 - Configuration in `src/config/llm.config.ts`
-- **Function Calling**: Uses Claude's function calling feature for structured responses
+- **Tool Use**: Uses Claude's tool-use API (`Anthropic.Tool` + forced `tool_choice`) for structured responses
     - Eliminates need for fuzzy string matching
-    - Enforces response schema with enum validation
-    - Provides reliable, type-safe AI responses
+    - Enforces response schema with enum validation (the `(no category)`/`(no budget)` sentinel is added by the schema, not by callers)
+    - `ClaudeClient` extracts only the matching `tool_use` block, so preamble text can never corrupt the payload
 - **Unified Assignment Service**: `LLMAssignmentService` handles both categories and budgets
-    - Single implementation using DRY principles
-    - Delegates batching to `ClaudeClient` for optimal performance
-    - No retry logic in service layer (handled by client)
-- **Batch Processing**: Handled by `ClaudeClient` with rate limiting and concurrency control
+    - Chunks transactions by `llm.batchSize` and runs a bounded worker pool (`llm.maxConcurrent`), preserving input order
+    - A recoverable chunk failure degrades only that chunk to the sentinel; auth/permission/bad-request errors abort the run
+- **Retries**: Owned entirely by the Anthropic SDK (`api.claude.maxRetries`), which honors `retry-after`
+- **Circuit Breaker**: One failure per logical request; HALF_OPEN requires a single successful probe to close
 - **Validation**: AI responses validated against available options before applying
 - **Dry-run mode**: Test AI suggestions without making changes
 

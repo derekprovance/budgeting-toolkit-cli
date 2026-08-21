@@ -92,12 +92,9 @@ export interface TagsConfig {
  */
 export interface LLMConfig {
     model: string;
-    temperature: number;
     maxTokens: number;
     batchSize: number;
     maxConcurrent: number;
-    retryDelayMs: number;
-    maxRetryDelayMs: number;
     rateLimit: RateLimitConfig;
     circuitBreaker: CircuitBreakerConfig;
 }
@@ -116,7 +113,6 @@ export interface RateLimitConfig {
 export interface CircuitBreakerConfig {
     failureThreshold: number;
     resetTimeout: number;
-    halfOpenTimeout: number;
 }
 
 /**

@@ -75,8 +75,8 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
             const isTransfer = this.transactionClassificationService.isTransfer(trx);
 
             return isTransfer
-                ? this.shouldCountExpense(trx) && this.shouldCountTransfer(trx)
-                : this.shouldCountExpense(trx);
+                ? this.isRegularExpenseTransaction(trx) && this.shouldCountTransfer(trx)
+                : this.isRegularExpenseTransaction(trx);
         });
     }
 
@@ -96,14 +96,6 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
                 transaction.source_id === transfer.source &&
                 transaction.destination_id === transfer.destination
         );
-    }
-
-    /**
-     * Checks if a transaction should be counted as an expense.
-     * Checks regular expense criteria (bills are handled separately by BillComparisonService).
-     */
-    private shouldCountExpense(transaction: TransactionSplit): boolean {
-        return this.isRegularExpenseTransaction(transaction);
     }
 
     /**

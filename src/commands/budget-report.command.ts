@@ -39,14 +39,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
             // Get days left info for current month
-            let daysInfo:
-                | {
-                      daysLeft: number;
-                      percentageLeft: number;
-                      currentDay: number;
-                      totalDays: number;
-                  }
-                | undefined;
+            let daysInfo: { daysLeft: number } | undefined;
             if (isCurrentMonth) {
                 const lastUpdatedOn =
                     (await this.transactionService.getMostRecentTransactionDate()) || new Date();
@@ -84,13 +77,12 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             spinner.text = 'Generating insights...';
 
+            const billComparison = billComparisonResult.ok
+                ? billComparisonResult.value
+                : this.createEmptyBillComparison();
+
             // Generate insights from budget data
-            const insights = this.budgetInsightService.generateInsights(
-                budgets,
-                billComparisonResult.ok
-                    ? billComparisonResult.value
-                    : this.createEmptyBillComparison()
-            );
+            const insights = this.budgetInsightService.generateInsights(budgets, billComparison);
 
             spinner.succeed('Budget report generated');
 
@@ -98,9 +90,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             const reportData = {
                 budgets: budgets,
                 topExpenses,
-                billComparison: billComparisonResult.ok
-                    ? billComparisonResult.value
-                    : this.createEmptyBillComparison(),
+                billComparison,
                 unbudgeted: categorizedUnbudgeted,
                 insights,
                 month,
@@ -128,15 +118,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     private getDaysLeftInfo(month: number, year: number, lastUpdatedOn: Date) {
         const lastDay = new Date(year, month, 0).getDate();
         const currentDay = lastUpdatedOn.getDate();
-        const daysLeft = Math.max(0, lastDay - currentDay);
-        const percentageLeft = ((lastDay - currentDay) / lastDay) * 100;
-
-        return {
-            daysLeft,
-            percentageLeft,
-            currentDay,
-            totalDays: lastDay,
-        };
+        return { daysLeft: Math.max(0, lastDay - currentDay) };
     }
 
     /**

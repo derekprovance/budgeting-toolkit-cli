@@ -3,6 +3,7 @@
 
 # Budget and Analysis Configuration
 expectedMonthlyPaycheck: 5000.00
+
 # Accounts where real income lands (checked on deposit transactions)
 incomeDestinationAccounts:
     - '1' # Checking Account ID
@@ -71,10 +72,7 @@ llm:
     maxTokens: 1000 # Maximum tokens per response
     batchSize: 10 # Transactions processed per batch
     maxConcurrent: 3 # Maximum concurrent API requests
-    temperature: 0.2 # Response randomness (0-1, lower = more deterministic)
-    model: 'claude-sonnet-4-5' # Default model (user-friendly name)
-    retryDelayMs: 1500 # Initial retry delay (default)
-    maxRetryDelayMs: 32000 # Maximum retry delay in milliseconds
+    model: 'claude-sonnet-5' # Claude model to use
 
     # Rate Limiting Configuration
     rateLimit:
@@ -85,7 +83,6 @@ llm:
     circuitBreaker:
         failureThreshold: 5 # Number of failures before opening circuit
         resetTimeout: 60000 # Time to wait before attempting reset (ms)
-        halfOpenTimeout: 30000 # Time to stay in half-open state (ms)
 
 # Performance Notes:
 # - Batch processing reduces API calls by 80-90%

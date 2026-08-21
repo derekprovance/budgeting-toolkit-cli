@@ -66,13 +66,10 @@ describe('ConfigValidator', () => {
                 },
             },
             llm: {
-                model: 'claude-3-5-sonnet-20241022',
-                temperature: 0.5,
+                model: 'claude-sonnet-5',
                 maxTokens: 1024,
                 batchSize: 10,
                 maxConcurrent: 3,
-                retryDelayMs: 1000,
-                maxRetryDelayMs: 10000,
                 rateLimit: {
                     maxTokensPerMinute: 50000,
                     refillInterval: 1000,
@@ -80,7 +77,6 @@ describe('ConfigValidator', () => {
                 circuitBreaker: {
                     failureThreshold: 5,
                     resetTimeout: 60000,
-                    halfOpenTimeout: 30000,
                 },
             },
             logging: {
@@ -321,6 +317,63 @@ qZXQ
 -----END CERTIFICATE-----`;
             mockReadFileSync.mockReturnValue(validPemCert);
 
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(true);
+        });
+    });
+
+    describe('LLM configuration validation', () => {
+        it.each([
+            ['llm.batchSize', () => (validConfig.llm.batchSize = 0)],
+            ['llm.maxConcurrent', () => (validConfig.llm.maxConcurrent = 0)],
+            ['llm.maxTokens', () => (validConfig.llm.maxTokens = -1)],
+            [
+                'llm.rateLimit.maxTokensPerMinute',
+                () => (validConfig.llm.rateLimit.maxTokensPerMinute = 0),
+            ],
+            [
+                'llm.circuitBreaker.failureThreshold',
+                () => (validConfig.llm.circuitBreaker.failureThreshold = 0),
+            ],
+        ])('should reject %s of zero or less (hang prevention)', (key, mutate) => {
+            mutate();
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect((result.error.details as { errors: string[] }).errors.join('\n')).toContain(
+                    key
+                );
+            }
+        });
+
+        it('should reject non-integer batch size', () => {
+            validConfig.llm.batchSize = 2.5;
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+        });
+
+        it('should reject negative refill interval', () => {
+            validConfig.llm.rateLimit.refillInterval = -1;
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+        });
+
+        it('should reject an empty model string', () => {
+            validConfig.llm.model = '   ';
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+        });
+
+        it('should accept the default LLM configuration', () => {
             const result = validator.validate(validConfig);
 
             expect(result.ok).toBe(true);

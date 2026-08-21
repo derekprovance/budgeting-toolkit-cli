@@ -24,10 +24,6 @@ export class TransactionClassificationService implements ITransactionClassificat
         return transaction.tags.includes(this.disposableIncomeTag);
     }
 
-    hasNoDestination(destinationId: string | null): boolean {
-        return destinationId === this.noNameExpenseAccountId;
-    }
-
     isSupplementedByDisposable(tags: string[] | null | undefined): boolean {
         return tags?.includes(this.disposableIncomeTag) ?? false;
     }

@@ -123,16 +123,6 @@ export class SplitTransactionDisplayService {
     }
 
     /**
-     * Formats amount input prompt
-     * @param originalAmount The original transaction amount
-     * @param currencySymbol Currency symbol to display
-     * @returns Formatted prompt string
-     */
-    formatAmountPrompt(originalAmount: number, currencySymbol: string): string {
-        return `Enter amount for first split (original: ${currencySymbol}${originalAmount}):`;
-    }
-
-    /**
      * Formats calculated remainder for display
      * @param amount The remainder amount for the second split
      * @param currencySymbol Currency symbol to display
@@ -143,18 +133,9 @@ export class SplitTransactionDisplayService {
     }
 
     /**
-     * Formats validation error message
-     * @param message The validation error message
-     * @returns Formatted error string
-     */
-    formatValidationError(message: string): string {
-        return chalk.red(`✗ ${message}`);
-    }
-
-    /**
      * Returns the transaction link
      */
     private getTransactionLink(transactionId: string): string {
-        return `${this.baseUrl}/transactions/show/${transactionId}`;
+        return DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId);
     }
 }

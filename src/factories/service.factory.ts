@@ -17,7 +17,6 @@ import { LLMConfig } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
 import { ConfigManager } from '../config/config-manager.js';
-import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
 import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { BillService } from '../services/core/bill.service.js';
@@ -78,10 +77,6 @@ export class ServiceFactory {
             transactionClassificationService,
             config.transactions.expectedMonthlyPaycheck
         );
-        const baseTransactionDisplayService = new BaseTransactionDisplayService(
-            transactionClassificationService,
-            config.api.firefly.url
-        );
         const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
@@ -120,7 +115,6 @@ export class ServiceFactory {
             excludedTransactionService,
             paycheckSurplusService,
             transactionValidatorService,
-            baseTransactionDisplayService,
             analyzeDisplayService,
             splitTransactionDisplayService,
             billService,
@@ -135,14 +129,17 @@ export class ServiceFactory {
     }
 
     static async createAITransactionUpdateOrchestrator(
-        apiClient: FireflyClientWithCerts,
+        services: ReturnType<typeof ServiceFactory.createServices>,
         force: boolean = false,
         dryRun: boolean = false
     ): Promise<AITransactionUpdateOrchestrator> {
-        const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
-        const llmAssignmentService = new LLMAssignmentService(claudeClient);
+        const llmConfig = ConfigManager.getInstance().getConfig().llm;
+        const llmAssignmentService = new LLMAssignmentService(claudeClient, {
+            batchSize: llmConfig.batchSize,
+            maxConcurrent: llmConfig.maxConcurrent,
+        });
         const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
         // Create AI validator service using factory method
@@ -158,7 +155,8 @@ export class ServiceFactory {
             services.transactionValidatorService,
             aiValidator,
             services.userInputService,
-            dryRun
+            dryRun,
+            force
         );
 
         return new AITransactionUpdateOrchestrator(
@@ -166,7 +164,6 @@ export class ServiceFactory {
             interactiveTransactionUpdater,
             services.categoryService,
             services.budgetService,
-            aiValidator,
             llmProcessingService,
             services.transactionValidatorService,
             force,

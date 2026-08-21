@@ -9,7 +9,6 @@ import { logger } from '../logger.js';
 import { ICategoryService } from './core/category.service.interface.js';
 import { TransactionService } from './core/transaction.service.js';
 import { IBudgetService } from './core/budget.service.interface.js';
-import { TransactionAIResultValidator } from './core/transaction-ai-result-validator.service.js';
 import {
     AIResponse,
     LLMTransactionProcessingService,
@@ -34,7 +33,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
         private readonly categoryService: ICategoryService,
         private readonly budgetService: IBudgetService,
-        private readonly aiValidator: TransactionAIResultValidator,
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: ITransactionValidatorService,
         private readonly force: boolean = false,
@@ -188,15 +186,10 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         categories?: CategoryProperties[],
         budgets?: BudgetRead[]
     ): Promise<AIResponse> {
+        // The no-match sentinel is handled inside LLMAssignmentService — plain
+        // option lists are all that's needed here
         const categoryNames = categories?.map(c => c.name);
-        if (categoryNames) {
-            categoryNames.push('(no category)');
-        }
-
         const budgetNames = budgets?.map(b => b.attributes.name);
-        if (budgetNames) {
-            budgetNames.push('(no budget)');
-        }
 
         logger.debug(
             {
@@ -208,13 +201,27 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             'Getting AI results for transactions'
         );
 
+        // Transactions without a journal ID can't be keyed or updated — drop them
+        // up front so they don't collapse onto one key and fail the count check
+        const identifiableTransactions = transactions.filter(t => {
+            if (t.transaction_journal_id) {
+                return true;
+            }
+            logger.warn(
+                { description: t.description },
+                'Skipping transaction without transaction_journal_id'
+            );
+            return false;
+        });
+
         // Group B: has category, no budget — budget assignment only
         const budgetOnlyTransactions = this.force
             ? []
-            : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t));
+            : identifiableTransactions.filter(t => this.validator.isBudgetOnlyCandidate(t));
+        const budgetOnlySet = new Set(budgetOnlyTransactions);
 
         // Group A: all others — full assignment per updateMode
-        const normalTransactions = transactions.filter(t => !budgetOnlyTransactions.includes(t));
+        const normalTransactions = identifiableTransactions.filter(t => !budgetOnlySet.has(t));
 
         const aiResults: AIResponse = {};
 
@@ -238,15 +245,15 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             Object.assign(aiResults, groupBResults);
         }
 
-        if (Object.keys(aiResults).length !== transactions.length) {
+        if (Object.keys(aiResults).length !== identifiableTransactions.length) {
             const error = new Error(
                 `LLM categorization result count (${
                     Object.keys(aiResults).length
-                }) doesn't match transaction count (${transactions.length})`
+                }) doesn't match transaction count (${identifiableTransactions.length})`
             );
             logger.error(
                 {
-                    expectedCount: transactions.length,
+                    expectedCount: identifiableTransactions.length,
                     actualCount: Object.keys(aiResults).length,
                 },
                 'AI result count mismatch'

@@ -13,7 +13,6 @@ import { StringUtils } from '../utils/string.utils.js';
  * - It is a deposit (not a withdrawal or transfer)
  * - It goes to a valid destination account
  * - It is not payroll
- * - It meets the minimum amount requirement (if specified)
  * - It is not disposable income (if configured)
  * - It is not in the excluded transactions list
  *
@@ -89,9 +88,8 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 1. Must be a deposit
      * 2. Must go to a valid destination account
      * 3. Must not be payroll
-     * 4. Must meet minimum amount requirement
+     * 4. Must have a positive amount
      * 5. Must not be disposable income (if configured)
-     * 6. Must not be in excluded transactions list
      */
     private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
         return transactions.filter(

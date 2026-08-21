@@ -75,16 +75,17 @@ describe('ServiceFactory', () => {
 
     describe('createAITransactionUpdateOrchestrator', () => {
         it('should create AITransactionUpdateOrchestrator with default parameters', async () => {
-            const service =
-                await ServiceFactory.createAITransactionUpdateOrchestrator(mockApiClient);
+            const services = ServiceFactory.createServices(mockApiClient);
+            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(services);
 
             expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
         });
 
-        it('should create AITransactionUpdateOrchestrator with custom parameters', async () => {
+        it('should reuse the provided services instead of rebuilding them', async () => {
+            const services = ServiceFactory.createServices(mockApiClient);
             const service = await ServiceFactory.createAITransactionUpdateOrchestrator(
-                mockApiClient,
-                true, // includeClassified
+                services,
+                true, // force
                 true // dryRun
             );
 

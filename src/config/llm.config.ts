@@ -20,14 +20,14 @@ export class LLMConfig {
                 // Authentication from environment (secure)
                 apiKey: apiKey,
 
-                // All other settings from configuration (user-configurable)
+                // SDK transport settings (retries/timeouts owned by the SDK)
+                baseURL: config.api.claude.baseURL,
+                timeout: config.api.claude.timeout,
+                maxRetries: config.api.claude.maxRetries,
+
+                // Model settings from configuration (user-configurable)
                 model: llmConfig.model,
                 maxTokens: llmConfig.maxTokens,
-                batchSize: llmConfig.batchSize,
-                maxConcurrent: llmConfig.maxConcurrent,
-                temperature: llmConfig.temperature,
-                retryDelayMs: llmConfig.retryDelayMs,
-                maxRetryDelayMs: llmConfig.maxRetryDelayMs,
             },
             undefined, // client
             llmConfig // Pass full LLM config for rate limiting and circuit breaker

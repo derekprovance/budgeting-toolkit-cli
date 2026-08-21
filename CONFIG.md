@@ -84,7 +84,6 @@ Use this quick reference to see what each command needs:
 **Recommended:**
 
 - `llm.model` - Claude model to use
-- `llm.temperature` - 0.1-0.3 for consistent categorization
 - `llm.batchSize` - Transactions per batch (default: 10)
 - `llm.maxConcurrent` - Concurrent requests (default: 3)
 
@@ -142,7 +141,7 @@ expenseSourceAccounts:
 
 **Important:** These should be asset-type accounts (checking, savings, credit cards) that money is withdrawn FROM, not expense-type merchant accounts.
 
-**Note on overlap:** `incomeDestinationAccounts` and `expenseSourceAccounts` are independent checks on different transaction fields (deposit destination vs. withdrawal source) — they are not two separate pools of accounts. The same account ID commonly belongs in both lists. For example, Checking Account `'1'` above appears in both because paychecks deposit into it *and* debit purchases withdraw from it.
+**Note on overlap:** `incomeDestinationAccounts` and `expenseSourceAccounts` are independent checks on different transaction fields (deposit destination vs. withdrawal source) — they are not two separate pools of accounts. The same account ID commonly belongs in both lists. For example, Checking Account `'1'` above appears in both because paychecks deposit into it _and_ debit purchases withdraw from it.
 
 #### expenseTransfers
 
@@ -289,8 +288,7 @@ Advanced settings for Claude AI integration.
 
 ```yaml
 llm:
-    model: 'claude-sonnet-4-5'
-    temperature: 0.2
+    model: 'claude-sonnet-5'
     maxTokens: 1000
     batchSize: 10
     maxConcurrent: 3
@@ -298,35 +296,29 @@ llm:
 
 **Options:**
 
-| Setting         | Type     | Default               | Description                                           |
-| --------------- | -------- | --------------------- | ----------------------------------------------------- |
-| `model`         | `string` | `'claude-sonnet-4-5'` | Claude model version to use                           |
-| `temperature`   | `number` | `0.2`                 | Response randomness (0-1, lower = more deterministic) |
-| `maxTokens`     | `number` | `2048`                | Maximum tokens per API response                       |
-| `batchSize`     | `number` | `10`                  | Number of transactions processed per batch            |
-| `maxConcurrent` | `number` | `2`                   | Maximum concurrent API requests                       |
+| Setting         | Type     | Default             | Description                                |
+| --------------- | -------- | ------------------- | ------------------------------------------ |
+| `model`         | `string` | `'claude-sonnet-5'` | Claude model version to use                |
+| `maxTokens`     | `number` | `2048`              | Maximum tokens per API response            |
+| `batchSize`     | `number` | `10`                | Number of transactions processed per batch |
+| `maxConcurrent` | `number` | `2`                 | Maximum concurrent API requests            |
 
 **Performance Notes:**
 
 - Batch processing reduces API calls by 80-90%
 - Lower `maxConcurrent` values prevent rate limiting
 - Higher `batchSize` improves efficiency but uses more tokens
-- `temperature` of 0.1-0.3 recommended for consistent categorization
 
 #### Retry Configuration
 
 ```yaml
 llm:
-    retryDelayMs: 1000
-    maxRetryDelayMs: 32000
 ```
 
 **Options:**
 
-| Setting           | Type     | Default | Description                               |
-| ----------------- | -------- | ------- | ----------------------------------------- |
-| `retryDelayMs`    | `number` | `1000`  | Initial retry delay in milliseconds       |
-| `maxRetryDelayMs` | `number` | `32000` | Maximum retry delay (exponential backoff) |
+| Setting | Type | Default | Description |
+| ------- | ---- | ------- | ----------- |
 
 **Behavior:**
 
@@ -363,7 +355,6 @@ llm:
     circuitBreaker:
         failureThreshold: 5
         resetTimeout: 60000
-        halfOpenTimeout: 30000
 ```
 
 **Options:**
@@ -372,7 +363,6 @@ llm:
 | ------------------ | -------- | ------- | --------------------------------- |
 | `failureThreshold` | `number` | `5`     | Failures before opening circuit   |
 | `resetTimeout`     | `number` | `60000` | Time before attempting reset (ms) |
-| `halfOpenTimeout`  | `number` | `30000` | Time in half-open state (ms)      |
 
 **States:**
 
@@ -401,7 +391,7 @@ Configuration is validated at two levels:
 **Startup Validation (ConfigValidator):**
 
 - Format validation: URLs are valid, numbers in correct ranges
-- Type validation: temperature 0-1, positive numbers, valid log levels
+- Type validation: positive numeric LLM settings, valid log levels
 - File existence: Certificate paths if specified
 - Firefly API credentials present
 
@@ -477,13 +467,10 @@ firefly:
     noNameExpenseAccountId: '5'
 
 llm:
-    model: 'claude-sonnet-4-5'
-    temperature: 0.15
+    model: 'claude-sonnet-5'
     maxTokens: 2000
     batchSize: 15
     maxConcurrent: 3
-    retryDelayMs: 1000
-    maxRetryDelayMs: 32000
 
     rateLimit:
         maxTokensPerMinute: 40000
@@ -492,7 +479,6 @@ llm:
     circuitBreaker:
         failureThreshold: 5
         resetTimeout: 60000
-        halfOpenTimeout: 30000
 ```
 
 ## Troubleshooting

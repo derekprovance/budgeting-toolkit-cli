@@ -57,3 +57,20 @@ export class BillComparisonDto {
         );
     }
 }
+
+/**
+ * Gets the top N bills by actual amount spent, sorted descending.
+ */
+export function getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
+    return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(0, limit);
+}
+
+/**
+ * Gets the remaining bills after the top N, in the same sorted order.
+ */
+export function getRemainingBills(
+    comparison: BillComparisonDto,
+    limit: number = 4
+): BillDetailDto[] {
+    return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(limit);
+}

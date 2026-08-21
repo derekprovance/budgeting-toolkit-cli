@@ -60,13 +60,14 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, false);
 
-            // Should contain top 4 bills
+            // Should contain top 4 bills by actual amount (sorted descending)
             expect(result).toContain('Electric');
             expect(result).toContain('Internet');
-            expect(result).toContain('Water');
             expect(result).toContain('Phone');
+            expect(result).toContain('Gym');
 
-            // Should contain "Others" grouping
+            // Smaller bills fall into the "Others" grouping
+            expect(result).not.toContain('Water');
             expect(result).toContain('Others (2)');
         });
 
@@ -177,7 +178,7 @@ describe('BudgetDisplayService', () => {
                 remaining: 50,
                 historicalComparison: {
                     previousMonthSpent: 400,
-                    threeMonthAvg: 425,
+                    averageSpent: 425,
                 },
                 transactionStats: {
                     count: 15,
@@ -186,11 +187,6 @@ describe('BudgetDisplayService', () => {
                         name: 'Whole Foods',
                         visitCount: 5,
                         totalSpent: 150,
-                    },
-                    spendingTrend: {
-                        direction: 'increasing',
-                        difference: 50,
-                        percentageChange: 12.5,
                     },
                 },
             };
@@ -217,7 +213,6 @@ describe('BudgetDisplayService', () => {
 
             // Should include statistics
             expect(result).toContain('Whole Foods');
-            expect(result).toContain('Increasing');
             expect(result).toContain('Avg Spending');
             expect(result).toContain('$425');
         });
@@ -233,7 +228,7 @@ describe('BudgetDisplayService', () => {
                 remaining: 50,
                 historicalComparison: {
                     previousMonthSpent: 400,
-                    threeMonthAvg: 425,
+                    averageSpent: 425,
                 },
                 transactionStats: {
                     count: 15,
@@ -282,7 +277,7 @@ describe('BudgetDisplayService', () => {
                 remaining: 100,
                 historicalComparison: {
                     previousMonthSpent: 120,
-                    threeMonthAvg: 110,
+                    averageSpent: 110,
                 },
                 transactionStats: {
                     count: 5,
@@ -318,151 +313,6 @@ describe('BudgetDisplayService', () => {
             // Should not contain "Top Merchant" line since it's missing
             const topMerchantLine = result.split('\n').find(line => line.includes('Top Merchant'));
             expect(topMerchantLine).toBeUndefined();
-        });
-
-        it('should handle missing spendingTrend gracefully', () => {
-            const budget: BudgetReportDto = {
-                budgetId: 'test-1',
-                name: 'Utilities',
-                amount: 300,
-                spent: -250,
-                status: 'on-track',
-                percentageUsed: 83.3,
-                remaining: 50,
-                historicalComparison: {
-                    previousMonthSpent: 260,
-                    threeMonthAvg: 255,
-                },
-                transactionStats: {
-                    count: 3,
-                    average: 83.33,
-                    // No spendingTrend
-                },
-            };
-
-            const reportData = {
-                budgets: [budget],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-                isCurrentMonth: false,
-            };
-
-            const result = service.formatReport(reportData, true);
-
-            // Should contain Avg Spending
-            expect(result).toContain('Avg Spending');
-
-            // Should not contain "Trend" line since it's missing
-            const trendLine = result.split('\n').find(line => line.includes('Trend'));
-            expect(trendLine).toBeUndefined();
-        });
-
-        it('should show decreasing trend with correct emoji', () => {
-            const budget: BudgetReportDto = {
-                budgetId: 'test-1',
-                name: 'Dining',
-                amount: 200,
-                spent: -100,
-                status: 'on-track',
-                percentageUsed: 50,
-                remaining: 100,
-                historicalComparison: {
-                    previousMonthSpent: 150,
-                    threeMonthAvg: 125,
-                },
-                transactionStats: {
-                    count: 8,
-                    average: 12.5,
-                    spendingTrend: {
-                        direction: 'decreasing',
-                        difference: -50,
-                        percentageChange: -33.3,
-                    },
-                },
-            };
-
-            const reportData = {
-                budgets: [budget],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-                isCurrentMonth: false,
-            };
-
-            const result = service.formatReport(reportData, true);
-
-            // Should contain decreasing trend with emoji
-            expect(result).toContain('Decreasing');
-            expect(result).toContain('vs last month');
-        });
-
-        it('should show stable trend with correct emoji', () => {
-            const budget: BudgetReportDto = {
-                budgetId: 'test-1',
-                name: 'Subscriptions',
-                amount: 100,
-                spent: -95,
-                status: 'on-track',
-                percentageUsed: 95,
-                remaining: 5,
-                historicalComparison: {
-                    previousMonthSpent: 95,
-                    threeMonthAvg: 95,
-                },
-                transactionStats: {
-                    count: 5,
-                    average: 19,
-                    spendingTrend: {
-                        direction: 'stable',
-                        difference: 0,
-                        percentageChange: 0,
-                    },
-                },
-            };
-
-            const reportData = {
-                budgets: [budget],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-                isCurrentMonth: false,
-            };
-
-            const result = service.formatReport(reportData, true);
-
-            // Should contain stable trend
-            expect(result).toContain('Stable');
         });
     });
 

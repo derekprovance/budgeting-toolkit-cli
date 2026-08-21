@@ -21,7 +21,7 @@ export default {
                     moduleResolution: 'nodenext',
                     isolatedModules: true,
                     // Allow test files to import from anywhere
-                    rootDir: undefined,
+                    rootDir: '.',
                 },
             },
         ],

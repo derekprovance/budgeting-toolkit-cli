@@ -38,9 +38,4 @@ export interface ITransactionService {
      * Gets the full TransactionRead object for a given split transaction
      */
     getTransactionReadBySplit(splitTransaction: TransactionSplit): TransactionRead | undefined;
-
-    /**
-     * Clears the transaction cache
-     */
-    clearCache(): void;
 }

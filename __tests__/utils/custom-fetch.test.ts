@@ -58,6 +58,20 @@ describe('createCustomAxiosInstance', () => {
         });
     });
 
+    describe('CA-only configuration (no client cert)', () => {
+        it('should create a custom agent that trusts the CA', () => {
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue(Buffer.from('ca-data'));
+
+            createCustomAxiosInstance({ caCertPath: '/path/to/ca.pem' });
+
+            expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/ca.pem');
+            expect(mockAxiosCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ httpsAgent: expect.any(Agent) })
+            );
+        });
+    });
+
     describe('certificate file validation', () => {
         it('should fallback to default axios when CA cert file does not exist', () => {
             (mockExistsSync as jest.Mock).mockImplementation(path => {
