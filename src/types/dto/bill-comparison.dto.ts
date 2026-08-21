@@ -1,3 +1,5 @@
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+
 /**
  * Data Transfer Object for individual bill details.
  * Represents a single bill's expected and actual payment for a specific month.
@@ -33,7 +35,15 @@ export class BillComparisonDto {
         public variance: number,
         public bills: BillDetailDto[],
         public currencyCode: string,
-        public currencySymbol: string
+        public currencySymbol: string,
+        /**
+         * The bill transactions counted in {@link actualTotal} that ALSO carry
+         * a budget, and are therefore inside Firefly's server-side budget total
+         * as well. The analyze report uses these to avoid subtracting the same
+         * spending twice. Optional so fixtures that don't exercise the overlap
+         * can omit it.
+         */
+        public budgetedTransactions?: TransactionSplit[]
     ) {}
 
     /**
@@ -44,7 +54,8 @@ export class BillComparisonDto {
         actualTotal: number,
         bills: BillDetailDto[],
         currencyCode: string,
-        currencySymbol: string
+        currencySymbol: string,
+        budgetedTransactions?: TransactionSplit[]
     ): BillComparisonDto {
         const variance = actualTotal - predictedTotal;
         return new BillComparisonDto(
@@ -53,7 +64,8 @@ export class BillComparisonDto {
             variance,
             bills,
             currencyCode,
-            currencySymbol
+            currencySymbol,
+            budgetedTransactions
         );
     }
 }

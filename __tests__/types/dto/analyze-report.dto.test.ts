@@ -2,6 +2,96 @@ import { AnalyzeReportDto } from '../../../src/types/dto/analyze-report.dto.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
 
 describe('AnalyzeReportDto', () => {
+    describe('create() - double-count correction', () => {
+        const txn = (amount: string, description: string) =>
+            ({ amount, description, type: 'withdrawal' }) as never;
+
+        const billComparisonWithBudgeted = (
+            actualTotal: number,
+            budgetedTransactions: unknown[]
+        ): BillComparisonDto =>
+            ({
+                predictedTotal: actualTotal,
+                actualTotal,
+                variance: 0,
+                bills: [],
+                currencyCode: 'USD',
+                currencySymbol: '$',
+                budgetedTransactions,
+                budgetedTotal: 0,
+            }) as unknown as BillComparisonDto;
+
+        const build = (
+            billComparison: BillComparisonDto,
+            disposableBudgeted: unknown[] = [],
+            disposableIncome = 0
+        ) =>
+            AnalyzeReportDto.create(
+                [],
+                [],
+                2000,
+                1500, // budgetSpent — already contains the overlapping transactions
+                500,
+                billComparison,
+                5000,
+                5000,
+                0,
+                [],
+                [],
+                disposableIncome,
+                11,
+                2025,
+                disposableBudgeted as never[]
+            );
+
+        it('should add a bill/budget overlap back exactly once', () => {
+            // A bill transaction carrying a budget is inside BOTH
+            // billComparison.actualTotal and Firefly's budgetSpent rollup
+            const dto = build(billComparisonWithBudgeted(950, [txn('39.00', 'LeetCode')]));
+
+            // 5000 - 950 - 1500 = 2550, plus the $39 charged twice
+            expect(dto.doubleCountedTotal).toBe(39);
+            expect(dto.netImpact).toBe(2589);
+        });
+
+        it('should include disposable transactions that also carry a budget', () => {
+            const dto = build(
+                billComparisonWithBudgeted(950, [txn('39.00', 'LeetCode')]),
+                [txn('20.00', 'Coffee')],
+                100
+            );
+
+            expect(dto.doubleCountedTotal).toBe(59);
+            expect(dto.doubleCountedTransactions).toHaveLength(2);
+            // 5000 - 950 - 1500 - 100 (disposable) + 59
+            expect(dto.netImpact).toBe(2509);
+        });
+
+        it('should be a no-op when nothing overlaps', () => {
+            const dto = build(billComparisonWithBudgeted(950, []));
+
+            expect(dto.doubleCountedTotal).toBe(0);
+            expect(dto.doubleCountedTransactions).toEqual([]);
+            expect(dto.netImpact).toBe(2550);
+        });
+
+        it('should tolerate a bill comparison without the budgeted fields', () => {
+            const legacy = {
+                predictedTotal: 1000,
+                actualTotal: 950,
+                variance: -50,
+                bills: [],
+                currencyCode: 'USD',
+                currencySymbol: '$',
+            } as BillComparisonDto;
+
+            const dto = build(legacy);
+
+            expect(dto.doubleCountedTotal).toBe(0);
+            expect(dto.netImpact).toBe(2550);
+        });
+    });
+
     describe('create() - Net Impact Formula', () => {
         const createMockBillComparison = (
             predictedTotal: number = 1000,

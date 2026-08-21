@@ -16,6 +16,12 @@ export interface DisposableIncomeAnalysis {
     transfers: TransactionSplit[];
     /** Net balance: tagged spending minus transfer deductions (minimum 0) */
     balance: number;
+    /**
+     * The transactions counted above that ALSO carry a budget, and are
+     * therefore inside Firefly's server-side budget total as well. The analyze
+     * report uses these to avoid subtracting the same spending twice.
+     */
+    budgetedTransactions: TransactionSplit[];
 }
 
 /**
@@ -106,6 +112,19 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Disp
         const transferDeduction = this.calculateTransferDeduction(transfers);
         const balance = Math.max(0, tagBasedTotal - transferDeduction);
 
+        // Of the spending counted above, the part Firefly's budget total also
+        // counts — only withdrawals, matching what calculateTotal summed
+        const budgetedTransactions = disposableIncomeTransactions.filter(
+            t =>
+                this.transactionClassificationService.isWithdrawal(t) &&
+                this.transactionClassificationService.hasBudget(t)
+        );
+        const budgetedTotal = TransactionCalculationUtils.calculateTransactionTotal(
+            budgetedTransactions,
+            true,
+            this.logger
+        );
+
         this.logger.debug(
             {
                 month,
@@ -115,11 +134,17 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Disp
                 tagBasedTotal,
                 transferDeduction,
                 balance,
+                budgetedTotal,
             },
             'Calculated disposable income analysis'
         );
 
-        return { transactions: disposableIncomeTransactions, transfers, balance };
+        return {
+            transactions: disposableIncomeTransactions,
+            transfers,
+            balance,
+            budgetedTransactions,
+        };
     }
 
     protected getOperationName(): string {
@@ -129,12 +154,17 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Disp
     /**
      * Finds all disposable income transactions in the given list.
      *
+     * Bill-linked transactions are excluded: BillComparisonService already
+     * counts those, and the analyze report must charge each transaction once.
+     *
      * @param transactions - All transactions to search
      * @returns Array of disposable income transactions
      */
     private findDisposableIncome(transactions: TransactionSplit[]): TransactionSplit[] {
-        return transactions.filter(t =>
-            this.transactionClassificationService.isDisposableIncome(t)
+        return transactions.filter(
+            t =>
+                this.transactionClassificationService.isDisposableIncome(t) &&
+                !this.transactionClassificationService.isBill(t)
         );
     }
 

@@ -50,7 +50,11 @@ describe('AdditionalIncomeService', () => {
             hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
             isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isWithdrawal: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isPaycheck: jest
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockReturnValue(false),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
 
         service = new AdditionalIncomeService(
@@ -430,12 +434,12 @@ describe('AdditionalIncomeService', () => {
                 }
             });
 
-            it('should handle negative amounts', async () => {
+            it('should exclude paycheck-tagged deposits', async () => {
+                // Regression: paychecks are counted by PaycheckSurplusService.
+                // Counting them here too double-counted income in the net.
                 const mockTransactions = [
-                    createMockTransaction({
-                        description: 'Negative Amount',
-                        amount: '-100.00',
-                    }),
+                    createMockTransaction({ description: 'ACME PAYROLL', amount: '2582.31' }),
+                    createMockTransaction({ description: 'Side gig', amount: '100.00' }),
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
@@ -443,12 +447,16 @@ describe('AdditionalIncomeService', () => {
                 (
                     mockTransactionClassificationService.isDisposableIncome as jest.Mock
                 ).mockReturnValue(false);
+                (mockTransactionClassificationService.isPaycheck as jest.Mock).mockImplementation(
+                    (t: TransactionSplit) => t.description === 'ACME PAYROLL'
+                );
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result.ok).toBe(true);
                 if (result.ok) {
-                    expect(result.value).toHaveLength(0);
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Side gig');
                 }
             });
 

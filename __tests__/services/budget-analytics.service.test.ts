@@ -5,6 +5,7 @@ import { TransactionService } from '../../src/services/core/transaction.service.
 import { BudgetService } from '../../src/services/core/budget.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 
 // Mock the services
 jest.mock('../../src/services/budget-report.service.js');
@@ -26,10 +27,12 @@ describe('BudgetAnalyticsService', () => {
         currencySymbol: '$',
     };
 
+    // Firefly returns amounts unsigned; direction comes from `type`
     const mockTransaction: Partial<TransactionSplit> = {
         transaction_journal_id: 'trans-1',
         description: 'Walmart',
-        amount: '-50.00',
+        amount: '50.00',
+        type: 'withdrawal',
         budget_id: 'budget-1',
         currency_symbol: '$',
         date: '2024-01-15',
@@ -45,7 +48,8 @@ describe('BudgetAnalyticsService', () => {
         service = new BudgetAnalyticsService(
             budgetReportService,
             budgetService,
-            transactionService
+            transactionService,
+            new TransactionClassificationService('5', 'Disposable Income', 'Paycheck')
         );
     });
 
@@ -154,10 +158,10 @@ describe('BudgetAnalyticsService', () => {
     describe('getTopExpenses', () => {
         it('should return top expenses sorted by amount descending', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', description: 'Walmart' },
-                { ...mockTransaction, amount: '-25.00', description: 'Gas Station' },
-                { ...mockTransaction, amount: '-100.00', description: 'Restaurant' },
-                { ...mockTransaction, amount: '-10.00', description: 'Coffee' },
+                { ...mockTransaction, amount: '50.00', description: 'Walmart' },
+                { ...mockTransaction, amount: '25.00', description: 'Gas Station' },
+                { ...mockTransaction, amount: '100.00', description: 'Restaurant' },
+                { ...mockTransaction, amount: '10.00', description: 'Coffee' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -173,11 +177,24 @@ describe('BudgetAnalyticsService', () => {
             expect(result[2].amount).toBe(25);
         });
 
-        it('should filter out positive amounts (deposits)', async () => {
+        it('should filter out deposits and transfers, keeping withdrawals', async () => {
+            // Regression: amounts are all positive, so the old `amount < 0`
+            // filter matched nothing and this section never rendered
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', description: 'Expense' },
-                { ...mockTransaction, amount: '100.00', description: 'Income' }, // Should be filtered
-                { ...mockTransaction, amount: '-25.00', description: 'Another Expense' },
+                { ...mockTransaction, amount: '50.00', description: 'Expense' },
+                {
+                    ...mockTransaction,
+                    amount: '100.00',
+                    type: 'deposit',
+                    description: 'Income',
+                },
+                {
+                    ...mockTransaction,
+                    amount: '75.00',
+                    type: 'transfer',
+                    description: 'Moved money',
+                },
+                { ...mockTransaction, amount: '25.00', description: 'Another Expense' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -187,13 +204,19 @@ describe('BudgetAnalyticsService', () => {
             const result = await service.getTopExpenses(1, 2024, 10);
 
             expect(result).toHaveLength(2);
+            expect(result.map(e => e.description)).toEqual(['Expense', 'Another Expense']);
             expect(result.every(e => e.amount > 0)).toBe(true);
         });
 
         it('should return empty array when no expenses exist', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '100.00', description: 'Income' },
-                { ...mockTransaction, amount: '50.00', description: 'More Income' },
+                { ...mockTransaction, amount: '100.00', type: 'deposit', description: 'Income' },
+                {
+                    ...mockTransaction,
+                    amount: '50.00',
+                    type: 'deposit',
+                    description: 'More Income',
+                },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -207,11 +230,11 @@ describe('BudgetAnalyticsService', () => {
 
         it('should respect the limit parameter', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-10.00', description: 'Exp1' },
-                { ...mockTransaction, amount: '-20.00', description: 'Exp2' },
-                { ...mockTransaction, amount: '-30.00', description: 'Exp3' },
-                { ...mockTransaction, amount: '-40.00', description: 'Exp4' },
-                { ...mockTransaction, amount: '-50.00', description: 'Exp5' },
+                { ...mockTransaction, amount: '10.00', description: 'Exp1' },
+                { ...mockTransaction, amount: '20.00', description: 'Exp2' },
+                { ...mockTransaction, amount: '30.00', description: 'Exp3' },
+                { ...mockTransaction, amount: '40.00', description: 'Exp4' },
+                { ...mockTransaction, amount: '50.00', description: 'Exp5' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -246,7 +269,7 @@ describe('BudgetAnalyticsService', () => {
 
         it('should include budget name for each expense', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', budget_name: 'Groceries' },
+                { ...mockTransaction, amount: '50.00', budget_name: 'Groceries' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -260,7 +283,7 @@ describe('BudgetAnalyticsService', () => {
 
         it('should use Unbudgeted when budget name is missing', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', budget_name: null },
+                { ...mockTransaction, amount: '50.00', budget_name: null },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -284,7 +307,7 @@ describe('BudgetAnalyticsService', () => {
             const transactions: Partial<TransactionSplit>[] = [
                 {
                     ...mockTransaction,
-                    amount: '-50.00',
+                    amount: '50.00',
                     date: '2024-01-20',
                     transaction_journal_id: 'journal-123',
                 },

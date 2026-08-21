@@ -60,12 +60,8 @@ export class BillComparisonService implements IBillComparisonService {
             );
 
             // Calculate bill details with predicted amounts based on pay_dates
-            const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
-                activeBills,
-                billTransactions,
-                month,
-                year
-            );
+            const { predictedTotal, actualTotal, billDetails, budgetedTransactions } =
+                this.calculateBillDetails(activeBills, billTransactions, month, year);
 
             // Get currency info from first bill or use default
             const currencyCode =
@@ -82,7 +78,8 @@ export class BillComparisonService implements IBillComparisonService {
                 actualTotal,
                 billDetails,
                 currencyCode,
-                currencySymbol
+                currencySymbol,
+                budgetedTransactions
             );
 
             logger.debug(
@@ -184,10 +181,19 @@ export class BillComparisonService implements IBillComparisonService {
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): { predictedTotal: number; actualTotal: number; billDetails: BillDetailDto[] } {
+    ): {
+        predictedTotal: number;
+        actualTotal: number;
+        billDetails: BillDetailDto[];
+        budgetedTransactions: TransactionSplit[];
+    } {
         let predictedTotal = 0;
         let actualTotal = 0;
         const billDetails: BillDetailDto[] = [];
+        // Bill transactions that also carry a budget. Collected only for bills
+        // actually summed into actualTotal, so the analyze report's correction
+        // matches what was counted rather than what merely exists.
+        const budgetedTransactions: TransactionSplit[] = [];
 
         logger.debug(
             `Calculating bill details from ${transactions.length} bill-linked transactions for ${bills.length} bills`
@@ -224,6 +230,10 @@ export class BillComparisonService implements IBillComparisonService {
             );
 
             actualTotal += actualAmount;
+
+            budgetedTransactions.push(
+                ...billTransactions.filter(t => this.transactionClassificationService.hasBudget(t))
+            );
 
             // Predicted amount determination with defensive logic:
             // 1. If bill is marked as due (has pay_dates) → use full bill amount
@@ -293,6 +303,6 @@ export class BillComparisonService implements IBillComparisonService {
 
         logger.debug({ predictedTotal, actualTotal, billDetailsCount: billDetails.length });
 
-        return { predictedTotal, actualTotal, billDetails };
+        return { predictedTotal, actualTotal, billDetails, budgetedTransactions };
     }
 }

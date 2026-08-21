@@ -3,6 +3,7 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { StringUtils } from '../utils/string.utils.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Service for calculating additional income.
@@ -12,6 +13,7 @@ import { StringUtils } from '../utils/string.utils.js';
  * A transaction is considered additional income if:
  * - It is a deposit (not a withdrawal or transfer)
  * - It goes to a valid destination account
+ * - It is not tagged as a paycheck (PaycheckSurplusService owns those)
  * - It is not payroll
  * - It is not disposable income (if configured)
  * - It is not in the excluded transactions list
@@ -87,17 +89,20 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      *
      * 1. Must be a deposit
      * 2. Must go to a valid destination account
-     * 3. Must not be payroll
-     * 4. Must have a positive amount
-     * 5. Must not be disposable income (if configured)
+     * 3. Must not be a paycheck — those are counted by PaycheckSurplusService,
+     *    and counting them here too would double-count income in the net
+     * 4. Must not match an excluded description pattern
+     * 5. Must have a positive amount
+     * 6. Must not be disposable income (if configured)
      */
     private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
         return transactions.filter(
             transaction =>
                 this.transactionClassificationService.isDeposit(transaction) &&
                 this.hasValidDestinationAccount(transaction) &&
+                !this.transactionClassificationService.isPaycheck(transaction) &&
                 this.isNotPayroll(transaction) &&
-                Number(transaction.amount) > 0 &&
+                TransactionCalculationUtils.parseAmountSafe(transaction.amount) > 0 &&
                 (!this.excludeDisposableIncome ||
                     !this.transactionClassificationService.isDisposableIncome(transaction))
         );

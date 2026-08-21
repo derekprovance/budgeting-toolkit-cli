@@ -98,7 +98,8 @@ export class ServiceFactory {
         const budgetAnalyticsService = new BudgetAnalyticsService(
             budgetReport,
             budgetService,
-            transactionService
+            transactionService,
+            transactionClassificationService
         );
         const budgetInsightService = new BudgetInsightService();
         const budgetDisplayService = new BudgetDisplayService(config.api.firefly.url);

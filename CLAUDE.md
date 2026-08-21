@@ -160,6 +160,12 @@ The `TransactionClassificationService` provides the core logic for classifying t
 - **Disposable Income**: Transactions tagged with configured disposable income tag (default: "Disposable Income")
 - **Paychecks**: Transactions tagged with configured paycheck tag (default: "Paycheck"). Supports all transaction types (deposits, transfers, etc).
 
+**Amount sign convention (verified against Firefly III 6.6.6):** `GET /v1/transactions` returns `amount` **unsigned** — withdrawals, deposits, and transfers are all positive, and direction comes from `type`. Never identify spending with `amount < 0`; use `isWithdrawal()`. Separately, `GET /v1/insight/expense/budget` returns `difference_float` **negative**, which is why code reading `budget.spent` uses `Math.abs` (or adds it, as in `amount + spent`).
+
+**Bucket precedence for the analyze report.** Each transaction must be charged exactly once, so the expense buckets are disjoint by construction, in the order **bill > disposable > unbudgeted** (`UnbudgetedExpenseService` excludes bills and disposable; `DisposableIncomeService` excludes bills). On the income side, **paycheck > additional income** (`AdditionalIncomeService` excludes paycheck-tagged transactions).
+
+The one overlap that cannot be filtered is `budgetSpent`: it comes from Firefly's server-side rollup (`insight/expense/budget`), which returns one number per budget with no per-transaction handle. A bill or disposable transaction that also carries a budget is therefore inside it. Those transactions are reported by `BillComparisonDto.budgetedTransactions` / `DisposableIncomeAnalysis.budgetedTransactions`, added back once in `AnalyzeReportDto` (`doubleCountedTotal`), and surfaced as a warning so the data can be corrected in Firefly.
+
 ### Transaction Splitting System
 
 The `TransactionSplitService` provides functionality for splitting transactions with controlled metadata preservation:

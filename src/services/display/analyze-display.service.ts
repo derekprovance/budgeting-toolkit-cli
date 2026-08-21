@@ -129,6 +129,8 @@ export class AnalyzeDisplayService {
             });
         }
 
+        lines.push(...this.formatDoubleCountWarning(data));
+
         // Disposable income subsection
         if (data.disposableIncomeTransactions.length > 0) {
             lines.push('');
@@ -213,6 +215,47 @@ export class AnalyzeDisplayService {
     }
 
     /**
+     * Warns when transactions are claimed by two buckets at once.
+     *
+     * Firefly's budget total is a server-side rollup, so a bill or disposable
+     * transaction that also carries a budget cannot be filtered out of it. The
+     * net is corrected arithmetically; this names the transactions so the data
+     * can be cleaned up in Firefly.
+     */
+    private formatDoubleCountWarning(data: AnalyzeReportDto): string[] {
+        const transactions = data.doubleCountedTransactions ?? [];
+        if (!data.doubleCountedTotal || data.doubleCountedTotal <= 0 || transactions.length === 0) {
+            return [];
+        }
+
+        const count = transactions.length;
+        const noun = count === 1 ? 'transaction is' : 'transactions are';
+        const lines = [
+            '',
+            chalk.yellow(`  ⚠ ${count} ${noun} claimed by two sections (counted once in net)`),
+        ];
+
+        transactions.forEach(transaction => {
+            const amount = this.formatCurrency(
+                TransactionCalculationUtils.parseAmountSafe(transaction.amount),
+                data.currencySymbol
+            );
+            // The overlap is always with the budget total; say which other
+            // section also claims it so it can be corrected in Firefly
+            const other = this.transactionClassificationService.isBill(transaction)
+                ? 'bill'
+                : 'disposable income';
+            lines.push(
+                chalk.dim(
+                    `    ${transaction.description ?? 'Unknown'} ${amount} — ${other} + budget`
+                )
+            );
+        });
+
+        return lines;
+    }
+
+    /**
      * Formats the financial summary section
      */
     private formatSummarySection(data: AnalyzeReportDto): string {
@@ -228,9 +271,18 @@ export class AnalyzeDisplayService {
             `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
         ];
 
-        if (data.disposableIncomeTransactions.length > 0) {
+        // Gate on the value, not the transaction count: netImpact always
+        // subtracts disposableIncome, so the itemized column must show it
+        // whenever it is non-zero or the list stops summing to the total
+        if (data.disposableIncome !== 0) {
             lines.push(
                 `    ${this.getStatusIcon(-data.disposableIncome, false)} ${'Disposable Spending:'.padEnd(30)} ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
+            );
+        }
+
+        if (data.doubleCountedTotal && data.doubleCountedTotal > 0) {
+            lines.push(
+                `    ${this.getStatusIcon(data.doubleCountedTotal, true)} ${'Double-Count Adj:'.padEnd(30)} ${this.formatNetImpact(data.doubleCountedTotal, data.currencySymbol, true)}`
             );
         }
 

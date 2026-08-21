@@ -388,7 +388,12 @@ export class BudgetDisplayService {
             const variance = bill.actual - bill.predicted;
             const varianceEmoji = EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
 
-            const line = `${varianceEmoji} ${bill.name.padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH)} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${predictedFormatted})`;
+            // Truncate as well as pad — a longer name would otherwise shove the
+            // amount column right and break alignment
+            const name = bill.name
+                .substring(0, BudgetDisplayService.NAME_COLUMN_WIDTH)
+                .padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH);
+            const line = `${varianceEmoji} ${name} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${predictedFormatted})`;
             lines.push(line);
         });
 

@@ -56,6 +56,12 @@ describe('DisposableIncomeService', () => {
             hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
             isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isWithdrawal: jest
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockImplementation((t: TransactionSplit) => t.type === 'withdrawal'),
+            hasBudget: jest
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockImplementation((t: TransactionSplit) => !!t.budget_id),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
 
@@ -484,6 +490,54 @@ describe('DisposableIncomeService', () => {
 
             // Assert - Invalid transfers should be skipped
             expect(result).toBe(100.0); // No deduction
+        });
+    });
+
+    describe('bucket disjointness and budget overlap', () => {
+        it('should exclude bill-linked transactions (BillComparisonService owns those)', async () => {
+            const tagged = createMockTransaction({ description: 'Coffee', amount: '10.00' });
+            const taggedBill = createMockTransaction({
+                description: 'Streaming bill',
+                amount: '15.00',
+                bill_id: '7',
+            });
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([tagged, taggedBill]);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockImplementation(
+                (t: TransactionSplit) => !!t.bill_id
+            );
+
+            const result = await service.calculateDisposableIncome(5, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.transactions).toHaveLength(1);
+                expect(result.value.transactions[0].description).toBe('Coffee');
+            }
+        });
+
+        it('should report counted transactions that also carry a budget', async () => {
+            const plain = createMockTransaction({ description: 'Coffee', amount: '10.00' });
+            const budgeted = createMockTransaction({
+                description: 'Dinner',
+                amount: '40.00',
+                budget_id: 'budget-1',
+            });
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([plain, budgeted]);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+
+            const result = await service.calculateDisposableIncome(5, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Firefly's budgetSpent already counts the budgeted one
+                expect(result.value.budgetedTransactions).toHaveLength(1);
+                expect(result.value.budgetedTransactions[0].description).toBe('Dinner');
+                expect(result.value.budgetedTransactions[0].amount).toBe('40.00');
+            }
         });
     });
 

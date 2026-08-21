@@ -47,18 +47,21 @@ describe('BillComparisonService', () => {
     const createMockTransaction = (
         description: string,
         amount: string,
-        bill_id: string
-    ): TransactionSplit => ({
-        transaction_journal_id: '1',
-        description,
-        amount,
-        type: 'withdrawal',
-        date: '2024-10-15',
-        source_id: 'source1',
-        destination_id: 'dest1',
-        currency_code: 'USD',
-        bill_id,
-    });
+        bill_id: string,
+        budget_id?: string
+    ): TransactionSplit =>
+        ({
+            transaction_journal_id: '1',
+            description,
+            amount,
+            type: 'withdrawal',
+            date: '2024-10-15',
+            source_id: 'source1',
+            destination_id: 'dest1',
+            currency_code: 'USD',
+            bill_id,
+            ...(budget_id ? { budget_id } : {}),
+        }) as TransactionSplit;
 
     beforeEach(() => {
         mockBillService = {
@@ -81,7 +84,9 @@ describe('BillComparisonService', () => {
             hasNoDestination: jest.fn(),
             isSupplementedByDisposable: jest.fn(),
             isDeposit: jest.fn(),
+            isWithdrawal: jest.fn((t: TransactionSplit) => t.type === 'withdrawal'),
             hasACategory: jest.fn(),
+            hasBudget: jest.fn((t: TransactionSplit) => !!t.budget_id),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
 
         billComparisonService = new BillComparisonService(
@@ -699,6 +704,48 @@ describe('BillComparisonService', () => {
                 expect(result.value.bills[0].frequency).toBe('monthly');
                 expect(result.value.bills[1].frequency).toBe('quarterly');
                 expect(result.value.bills[2].frequency).toBe('yearly');
+            }
+        });
+    });
+
+    describe('budget overlap reporting', () => {
+        it('should report counted bill transactions that also carry a budget', async () => {
+            const mockTransactions = [
+                createMockTransaction('Rent Payment', '2000.00', '1'),
+                createMockTransaction('LeetCode', '39.00', '2', 'budget-9'),
+            ];
+
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([
+                createMockBill('1', 'Rent', '2000', 'monthly', 0, true),
+                createMockBill('2', 'LeetCode', '39', 'monthly', 0, true),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Firefly's server-side budgetSpent counts this one too, so the
+                // analyze report needs it to avoid subtracting twice
+                expect(result.value.budgetedTransactions).toHaveLength(1);
+                expect(result.value.budgetedTransactions?.[0].description).toBe('LeetCode');
+                expect(result.value.budgetedTransactions?.[0].amount).toBe('39.00');
+            }
+        });
+
+        it('should report nothing when no bill carries a budget', async () => {
+            mockBillService.getActiveBillsForMonth.mockResolvedValue([
+                createMockBill('1', 'Rent', '2000', 'monthly', 0, true),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction('Rent Payment', '2000.00', '1'),
+            ]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.budgetedTransactions).toEqual([]);
             }
         });
     });

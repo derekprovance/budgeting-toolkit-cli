@@ -31,6 +31,12 @@ export interface ITransactionClassificationService {
     isDeposit(transaction: TransactionSplit): boolean;
 
     /**
+     * Checks if transaction is a withdrawal (spending).
+     * Firefly returns amounts unsigned, so direction must come from the type.
+     */
+    isWithdrawal(transaction: TransactionSplit): boolean;
+
+    /**
      * Checks if transaction has a category assigned
      */
     hasACategory(transaction: TransactionSplit): boolean;

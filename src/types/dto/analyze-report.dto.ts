@@ -1,5 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from './bill-comparison.dto.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 
 /**
  * Data Transfer Object for analyze command report.
@@ -33,6 +34,16 @@ export class AnalyzeReportDto {
         public disposableIncomeTransfers: TransactionSplit[], // Transfers OUT that reduce balance
         public disposableIncome: number,
 
+        // Double-counting correction
+        /**
+         * Transactions counted in the bills or disposable buckets that ALSO
+         * carry a budget. Firefly's budget total is a server-side rollup with
+         * no per-transaction handle, so these cannot be filtered out of
+         * budgetSpent — they are corrected arithmetically in netImpact instead.
+         */
+        public doubleCountedTransactions: TransactionSplit[],
+        public doubleCountedTotal: number,
+
         // Calculations
         public netImpact: number, // Total surplus/deficit from all sources
 
@@ -61,18 +72,29 @@ export class AnalyzeReportDto {
         disposableIncomeTransfers: TransactionSplit[],
         disposableIncome: number,
         month: number,
-        year: number
+        year: number,
+        disposableBudgetedTransactions: TransactionSplit[] = []
     ): AnalyzeReportDto {
         // Calculate totals
-        const additionalIncomeTotal = additionalIncome.reduce((sum, t) => {
-            const amount = parseFloat(t.amount);
-            return sum + (isNaN(amount) ? 0 : amount);
-        }, 0);
+        const additionalIncomeTotal =
+            TransactionCalculationUtils.calculateTransactionTotal(additionalIncome);
 
-        const unbudgetedExpenseTotal = unbudgetedExpenses.reduce((sum, t) => {
-            const amount = parseFloat(t.amount);
-            return sum + Math.abs(isNaN(amount) ? 0 : amount);
-        }, 0);
+        const unbudgetedExpenseTotal = TransactionCalculationUtils.calculateTransactionTotal(
+            unbudgetedExpenses,
+            true
+        );
+
+        // Transactions counted in the bills or disposable buckets that also sit
+        // inside Firefly's server-side budgetSpent rollup. budgetSpent cannot be
+        // filtered locally, so the overlap is added back once below.
+        const doubleCountedTransactions = [
+            ...(billComparison.budgetedTransactions ?? []),
+            ...disposableBudgetedTransactions,
+        ];
+        const doubleCountedTotal = TransactionCalculationUtils.calculateTransactionTotal(
+            doubleCountedTransactions,
+            true
+        );
 
         // Calculate net impact: true cash flow
         // Income: actual paycheck + additional income
@@ -83,7 +105,8 @@ export class AnalyzeReportDto {
             billComparison.actualTotal -
             budgetSpent -
             unbudgetedExpenseTotal -
-            disposableIncome;
+            disposableIncome +
+            doubleCountedTotal; // already inside budgetSpent above; charge it once
 
         // Extract currency from bill comparison (or use defaults)
         const currencySymbol = billComparison.currencySymbol || '$';
@@ -104,6 +127,8 @@ export class AnalyzeReportDto {
             disposableIncomeTransactions,
             disposableIncomeTransfers,
             disposableIncome,
+            doubleCountedTransactions,
+            doubleCountedTotal,
             netImpact,
             month,
             year,

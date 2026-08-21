@@ -13,6 +13,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 
 /**
  * Service for aggregating and analyzing budget data with historical context
@@ -22,7 +23,8 @@ export class BudgetAnalyticsService {
     constructor(
         private readonly budgetReportService: BudgetReportService,
         private readonly budgetService: IBudgetService,
-        private readonly transactionService: TransactionService
+        private readonly transactionService: TransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 
     /**
@@ -121,23 +123,23 @@ export class BudgetAnalyticsService {
         try {
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
-            // Filter to withdrawal/expenses only (negative amounts)
-            const expenses = transactions.filter(t => {
-                const amount = parseFloat(t.amount);
-                return amount < 0;
-            });
+            // Firefly returns all amounts positive — spending is identified by
+            // type, not by sign
+            const expenses = transactions.filter(t =>
+                this.transactionClassificationService.isWithdrawal(t)
+            );
 
-            // Sort by absolute amount descending
-            const sorted = expenses.sort((a, b) => {
-                const amountA = Math.abs(parseFloat(a.amount));
-                const amountB = Math.abs(parseFloat(b.amount));
-                return amountB - amountA;
-            });
+            // Sort by amount descending
+            const sorted = expenses.sort(
+                (a, b) =>
+                    TransactionCalculationUtils.parseAmountSafe(b.amount) -
+                    TransactionCalculationUtils.parseAmountSafe(a.amount)
+            );
 
             // Map to TopExpenseDto and limit
             const topExpenses = sorted.slice(0, limit).map((t, index) => ({
                 description: t.description || `Transaction ${index + 1}`,
-                amount: Math.abs(parseFloat(t.amount)),
+                amount: TransactionCalculationUtils.parseAmountSafe(t.amount),
                 budgetName: t.budget_name || 'Unbudgeted',
                 date: (t.date || new Date().toISOString()).split('T')[0],
                 transactionId: t.transaction_journal_id || '',

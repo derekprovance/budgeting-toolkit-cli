@@ -3,6 +3,15 @@ import { ILogger } from '../types/interface/logger.interface.js';
 
 /**
  * Utility class for common transaction calculation operations
+ *
+ * **Amount sign convention (verified against Firefly III 6.6.6):**
+ * - `GET /v1/transactions` returns `amount` **unsigned** — withdrawals,
+ *   deposits, and transfers are all positive. Direction comes from `type`,
+ *   never from the sign. Never filter spending with `amount < 0`; use
+ *   `TransactionClassificationService.isWithdrawal()`.
+ * - `GET /v1/insight/expense/budget` returns `difference_float` **negative**.
+ *   Code reading `budget.spent` must account for that (existing call sites use
+ *   `Math.abs`, or add it as in `amount + spent`).
  */
 export class TransactionCalculationUtils {
     /**
