@@ -427,6 +427,8 @@ export class AnalyzeDisplayService {
             return chalk.dim('[TRANSFER]');
         } else if (this.transactionClassificationService.isDeposit(transaction)) {
             return chalk.dim('[DEPOSIT]');
+        } else if (this.transactionClassificationService.isWithdrawal(transaction)) {
+            return chalk.dim('[WITHDRAWAL]');
         }
         return chalk.dim('[OTHER]');
     }
