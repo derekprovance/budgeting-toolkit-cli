@@ -70,7 +70,8 @@ export class ServiceFactory {
         );
         const budgetReport = new BudgetReportService(
             budgetService,
-            transactionClassificationService
+            transactionClassificationService,
+            excludedTransactionService
         );
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,

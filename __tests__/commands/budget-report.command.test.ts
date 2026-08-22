@@ -5,6 +5,7 @@ import { BudgetDisplayService } from '../../src/services/display/budget-display.
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
@@ -25,6 +26,7 @@ describe('BudgetReportCommand', () => {
     let budgetReportService: jest.Mocked<BudgetReportService>;
     let billComparisonService: jest.Mocked<BillComparisonService>;
     let transactionService: jest.Mocked<TransactionService>;
+    let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
 
     const mockBudgets: BudgetReportDto[] = [
@@ -104,6 +106,12 @@ describe('BudgetReportCommand', () => {
                 .mockResolvedValue(new Date('2024-05-15')),
         } as unknown as jest.Mocked<TransactionService>;
 
+        unbudgetedExpenseService = {
+            calculateUnbudgetedExpenses: jest
+                .fn<(month: number, year: number) => Promise<any>>()
+                .mockResolvedValue({ ok: true, value: [] }),
+        } as unknown as jest.Mocked<UnbudgetedExpenseService>;
+
         // Create command instance with new signature
         command = new BudgetReportCommand(
             budgetAnalyticsService,
@@ -111,7 +119,8 @@ describe('BudgetReportCommand', () => {
             budgetDisplayService,
             budgetReportService,
             billComparisonService,
-            transactionService
+            transactionService,
+            unbudgetedExpenseService
         );
 
         // Spy on console.log

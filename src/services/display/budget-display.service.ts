@@ -20,6 +20,7 @@ interface ReportData {
     topExpenses: TopExpenseDto[];
     billComparison: BillComparisonDto;
     unbudgeted: CategorizedUnbudgetedDto[];
+    untracked: CategorizedUnbudgetedDto[];
     insights: BudgetInsight[];
     month: number;
     year: number;
@@ -89,10 +90,27 @@ export class BudgetDisplayService {
         // Bills section
         sections.push(this.formatBillsSection(data.billComparison, verbose));
 
-        // Unbudgeted expenses
+        // Unbudgeted expenses — spending the cash-flow net charges to the
+        // unbudgeted bucket, the same definition the analyze command uses
         if (data.unbudgeted.length > 0) {
             sections.push(
-                this.formatUnbudgetedSection(data.unbudgeted, data.billComparison.currencySymbol)
+                this.formatUnbudgetedSection(
+                    data.unbudgeted,
+                    data.billComparison.currencySymbol,
+                    'UNBUDGETED EXPENSES'
+                )
+            );
+        }
+
+        // Spending no bucket accounts for at all
+        if (data.untracked.length > 0) {
+            sections.push(
+                this.formatUnbudgetedSection(
+                    data.untracked,
+                    data.billComparison.currencySymbol,
+                    'UNTRACKED SPENDING',
+                    'Charged to no bucket - not counted in the cash-flow net'
+                )
             );
         }
 
@@ -450,11 +468,17 @@ export class BudgetDisplayService {
      */
     private formatUnbudgetedSection(
         unbudgeted: CategorizedUnbudgetedDto[],
-        currencySymbol: string
+        currencySymbol: string,
+        header: string,
+        subtitle?: string
     ): string {
         const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader('UNBUDGETED EXPENSES'));
+        lines.push(DisplayFormatterUtils.createSectionHeader(header));
         lines.push('');
+        if (subtitle) {
+            lines.push(chalk.dim(`  ${subtitle}`));
+            lines.push('');
+        }
 
         let total = 0;
 

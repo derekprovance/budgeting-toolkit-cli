@@ -10,6 +10,8 @@ import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { EmojiUtils } from '../utils/emoji.utils.js';
 import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
+import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 /**
  * Command for displaying budget report with insights and categorized sections
@@ -23,7 +25,8 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         private readonly budgetDisplayService: BudgetDisplayService,
         private readonly budgetReportService: BudgetReportService,
         private readonly billComparisonService: BillComparisonService,
-        private readonly transactionService: TransactionService
+        private readonly transactionService: TransactionService,
+        private readonly unbudgetedExpenseService: UnbudgetedExpenseService
     ) {}
 
     /**
@@ -48,24 +51,44 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             // Fetch all data in parallel
             spinner.text = 'Fetching budget data...';
-            const [budgets, topExpenses, billComparisonResult, untrackedTransactions] =
+            const [budgets, topExpenses, billComparisonResult, unbudgetedResult] =
                 await Promise.all([
                     this.budgetAnalyticsService.getBudgetReport(month, year, 1),
                     this.budgetAnalyticsService.getTopExpenses(month, year, 5),
                     this.billComparisonService.calculateBillComparison(month, year),
-                    this.budgetReportService.getUntrackedTransactions(month, year),
+                    this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
                 ]);
 
-            // Map untracked transactions with emoji indicators
-            const categorizedUnbudgeted: CategorizedUnbudgetedDto[] = untrackedTransactions.map(
-                transaction => ({
+            if (!unbudgetedResult.ok) {
+                spinner.warn('Warning: Unbudgeted expense data unavailable');
+                logger.warn(
+                    { error: unbudgetedResult.error.message },
+                    'Failed to calculate unbudgeted expenses'
+                );
+            }
+
+            // The bucket that feeds the cash-flow net, same definition analyze uses
+            const unbudgetedExpenses = unbudgetedResult.ok ? unbudgetedResult.value : [];
+
+            // Spending no bucket accounts for. Depends on the list above, so it
+            // cannot join the parallel fetch.
+            const untrackedTransactions = await this.budgetReportService.getUntrackedTransactions(
+                month,
+                year,
+                unbudgetedExpenses
+            );
+
+            const categorize = (transactions: TransactionSplit[]): CategorizedUnbudgetedDto[] =>
+                transactions.map(transaction => ({
                     transaction,
                     categoryEmoji: EmojiUtils.getCategoryEmoji(
                         transaction.category_name || undefined
                     ),
                     categoryName: transaction.category_name || undefined,
-                })
-            );
+                }));
+
+            const categorizedUnbudgeted = categorize(unbudgetedExpenses);
+            const categorizedUntracked = categorize(untrackedTransactions);
 
             if (!billComparisonResult.ok) {
                 spinner.warn('Warning: Bill comparison data unavailable');
@@ -92,6 +115,7 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 topExpenses,
                 billComparison,
                 unbudgeted: categorizedUnbudgeted,
+                untracked: categorizedUntracked,
                 insights,
                 month,
                 year,

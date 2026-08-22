@@ -7,11 +7,13 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { Result } from '../types/result.type.js';
 import { BudgetError, BudgetErrorFactory, BudgetErrorType } from '../types/error/budget.error.js';
+import { IExcludedTransactionService } from './excluded-transaction.service.interface.js';
 
 export class BudgetReportService implements IBudgetReportService {
     constructor(
         private budgetService: IBudgetService,
-        private readonly transactionClassificationService: ITransactionClassificationService
+        private readonly transactionClassificationService: ITransactionClassificationService,
+        private readonly excludedTransactionService: IExcludedTransactionService
     ) {}
 
     /**
@@ -100,23 +102,47 @@ export class BudgetReportService implements IBudgetReportService {
     }
 
     /**
-     * Gets the untracked transactions for a particular budget. Usually indicates something fell through the cracks.
+     * Gets the spending that no bucket accounts for — the genuine "fell through
+     * the cracks" list.
      *
-     * We follow the following rules to create this list:
-     * - Must not have a budget
-     * - Must not be a bill, these are tracked outside of the budget
-     * - Must not be disposable income, this is also tracked outside of the budget
+     * A withdrawal is charged exactly once across the report's buckets: budget,
+     * bill, disposable income, or unbudgeted. Anything left over is invisible to
+     * the cash-flow net, which is precisely what makes it worth surfacing.
+     *
+     * Rules:
+     * - Must not have a budget (the endpoint guarantees this)
+     * - Must not be a bill — tracked by BillComparisonService
+     * - Must not be disposable income — tracked by DisposableIncomeService
+     * - Must not already be in the unbudgeted bucket — tracked by
+     *   UnbudgetedExpenseService, which is what feeds netImpact
+     * - Must not be globally excluded
+     *
+     * In practice what survives is spending from an account outside
+     * `expenseSourceAccounts`, which the unbudgeted bucket deliberately ignores.
+     *
+     * @param unbudgetedExpenses The unbudgeted bucket for the same month, from
+     *   `UnbudgetedExpenseService`. Passed in rather than recomputed so both
+     *   sections of the report derive from one calculation.
      */
-    async getUntrackedTransactions(month: number, year: number): Promise<TransactionSplit[]> {
-        let transactions = await this.budgetService.getTransactionsWithoutBudget(month, year);
+    async getUntrackedTransactions(
+        month: number,
+        year: number,
+        unbudgetedExpenses: TransactionSplit[] = []
+    ): Promise<TransactionSplit[]> {
+        const transactions = await this.budgetService.getTransactionsWithoutBudget(month, year);
 
-        transactions = transactions.filter(t => {
-            return (
+        const alreadyCounted = new Set(
+            unbudgetedExpenses.map(t => t.transaction_journal_id).filter(Boolean)
+        );
+
+        return transactions.filter(
+            t =>
                 !this.transactionClassificationService.isBill(t) &&
-                !this.transactionClassificationService.isDisposableIncome(t)
-            );
-        });
-
-        return transactions;
+                !this.transactionClassificationService.isDisposableIncome(t) &&
+                !alreadyCounted.has(t.transaction_journal_id) &&
+                // This endpoint bypasses TransactionService, so the global
+                // exclusion list has to be applied here too
+                !this.excludedTransactionService.isExcludedTransaction(t.description, t.amount)
+        );
     }
 }

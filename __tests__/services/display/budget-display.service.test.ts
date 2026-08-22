@@ -52,6 +52,7 @@ describe('BudgetDisplayService', () => {
                 topExpenses: [],
                 billComparison,
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -101,6 +102,7 @@ describe('BudgetDisplayService', () => {
                 topExpenses: [],
                 billComparison,
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -148,6 +150,7 @@ describe('BudgetDisplayService', () => {
                 topExpenses: [],
                 billComparison,
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -203,6 +206,7 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -253,6 +257,7 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -298,6 +303,7 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -330,6 +336,7 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
+                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -368,6 +375,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
+                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -420,6 +428,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
+                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -461,6 +470,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
+                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -502,6 +512,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
+                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -518,6 +529,74 @@ describe('BudgetDisplayService', () => {
 
             // Should not contain OSC 8 escape sequences since there's no transaction ID
             expect(result).not.toContain('\x1B]8;;');
+        });
+    });
+
+    describe('formatReport - unbudgeted vs untracked sections', () => {
+        const item = (description: string, amount: string) => ({
+            transaction: {
+                description,
+                amount,
+                transaction_journal_id: '1',
+                date: '2026-08-11',
+            },
+            categoryEmoji: '💰',
+        });
+
+        const baseData = () => ({
+            budgets: [],
+            topExpenses: [],
+            billComparison: {
+                predictedTotal: 0,
+                actualTotal: 0,
+                variance: 0,
+                bills: [],
+                currencySymbol: '$',
+                currencyCode: 'USD',
+            },
+            unbudgeted: [],
+            untracked: [],
+            insights: [],
+            month: 8,
+            year: 2026,
+            isCurrentMonth: false,
+        });
+
+        it('should render both sections under distinct headers', () => {
+            const data = {
+                ...baseData(),
+                unbudgeted: [item('Coffee', '4.50')],
+                untracked: [item('VANGUARD BUY INVESTMENT', '550.27')],
+            };
+
+            const result = service.formatReport(data as never, false);
+
+            expect(result).toContain('UNBUDGETED EXPENSES');
+            expect(result).toContain('UNTRACKED SPENDING');
+            expect(result).toContain('Charged to no bucket');
+            expect(result).toContain('Coffee');
+            expect(result).toContain('VANGUARD BUY INVESTMENT');
+        });
+
+        it('should omit the untracked section when nothing is untracked', () => {
+            const data = { ...baseData(), unbudgeted: [item('Coffee', '4.50')] };
+
+            const result = service.formatReport(data as never, false);
+
+            expect(result).toContain('UNBUDGETED EXPENSES');
+            expect(result).not.toContain('UNTRACKED SPENDING');
+        });
+
+        it('should omit the unbudgeted section when the bucket is empty', () => {
+            const data = {
+                ...baseData(),
+                untracked: [item('VANGUARD BUY INVESTMENT', '550.27')],
+            };
+
+            const result = service.formatReport(data as never, false);
+
+            expect(result).not.toContain('UNBUDGETED EXPENSES');
+            expect(result).toContain('UNTRACKED SPENDING');
         });
     });
 });

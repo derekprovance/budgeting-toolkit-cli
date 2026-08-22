@@ -125,7 +125,9 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
     - Unbudgeted expenses and disposable income
     - True cash flow net impact calculation
 
-2. **report** (alias: `st`) - Shows current budget report for a given month
+2. **report** (alias: `st`) - Shows current budget report for a given month. Its two spending sections are deliberately different:
+    - **Unbudgeted Expenses** - the bucket that feeds `netImpact`, from `UnbudgetedExpenseService`. Same definition `analyze` uses, so the two commands always agree
+    - **Untracked Spending** - withdrawals charged to *no* bucket at all (not budget, bill, disposable, or unbudgeted). In practice this is spending from an account outside `expenseSourceAccounts`, which the cash-flow net deliberately ignores. It is a diagnostic, not part of the net
 
 3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
     - By default, processes uncategorized transactions and transactions with category but no budget
