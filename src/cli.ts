@@ -214,7 +214,8 @@ Examples:
                     services.budgetSurplusService,
                     services.billComparisonService,
                     services.analyzeDisplayService,
-                    config.transactions.expectedMonthlyPaycheck || 0
+                    services.transactionService,
+                    services.transactionClassificationService
                 );
                 await command.execute({
                     month: opts.month!,

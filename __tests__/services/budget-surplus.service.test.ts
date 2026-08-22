@@ -297,4 +297,27 @@ describe('BudgetSurplusService', () => {
             }
         });
     });
+
+    describe('per-budget sign handling', () => {
+        it('should let a net-refunded budget reduce total spend rather than add to it', async () => {
+            // insight/expense/budget reports difference_float negative for
+            // spending; a budget whose refunds exceeded its outflows reports a
+            // POSITIVE value, and Math.abs() would count that refund as spend
+            mockBudgetService.getBudgetLimits.mockResolvedValue([
+                { attributes: { amount: '1000' } },
+            ] as never);
+            mockBudgetService.getBudgetExpenseInsights.mockResolvedValue([
+                { difference_float: -300 },
+                { difference_float: 50 }, // net refund
+            ] as never);
+
+            const result = await service.calculateBudgetSurplus(5, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.totalSpent).toBe(250);
+                expect(result.value.surplus).toBe(750);
+            }
+        });
+    });
 });

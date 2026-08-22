@@ -224,15 +224,21 @@ export class AnalyzeDisplayService {
      */
     private formatDoubleCountWarning(data: AnalyzeReportDto): string[] {
         const transactions = data.doubleCountedTransactions ?? [];
-        if (!data.doubleCountedTotal || data.doubleCountedTotal <= 0 || transactions.length === 0) {
+        // Gate on the transactions, never on the adjustment. The correction is
+        // capped by what each bucket actually subtracted, so a genuinely
+        // double-claimed transaction can carry a $0 adjustment — and that is
+        // precisely the case most worth telling the user to fix in Firefly.
+        if (transactions.length === 0) {
             return [];
         }
 
         const count = transactions.length;
         const noun = count === 1 ? 'transaction is' : 'transactions are';
+        const adjustment = this.formatCurrency(data.doubleCountedTotal ?? 0, data.currencySymbol);
         const lines = [
             '',
-            chalk.yellow(`  ⚠ ${count} ${noun} claimed by two sections (counted once in net)`),
+            chalk.yellow(`  ⚠ ${count} ${noun} claimed by two sections`),
+            chalk.dim(`    net adjustment applied: ${adjustment}`),
         ];
 
         transactions.forEach(transaction => {

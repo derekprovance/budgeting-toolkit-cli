@@ -44,6 +44,65 @@ export class TransactionCalculationUtils {
     }
 
     /**
+     * Sums a set of transactions as *spending*, honouring direction.
+     *
+     * Firefly reports `amount` unsigned, so direction has to come from `type`:
+     * withdrawals and transfers add to the total, and deposits (refunds,
+     * chargebacks, returned payments) subtract from it. Summing with
+     * `useAbsolute` instead makes a refund inflate the very bucket it should
+     * reduce.
+     *
+     * @returns Net spend; negative when refunds exceed outflows
+     */
+    static calculateNetSpend(transactions: TransactionSplit[], logger?: ILogger): number {
+        return TransactionCalculationUtils.sumBySignedType(transactions, 'spend', logger);
+    }
+
+    /**
+     * Sums a set of transactions as *income*, honouring direction.
+     *
+     * The mirror of {@link calculateNetSpend}: deposits and transfers add,
+     * withdrawals subtract. Used for paycheck totals, where a transaction
+     * tagged as a paycheck but recorded as a withdrawal (a clawback or a
+     * correction) must reduce income rather than inflate it.
+     */
+    static calculateNetIncome(transactions: TransactionSplit[], logger?: ILogger): number {
+        return TransactionCalculationUtils.sumBySignedType(transactions, 'income', logger);
+    }
+
+    private static sumBySignedType(
+        transactions: TransactionSplit[],
+        direction: 'spend' | 'income',
+        logger?: ILogger
+    ): number {
+        const positiveType = direction === 'spend' ? 'withdrawal' : 'deposit';
+        const negativeType = direction === 'spend' ? 'deposit' : 'withdrawal';
+
+        return transactions.reduce((sum, transaction) => {
+            const amount = parseFloat(transaction.amount);
+            if (isNaN(amount)) {
+                logger?.warn({ transaction }, 'Invalid transaction amount found');
+                return sum;
+            }
+
+            const magnitude = Math.abs(amount);
+
+            if (transaction.type === negativeType) {
+                return sum - magnitude;
+            }
+
+            if (transaction.type !== positiveType && transaction.type !== 'transfer') {
+                logger?.debug(
+                    { type: transaction.type, description: transaction.description, direction },
+                    'Unrecognised transaction type in signed sum - counting toward the total'
+                );
+            }
+
+            return sum + magnitude;
+        }, 0);
+    }
+
+    /**
      * Safely parses an amount string, handling currency formatting
      * @param amount Amount string to parse
      * @param defaultValue Default value if parsing fails

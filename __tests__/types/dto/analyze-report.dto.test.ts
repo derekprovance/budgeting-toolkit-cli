@@ -44,6 +44,86 @@ describe('AnalyzeReportDto', () => {
                 disposableBudgeted as never[]
             );
 
+        it('should not credit back more disposable spending than it subtracted', () => {
+            // $100 of disposable-tagged, budgeted spending, fully offset by a
+            // $100 transfer back out, so the service reports a balance of 0.
+            // The correction must not hand back $100 that was never subtracted.
+            const budgeted = [txn('100.00', 'Tagged and budgeted')];
+            const dto = build(billComparisonWithBudgeted(0, []), budgeted, 0);
+
+            expect(dto.doubleCountedTotal).toBe(0);
+            // income 5000 - budgetSpent 1500, and nothing conjured from nowhere
+            expect(dto.netImpact).toBe(3500);
+        });
+
+        it('should cap the disposable correction at the balance actually subtracted', () => {
+            // $100 tagged and budgeted, but only $40 survived the transfer
+            // deduction, so at most $40 can have been double-counted
+            const budgeted = [txn('100.00', 'Tagged and budgeted')];
+            const dto = build(billComparisonWithBudgeted(0, []), budgeted, 40);
+
+            expect(dto.doubleCountedTotal).toBe(40);
+            expect(dto.netImpact).toBe(5000 - 1500 - 40 + 40);
+        });
+
+        it('should cap the bill correction at the bill total actually subtracted', () => {
+            // Budgeted bill transactions exceed what the bill bucket charged
+            const dto = build(billComparisonWithBudgeted(30, [txn('80.00', 'Bill')]));
+
+            expect(dto.doubleCountedTotal).toBe(30);
+        });
+
+        it('should never credit back more than budgetSpent contains', () => {
+            const dto = AnalyzeReportDto.create(
+                [],
+                [],
+                2000,
+                25, // budgetSpent is smaller than the claimed overlap
+                0,
+                billComparisonWithBudgeted(900, [txn('900.00', 'Bill')]),
+                5000,
+                5000,
+                0,
+                [],
+                [],
+                0,
+                11,
+                2025,
+                []
+            );
+
+            expect(dto.doubleCountedTotal).toBe(25);
+        });
+
+        it('should treat a refunded unbudgeted expense as reducing the total', () => {
+            const refund = { amount: '60.00', description: 'Return', type: 'deposit' } as never;
+            const spend = {
+                amount: '100.00',
+                description: 'Purchase',
+                type: 'withdrawal',
+            } as never;
+
+            const dto = AnalyzeReportDto.create(
+                [],
+                [spend, refund],
+                0,
+                0,
+                0,
+                billComparisonWithBudgeted(0, []),
+                0,
+                0,
+                0,
+                [],
+                [],
+                0,
+                11,
+                2025,
+                []
+            );
+
+            expect(dto.unbudgetedExpenseTotal).toBe(40);
+        });
+
         it('should add a bill/budget overlap back exactly once', () => {
             // A bill transaction carrying a budget is inside BOTH
             // billComparison.actualTotal and Firefly's budgetSpent rollup

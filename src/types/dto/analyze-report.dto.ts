@@ -55,6 +55,17 @@ export class AnalyzeReportDto {
     ) {}
 
     /**
+     * The portion of {@link budgeted} that a bucket genuinely double-counted.
+     *
+     * Bounded by what that bucket contributed to the net: crediting back more
+     * than was subtracted would invent income.
+     */
+    private static cappedCorrection(budgeted: TransactionSplit[], bucketTotal: number): number {
+        const budgetedTotal = TransactionCalculationUtils.calculateNetSpend(budgeted);
+        return Math.max(0, Math.min(budgetedTotal, bucketTotal));
+    }
+
+    /**
      * Factory method to create AnalyzeReportDto from calculation results.
      * Handles currency extraction and net impact calculation.
      */
@@ -79,21 +90,33 @@ export class AnalyzeReportDto {
         const additionalIncomeTotal =
             TransactionCalculationUtils.calculateTransactionTotal(additionalIncome);
 
-        const unbudgetedExpenseTotal = TransactionCalculationUtils.calculateTransactionTotal(
-            unbudgetedExpenses,
-            true
-        );
+        const unbudgetedExpenseTotal =
+            TransactionCalculationUtils.calculateNetSpend(unbudgetedExpenses);
 
         // Transactions counted in the bills or disposable buckets that also sit
         // inside Firefly's server-side budgetSpent rollup. budgetSpent cannot be
         // filtered locally, so the overlap is added back once below.
+        const billBudgetedTransactions = billComparison.budgetedTransactions ?? [];
         const doubleCountedTransactions = [
-            ...(billComparison.budgetedTransactions ?? []),
+            ...billBudgetedTransactions,
             ...disposableBudgetedTransactions,
         ];
-        const doubleCountedTotal = TransactionCalculationUtils.calculateTransactionTotal(
-            doubleCountedTransactions,
-            true
+
+        // The correction credits back spending that was subtracted twice, so it
+        // can never exceed what each bucket actually subtracted. The disposable
+        // bucket in particular reports a balance that is net of transfers and
+        // floored at zero, while its budgeted-transaction list is neither — so
+        // an uncapped add-back can hand back more than was ever taken away and
+        // conjure cash out of nothing.
+        // Bounded a second time by budgetSpent itself: the whole premise of the
+        // correction is that this spending is already inside that rollup, so it
+        // cannot credit back more than the rollup contains.
+        const doubleCountedTotal = Math.min(
+            AnalyzeReportDto.cappedCorrection(
+                billBudgetedTransactions,
+                billComparison.actualTotal
+            ) + AnalyzeReportDto.cappedCorrection(disposableBudgetedTransactions, disposableIncome),
+            Math.max(0, budgetSpent)
         );
 
         // Calculate net impact: true cash flow

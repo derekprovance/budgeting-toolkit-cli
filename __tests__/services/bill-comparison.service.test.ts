@@ -108,7 +108,7 @@ describe('BillComparisonService', () => {
                 createMockTransaction('Internet Payment', '100.00', '2'),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -123,7 +123,7 @@ describe('BillComparisonService', () => {
         });
 
         it('should handle empty bills gracefully', async () => {
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([]);
+            mockBillService.getBillsForMonth.mockResolvedValue([]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -149,7 +149,7 @@ describe('BillComparisonService', () => {
             const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
             const mockTransactions = [createMockTransaction('Subscription Payment', '60.00', '1')];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -170,7 +170,7 @@ describe('BillComparisonService', () => {
                 createMockBill('3', 'Quarterly', '300', 'quarterly', 0, true),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -198,7 +198,7 @@ describe('BillComparisonService', () => {
                 createMockBill('3', 'Quarterly Not Due', '300', 'quarterly', 0, false),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -231,7 +231,7 @@ describe('BillComparisonService', () => {
                 createMockTransaction('Payment B2', '100.00', '2'),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -253,7 +253,7 @@ describe('BillComparisonService', () => {
                 bill_id: null,
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([unbilledTransaction]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -280,7 +280,7 @@ describe('BillComparisonService', () => {
                 },
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([billWithoutCurrency]);
+            mockBillService.getBillsForMonth.mockResolvedValue([billWithoutCurrency]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -300,7 +300,7 @@ describe('BillComparisonService', () => {
                 subscription_id: '1',
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([
                 transactionWithSubscriptionId,
             ]);
@@ -328,7 +328,7 @@ describe('BillComparisonService', () => {
                 },
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([invalidBill]);
+            mockBillService.getBillsForMonth.mockResolvedValue([invalidBill]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -354,7 +354,7 @@ describe('BillComparisonService', () => {
                 },
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([negativeBill]);
+            mockBillService.getBillsForMonth.mockResolvedValue([negativeBill]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -380,7 +380,7 @@ describe('BillComparisonService', () => {
                 },
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([billWithoutAverage]);
+            mockBillService.getBillsForMonth.mockResolvedValue([billWithoutAverage]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -394,7 +394,7 @@ describe('BillComparisonService', () => {
         });
 
         it('should handle errors from bill service', async () => {
-            mockBillService.getActiveBillsForMonth.mockRejectedValue(new Error('API Error'));
+            mockBillService.getBillsForMonth.mockRejectedValue(new Error('API Error'));
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
             expect(result.ok).toBe(false);
@@ -407,7 +407,7 @@ describe('BillComparisonService', () => {
 
         it('should handle errors from transaction service', async () => {
             const mockBills = [createMockBill('1', 'Test Bill', '100', 'monthly', 0, true)];
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockRejectedValue(
                 new Error('Transaction Error')
             );
@@ -456,7 +456,7 @@ describe('BillComparisonService', () => {
                 },
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([
+            mockBillService.getBillsForMonth.mockResolvedValue([
                 billDueThisMonth,
                 billDueNextMonth,
             ]);
@@ -475,7 +475,7 @@ describe('BillComparisonService', () => {
 
         it('should return false when pay_dates is empty', async () => {
             const mockBills = [createMockBill('1', 'Not Due Bill', '100', 'monthly', 0, false)];
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -503,7 +503,7 @@ describe('BillComparisonService', () => {
                 },
             };
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([billWithoutPayDates]);
+            mockBillService.getBillsForMonth.mockResolvedValue([billWithoutPayDates]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -526,7 +526,7 @@ describe('BillComparisonService', () => {
                 createMockTransaction('Payment for Buggy Bill', '100.00', '1'),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -553,7 +553,7 @@ describe('BillComparisonService', () => {
             // And no transactions
             const mockTransactions: TransactionSplit[] = [];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -583,7 +583,7 @@ describe('BillComparisonService', () => {
                 // No transaction for bill 3
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -613,7 +613,7 @@ describe('BillComparisonService', () => {
             // Partial payment
             const mockTransactions = [createMockTransaction('Partial Payment', '50.00', '1')];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -642,7 +642,7 @@ describe('BillComparisonService', () => {
                 createMockTransaction('Payment 2', '100.00', '1'),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -667,7 +667,7 @@ describe('BillComparisonService', () => {
                 createMockBill('3', 'Yearly Bill', '1200', 'yearly', 0, true),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -694,7 +694,7 @@ describe('BillComparisonService', () => {
                 createMockBill('3', 'Yearly', '1200', 'yearly', 0, true),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue(mockBills);
+            mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);
@@ -715,7 +715,7 @@ describe('BillComparisonService', () => {
                 createMockTransaction('LeetCode', '39.00', '2', 'budget-9'),
             ];
 
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([
+            mockBillService.getBillsForMonth.mockResolvedValue([
                 createMockBill('1', 'Rent', '2000', 'monthly', 0, true),
                 createMockBill('2', 'LeetCode', '39', 'monthly', 0, true),
             ]);
@@ -734,7 +734,7 @@ describe('BillComparisonService', () => {
         });
 
         it('should report nothing when no bill carries a budget', async () => {
-            mockBillService.getActiveBillsForMonth.mockResolvedValue([
+            mockBillService.getBillsForMonth.mockResolvedValue([
                 createMockBill('1', 'Rent', '2000', 'monthly', 0, true),
             ]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([
@@ -746,6 +746,84 @@ describe('BillComparisonService', () => {
             expect(result.ok).toBe(true);
             if (result.ok) {
                 expect(result.value.budgetedTransactions).toEqual([]);
+            }
+        });
+    });
+
+    describe('direction and orphaned bills', () => {
+        it('should let a refund reduce what a bill actually cost', async () => {
+            // Firefly reports amount unsigned, so a deposit linked to a bill
+            // would inflate the bill total if summed by magnitude
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                createMockBill('1', 'Internet', '100', 'monthly'),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                { amount: '100.00', type: 'withdrawal', bill_id: '1' },
+                { amount: '30.00', type: 'deposit', bill_id: '1' },
+            ] as never);
+            mockTransactionClassificationService.isBill.mockReturnValue(true);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.actualTotal).toBe(70);
+            }
+        });
+
+        it('should still count spending on a deactivated bill, predicting nothing for it', async () => {
+            // Every other bucket rejects a bill-linked transaction, so without
+            // this the spending would be charged nowhere at all
+            const inactive = createMockBill('9', 'Cancelled Gym', '60', 'monthly');
+            inactive.attributes.active = false;
+
+            mockBillService.getBillsForMonth.mockResolvedValue([inactive]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                { amount: '60.00', type: 'withdrawal', bill_id: '9' },
+            ] as never);
+            mockTransactionClassificationService.isBill.mockReturnValue(true);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.actualTotal).toBe(60);
+                expect(result.value.predictedTotal).toBe(0);
+            }
+        });
+
+        it('should omit a deactivated bill with no activity', async () => {
+            const inactive = createMockBill('9', 'Cancelled Gym', '60', 'monthly');
+            inactive.attributes.active = false;
+
+            mockBillService.getBillsForMonth.mockResolvedValue([inactive]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills).toEqual([]);
+                expect(result.value.actualTotal).toBe(0);
+            }
+        });
+
+        it('should count transactions linked to a bill missing from the bill list', async () => {
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                createMockBill('1', 'Internet', '100', 'monthly'),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                { amount: '100.00', type: 'withdrawal', bill_id: '1' },
+                { amount: '45.00', type: 'withdrawal', bill_id: '404' }, // deleted bill
+            ] as never);
+            mockTransactionClassificationService.isBill.mockReturnValue(true);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.actualTotal).toBe(145);
+                expect(result.value.bills.map(b => b.id)).toContain('404');
             }
         });
     });

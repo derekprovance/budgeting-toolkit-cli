@@ -125,4 +125,32 @@ describe('StringUtils', () => {
             expect(StringUtils.matchesAnyPattern('test@example.com', ['example.com'])).toBe(true);
         });
     });
+
+    describe('matchesAnyPattern word boundaries', () => {
+        it('should not match a pattern that is only part of a longer word', () => {
+            // 'transfer' must not swallow every deposit from Transferwise
+            expect(StringUtils.matchesAnyPattern('TRANSFERWISE INC', ['transfer'])).toBe(false);
+            expect(StringUtils.matchesAnyPattern('Funds transferred', ['transfer'])).toBe(false);
+        });
+
+        it('should still match the pattern as a whole word', () => {
+            expect(StringUtils.matchesAnyPattern('Zelle TRANSFER from Mom', ['transfer'])).toBe(
+                true
+            );
+            expect(StringUtils.matchesAnyPattern('MY_PAYROLL', ['payroll'])).toBe(true);
+        });
+
+        it('should require multi-word patterns to appear contiguously', () => {
+            expect(
+                StringUtils.matchesAnyPattern('direct deposit payroll', ['deposit payroll'])
+            ).toBe(true);
+            expect(
+                StringUtils.matchesAnyPattern('deposit from the payroll', ['deposit payroll'])
+            ).toBe(false);
+        });
+
+        it('should ignore empty patterns', () => {
+            expect(StringUtils.matchesAnyPattern('anything', [''])).toBe(false);
+        });
+    });
 });

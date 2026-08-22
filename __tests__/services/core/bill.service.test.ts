@@ -1,3 +1,4 @@
+import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import { BillService } from '../../../src/services/core/bill.service.js';
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
@@ -159,8 +160,8 @@ describe('BillService', () => {
             // Verify listBill was called with date range parameters
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined, // xTraceId
-                undefined, // limit
-                undefined, // page
+                PAGE_SIZE,
+                1, // page
                 '2024-10-01', // start date
                 '2024-10-31' // end date
             );
@@ -176,8 +177,8 @@ describe('BillService', () => {
 
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined,
-                undefined,
-                undefined,
+                PAGE_SIZE,
+                1,
                 '2024-02-01',
                 '2024-02-29' // 2024 is a leap year
             );
@@ -192,8 +193,8 @@ describe('BillService', () => {
 
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined,
-                undefined,
-                undefined,
+                PAGE_SIZE,
+                1,
                 '2024-12-01',
                 '2024-12-31'
             );
@@ -297,8 +298,8 @@ describe('BillService', () => {
 
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined,
-                undefined,
-                undefined,
+                PAGE_SIZE,
+                1,
                 '2025-06-01',
                 '2025-06-30'
             );

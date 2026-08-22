@@ -113,15 +113,13 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Disp
         const balance = Math.max(0, tagBasedTotal - transferDeduction);
 
         // Of the spending counted above, the part Firefly's budget total also
-        // counts — only withdrawals, matching what calculateTotal summed
-        const budgetedTransactions = disposableIncomeTransactions.filter(
-            t =>
-                this.transactionClassificationService.isWithdrawal(t) &&
-                this.transactionClassificationService.hasBudget(t)
+        // counts. Same basis as calculateTotal — transfers excluded — so the
+        // report's correction matches what was actually charged.
+        const budgetedTransactions = this.excludeTransfers(disposableIncomeTransactions).filter(t =>
+            this.transactionClassificationService.hasBudget(t)
         );
-        const budgetedTotal = TransactionCalculationUtils.calculateTransactionTotal(
+        const budgetedTotal = TransactionCalculationUtils.calculateNetSpend(
             budgetedTransactions,
-            true,
             this.logger
         );
 
@@ -170,16 +168,24 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Disp
 
     /**
      * Calculates total spending from disposable income transactions.
-     * Only withdrawals count as spending — a deposit or refund tagged as
-     * disposable income must not inflate the total via absolute-value summing.
+     *
+     * Direction comes from the transaction type: a deposit or refund tagged as
+     * disposable income reduces the total rather than inflating it.
+     *
+     * Transfers are excluded on purpose. Movement in and out of a disposable
+     * account is already accounted for by {@link calculateTransferDeduction};
+     * counting a tagged transfer here as well would add it (+X) and deduct it
+     * (-X) in the same breath, silently cancelling the deduction.
      */
     private calculateTotal(transactions: TransactionSplit[]): number {
-        const withdrawals = transactions.filter(t => t.type === 'withdrawal');
-        return TransactionCalculationUtils.calculateTransactionTotal(
-            withdrawals,
-            true,
+        return TransactionCalculationUtils.calculateNetSpend(
+            this.excludeTransfers(transactions),
             this.logger
         );
+    }
+
+    private excludeTransfers(transactions: TransactionSplit[]): TransactionSplit[] {
+        return transactions.filter(t => !this.transactionClassificationService.isTransfer(t));
     }
 
     /**

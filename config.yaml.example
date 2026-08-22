@@ -23,6 +23,10 @@ excludedAdditionalIncomePatterns:
     - 'TRANSFER'
 
 # These are transfers that would be counted towards unbudgeted expenses
+# Only list transfers that represent money genuinely leaving your control.
+# Do NOT list transfers that fund a disposable/cash account: spending out of
+# that account is already charged once via the Disposable Income tag, so
+# listing the funding transfer charges the same dollars twice.
 expenseTransfers:
     - source: '5' # Remote Investment Account ID
       destination: '1' # Checking Account ID

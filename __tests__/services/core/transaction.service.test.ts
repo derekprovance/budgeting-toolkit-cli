@@ -1,3 +1,4 @@
+import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import '../../setup/mock-logger.js'; // Must be first to mock logger module
 import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
@@ -80,7 +81,12 @@ describe('TransactionService', () => {
                 date: '2024-01-01',
                 type: 'withdrawal',
             });
-            expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledWith('test-tag');
+            expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledWith(
+                'test-tag',
+                undefined,
+                PAGE_SIZE,
+                1
+            );
         });
 
         it('should throw error when tag is empty', async () => {
@@ -1146,6 +1152,91 @@ describe('TransactionService', () => {
             // Verify split index is populated
             const indexedTransaction = serviceWithCache.getTransactionReadBySplit(mockTransaction);
             expect(indexedTransaction).toEqual(mockTransactionRead);
+        });
+    });
+
+    describe('pagination and exclusions', () => {
+        const split = (id: string, amount: string, budgetId?: string) =>
+            ({
+                transaction_journal_id: id,
+                description: `txn-${id}`,
+                amount,
+                date: '2024-01-15',
+                type: 'withdrawal',
+                budget_id: budgetId,
+            }) as unknown as TransactionSplit;
+
+        const group = (splits: TransactionSplit[]) =>
+            ({
+                id: splits[0].transaction_journal_id,
+                attributes: { transactions: splits },
+            }) as unknown as TransactionRead;
+
+        it('should fetch every page, not just the first', async () => {
+            // Firefly defaults to 50 items per page; reading only response.data
+            // silently truncates any busy month
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockImplementation((async (
+                _trace: unknown,
+                _limit: number,
+                page: number
+            ) => ({
+                data: [group([split(`p${page}`, '10.00')])],
+                meta: { pagination: { current_page: page, total_pages: 3 } },
+            })) as never);
+
+            const result = await service.getTransactionsForMonth(1, 2024);
+
+            expect(result).toHaveLength(3);
+            expect(result.map(t => t.transaction_journal_id)).toEqual(['p1', 'p2', 'p3']);
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(3);
+        });
+
+        it('should request a page size instead of relying on the API default', async () => {
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [],
+                meta: { pagination: { current_page: 1, total_pages: 1 } },
+            } as never);
+
+            await service.getTransactionsForMonth(1, 2024);
+
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledWith(
+                undefined,
+                PAGE_SIZE,
+                1,
+                '2024-01-01',
+                '2024-01-31'
+            );
+        });
+
+        it('should expose the transactions the exclusion list removed', async () => {
+            const kept = split('1', '10.00');
+            const dropped = split('2', '99.00', 'budget-7');
+
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [group([kept, dropped])],
+                meta: { pagination: { current_page: 1, total_pages: 1 } },
+            } as never);
+            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
+                (description: string) => description === 'txn-2'
+            );
+
+            const included = await service.getTransactionsForMonth(1, 2024);
+            const excluded = await service.getExcludedTransactionsForMonth(1, 2024);
+
+            expect(included.map(t => t.transaction_journal_id)).toEqual(['1']);
+            expect(excluded.map(t => t.transaction_journal_id)).toEqual(['2']);
+            // shares the cached fetch rather than hitting the API again
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
+        });
+
+        it('should report no exclusions when nothing was filtered', async () => {
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [group([split('1', '10.00')])],
+                meta: { pagination: { current_page: 1, total_pages: 1 } },
+            } as never);
+            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+
+            await expect(service.getExcludedTransactionsForMonth(1, 2024)).resolves.toEqual([]);
         });
     });
 });

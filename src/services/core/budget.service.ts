@@ -9,6 +9,8 @@ import { IDateRangeService } from '../../types/interface/date-range.service.inte
 import { DateUtils } from '../../utils/date.utils.js';
 import { IBudgetService } from './budget.service.interface.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
+import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
+import { logger } from '../../logger.js';
 
 export class BudgetService implements IBudgetService {
     constructor(
@@ -68,30 +70,48 @@ export class BudgetService implements IBudgetService {
                 `Failed to get budget limits for month ${month}: API returned empty response`
             );
         }
+
+        // The SDK's listBudgetLimit exposes no page parameter, so a month with
+        // more budget limits than one page holds cannot be drained here. Say so
+        // loudly rather than silently reporting a short allocation total.
+        const totalPages = results.meta?.pagination?.total_pages;
+        if (totalPages !== undefined && totalPages > 1) {
+            logger.warn(
+                {
+                    month,
+                    year,
+                    totalPages,
+                    returned: results.data.length,
+                    total: results.meta?.pagination?.total,
+                },
+                'Budget limits span multiple pages but the API client cannot request them - allocation total is incomplete'
+            );
+        }
+
         return results.data;
     }
 
     async getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]> {
         DateUtils.validateMonthYear(month, year);
         const range = this.dateRangeService.getDateRange(month, year);
-        const response = await this.client.budgets.listTransactionWithoutBudget(
-            undefined, // xTraceId
-            undefined, // limit
-            undefined, // page
-            range.startDateString,
-            range.endDateString
+        const data = await fetchAllPages(
+            page =>
+                this.client.budgets.listTransactionWithoutBudget(
+                    undefined, // xTraceId
+                    PAGE_SIZE,
+                    page,
+                    range.startDateString,
+                    range.endDateString
+                ),
+            `fetch transactions without budget for month: ${month}`
         );
-        if (!response || !response.data) {
-            throw new Error(`Failed to fetch transactions for month: ${month}`);
-        }
-        return TransactionCalculationUtils.flattenTransactions(response.data);
+        return TransactionCalculationUtils.flattenTransactions(data);
     }
 
     private async fetchBudgets(): Promise<BudgetRead[]> {
-        const results = await this.client.budgets.listBudget();
-        if (!results || !results.data) {
-            throw new Error('Failed to fetch budgets');
-        }
-        return results.data;
+        return fetchAllPages(
+            page => this.client.budgets.listBudget(undefined, PAGE_SIZE, page),
+            'fetch budgets'
+        );
     }
 }

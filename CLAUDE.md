@@ -70,13 +70,13 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 
 - `incomeDestinationAccounts` - Array of account IDs that are valid deposit destinations for income
 - `expenseSourceAccounts` - Array of account IDs (asset accounts) that withdrawals must source from to count as expenses. Independent of `incomeDestinationAccounts` (checks the opposite side of different transaction types) — the same account ID often belongs in both lists
-- `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses
+- `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Do **not** list a transfer that funds a disposable/cash account: spending out of that account is already charged once via the disposable income tag, so listing the funding transfer charges the same dollars twice
 - `disposableIncomeAccounts` - Array of account IDs for discretionary/disposable spending accounts (e.g., a credit card for personal expenses); used by `DisposableIncomeService` for surplus calculations
 
 **Transaction Configuration:**
 
 - `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations
-- `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude (e.g., "PAYROLL")
+- `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude (e.g., "PAYROLL"). Matched **whole-word** by `StringUtils.matchesAnyPattern`, splitting on punctuation, so `transfer` will not swallow `Transferwise`. A pattern fused into a longer word (`ACHPAYROLLDEP`) therefore will not match — write patterns as they appear as words. Do not add `TRANSFER` here: additional income already filters on deposit type, so the pattern can only discard legitimate deposits
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
 - `excludedTransactions` - Array of transactions to globally exclude; each entry requires `description` with optional `amount` and `reason` fields
 
@@ -160,11 +160,21 @@ The `TransactionClassificationService` provides the core logic for classifying t
 - **Disposable Income**: Transactions tagged with configured disposable income tag (default: "Disposable Income")
 - **Paychecks**: Transactions tagged with configured paycheck tag (default: "Paycheck"). Supports all transaction types (deposits, transfers, etc).
 
-**Amount sign convention (verified against Firefly III 6.6.6):** `GET /v1/transactions` returns `amount` **unsigned** — withdrawals, deposits, and transfers are all positive, and direction comes from `type`. Never identify spending with `amount < 0`; use `isWithdrawal()`. Separately, `GET /v1/insight/expense/budget` returns `difference_float` **negative**, which is why code reading `budget.spent` uses `Math.abs` (or adds it, as in `amount + spent`).
+**Amount sign convention (verified against Firefly III 6.6.6):** `GET /v1/transactions` returns `amount` **unsigned** — withdrawals, deposits, and transfers are all positive, and direction comes from `type`. Never identify spending with `amount < 0`; use `isWithdrawal()`.
+
+Because direction lives in `type`, never total a mixed set of transactions with `calculateTransactionTotal(..., useAbsolute)` — a refund would inflate the very bucket it should reduce. Use `TransactionCalculationUtils.calculateNetSpend()` (withdrawals and transfers add, deposits subtract) or `calculateNetIncome()` (its mirror, for paycheck totals).
+
+Separately, `GET /v1/insight/expense/budget` returns `difference_float` **negative** per budget. Convert it by negating, never with `Math.abs` per budget: a budget whose refunds exceed its outflows reports a _positive_ value, and taking its absolute value would count that refund as spending.
 
 **Bucket precedence for the analyze report.** Each transaction must be charged exactly once, so the expense buckets are disjoint by construction, in the order **bill > disposable > unbudgeted** (`UnbudgetedExpenseService` excludes bills and disposable; `DisposableIncomeService` excludes bills). On the income side, **paycheck > additional income** (`AdditionalIncomeService` excludes paycheck-tagged transactions).
 
+Bill-linked transactions are counted by `BillComparisonService` even when the bill is deactivated or missing from the bill list entirely — every other bucket rejects a bill-linked transaction, so without that they would be charged nowhere.
+
 The one overlap that cannot be filtered is `budgetSpent`: it comes from Firefly's server-side rollup (`insight/expense/budget`), which returns one number per budget with no per-transaction handle. A bill or disposable transaction that also carries a budget is therefore inside it. Those transactions are reported by `BillComparisonDto.budgetedTransactions` / `DisposableIncomeAnalysis.budgetedTransactions`, added back once in `AnalyzeReportDto` (`doubleCountedTotal`), and surfaced as a warning so the data can be corrected in Firefly.
+
+**The correction is bounded, and must stay bounded.** It credits back spending that was subtracted twice, so it can never exceed what each bucket actually subtracted, nor `budgetSpent` itself. The disposable bucket is the reason this matters: its balance is net of transfers and floored at zero, while its budgeted-transaction list is neither, so an uncapped add-back invents cash that was never spent.
+
+The same rollup is also blind to `excludedTransactions`, which is filtered client-side. `AnalyzeCommand` subtracts excluded budgeted spending from `budgetSpent` so both sides describe the same set of transactions.
 
 ### Transaction Splitting System
 
@@ -235,6 +245,12 @@ To add a new configuration key:
     - Structured JSON logs controlled by `LOG_LEVEL` environment variable
     - Includes context objects for troubleshooting
     - Examples: API errors, validation failures, processing statistics
+
+### Pagination
+
+Firefly III paginates **every** list endpoint and defaults to 50 items per page. Reading `response.data` alone therefore silently truncates any busy month. All list calls must go through `fetchAllPages()` (`src/utils/pagination.utils.ts`), which follows `meta.pagination.total_pages`.
+
+The one exception is `budgets.listBudgetLimit`, which the SDK exposes with no `page` parameter; `BudgetService.getBudgetLimits` logs a warning when the response reports more than one page.
 
 ### Transaction Filtering
 

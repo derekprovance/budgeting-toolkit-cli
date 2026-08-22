@@ -10,6 +10,7 @@ import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
 import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
+import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 
 class TransactionError extends Error {
     constructor(
@@ -27,6 +28,8 @@ export class TransactionService implements ITransactionService {
     private readonly cache: TransactionCache;
     private readonly splitTransactionIdx: TransactionSplitIndex;
     private readonly logger: ILogger;
+    /** Splits removed by the exclusion list, per cache key */
+    private readonly excludedByKey: Map<string, TransactionSplit[]>;
 
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
@@ -38,6 +41,7 @@ export class TransactionService implements ITransactionService {
         this.cache = cacheImplementation;
         this.splitTransactionIdx = new Map();
         this.logger = logger;
+        this.excludedByKey = new Map();
     }
 
     /**
@@ -54,6 +58,20 @@ export class TransactionService implements ITransactionService {
         } catch (error) {
             throw this.handleError('fetch transactions for month', month, error);
         }
+    }
+
+    /**
+     * Retrieves the transactions for a month that the exclusion list removed.
+     * Shares the same fetch as getTransactionsForMonth.
+     */
+    async getExcludedTransactionsForMonth(
+        month: number,
+        year: number
+    ): Promise<TransactionSplit[]> {
+        const cacheKey = `month-${month}-year-${year}`;
+        // Awaiting the normal fetch guarantees the excluded set is populated
+        await this.getTransactionsForMonth(month, year);
+        return this.excludedByKey.get(cacheKey) ?? [];
     }
 
     async getMostRecentTransactionDate(): Promise<Date | null> {
@@ -200,14 +218,23 @@ export class TransactionService implements ITransactionService {
         const promise = (async () => {
             const data = await fetchFn();
 
-            const transactions = TransactionCalculationUtils.flattenTransactions(data).filter(
-                trx =>
-                    !this.excludedTransactionService.isExcludedTransaction(
+            const transactions: TransactionSplit[] = [];
+            const excluded: TransactionSplit[] = [];
+
+            for (const trx of TransactionCalculationUtils.flattenTransactions(data)) {
+                if (
+                    this.excludedTransactionService.isExcludedTransaction(
                         trx.description,
                         trx.amount
                     )
-            );
+                ) {
+                    excluded.push(trx);
+                } else {
+                    transactions.push(trx);
+                }
+            }
 
+            this.excludedByKey.set(key, excluded);
             this.storeTransactionSplitInIndex(data);
 
             return transactions;
@@ -215,7 +242,10 @@ export class TransactionService implements ITransactionService {
 
         this.cache.set(key, promise);
         // Don't cache failures — let the next caller retry
-        promise.catch(() => this.cache.delete(key));
+        promise.catch(() => {
+            this.cache.delete(key);
+            this.excludedByKey.delete(key);
+        });
 
         return promise;
     }
@@ -248,11 +278,11 @@ export class TransactionService implements ITransactionService {
     }
 
     private async fetchTransactionsByTag(tag: string): Promise<TransactionRead[]> {
-        const response = await this.client.tags.listTransactionByTag(tag);
-        if (!response || !response.data) {
-            throw new Error(`Failed to fetch transactions for tag: ${tag}`);
-        }
-        return response.data;
+        return fetchAllPages(
+            page => this.client.tags.listTransactionByTag(tag, undefined, PAGE_SIZE, page),
+            `fetch transactions for tag: ${tag}`,
+            this.logger
+        );
     }
 
     private async fetchTransactionsFromAPIByMonth(
@@ -260,17 +290,18 @@ export class TransactionService implements ITransactionService {
         year: number
     ): Promise<TransactionRead[]> {
         const range = this.dateRangeService.getDateRange(month, year);
-        const response = await this.client.transactions.listTransaction(
-            undefined, // xTraceId
-            undefined, // limit
-            undefined, // page
-            range.startDateString,
-            range.endDateString
+        return fetchAllPages(
+            page =>
+                this.client.transactions.listTransaction(
+                    undefined, // xTraceId
+                    PAGE_SIZE,
+                    page,
+                    range.startDateString,
+                    range.endDateString
+                ),
+            `fetch transactions for month: ${month}`,
+            this.logger
         );
-        if (!response || !response.data) {
-            throw new Error(`Failed to fetch transactions for month: ${month}`);
-        }
-        return response.data;
     }
 
     private generateSplitTransactionKey(tx: TransactionSplit): string {

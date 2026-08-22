@@ -2,6 +2,7 @@ import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
+import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 
 export class BillService {
     constructor(
@@ -10,11 +11,10 @@ export class BillService {
     ) {}
 
     async getBills(): Promise<BillRead[]> {
-        const results = await this.client.bills.listBill();
-        if (!results || !results.data) {
-            throw new Error('Failed to fetch bills');
-        }
-        return results.data;
+        return fetchAllPages(
+            page => this.client.bills.listBill(undefined, PAGE_SIZE, page),
+            'fetch bills'
+        );
     }
 
     async getActiveBills(): Promise<BillRead[]> {
@@ -38,17 +38,10 @@ export class BillService {
         const start = range.startDateString;
         const end = range.endDateString;
 
-        const results = await this.client.bills.listBill(
-            undefined,
-            undefined,
-            undefined,
-            start,
-            end
+        return fetchAllPages(
+            page => this.client.bills.listBill(undefined, PAGE_SIZE, page, start, end),
+            'fetch bills'
         );
-        if (!results || !results.data) {
-            throw new Error('Failed to fetch bills');
-        }
-        return results.data;
     }
 
     /**

@@ -691,7 +691,7 @@ describe('AnalyzeDisplayService', () => {
 
             expect(result).toContain('1 transaction is claimed by two sections');
             expect(result).toContain('LeetCode');
-            expect(result).toContain('counted once in net');
+            expect(result).toContain('claimed by two sections');
             expect(result).toContain('budget');
             // and it appears in the itemized adjustments so the column still sums
             expect(result).toContain('Double-Count Adj');
@@ -708,6 +708,33 @@ describe('AnalyzeDisplayService', () => {
             const result = stripAnsi(service.formatAnalysisReport(data, false));
 
             expect(result).toContain('2 transactions are claimed by two sections');
+        });
+
+        it('should still warn when the correction was clamped to zero', () => {
+            // The adjustment is capped by what each bucket actually subtracted,
+            // so a genuinely double-claimed transaction can carry a $0
+            // adjustment. That is exactly when the user most needs telling.
+            const data = createBasicReportData();
+            data.doubleCountedTransactions = [createMockTransaction('LeetCode', 39, 'withdrawal')];
+            data.doubleCountedTotal = 0;
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('1 transaction is claimed by two sections');
+            expect(result).toContain('LeetCode');
+        });
+
+        it('should state the adjustment actually applied, not the raw overlap', () => {
+            const data = createBasicReportData();
+            data.doubleCountedTransactions = [
+                createMockTransaction('LeetCode', 39, 'withdrawal'),
+                createMockTransaction('Gym', 25, 'withdrawal'),
+            ];
+            data.doubleCountedTotal = 39; // partially clamped
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('net adjustment applied: $39.00');
         });
 
         it('should stay silent when nothing overlaps', () => {

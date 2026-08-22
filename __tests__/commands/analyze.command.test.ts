@@ -1,7 +1,12 @@
+import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
+import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
 import { AnalyzeCommand } from '../../src/commands/analyze.command.js';
 import { AdditionalIncomeService } from '../../src/services/additional-income.service.js';
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
-import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
+import {
+    PaycheckAnalysis,
+    PaycheckSurplusService,
+} from '../../src/services/paycheck-surplus.service.js';
 import {
     DisposableIncomeService,
     DisposableIncomeAnalysis,
@@ -38,6 +43,8 @@ describe('AnalyzeCommand', () => {
     let budgetSurplusService: jest.Mocked<BudgetSurplusService>;
     let billComparisonService: jest.Mocked<BillComparisonService>;
     let analyzeDisplayService: jest.Mocked<AnalyzeDisplayService>;
+    let transactionService: jest.Mocked<ITransactionService>;
+    let transactionClassificationService: jest.Mocked<ITransactionClassificationService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
     let consoleErrorSpy: jest.Spied<typeof console.error>;
 
@@ -68,8 +75,11 @@ describe('AnalyzeCommand', () => {
 
         paycheckSurplusService = {
             calculatePaycheckSurplus: jest
-                .fn<() => Promise<Result<number, TransactionAnalysisError>>>()
-                .mockResolvedValue({ ok: true, value: 500.0 }),
+                .fn<() => Promise<Result<PaycheckAnalysis, TransactionAnalysisError>>>()
+                .mockResolvedValue({
+                    ok: true,
+                    value: { actual: 5500.0, expected: 5000.0, surplus: 500.0 },
+                }),
         } as unknown as jest.Mocked<PaycheckSurplusService>;
 
         disposableIncomeService = {
@@ -113,6 +123,16 @@ describe('AnalyzeCommand', () => {
         } as unknown as jest.Mocked<AnalyzeDisplayService>;
 
         // Create command instance
+        transactionService = {
+            getExcludedTransactionsForMonth: jest
+                .fn<() => Promise<TransactionSplit[]>>()
+                .mockResolvedValue([]),
+        } as unknown as jest.Mocked<ITransactionService>;
+
+        transactionClassificationService = {
+            hasBudget: jest.fn((t: TransactionSplit) => !!t.budget_id),
+        } as unknown as jest.Mocked<ITransactionClassificationService>;
+
         command = new AnalyzeCommand(
             additionalIncomeService,
             unbudgetedExpenseService,
@@ -120,7 +140,9 @@ describe('AnalyzeCommand', () => {
             disposableIncomeService,
             budgetSurplusService,
             billComparisonService,
-            analyzeDisplayService
+            analyzeDisplayService,
+            transactionService,
+            transactionClassificationService
         );
 
         // Spy on console methods
@@ -161,7 +183,7 @@ describe('AnalyzeCommand', () => {
             });
             paycheckSurplusService.calculatePaycheckSurplus.mockResolvedValueOnce({
                 ok: true,
-                value: 0,
+                value: { actual: 0, expected: 0, surplus: 0 },
             });
             disposableIncomeService.calculateDisposableIncome.mockResolvedValueOnce({
                 ok: true,
@@ -264,6 +286,42 @@ describe('AnalyzeCommand', () => {
                 expect.stringContaining('Error calculating paycheck surplus'),
                 expect.stringContaining('Failed to calculate paycheck surplus')
             );
+        });
+    });
+
+    describe('exclusion list vs the server-side budget rollup', () => {
+        it('should remove excluded budgeted spending from budgetSpent', async () => {
+            // Firefly's insight rollup knows nothing about the local exclusion
+            // list, so an excluded transaction carrying a budget is still
+            // inside budgetSpent even though every local bucket dropped it
+            transactionService.getExcludedTransactionsForMonth.mockResolvedValue([
+                { amount: '200.00', type: 'withdrawal', budget_id: 'b1' },
+                { amount: '50.00', type: 'withdrawal' }, // no budget: not in the rollup
+            ] as never);
+
+            budgetSurplusService.calculateBudgetSurplus.mockResolvedValueOnce({
+                ok: true,
+                value: { totalAllocated: 1000, totalSpent: 800, surplus: 200 },
+            });
+
+            await command.execute({ month: 5, year: 2024, verbose: false });
+
+            const reportData = analyzeDisplayService.formatAnalysisReport.mock.calls[0][0];
+            expect(reportData.budgetSpent).toBe(600);
+            expect(reportData.budgetSurplus).toBe(400);
+        });
+
+        it('should leave budgetSpent alone when nothing was excluded', async () => {
+            transactionService.getExcludedTransactionsForMonth.mockResolvedValue([]);
+            budgetSurplusService.calculateBudgetSurplus.mockResolvedValueOnce({
+                ok: true,
+                value: { totalAllocated: 1000, totalSpent: 800, surplus: 200 },
+            });
+
+            await command.execute({ month: 5, year: 2024, verbose: false });
+
+            const reportData = analyzeDisplayService.formatAnalysisReport.mock.calls[0][0];
+            expect(reportData.budgetSpent).toBe(800);
         });
     });
 });

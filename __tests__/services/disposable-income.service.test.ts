@@ -238,7 +238,11 @@ describe('DisposableIncomeService', () => {
             mockTransactionClassificationService.isDisposableIncome
                 .mockReturnValueOnce(true)
                 .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
+            // Type-driven, not blanket-true: the withdrawal fixture is not a
+            // transfer, and disposable spending excludes transfers
+            mockTransactionClassificationService.isTransfer.mockImplementation(
+                (t: TransactionSplit) => t.type === 'transfer'
+            );
 
             // Act
             const analysisResult = await service.calculateDisposableIncome(5, 2024);
@@ -805,6 +809,67 @@ describe('DisposableIncomeService', () => {
             expect(result.ok).toBe(false);
             if (!result.ok) {
                 expect(result.error.message).toContain('API connection failed');
+            }
+        });
+    });
+
+    describe('transaction direction', () => {
+        it('should let a refund reduce disposable spending rather than inflate it', async () => {
+            const transactions = [
+                { amount: '100.00', type: 'withdrawal', tags: ['Disposable Income'] },
+                { amount: '25.00', type: 'deposit', tags: ['Disposable Income'] },
+            ] as never;
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue(transactions);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
+
+            const result = await service.calculateDisposableIncome(1, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.balance).toBe(75);
+            }
+        });
+    });
+
+    describe('transfers are not disposable spending', () => {
+        it('should not let a tagged transfer cancel out its own deduction', async () => {
+            // A transfer OUT of the disposable account that also carries the
+            // tag must reduce the balance once. Counting it as spending too
+            // would add it and deduct it in the same breath, netting to zero.
+            const spend = { amount: '100.00', type: 'withdrawal', tags: ['Disposable Income'] };
+            const transferOut = {
+                amount: '40.00',
+                type: 'transfer',
+                tags: ['Disposable Income'],
+                source_id: '27',
+                destination_id: '1',
+            };
+
+            const svc = new DisposableIncomeService(
+                mockTransactionService,
+                mockTransactionClassificationService,
+                ['27'],
+                ['1']
+            );
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                spend,
+                transferOut,
+            ] as never);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockImplementation(
+                (t: TransactionSplit) => t.type === 'transfer'
+            );
+
+            const result = await svc.calculateDisposableIncome(5, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.balance).toBe(60);
             }
         });
     });

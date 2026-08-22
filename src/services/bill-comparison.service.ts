@@ -42,14 +42,11 @@ export class BillComparisonService implements IBillComparisonService {
         }
 
         try {
-            // Get active bills with pay_dates populated for this month
-            const activeBills = await this.billService.getActiveBillsForMonth(month, year);
-
-            if (activeBills.length === 0) {
-                logger.debug('No active bills found for year ' + year);
-                // Not an error - just return empty result
-                return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
-            }
+            // All bills with pay_dates populated for this month. Deactivated
+            // bills are kept: they predict nothing, but spending still linked
+            // to them has to be counted somewhere, and every other bucket
+            // rejects a bill-linked transaction.
+            const bills = await this.billService.getBillsForMonth(month, year);
 
             // Get actual transactions for the specific month
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
@@ -59,18 +56,28 @@ export class BillComparisonService implements IBillComparisonService {
                 this.transactionClassificationService.isBill(t)
             );
 
+            // Bail out only when there is genuinely nothing to report. Returning
+            // early on `bills.length === 0` alone would skip the orphan path
+            // below, and bill-linked spending would then be charged nowhere at
+            // all — every other bucket rejects a bill-linked transaction.
+            if (bills.length === 0 && billTransactions.length === 0) {
+                logger.debug('No bills or bill-linked transactions found for year ' + year);
+                // Not an error - just return empty result
+                return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
+            }
+
             // Calculate bill details with predicted amounts based on pay_dates
             const { predictedTotal, actualTotal, billDetails, budgetedTransactions } =
-                this.calculateBillDetails(activeBills, billTransactions, month, year);
+                this.calculateBillDetails(bills, billTransactions, month, year);
 
             // Get currency info from first bill or use default
             const currencyCode =
-                activeBills[0]?.attributes.currency_code ??
-                activeBills[0]?.attributes.primary_currency_code ??
+                bills[0]?.attributes.currency_code ??
+                bills[0]?.attributes.primary_currency_code ??
                 'USD';
             const currencySymbol =
-                activeBills[0]?.attributes.currency_symbol ??
-                activeBills[0]?.attributes.primary_currency_symbol ??
+                bills[0]?.attributes.currency_symbol ??
+                bills[0]?.attributes.primary_currency_symbol ??
                 '$';
 
             const result = BillComparisonDto.create(
@@ -86,7 +93,7 @@ export class BillComparisonService implements IBillComparisonService {
                 {
                     month,
                     year,
-                    billCount: activeBills.length,
+                    billCount: bills.length,
                     predictedTotal,
                     actualTotal,
                 },
@@ -221,11 +228,18 @@ export class BillComparisonService implements IBillComparisonService {
             const billId = bill.id;
             const billTransactions = billTransactionMap.get(billId) ?? [];
             const frequency = bill.attributes.repeat_freq ?? 'monthly';
+            const isActive = bill.attributes.active ?? false;
 
-            // Calculate actual amount for this bill (sum of all transactions)
-            const actualAmount = TransactionCalculationUtils.calculateTransactionTotal(
+            // A deactivated bill with no activity this month is not worth a row
+            if (!isActive && billTransactions.length === 0) {
+                billTransactionMap.delete(billId);
+                continue;
+            }
+
+            // Net spend for this bill: a refund or returned payment linked to
+            // the bill reduces what was actually paid, it does not add to it
+            const actualAmount = TransactionCalculationUtils.calculateNetSpend(
                 billTransactions,
-                true,
                 logger
             );
 
@@ -240,8 +254,10 @@ export class BillComparisonService implements IBillComparisonService {
             // 2. If bill is NOT marked as due BUT has actual transactions → use full bill amount (Firefly III bug workaround)
             // 3. If bill is NOT marked as due AND has no transactions → use 0
             // (represents what's actually owed this month, not the monthly budget equivalent)
-            const isDue = this.isBillDueThisMonth(bill, month, year);
-            const hasActualTransactions = billTransactions.length > 0;
+            // A deactivated bill predicts nothing - it is only here so its
+            // actual spending is not dropped on the floor
+            const isDue = isActive && this.isBillDueThisMonth(bill, month, year);
+            const hasActualTransactions = isActive && billTransactions.length > 0;
 
             // Defensive logic: If bill has transactions but pay_dates is empty,
             // assume Firefly III bug and treat as due
@@ -298,6 +314,40 @@ export class BillComparisonService implements IBillComparisonService {
                     actualAmount,
                     frequency
                 )
+            );
+
+            billTransactionMap.delete(billId);
+        }
+
+        // Anything still in the map links to a bill this month's bill list does
+        // not contain - a deleted bill, most often. Every other bucket rejects a
+        // bill-linked transaction, so without this it would vanish from the net.
+        for (const [billId, orphanTransactions] of billTransactionMap) {
+            const orphanAmount = TransactionCalculationUtils.calculateNetSpend(
+                orphanTransactions,
+                logger
+            );
+
+            actualTotal += orphanAmount;
+            budgetedTransactions.push(
+                ...orphanTransactions.filter(t =>
+                    this.transactionClassificationService.hasBudget(t)
+                )
+            );
+
+            logger.warn(
+                {
+                    billId,
+                    transactionCount: orphanTransactions.length,
+                    orphanAmount,
+                    month,
+                    year,
+                },
+                'Transactions reference a bill that is not in the bill list - counted as bills paid with no prediction'
+            );
+
+            billDetails.push(
+                new BillDetailDto(billId, `Unknown Bill (#${billId})`, 0, orphanAmount, 'unknown')
             );
         }
 
