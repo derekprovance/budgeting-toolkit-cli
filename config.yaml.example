@@ -17,10 +17,17 @@ expenseSourceAccounts:
     - '1' # Checking Account ID (debit purchases)
     - '3' # Credit Card Account ID
 
+# Descriptions that must NOT count as additional income. Matched whole-word.
+#
+# Do NOT add 'TRANSFER': additional income already filters on deposit type, so
+# real transfers never reach this list, and the pattern can only discard
+# legitimate deposits that happen to say "transfer" (e.g. STRIPE TRANSFER).
+#
+# Think twice before adding 'PAYROLL' too. It only helps if a payroll deposit
+# genuinely is not income to you; a split paycheck usually has both halves
+# counted, and the Paycheck-tagged half is already excluded here by tag.
 excludedAdditionalIncomePatterns:
-    - 'PAYROLL'
     - 'ATM FEE'
-    - 'TRANSFER'
 
 # These are transfers that would be counted towards unbudgeted expenses
 # Only list transfers that represent money genuinely leaving your control.
@@ -73,7 +80,7 @@ firefly:
 # LLM Configuration (Advanced)
 llm:
     # Basic LLM Settings
-    maxTokens: 1000 # Maximum tokens per response
+    maxTokens: 16000 # Response ceiling; adaptive thinking draws from this too
     batchSize: 10 # Transactions processed per batch
     maxConcurrent: 3 # Maximum concurrent API requests
     model: 'claude-sonnet-5' # Claude model to use

@@ -47,7 +47,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     },
     llm: {
         model: 'claude-sonnet-5',
-        maxTokens: 2000,
+        maxTokens: 16000,
         batchSize: 10,
         maxConcurrent: 3,
         rateLimit: {

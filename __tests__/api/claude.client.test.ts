@@ -180,6 +180,36 @@ describe('ClaudeClient', () => {
         });
     });
 
+    describe('reasoning spend', () => {
+        it('should cap effort so adaptive thinking cannot consume max_tokens', async () => {
+            // Current models run adaptive thinking whenever `thinking` is
+            // omitted, and those tokens come out of max_tokens. Left uncapped,
+            // a forced-tool classification can spend its whole budget thinking
+            // and come back truncated with no answer at all.
+            mockMessagesCreate.mockResolvedValue(
+                textResponse('ok') as unknown as Anthropic.Message
+            );
+
+            await client.chat(messages);
+
+            expect(mockMessagesCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ output_config: { effort: 'low' } })
+            );
+        });
+
+        it('should let a caller override the effort level', async () => {
+            mockMessagesCreate.mockResolvedValue(
+                textResponse('ok') as unknown as Anthropic.Message
+            );
+
+            await client.chat(messages, { effort: 'high' });
+
+            expect(mockMessagesCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ output_config: { effort: 'high' } })
+            );
+        });
+    });
+
     describe('stop_reason handling', () => {
         it('should throw a truncation error on max_tokens', async () => {
             mockMessagesCreate.mockResolvedValue({

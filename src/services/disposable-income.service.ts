@@ -14,6 +14,14 @@ export interface DisposableIncomeAnalysis {
     transactions: TransactionSplit[];
     /** Transfers OUT of disposable income accounts that reduce the balance */
     transfers: TransactionSplit[];
+    /**
+     * Tagged spending on the same basis {@link balance} is built from: net of
+     * refunds, transfers excluded. Reported rather than left to the caller so
+     * a display can print `tagged - transfers = balance` without re-deriving
+     * the first term on a different basis and printing a sum that does not add
+     * up.
+     */
+    taggedTotal: number;
     /** Net balance: tagged spending minus transfer deductions (minimum 0) */
     balance: number;
     /**
@@ -140,6 +148,7 @@ export class DisposableIncomeService extends BaseTransactionAnalysisService<Disp
         return {
             transactions: disposableIncomeTransactions,
             transfers,
+            taggedTotal: tagBasedTotal,
             balance,
             budgetedTransactions,
         };

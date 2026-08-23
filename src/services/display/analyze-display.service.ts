@@ -135,11 +135,11 @@ export class AnalyzeDisplayService {
         if (data.disposableIncomeTransactions.length > 0) {
             lines.push('');
 
-            // Calculate tagged total for breakdown
-            const taggedTotal = TransactionCalculationUtils.calculateTransactionTotal(
-                data.disposableIncomeTransactions,
-                true
-            );
+            // Tagged spending on the same basis the service used to build the
+            // net. Never recompute it here: an absolute sum over every tagged
+            // transaction counts a refund as spending and counts a transfer the
+            // service excluded, so the printed subtraction stops adding up.
+            const taggedTotal = data.disposableIncomeTagged;
 
             // Show breakdown format when transfers exist
             if (data.disposableIncomeTransfers.length > 0) {
@@ -161,6 +161,15 @@ export class AnalyzeDisplayService {
                 lines.push(
                     `    Net:          ${this.formatNetImpact(data.disposableIncome, data.currencySymbol, true)}`
                 );
+
+                // The balance is floored at zero, so when transfers exceed
+                // tagged spending the column genuinely does not subtract to the
+                // printed net. Say so rather than letting it look like an error.
+                if (taggedTotal - transferTotal < 0) {
+                    lines.push(
+                        `    ${chalk.dim('(floored at 0 - transfers exceeded tagged spending)')}`
+                    );
+                }
             } else {
                 // Original single-line format when no transfers
                 lines.push(

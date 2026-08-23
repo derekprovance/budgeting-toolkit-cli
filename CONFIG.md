@@ -299,9 +299,9 @@ llm:
 | Setting         | Type     | Default             | Description                                |
 | --------------- | -------- | ------------------- | ------------------------------------------ |
 | `model`         | `string` | `'claude-sonnet-5'` | Claude model version to use                |
-| `maxTokens`     | `number` | `2048`              | Maximum tokens per API response            |
+| `maxTokens`     | `number` | `16000`             | Maximum tokens per API response            |
 | `batchSize`     | `number` | `10`                | Number of transactions processed per batch |
-| `maxConcurrent` | `number` | `2`                 | Maximum concurrent API requests            |
+| `maxConcurrent` | `number` | `3`                 | Maximum concurrent API requests            |
 
 **Performance Notes:**
 

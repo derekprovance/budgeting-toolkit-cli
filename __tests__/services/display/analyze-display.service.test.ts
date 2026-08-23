@@ -73,6 +73,7 @@ describe('AnalyzeDisplayService', () => {
         disposableIncomeTransactions: [],
         disposableIncomeTransfers: [],
         disposableIncome: 0,
+        disposableIncomeTagged: 0,
         billComparison: {
             predictedTotal: 1000,
             actualTotal: 950,
@@ -311,6 +312,7 @@ describe('AnalyzeDisplayService', () => {
                     createMockTransaction('Transfer out', 2500.0, 'transfer'),
                 ],
                 disposableIncome: 440.33,
+                disposableIncomeTagged: 2940.33,
             };
             const result = service.formatAnalysisReport(data, false);
 
@@ -333,6 +335,7 @@ describe('AnalyzeDisplayService', () => {
                     createMockTransaction('Transfer out', 1000.0, 'transfer'),
                 ],
                 disposableIncome: 0,
+                disposableIncomeTagged: 1000.0,
             };
             const result = service.formatAnalysisReport(data, false);
 
@@ -350,6 +353,7 @@ describe('AnalyzeDisplayService', () => {
                     createMockTransaction('Transfer out', 1000.0, 'transfer'),
                 ],
                 disposableIncome: 0,
+                disposableIncomeTagged: 500.0,
             };
             const result = service.formatAnalysisReport(data, false);
 
@@ -359,6 +363,87 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('$1000.00');
             expect(result).toContain('Net:');
             expect(result).toContain('$0.00');
+        });
+
+        it('should foot Tagged - Transfers = Net when a tagged refund exists', () => {
+            // $100 purchase with a $40 refund, both tagged. The service nets
+            // them to $60; an absolute sum here would print $140 and the
+            // column would no longer subtract to the printed Net.
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged purchase', 100.0, 'withdrawal'),
+                    createMockTransaction('Refund on purchase', 40.0, 'deposit'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 10.0, 'transfer'),
+                ],
+                disposableIncomeTagged: 60.0,
+                disposableIncome: 50.0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('$60.00'); // Tagged, not $140.00
+            expect(result).not.toContain('$140.00');
+            expect(result).toContain('$10.00'); // Transfers
+            expect(result).toContain('$50.00'); // Net — 60 - 10
+        });
+
+        it('should exclude a tagged transfer from the Tagged line', () => {
+            // The transfer is tagged AND qualifies for deduction. Counting it
+            // in Tagged as well would add it once and deduct it once, so the
+            // printed subtraction would disagree with Net by the transfer.
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 500.0, 'withdrawal'),
+                    createMockTransaction('Tagged transfer', 300.0, 'transfer'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Tagged transfer', 300.0, 'transfer'),
+                ],
+                disposableIncomeTagged: 500.0,
+                disposableIncome: 200.0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('$500.00'); // Tagged, not $800.00
+            expect(result).not.toContain('$800.00');
+            expect(result).toContain('$200.00'); // Net — 500 - 300
+        });
+
+        it('should say so when the net is floored rather than subtracted', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 500.0, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 1000.0, 'transfer'),
+                ],
+                disposableIncomeTagged: 500.0,
+                disposableIncome: 0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('floored at 0');
+        });
+
+        it('should not mention flooring when the column subtracts cleanly', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 3000.0, 'withdrawal'),
+                ],
+                disposableIncomeTransfers: [
+                    createMockTransaction('Transfer out', 1000.0, 'transfer'),
+                ],
+                disposableIncomeTagged: 3000.0,
+                disposableIncome: 2000.0,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).not.toContain('floored at 0');
         });
 
         it('should show breakdown with multiple transfers summed', () => {
@@ -372,6 +457,7 @@ describe('AnalyzeDisplayService', () => {
                     createMockTransaction('Transfer 2', 1500.0, 'transfer'),
                 ],
                 disposableIncome: 500.0,
+                disposableIncomeTagged: 3000.0,
             };
             const result = service.formatAnalysisReport(data, false);
 
@@ -389,6 +475,7 @@ describe('AnalyzeDisplayService', () => {
                     createMockTransaction('Transfer out', 2500.0, 'transfer'),
                 ],
                 disposableIncome: 440.33,
+                disposableIncomeTagged: 2940.33,
             };
             const result = service.formatAnalysisReport(data, true);
 

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ClaudeClient } from '../../api/claude.client.js';
+import { ClaudeClient, CircuitOpenError, ClaudeResponseError } from '../../api/claude.client.js';
 import { logger as defaultLogger } from '../../logger.js';
 import {
     AssignmentType,
@@ -12,6 +12,13 @@ import {
 } from './utils/prompt-templates.js';
 import { mapTransactionForLLM, LLMTransactionData } from './utils/transaction-mapper.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
+
+/** One chunk's assignments, plus whether they are real or a degraded fallback */
+interface ChunkResult {
+    values: string[];
+    /** True when the chunk failed and was filled with the no-match sentinel */
+    degraded: boolean;
+}
 
 /**
  * Batching options for LLM assignment requests
@@ -120,7 +127,7 @@ export class LLMAssignmentService {
         const functionSchema = this.deps.getFunctionSchema(type, validOptions);
 
         // Bounded worker pool with order-preserving results
-        const results: string[][] = new Array(chunks.length);
+        const results: ChunkResult[] = new Array(chunks.length);
         let nextChunk = 0;
         const workerCount = Math.min(this.batchOptions.maxConcurrent, chunks.length);
 
@@ -143,7 +150,28 @@ export class LLMAssignmentService {
 
         await Promise.all(Array.from({ length: workerCount }, worker));
 
-        const assignments = results.flat();
+        const assignments = results.flatMap(result => result.values);
+
+        // A degraded chunk yields sentinels indistinguishable from a genuine
+        // "no match", so the count has to be carried out rather than inferred.
+        // Without this the run reports success while some transactions were
+        // never actually looked at.
+        const degradedTransactionCount = results
+            .filter(result => result.degraded)
+            .reduce((sum, result) => sum + result.values.length, 0);
+
+        if (degradedTransactionCount > 0) {
+            this.deps.logger.warn(
+                {
+                    type,
+                    degradedTransactionCount,
+                    totalTransactions: transactions.length,
+                    degradedChunks: results.filter(r => r.degraded).length,
+                    totalChunks: chunks.length,
+                },
+                `${type} assignment degraded - ${degradedTransactionCount} of ${transactions.length} transactions were not processed and will be left unassigned`
+            );
+        }
 
         // Log each transaction's AI assignment for debugging
         assignments.forEach((assignment, index) => {
@@ -181,7 +209,7 @@ export class LLMAssignmentService {
         systemPrompt: string,
         functionSchema: Anthropic.Tool,
         chunkIndex: number
-    ): Promise<string[]> {
+    ): Promise<ChunkResult> {
         try {
             const userPrompt = this.deps.getUserPrompt(type, chunk, validOptions);
 
@@ -191,7 +219,10 @@ export class LLMAssignmentService {
                 toolChoice: { type: 'tool', name: functionSchema.name },
             });
 
-            return this.deps.parseAssignmentResponse(type, result, chunk.length, validOptions);
+            return {
+                values: this.deps.parseAssignmentResponse(type, result, chunk.length, validOptions),
+                degraded: false,
+            };
         } catch (error) {
             if (this.isCriticalError(error)) {
                 this.deps.logger.error(
@@ -216,20 +247,36 @@ export class LLMAssignmentService {
                 `${type} assignment chunk failed, using defaults for this chunk`
             );
 
-            return new Array<string>(chunk.length).fill(getNoMatchValue(type));
+            return {
+                values: new Array<string>(chunk.length).fill(getNoMatchValue(type)),
+                degraded: true,
+            };
         }
     }
 
     /**
-     * Critical errors abort the whole run: authentication and permission
-     * failures won't heal on retry, and a bad request signals a config bug
-     * that silent degradation would hide.
+     * Critical errors abort the whole run rather than degrading a chunk to the
+     * sentinel. Degrading is only ever the right call for a failure the *next*
+     * chunk might survive; for everything below, carrying on would quietly
+     * sentinel-fill the rest of the run and still report success.
+     *
+     * - auth / permission: will not heal on retry
+     * - bad request: a config bug that silent degradation would hide
+     * - circuit open: the breaker has already given up, so every remaining
+     *   chunk would be rejected without even reaching the API
+     * - truncated: the response outgrew `llm.maxTokens`, which is a
+     *   configuration problem that every subsequent chunk will hit too
      */
     private isCriticalError(error: unknown): boolean {
+        if (error instanceof ClaudeResponseError) {
+            return error.reason === 'truncated';
+        }
+
         return (
             error instanceof Anthropic.AuthenticationError ||
             error instanceof Anthropic.PermissionDeniedError ||
-            error instanceof Anthropic.BadRequestError
+            error instanceof Anthropic.BadRequestError ||
+            error instanceof CircuitOpenError
         );
     }
 

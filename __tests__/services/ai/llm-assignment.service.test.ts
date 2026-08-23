@@ -6,7 +6,11 @@ import {
     LLMAssignmentDependencies,
 } from '../../../src/services/ai/llm-assignment.service.js';
 import { ILogger } from '../../../src/types/interface/logger.interface.js';
-import { ClaudeClient } from '../../../src/api/claude.client.js';
+import {
+    ClaudeClient,
+    CircuitOpenError,
+    ClaudeResponseError,
+} from '../../../src/api/claude.client.js';
 import { createMockTransaction } from '../../shared/test-data.js';
 
 describe('LLMAssignmentService', () => {
@@ -304,6 +308,74 @@ describe('LLMAssignmentService', () => {
                 const result = await service.assign('budget', mockTransactions, validBudgets);
 
                 expect(result).toEqual(['(no budget)', '(no budget)', '(no budget)']);
+            });
+
+            it('should abort the run when the circuit breaker is open', async () => {
+                // Every remaining chunk would be rejected without an API call,
+                // so degrading them to the sentinel would sentinel-fill the
+                // rest of the run and still report success.
+                mockClaudeClient.chat = jest
+                    .fn()
+                    .mockRejectedValue(new CircuitOpenError('Circuit is open'));
+
+                await expect(
+                    service.assign('category', mockTransactions, validCategories)
+                ).rejects.toThrow(CircuitOpenError);
+            });
+
+            it('should abort the run when a response is truncated at max_tokens', async () => {
+                // Truncation means the response outgrew llm.maxTokens — a
+                // configuration problem every later chunk will hit too.
+                mockClaudeClient.chat = jest
+                    .fn()
+                    .mockRejectedValue(new ClaudeResponseError('truncated', 'Response truncated'));
+
+                await expect(
+                    service.assign('category', mockTransactions, validCategories)
+                ).rejects.toThrow(ClaudeResponseError);
+            });
+
+            it('should still degrade a chunk on a recoverable response error', async () => {
+                mockClaudeClient.chat = jest
+                    .fn()
+                    .mockRejectedValue(new ClaudeResponseError('empty', 'No content'));
+
+                const result = await service.assign('category', mockTransactions, validCategories);
+
+                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+            });
+
+            it('should report how many transactions went unassigned after degrading', async () => {
+                mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('API Error'));
+
+                await service.assign('category', mockTransactions, validCategories);
+
+                expect(mockLogger.warn).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        type: 'category',
+                        degradedTransactionCount: 3,
+                        totalTransactions: 3,
+                    }),
+                    expect.stringContaining('were not processed')
+                );
+            });
+
+            it('should not report degradation when every chunk succeeds', async () => {
+                mockClaudeClient.chat = jest
+                    .fn()
+                    .mockResolvedValue(JSON.stringify({ categories: ['Groceries'] }));
+                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
+                    'Groceries',
+                    'Healthcare',
+                    'Groceries',
+                ]);
+
+                await service.assign('category', mockTransactions, validCategories);
+
+                expect(mockLogger.warn).not.toHaveBeenCalledWith(
+                    expect.objectContaining({ degradedTransactionCount: expect.anything() }),
+                    expect.anything()
+                );
             });
 
             it('should handle parsing errors gracefully', async () => {

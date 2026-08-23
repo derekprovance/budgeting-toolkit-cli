@@ -23,7 +23,22 @@ export interface ChatOptions {
     toolChoice?: Anthropic.ToolChoice;
     maxTokens?: number;
     model?: string;
+    /** Overrides {@link DEFAULT_EFFORT} for a single request */
+    effort?: NonNullable<Anthropic.OutputConfig['effort']>;
 }
+
+/**
+ * Current models run adaptive thinking whenever `thinking` is omitted, and
+ * thinking tokens are drawn from `max_tokens`. Every request this client makes
+ * is a forced-tool classification against a fixed enum — the schema does the
+ * structuring, so deep reasoning buys nothing and can consume the whole budget
+ * before a single answer is emitted.
+ *
+ * `effort` is the model-agnostic lever for that: `thinking: { type: 'disabled' }`
+ * is rejected outright on some current models, whereas every one of them accepts
+ * a low effort level.
+ */
+const DEFAULT_EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
 
 /** Thrown when the circuit breaker rejects a request without calling the API */
 export class CircuitOpenError extends Error {
@@ -121,6 +136,7 @@ export class ClaudeClient {
                 model: options.model ?? this.config.model,
                 max_tokens: options.maxTokens ?? this.config.maxTokens,
                 messages,
+                output_config: { effort: options.effort ?? DEFAULT_EFFORT },
                 ...(options.systemPrompt && { system: options.systemPrompt }),
                 ...(options.tools && { tools: options.tools }),
                 ...(options.toolChoice && { tool_choice: options.toolChoice }),

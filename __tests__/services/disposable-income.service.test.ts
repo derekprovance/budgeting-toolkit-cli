@@ -873,4 +873,49 @@ describe('DisposableIncomeService', () => {
             }
         });
     });
+
+    describe('taggedTotal', () => {
+        it('should report tagged spending on the same basis as the balance', async () => {
+            // Consumers print `tagged - transfers = balance`. taggedTotal must
+            // therefore be net of refunds and exclude transfers, exactly like
+            // the balance — otherwise the printed subtraction does not add up.
+            const spend = { amount: '100.00', type: 'withdrawal', tags: ['Disposable Income'] };
+            const refund = { amount: '40.00', type: 'deposit', tags: ['Disposable Income'] };
+            const transferOut = {
+                amount: '10.00',
+                type: 'transfer',
+                tags: ['Disposable Income'],
+                source_id: '27',
+                destination_id: '1',
+            };
+
+            const svc = new DisposableIncomeService(
+                mockTransactionService,
+                mockTransactionClassificationService,
+                ['27'],
+                ['1']
+            );
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                spend,
+                refund,
+                transferOut,
+            ] as never);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockImplementation(
+                (t: TransactionSplit) => t.type === 'transfer'
+            );
+
+            const result = await svc.calculateDisposableIncome(5, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // 100 spent - 40 refunded, transfer excluded
+                expect(result.value.taggedTotal).toBe(60);
+                // and the column subtracts cleanly: 60 - 10 = 50
+                expect(result.value.taggedTotal - 10).toBe(result.value.balance);
+            }
+        });
+    });
 });
