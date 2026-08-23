@@ -17,6 +17,15 @@ expenseSourceAccounts:
     - '1' # Checking Account ID (debit purchases)
     - '3' # Credit Card Account ID
 
+# Accounts a Paycheck-tagged deposit must land in to count as the paycheck.
+#
+# Useful when payroll is split across accounts and only one half is the
+# paycheck: a stray tag on the other half is then disregarded and falls through
+# to additional income, instead of inflating paycheck income.
+#
+# Leave empty (the default) to let the tag alone decide.
+paycheckDestinationAccounts: []
+
 # Descriptions that must NOT count as additional income. Matched whole-word.
 #
 # Do NOT add 'TRANSFER': additional income already filters on deposit type, so

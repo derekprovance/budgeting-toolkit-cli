@@ -184,6 +184,61 @@ describe('TransactionClassificationService', () => {
             expect(service.isPaycheck(transaction)).toBe(false);
         });
 
+        describe('paycheckDestinationAccounts', () => {
+            const withAccounts = (accounts: string[]) =>
+                new TransactionClassificationService(
+                    '5',
+                    DISPOSABLE_INCOME_TAG,
+                    PAYCHECK_TAG,
+                    accounts
+                );
+
+            it('should accept a tagged transaction landing in a configured account', () => {
+                const transaction = {
+                    tags: [PAYCHECK_TAG],
+                    destination_id: '1',
+                } as TransactionSplit;
+
+                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(true);
+            });
+
+            it('should reject a tagged transaction landing elsewhere', () => {
+                // Payroll split across accounts: a stray tag on the savings
+                // half must not be charged to the paycheck bucket.
+                const transaction = {
+                    tags: [PAYCHECK_TAG],
+                    destination_id: '2',
+                } as TransactionSplit;
+
+                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(false);
+            });
+
+            it('should reject a tagged transaction with no destination', () => {
+                const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
+
+                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(false);
+            });
+
+            it('should let the tag alone decide when no accounts are configured', () => {
+                const transaction = {
+                    tags: [PAYCHECK_TAG],
+                    destination_id: '99',
+                } as TransactionSplit;
+
+                expect(withAccounts([]).isPaycheck(transaction)).toBe(true);
+                expect(service.isPaycheck(transaction)).toBe(true);
+            });
+
+            it('should still require the tag even for a configured account', () => {
+                const transaction = {
+                    tags: ['Other'],
+                    destination_id: '1',
+                } as TransactionSplit;
+
+                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(false);
+            });
+        });
+
         it('should support custom paycheck tag name', () => {
             const customPaycheckTag = 'Salary';
             const customService = new TransactionClassificationService(

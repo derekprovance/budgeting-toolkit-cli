@@ -72,6 +72,7 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 - `expenseSourceAccounts` - Array of account IDs (asset accounts) that withdrawals must source from to count as expenses. Independent of `incomeDestinationAccounts` (checks the opposite side of different transaction types) — the same account ID often belongs in both lists
 - `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Do **not** list a transfer that funds a disposable/cash account: spending out of that account is already charged once via the disposable income tag, so listing the funding transfer charges the same dollars twice
 - `disposableIncomeAccounts` - Array of account IDs for discretionary/disposable spending accounts (e.g., a credit card for personal expenses); used by `DisposableIncomeService` for surplus calculations
+- `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded and falls through to additional income rather than inflating paycheck income
 
 **Transaction Configuration:**
 
@@ -160,7 +161,9 @@ The `TransactionClassificationService` provides the core logic for classifying t
 - **Transfers**: `type === "transfer"`
 - **Bills**: Transactions linked to a bill (bill_id or subscription_id is set)
 - **Disposable Income**: Transactions tagged with configured disposable income tag (default: "Disposable Income")
-- **Paychecks**: Transactions tagged with configured paycheck tag (default: "Paycheck"). Supports all transaction types (deposits, transfers, etc).
+- **Paychecks**: Transactions tagged with the configured paycheck tag (default: "Paycheck") **and**, when `paycheckDestinationAccounts` is configured, destined for one of those accounts. Supports all transaction types (deposits, transfers, etc).
+
+The account constraint lives in `isPaycheck` rather than in its callers on purpose. The same predicate decides what `PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside for, so a transaction rejected as a paycheck falls through to additional income instead of disappearing from both buckets.
 
 **Amount sign convention (verified against Firefly III 6.6.6):** `GET /v1/transactions` returns `amount` **unsigned** — withdrawals, deposits, and transfers are all positive, and direction comes from `type`. Never identify spending with `amount < 0`; use `isWithdrawal()`.
 

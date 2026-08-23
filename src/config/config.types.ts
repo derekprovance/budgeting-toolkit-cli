@@ -57,6 +57,11 @@ export interface AccountsConfig {
     expenseSourceAccounts: string[];
     expenseTransfers: ValidTransfer[];
     disposableIncomeAccounts: string[];
+    /**
+     * Accounts a paycheck-tagged deposit must land in to count as a paycheck.
+     * Empty means no constraint — the tag alone decides.
+     */
+    paycheckDestinationAccounts: string[];
 }
 
 /**

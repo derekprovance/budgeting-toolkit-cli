@@ -5,7 +5,12 @@ export class TransactionClassificationService implements ITransactionClassificat
     constructor(
         private readonly noNameExpenseAccountId: string,
         private readonly disposableIncomeTag: string,
-        private readonly paycheckTag: string
+        private readonly paycheckTag: string,
+        /**
+         * Accounts a paycheck-tagged transaction must be destined for. Empty
+         * means the tag alone decides.
+         */
+        private readonly paycheckDestinationAccounts: string[] = []
     ) {}
 
     isTransfer(transaction: TransactionSplit): boolean {
@@ -44,11 +49,34 @@ export class TransactionClassificationService implements ITransactionClassificat
         return !(transaction.budget_id === undefined || transaction.budget_id === null);
     }
 
+    /**
+     * A paycheck is tagged with the configured paycheck tag AND, when
+     * `paycheckDestinationAccounts` is configured, lands in one of those
+     * accounts.
+     *
+     * The account check exists because a payroll deposit is often split across
+     * accounts, and a stray tag on the half that is not the paycheck would
+     * charge that money to the paycheck bucket. Constraining it here rather
+     * than in the callers keeps the precedence rule intact: the same predicate
+     * decides what PaycheckSurplusService counts and what AdditionalIncomeService
+     * steps aside for, so a rejected transaction falls through to additional
+     * income rather than disappearing from both.
+     *
+     * Left empty the tag alone decides, which is the behaviour for anyone who
+     * has not configured the accounts.
+     */
     isPaycheck(transaction: TransactionSplit): boolean {
-        if (!transaction.tags) {
+        if (!transaction.tags?.includes(this.paycheckTag)) {
             return false;
         }
 
-        return transaction.tags.includes(this.paycheckTag);
+        if (this.paycheckDestinationAccounts.length === 0) {
+            return true;
+        }
+
+        return (
+            !!transaction.destination_id &&
+            this.paycheckDestinationAccounts.includes(transaction.destination_id)
+        );
     }
 }
