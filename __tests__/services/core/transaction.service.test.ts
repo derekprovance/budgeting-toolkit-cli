@@ -443,14 +443,17 @@ describe('TransactionService', () => {
     });
 
     describe('getMostRecentTransactionDate', () => {
-        it('should return date from most recent transaction', async () => {
-            const mockTransaction: TransactionRead = {
+        it('should return the transaction date, not the import timestamp', async () => {
+            // The two differ whenever a backdated batch is imported, and
+            // created_at would report the data as current as of the import --
+            // the false reassurance this figure exists to prevent.
+            const mockTransaction = {
                 id: '1',
                 attributes: {
-                    created_at: '2024-01-15T10:30:00Z',
-                    transactions: [],
+                    created_at: '2024-03-02T09:00:00Z', // imported in March
+                    transactions: [{ date: '2024-01-15T10:30:00Z' }],
                 },
-            } as TransactionRead;
+            } as unknown as TransactionRead;
 
             (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
                 data: [mockTransaction],
@@ -461,14 +464,11 @@ describe('TransactionService', () => {
             expect(result).toEqual(new Date('2024-01-15T10:30:00Z'));
         });
 
-        it('should return null when created_at is undefined', async () => {
-            const mockTransaction: TransactionRead = {
+        it('should return null when the group carries no splits', async () => {
+            const mockTransaction = {
                 id: '1',
-                attributes: {
-                    created_at: undefined,
-                    transactions: [],
-                },
-            } as TransactionRead;
+                attributes: { created_at: '2024-01-15T10:30:00Z', transactions: [] },
+            } as unknown as TransactionRead;
 
             (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
                 data: [mockTransaction],

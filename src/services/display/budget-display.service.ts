@@ -6,6 +6,7 @@ import {
     BillComparisonDto,
     getTopBills,
     getRemainingBills,
+    isBillUpcoming,
 } from '../../types/dto/bill-comparison.dto.js';
 import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
@@ -425,12 +426,12 @@ export class BudgetDisplayService {
                 billComparison.currencySymbol
             );
             const variance = bill.actual - bill.predicted;
+            const isUpcoming = isBillUpcoming(bill);
             const varianceEmoji = EmojiUtils.getBillVarianceEmoji(
                 variance,
                 bill.predicted,
-                bill.dueDate
+                isUpcoming
             );
-            const isUpcoming = !!bill.dueDate && bill.dueDate.getTime() > Date.now();
 
             // Truncate as well as pad — a longer name would otherwise shove the
             // amount column right and break alignment

@@ -30,13 +30,13 @@ export class EmojiUtils {
     static getBillVarianceEmoji(
         variance: number,
         predictedAmount: number,
-        dueDate?: Date,
-        now: Date = new Date()
+        isUpcoming: boolean = false
     ): string {
         // A bill that has not come around yet is not "under budget" — it is
         // simply unpaid, and rendering it green alongside genuinely cheap bills
-        // invites the reader to bank money they still owe.
-        if (dueDate && dueDate.getTime() > now.getTime()) {
+        // invites the reader to bank money they still owe. Whether it counts as
+        // upcoming is BillDetailDto's call, not ours.
+        if (isUpcoming) {
             return '⏳';
         }
 

@@ -65,9 +65,14 @@ export interface AccountsConfig {
     expenseSourceAccounts: string[];
     expenseTransfers: ValidTransfer[];
     /**
-     * Accounts outside the tracked boundary. Money crossing into them is not
-     * spending and money generated inside them is not income — a brokerage is
-     * the usual case. Excluded from both derived lists.
+     * Accounts outside the tracked boundary: excluded from both derived lists,
+     * so money leaving them is not spending and money arriving in them is not
+     * income. A brokerage is the usual case.
+     *
+     * This does NOT hide money moving into one from a tracked account — a
+     * withdrawal from checking to buy an investment still counts as spending,
+     * because the source is tracked. Only activity whose tracked side is the
+     * untracked account itself disappears.
      */
     untrackedAccounts: string[];
     /**

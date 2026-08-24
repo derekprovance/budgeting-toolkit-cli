@@ -211,6 +211,70 @@ describe('BillComparisonService', () => {
             }
         });
 
+        it('should still report the remainder when one occurrence is paid', async () => {
+            // The case this whole feature exists for: fortnightly $130, due
+            // twice, first one paid. The second $130 is still owed, and
+            // reporting 0 outstanding makes the -$130 variance read as a saving.
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [
+                    '2024-10-14', // past, and paid
+                    `${FUTURE_YEAR}-10-28`,
+                ]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction('Payment', '130.00', '1'),
+            ]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].actual).toBe(130);
+            }
+        });
+
+        it('should not report an outstanding amount for a bill paid in full early', async () => {
+            // pay_dates is payment-unaware, so a future date alone cannot mean
+            // money is still owed.
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [`${FUTURE_YEAR}-10-28`]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction('Paid early', '130.00', '1'),
+            ]);
+
+            const result = await billComparisonService.calculateBillComparison(10, FUTURE_YEAR);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].upcomingAmount).toBe(0);
+                expect(result.value.bills[0].dueDate).toBeUndefined();
+            }
+        });
+
+        it('should report only the unpaid half of a partly-settled bill', async () => {
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [
+                    `${FUTURE_YEAR}-10-14`,
+                    `${FUTURE_YEAR}-10-28`,
+                ]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction('First payment', '130.00', '1'),
+            ]);
+
+            const result = await billComparisonService.calculateBillComparison(10, FUTURE_YEAR);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].predicted).toBe(260);
+                expect(result.value.bills[0].actual).toBe(130);
+                // one payment left, not the whole remainder and not zero
+                expect(result.value.bills[0].upcomingAmount).toBe(130);
+                expect(result.value.bills[0].dueDate).toBeDefined();
+            }
+        });
+
         it('should drop the due date once a payment lands', async () => {
             // With a real actual to judge, the row no longer needs to explain
             // itself as merely upcoming.

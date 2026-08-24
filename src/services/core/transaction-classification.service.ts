@@ -57,10 +57,20 @@ export class TransactionClassificationService implements ITransactionClassificat
      * The account check exists because a payroll deposit is often split across
      * accounts, and a stray tag on the half that is not the paycheck would
      * charge that money to the paycheck bucket. Constraining it here rather
-     * than in the callers keeps the precedence rule intact: the same predicate
-     * decides what PaycheckSurplusService counts and what AdditionalIncomeService
-     * steps aside for, so a rejected transaction falls through to additional
-     * income rather than disappearing from both.
+     * than in the callers keeps one predicate deciding both what
+     * PaycheckSurplusService counts and what AdditionalIncomeService steps
+     * aside for, so the two cannot both claim a transaction.
+     *
+     * A rejected transaction reaches additional income only if it also passes
+     * that service's own filters. Two cases where it will not, and the money
+     * lands in no income bucket at all:
+     *
+     * - it is a transfer. AdditionalIncomeService requires a deposit. This is
+     *   the right outcome — a transfer between accounts the owner already holds
+     *   is not income — but a paycheck-tagged transfer is silently uncounted.
+     * - its description matches `excludedAdditionalIncomePatterns`. A `PAYROLL`
+     *   entry there will match a payroll deposit by construction, so pairing
+     *   that pattern with this setting drops the rejected half entirely.
      *
      * Left empty the tag alone decides, which is the behaviour for anyone who
      * has not configured the accounts.

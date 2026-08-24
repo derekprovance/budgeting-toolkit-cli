@@ -88,6 +88,20 @@ export class BillComparisonDto {
 }
 
 /**
+ * Whether a bill still has a payment ahead of it this month.
+ *
+ * The single definition of "upcoming": the row renderers and the status emoji
+ * all ask here rather than each re-deriving it from `dueDate`, so the icon and
+ * the text beside it cannot come to different conclusions.
+ *
+ * A free function rather than a method because these DTOs are routinely built
+ * as plain objects.
+ */
+export function isBillUpcoming(bill: BillDetailDto, now: Date = new Date()): boolean {
+    return !!bill.dueDate && bill.dueDate.getTime() > now.getTime();
+}
+
+/**
  * Gets the top N bills by actual amount spent, sorted descending.
  */
 export function getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {

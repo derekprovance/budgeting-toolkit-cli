@@ -309,6 +309,21 @@ export class BillComparisonService implements IBillComparisonService {
 
             predictedTotal += predictedAmount;
 
+            // What is still ahead of us, capped by what is actually unpaid.
+            //
+            // Both halves matter. Without the cap, a bill paid early still
+            // reports its next date as outstanding, because Firefly's pay_dates
+            // is payment-unaware and cannot say which occurrence was settled.
+            // Without the per-occurrence bound, a bill due twice and paid once
+            // would report the whole remainder rather than the one payment left.
+            const outstanding = Math.max(
+                0,
+                Math.min(
+                    predictedAmount - actualAmount,
+                    this.getBillAmount(bill) * upcomingDates.length
+                )
+            );
+
             logger.debug({
                 billName: bill.attributes.name,
                 billId,
@@ -329,10 +344,8 @@ export class BillComparisonService implements IBillComparisonService {
                     predictedAmount,
                     actualAmount,
                     frequency,
-                    // Only meaningful while nothing has been paid: once a
-                    // payment lands the row has a real actual to judge.
-                    actualAmount === 0 ? upcomingDates[0] : undefined,
-                    actualAmount === 0 ? this.getBillAmount(bill) * upcomingDates.length : 0
+                    upcomingDates.length > 0 && outstanding > 0 ? upcomingDates[0] : undefined,
+                    outstanding
                 )
             );
 

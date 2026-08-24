@@ -179,7 +179,28 @@ describe('AccountScopeService', () => {
                 meta: { pagination: { total_pages: 1 } },
             } as never);
 
-            await expect(build().getExpenseSources()).rejects.toThrow(/No expense source accounts/);
+            await expect(build().getExpenseSources()).rejects.toThrow(
+                /No expense source or income destination accounts/
+            );
+        });
+
+        it('should fail when only the income side derives to nothing', async () => {
+            // Every asset account a credit card: they can source spending but
+            // never receive income, so additional income would silently report
+            // $0 forever. The constructor validation this derivation replaced
+            // used to catch exactly this.
+            listAccount.mockResolvedValue({
+                data: [account('8', 'ccAsset'), account('11', 'ccAsset')],
+                meta: { pagination: { total_pages: 1 } },
+            } as never);
+
+            await expect(build().getExpenseSources()).rejects.toThrow(
+                /No income destination accounts/
+            );
+        });
+
+        it('should not fire when both sides derive to something', async () => {
+            await expect(build().getExpenseSources()).resolves.toContain('1');
         });
     });
 });

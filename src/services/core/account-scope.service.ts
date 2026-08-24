@@ -23,9 +23,14 @@ export interface AccountScopeOverrides {
     /** Explicit expense sources. Same override semantics. */
     expenseSourceAccounts: string[];
     /**
-     * Accounts outside the tracked boundary. Money crossing into them is not
-     * income and money leaving them is not spending — an investment account is
-     * the usual case.
+     * Accounts outside the tracked boundary: excluded from both derived lists,
+     * so money leaving them is not spending and money arriving in them is not
+     * income. A brokerage is the usual case.
+     *
+     * This does NOT hide money moving into one from a tracked account — a
+     * withdrawal from checking to buy an investment still counts as spending,
+     * because the source is tracked. Only activity whose tracked side is the
+     * untracked account itself disappears.
      */
     untrackedAccounts: string[];
 }
@@ -109,9 +114,17 @@ export class AccountScopeService {
         const accounts = await this.fetchAssetAccounts();
         const untracked = new Set(untrackedAccounts);
 
-        // A closed account keeps its history but must not widen the scope
+        // The asset filter is also applied client-side, not only asked for in
+        // the query. `listAccount` takes seven positional parameters with the
+        // type last, and getting that wrong would quietly admit expense and
+        // revenue accounts here — making every merchant a spending account and
+        // every payee an income destination, with no error to show for it.
         const tracked = accounts.filter(
-            account => account.attributes.active !== false && !untracked.has(account.id)
+            account =>
+                account.attributes.type === 'asset' &&
+                // A closed account keeps its history but must not widen the scope
+                account.attributes.active !== false &&
+                !untracked.has(account.id)
         );
 
         const derived: AccountScope = {
@@ -131,12 +144,20 @@ export class AccountScopeService {
         };
 
         // Deriving nothing means the analysis would silently report zero
-        // spending, which is far worse than failing here.
-        if (scope.expenseSources.length === 0) {
+        // spending, or zero income, which is far worse than failing here. Both
+        // sides are checked: an income scope that derives to nothing used to be
+        // caught by AdditionalIncomeService's constructor validation, which this
+        // derivation replaced.
+        const empty = [
+            scope.expenseSources.length === 0 ? 'expense source' : undefined,
+            scope.incomeDestinations.length === 0 ? 'income destination' : undefined,
+        ].filter(Boolean);
+
+        if (empty.length > 0) {
             throw new Error(
-                'No expense source accounts could be determined. Firefly returned ' +
+                `No ${empty.join(' or ')} accounts could be determined. Firefly returned ` +
                     `${accounts.length} asset account(s), and untrackedAccounts excludes ` +
-                    `${untracked.size}. Set expenseSourceAccounts explicitly in config.yaml, ` +
+                    `${untracked.size}. Set the corresponding list explicitly in config.yaml, ` +
                     'or check that your asset accounts are active in Firefly III.'
             );
         }

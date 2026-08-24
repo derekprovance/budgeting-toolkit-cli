@@ -2,7 +2,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { ITransactionClassificationService } from '../core/transaction-classification.service.interface.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
-import { BillDetailDto } from '../../types/dto/bill-comparison.dto.js';
+import { BillDetailDto, isBillUpcoming } from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 
@@ -406,7 +406,7 @@ export class AnalyzeDisplayService {
      * Formats a bill detail for verbose mode
      */
     private formatBillDetail(bill: BillDetailDto, symbol: string): string {
-        const isUpcoming = !!bill.dueDate && bill.dueDate.getTime() > Date.now();
+        const isUpcoming = isBillUpcoming(bill);
         const variance = bill.actual - bill.predicted;
         const varianceColor = variance > 0 ? chalk.red : chalk.green;
         // formatCurrency renders the absolute value, so the sign must be explicit

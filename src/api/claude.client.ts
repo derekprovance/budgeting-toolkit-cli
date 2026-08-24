@@ -73,6 +73,9 @@ interface CircuitBreakerState {
 }
 
 export class ClaudeClient {
+    /** Set once a model rejects output_config, so later chunks skip it */
+    private effortUnsupported = false;
+
     private client: Anthropic;
     private config: Required<Pick<ClaudeClientConfig, 'model' | 'maxTokens'>> &
         Omit<ClaudeClientConfig, 'model' | 'maxTokens'>;
@@ -130,20 +133,46 @@ export class ClaudeClient {
         this.assertCircuitAllows();
         await this.waitForRateLimit();
 
+        const request: Anthropic.MessageCreateParamsNonStreaming = {
+            model: options.model ?? this.config.model,
+            max_tokens: options.maxTokens ?? this.config.maxTokens,
+            messages,
+            ...(options.systemPrompt && { system: options.systemPrompt }),
+            ...(options.tools && { tools: options.tools }),
+            ...(options.toolChoice && { tool_choice: options.toolChoice }),
+        };
+
         let response: Anthropic.Message;
         try {
-            response = await this.client.messages.create({
-                model: options.model ?? this.config.model,
-                max_tokens: options.maxTokens ?? this.config.maxTokens,
-                messages,
-                output_config: { effort: options.effort ?? DEFAULT_EFFORT },
-                ...(options.systemPrompt && { system: options.systemPrompt }),
-                ...(options.tools && { tools: options.tools }),
-                ...(options.toolChoice && { tool_choice: options.toolChoice }),
-            });
+            response = await this.client.messages.create(
+                this.effortUnsupported
+                    ? request
+                    : { ...request, output_config: { effort: options.effort ?? DEFAULT_EFFORT } }
+            );
         } catch (error) {
-            this.onRequestFailure();
-            throw error;
+            // `llm.model` is user-configurable and validated only as a non-empty
+            // string, and `output_config.effort` is rejected outright by models
+            // older than this client assumes. Since a bad request now aborts the
+            // whole run, an unrecognised parameter would take a working
+            // configuration down with it — so drop it and try once more before
+            // giving up. Any other bad request fails again immediately.
+            if (error instanceof Anthropic.BadRequestError && !this.effortUnsupported) {
+                this.effortUnsupported = true;
+                logger.warn(
+                    { model: request.model, error: error.message },
+                    'Model rejected output_config.effort - retrying without it for the rest of this run'
+                );
+
+                try {
+                    response = await this.client.messages.create(request);
+                } catch (retryError) {
+                    this.onRequestFailure();
+                    throw retryError;
+                }
+            } else {
+                this.onRequestFailure();
+                throw error;
+            }
         }
 
         // Transport succeeded — the breaker only tracks transport health.

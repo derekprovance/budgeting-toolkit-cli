@@ -18,11 +18,16 @@ expectedMonthlyPaycheck: 5000.00
 incomeDestinationAccounts: []
 expenseSourceAccounts: []
 
-# Accounts outside the tracked boundary: money crossing INTO them is not
-# spending, money generated INSIDE them is not income. A brokerage is the usual
-# case - its role is savingAsset, identical to an ordinary savings account, but
-# its outflows are fund transfers rather than purchases and Firefly cannot tell
-# those apart.
+# Accounts outside the tracked boundary. Excluded from both derived lists, so
+# money leaving them is not spending and money arriving in them is not income.
+#
+# A brokerage is the usual case: its role is savingAsset, identical to an
+# ordinary savings account, but its outflows are fund transfers rather than
+# purchases and Firefly cannot tell those apart.
+#
+# This does NOT hide money moving into one from a tracked account - a withdrawal
+# from checking to buy an investment still counts as spending, because the
+# source is tracked.
 untrackedAccounts: []
 
 # Accounts a Paycheck-tagged deposit must land in to count as the paycheck.

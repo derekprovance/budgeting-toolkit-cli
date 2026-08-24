@@ -74,15 +74,23 @@ export class TransactionService implements ITransactionService {
         return this.excludedByKey.get(cacheKey) ?? [];
     }
 
+    /**
+     * The date of the most recent transaction, for reporting how current the
+     * data is.
+     *
+     * Deliberately the transaction's own `date`, not the record's `created_at`.
+     * Firefly lists newest-by-date first, so `created_at` would answer "when
+     * was this imported" — importing a backdated batch today would report data
+     * current as of today, which is the false reassurance this exists to
+     * prevent.
+     */
     async getMostRecentTransactionDate(): Promise<Date | null> {
         const response = await this.client.transactions.listTransaction(undefined, 1);
         if (!response || !response.data || response.data.length === 0) {
             throw new Error(`Failed to fetch transactions`);
         }
-        const transaction = response.data[0];
-        return transaction.attributes && transaction.attributes.created_at
-            ? new Date(transaction.attributes.created_at)
-            : null;
+        const date = response.data[0]?.attributes?.transactions?.[0]?.date;
+        return date ? new Date(date) : null;
     }
 
     /**

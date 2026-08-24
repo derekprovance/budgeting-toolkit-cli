@@ -150,7 +150,7 @@ Credit cards are excluded from income because deposits to them are refunds and s
 - `incomeDestinationAccounts` - **Override.** Empty (the default) derives the list. Non-empty replaces derivation entirely for that side. Set it only when a Firefly `account_role` is wrong and you would rather not fix it there
 - `expenseSourceAccounts` - **Override.** Same semantics as above
 - `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Note that a transfer funding a disposable pool does **not** belong here: the tagged purchase is already the expense (see "Disposable income" above)
-- `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded and falls through to additional income rather than inflating paycheck income
+- `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded rather than inflating paycheck income. A rejected **deposit** falls through to additional income; a rejected **transfer** does not (additional income filters on deposit type), and neither does one matching `excludedAdditionalIncomePatterns` — do not pair this setting with a `PAYROLL` pattern
 
 **Transaction Configuration:**
 
@@ -241,7 +241,7 @@ The `TransactionClassificationService` provides the core logic for classifying t
 - **Disposable Income**: Transactions tagged with configured disposable income tag (default: "Disposable Income")
 - **Paychecks**: Transactions tagged with the configured paycheck tag (default: "Paycheck") **and**, when `paycheckDestinationAccounts` is configured, destined for one of those accounts. Supports all transaction types (deposits, transfers, etc).
 
-The account constraint lives in `isPaycheck` rather than in its callers on purpose. The same predicate decides what `PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside for, so a transaction rejected as a paycheck falls through to additional income instead of disappearing from both buckets.
+The account constraint lives in `isPaycheck` rather than in its callers on purpose: one predicate decides both what `PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside for, so the two cannot both claim a transaction. A rejected transaction reaches additional income only if it also passes that service's filters — it must be a deposit and must not match `excludedAdditionalIncomePatterns`. A rejected transfer is counted in neither bucket, which is correct (a transfer between accounts you already hold is not income) but worth knowing.
 
 **Amount sign convention (verified against Firefly III 6.6.6):** `GET /v1/transactions` returns `amount` **unsigned** — withdrawals, deposits, and transfers are all positive, and direction comes from `type`. Never identify spending with `amount < 0`; use `isWithdrawal()`.
 

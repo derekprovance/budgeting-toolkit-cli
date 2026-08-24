@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/common.types.js';
 import { logger } from '../logger.js';
@@ -64,16 +65,22 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                     this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
                 ]);
 
+            // Not a warning: the untracked list below is derived by subtracting
+            // this one, so an empty stand-in does not degrade the report -- it
+            // inverts it, re-labelling every unbudgeted withdrawal as "untracked"
+            // and rendering the unbudgeted section empty. A plausible-looking
+            // report built on a failed calculation is worse than no report.
             if (!unbudgetedResult.ok) {
-                spinner.warn('Warning: Unbudgeted expense data unavailable');
-                logger.warn(
-                    { error: unbudgetedResult.error.message },
-                    'Failed to calculate unbudgeted expenses'
+                spinner.fail('Failed to generate budget report');
+                console.error(
+                    chalk.red('Error calculating unbudgeted expenses:'),
+                    chalk.red.bold(unbudgetedResult.error.userMessage)
                 );
+                throw new Error(unbudgetedResult.error.message);
             }
 
             // The bucket that feeds the cash-flow net, same definition analyze uses
-            const unbudgetedExpenses = unbudgetedResult.ok ? unbudgetedResult.value : [];
+            const unbudgetedExpenses = unbudgetedResult.value;
 
             // Spending no bucket accounts for. Depends on the list above, so it
             // cannot join the parallel fetch.
