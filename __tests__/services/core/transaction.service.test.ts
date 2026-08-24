@@ -326,10 +326,10 @@ describe('TransactionService', () => {
         it('should filter excluded transactions via ExcludedTransactionService', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const includedTransaction: TransactionSplit = {
@@ -353,7 +353,7 @@ describe('TransactionService', () => {
 
             mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
                 (desc, amount) => {
-                    return desc === 'VANGUARD BUY INVESTMENT' && amount === '4400.00';
+                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
                 }
             );
 
@@ -396,10 +396,10 @@ describe('TransactionService', () => {
         it('should not add excluded transactions to split index', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const mockTransactionRead: TransactionRead = {
@@ -684,10 +684,10 @@ describe('TransactionService', () => {
         it('should exclude transactions matching description and amount', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const mockTransactionRead: TransactionRead = {
@@ -703,7 +703,7 @@ describe('TransactionService', () => {
 
             mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
                 (desc, amount) => {
-                    return desc === 'VANGUARD BUY INVESTMENT' && amount === '4400.00';
+                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
                 }
             );
 
@@ -741,10 +741,10 @@ describe('TransactionService', () => {
             expect(result).toHaveLength(0);
         });
 
-        it('should exclude transactions matching amount only', async () => {
+        it('should exclude a transaction the service matches on description and amount', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'Any Description',
+                description: 'Monthly Rent',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
                 amount: '999.99',
@@ -761,9 +761,9 @@ describe('TransactionService', () => {
                 data: [mockTransactionRead],
             } as TransactionArray);
 
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation((_, amount) => {
-                return amount === '999.99';
-            });
+            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
+                (description, amount) => description === 'Monthly Rent' && amount === '999.99'
+            );
 
             const result = await service.getTransactionsByTag('test-tag');
 
@@ -801,10 +801,10 @@ describe('TransactionService', () => {
         it('should handle mixed excluded and included transactions', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const includedTransaction1: TransactionSplit = {
@@ -836,7 +836,7 @@ describe('TransactionService', () => {
 
             mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
                 (desc, amount) => {
-                    return desc === 'VANGUARD BUY INVESTMENT' && amount === '4400.00';
+                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
                 }
             );
 

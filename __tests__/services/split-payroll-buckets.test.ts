@@ -27,7 +27,7 @@ describe('split payroll bucketing', () => {
         ({
             amount,
             type: 'deposit',
-            description: 'LOBDOTCOM INC PAYROLL',
+            description: 'ACME CORP PAYROLL',
             destination_id: destination,
             tags,
         }) as unknown as TransactionSplit;
@@ -75,29 +75,29 @@ describe('split payroll bucketing', () => {
     };
 
     it('should disregard a stray paycheck tag outside the configured accounts', async () => {
-        // Both halves carry the tag, which is the July 2026 data problem.
+        // Both halves carry the tag, which is the data problem this guards against.
         const transactions = [
-            deposit('2582.31', CHECKING, ['Paycheck']),
-            deposit('3229.76', SAVINGS, ['Paycheck']),
+            deposit('1234.56', CHECKING, ['Paycheck']),
+            deposit('1765.44', SAVINGS, ['Paycheck']),
         ];
 
         const result = await totals(transactions, [CHECKING]);
 
-        expect(result.paycheck).toBe(2582.31);
-        expect(result.additionalIncome).toBe(3229.76);
+        expect(result.paycheck).toBe(1234.56);
+        expect(result.additionalIncome).toBe(1765.44);
     });
 
     it('should route the untagged savings half to additional income', async () => {
-        // The correctly-tagged shape, as June and August 2026 have it.
+        // The correctly-tagged shape, as most months have it.
         const transactions = [
-            deposit('2582.31', CHECKING, ['Paycheck']),
-            deposit('3229.77', SAVINGS),
+            deposit('1234.56', CHECKING, ['Paycheck']),
+            deposit('1765.45', SAVINGS),
         ];
 
         const result = await totals(transactions, [CHECKING]);
 
-        expect(result.paycheck).toBe(2582.31);
-        expect(result.additionalIncome).toBe(3229.77);
+        expect(result.paycheck).toBe(1234.56);
+        expect(result.additionalIncome).toBe(1765.45);
     });
 
     it('should conserve total income however the halves are tagged', async () => {
@@ -105,31 +105,31 @@ describe('split payroll bucketing', () => {
         // transaction from the paycheck bucket must hand it to additional
         // income, never drop it from both.
         const bothTagged = [
-            deposit('2582.31', CHECKING, ['Paycheck']),
-            deposit('3229.76', SAVINGS, ['Paycheck']),
+            deposit('1234.56', CHECKING, ['Paycheck']),
+            deposit('1765.44', SAVINGS, ['Paycheck']),
         ];
         const onlyCheckingTagged = [
-            deposit('2582.31', CHECKING, ['Paycheck']),
-            deposit('3229.76', SAVINGS),
+            deposit('1234.56', CHECKING, ['Paycheck']),
+            deposit('1765.44', SAVINGS),
         ];
 
         const tagged = await totals(bothTagged, [CHECKING]);
         const untagged = await totals(onlyCheckingTagged, [CHECKING]);
 
-        expect(tagged.paycheck + tagged.additionalIncome).toBeCloseTo(5812.07, 2);
-        expect(untagged.paycheck + untagged.additionalIncome).toBeCloseTo(5812.07, 2);
+        expect(tagged.paycheck + tagged.additionalIncome).toBeCloseTo(3000.0, 2);
+        expect(untagged.paycheck + untagged.additionalIncome).toBeCloseTo(3000.0, 2);
     });
 
     it('should count both halves as paycheck when no accounts are configured', async () => {
         // Backwards compatibility: an unconfigured list means the tag decides.
         const transactions = [
-            deposit('2582.31', CHECKING, ['Paycheck']),
-            deposit('3229.76', SAVINGS, ['Paycheck']),
+            deposit('1234.56', CHECKING, ['Paycheck']),
+            deposit('1765.44', SAVINGS, ['Paycheck']),
         ];
 
         const result = await totals(transactions, []);
 
-        expect(result.paycheck).toBeCloseTo(5812.07, 2);
+        expect(result.paycheck).toBeCloseTo(3000.0, 2);
         expect(result.additionalIncome).toBe(0);
     });
 

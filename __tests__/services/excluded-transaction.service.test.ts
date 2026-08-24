@@ -9,21 +9,22 @@ describe('ExcludedTransactionService', () => {
 
     const mockExcludedTransactions: ExcludedTransaction[] = [
         {
-            description: 'VANGUARD BUY INVESTMENT',
-            amount: '4400.00',
+            description: 'BROKERAGE BUY INVESTMENT',
+            amount: '2000.00',
             reason: 'Investment purchase',
         },
         {
-            description: 'CRT Management',
-            amount: '1047.66',
+            description: 'PROPERTY MGMT CO',
+            amount: '850.00',
             reason: 'Management fee',
         },
         {
             description: 'Excluded Description Only',
         },
         {
-            amount: '999.99',
-            reason: 'Excluded by amount only',
+            description: 'Monthly Rent',
+            amount: '$1,200.00',
+            reason: 'Rule amount written with currency formatting',
         },
     ];
 
@@ -42,10 +43,10 @@ describe('ExcludedTransactionService', () => {
 
     describe('isExcludedTransaction', () => {
         it('should return true when both description and amount match', () => {
-            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '4400.00');
+            const result = service.isExcludedTransaction('BROKERAGE BUY INVESTMENT', '2000.00');
             expect(result).toBe(true);
             expect(mockLogger.debug).toHaveBeenCalledWith(
-                { description: 'VANGUARD BUY INVESTMENT', amount: '4400.00' },
+                { description: 'BROKERAGE BUY INVESTMENT', amount: '2000.00' },
                 'Transaction matched exclusion criteria'
             );
         });
@@ -55,43 +56,45 @@ describe('ExcludedTransactionService', () => {
             expect(result).toBe(true);
         });
 
-        it('should return true when only amount matches (no description in config)', () => {
-            const result = service.isExcludedTransaction('Any Description', '999.99');
-            expect(result).toBe(true);
+        it('should parse a currency-formatted rule amount the same way as the transaction', () => {
+            // The rule reads '$1,200.00'; bare parseFloat would make it NaN (or,
+            // without the '$', the number 1) and silently match the wrong thing
+            expect(service.isExcludedTransaction('Monthly Rent', '1200.00')).toBe(true);
+            expect(service.isExcludedTransaction('Monthly Rent', '1.00')).toBe(false);
         });
 
         it('should return false when description matches but amount does not', () => {
-            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '1000.00');
+            const result = service.isExcludedTransaction('BROKERAGE BUY INVESTMENT', '1000.00');
             expect(result).toBe(false);
         });
 
         it('should return false for non-matching description', () => {
-            const result = service.isExcludedTransaction('NON-MATCHING', '4400.00');
+            const result = service.isExcludedTransaction('NON-MATCHING', '2000.00');
             expect(result).toBe(false);
         });
 
         it('should return false for non-matching amount', () => {
-            const result = service.isExcludedTransaction('CRT Management', '2000.00');
+            const result = service.isExcludedTransaction('PROPERTY MGMT CO', '2000.00');
             expect(result).toBe(false);
         });
 
         it('should handle amount conversion with currency symbols', () => {
-            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '$4,400.00');
+            const result = service.isExcludedTransaction('BROKERAGE BUY INVESTMENT', '$2,000.00');
             expect(result).toBe(true);
         });
 
         it('should handle negative amounts with parentheses', () => {
-            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '($4,400.00)');
+            const result = service.isExcludedTransaction('BROKERAGE BUY INVESTMENT', '($2,000.00)');
             expect(result).toBe(true);
         });
 
         it('should handle negative amounts with minus sign', () => {
-            const result = service.isExcludedTransaction('VANGUARD BUY INVESTMENT', '-4400.00');
+            const result = service.isExcludedTransaction('BROKERAGE BUY INVESTMENT', '-2000.00');
             expect(result).toBe(true);
         });
 
         it('should compare absolute values for amounts', () => {
-            const result = service.isExcludedTransaction('CRT Management', '-1047.66');
+            const result = service.isExcludedTransaction('PROPERTY MGMT CO', '-850.00');
             expect(result).toBe(true);
         });
     });
@@ -111,6 +114,40 @@ describe('ExcludedTransactionService', () => {
             expect(service.isExcludedTransaction('Excluded Description Only', 'garbage')).toBe(
                 true
             );
+        });
+
+        it('should not match when the RULE amount is unparseable', () => {
+            const badRule = new ExcludedTransactionService(
+                [{ description: 'Broken Rule', amount: 'not-an-amount' }],
+                mockLogger
+            );
+
+            expect(badRule.isExcludedTransaction('Broken Rule', '100.00')).toBe(false);
+        });
+    });
+
+    describe('rules without a description', () => {
+        // ConfigValidator rejects these at startup, but the service must never
+        // fall back to matching on amount alone: exclusion happens at fetch time,
+        // so an amount-only rule would drop every transaction of that amount on
+        // every account, in either direction.
+        it('should ignore a rule carrying only an amount', () => {
+            const amountOnly = new ExcludedTransactionService(
+                [{ amount: '999.99' } as unknown as ExcludedTransaction],
+                mockLogger
+            );
+
+            expect(amountOnly.isExcludedTransaction('Any Description', '999.99')).toBe(false);
+            expect(amountOnly.isExcludedTransaction('Any Description', '-999.99')).toBe(false);
+        });
+
+        it('should ignore a rule with an empty description', () => {
+            const emptyDescription = new ExcludedTransactionService(
+                [{ description: '', amount: '999.99' }],
+                mockLogger
+            );
+
+            expect(emptyDescription.isExcludedTransaction('', '999.99')).toBe(false);
         });
     });
 });

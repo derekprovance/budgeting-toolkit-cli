@@ -94,7 +94,23 @@ export interface TransactionsConfig {
 }
 
 /**
- * Excluded Transaction Configuration
+ * A rule that removes matching transactions from every report.
+ *
+ * Exclusion is applied at fetch time, so a match drops the transaction from
+ * every bucket in every command — not just the one you had in mind. The schema
+ * is deliberately narrow to keep that blunt instrument aimed:
+ *
+ * - `description` is REQUIRED and matched as whole-string equality, after
+ *   trimming and lower-casing (`StringUtils.normalizeForMatching`). It is not a
+ *   substring match.
+ * - `amount` is optional and narrows a rule to a single amount. Currency
+ *   formatting (`$`, thousands separators, accounting parentheses) is accepted,
+ *   and the comparison is on absolute value, so it ignores direction.
+ * - `reason` is free text for your own benefit; nothing reads it.
+ *
+ * Amount-only rules are NOT supported: they would silently drop every
+ * transaction of that amount, on any account, in either direction.
+ * `ConfigValidator` rejects them at startup.
  */
 export interface ExcludedTransaction {
     description: string;

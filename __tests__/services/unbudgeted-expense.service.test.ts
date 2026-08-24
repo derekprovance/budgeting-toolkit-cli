@@ -10,9 +10,9 @@ import { createMockAccountScopeService } from '../setup/mock-services.js';
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
     PRIMARY: 'test-primary-account',
-    CHASE_SAPPHIRE: 'test-chase-sapphire',
-    CHASE_AMAZON: 'test-chase-amazon',
-    CITIBANK_DOUBLECASH: 'test-citibank-doublecash',
+    CREDIT_CARD_A: 'test-credit-card-a',
+    CREDIT_CARD_B: 'test-credit-card-b',
+    CREDIT_CARD_C: 'test-credit-card-c',
     MONEY_MARKET: 'test-money-market',
 } as const;
 
@@ -60,9 +60,9 @@ describe('UnbudgetedExpenseService', () => {
             createMockAccountScopeService(
                 [],
                 [
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.CREDIT_CARD_B,
+                    TestAccount.CREDIT_CARD_A,
+                    TestAccount.CREDIT_CARD_C,
                     TestAccount.PRIMARY,
                 ]
             ),
@@ -248,7 +248,7 @@ describe('UnbudgetedExpenseService', () => {
                 createMockTransaction({
                     description: 'Invalid Transfer',
                     source_id: TestAccount.PRIMARY,
-                    destination_id: TestAccount.CHASE_SAPPHIRE,
+                    destination_id: TestAccount.CREDIT_CARD_A,
                 }),
             ];
 
@@ -299,16 +299,16 @@ describe('UnbudgetedExpenseService', () => {
         it('should include expenses from all valid expense accounts', async () => {
             const mockTransactions = [
                 createMockTransaction({
-                    description: 'Chase Amazon Expense',
-                    source_id: TestAccount.CHASE_AMAZON,
+                    description: 'Credit Card B Expense',
+                    source_id: TestAccount.CREDIT_CARD_B,
                 }),
                 createMockTransaction({
-                    description: 'Chase Sapphire Expense',
-                    source_id: TestAccount.CHASE_SAPPHIRE,
+                    description: 'Credit Card A Expense',
+                    source_id: TestAccount.CREDIT_CARD_A,
                 }),
                 createMockTransaction({
                     description: 'Citi Double Cash Expense',
-                    source_id: TestAccount.CITIBANK_DOUBLECASH,
+                    source_id: TestAccount.CREDIT_CARD_C,
                 }),
                 createMockTransaction({
                     description: 'Primary TestAccount Expense',
@@ -333,8 +333,8 @@ describe('UnbudgetedExpenseService', () => {
             if (result.ok) {
                 expect(result.value).toHaveLength(4);
                 expect(result.value.map(t => t.description)).toEqual([
-                    'Chase Amazon Expense',
-                    'Chase Sapphire Expense',
+                    'Credit Card B Expense',
+                    'Credit Card A Expense',
                     'Citi Double Cash Expense',
                     'Primary TestAccount Expense',
                 ]);
@@ -435,7 +435,7 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Invalid Transfer',
-                        source_id: TestAccount.CHASE_SAPPHIRE,
+                        source_id: TestAccount.CREDIT_CARD_A,
                         destination_id: TestAccount.MONEY_MARKET,
                     }),
                 ];
@@ -460,9 +460,9 @@ describe('UnbudgetedExpenseService', () => {
             it('should handle transactions from all valid expense accounts', async () => {
                 const validAccounts = [
                     TestAccount.PRIMARY,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.CREDIT_CARD_B,
+                    TestAccount.CREDIT_CARD_A,
+                    TestAccount.CREDIT_CARD_C,
                 ];
 
                 const mockTransactions = validAccounts.map(account =>

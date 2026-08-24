@@ -173,7 +173,7 @@ describe('BudgetReportService', () => {
             // The unbudgeted bucket feeds netImpact, so those transactions are
             // tracked — listing them as "fell through the cracks" is wrong
             const charged = split('1', 'Coffee');
-            const orphan = split('2', 'VANGUARD BUY INVESTMENT', '550.27');
+            const orphan = split('2', 'BROKERAGE BUY INVESTMENT', '300.00');
             mockBudgetService.getTransactionsWithoutBudget.mockResolvedValue([charged, orphan]);
 
             const result = await budgetReportService.getUntrackedTransactions(8, 2026, [charged]);
@@ -218,7 +218,7 @@ describe('BudgetReportService', () => {
         });
 
         it('should return everything untracked when the unbudgeted bucket is empty', async () => {
-            const orphan = split('1', 'VANGUARD BUY INVESTMENT', '550.27');
+            const orphan = split('1', 'BROKERAGE BUY INVESTMENT', '300.00');
             mockBudgetService.getTransactionsWithoutBudget.mockResolvedValue([orphan]);
 
             const result = await budgetReportService.getUntrackedTransactions(8, 2026, []);

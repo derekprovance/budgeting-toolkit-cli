@@ -80,7 +80,7 @@ excludedAdditionalIncomePatterns:
 # that account is already charged once via the Disposable Income tag, so
 # listing the funding transfer charges the same dollars twice.
 expenseTransfers:
-    - source: '5' # Remote Investment Account ID
+    - source: '10' # Remote Investment Account ID
       destination: '1' # Checking Account ID
 
 # Disposable income is identified by tag alone - there is no account list. The
@@ -94,23 +94,28 @@ excludeDisposableIncome: false
 #     disposableIncome: 'Fun Money'
 #     paycheck: 'Salary'
 
-# Globally excluded transactions (removes transactions from all reports)
-# At least one field (description or amount) is required per entry
+# Globally excluded transactions (removes transactions from all reports).
+#
+# 'description' is REQUIRED and matched whole-string, after trimming and
+# lower-casing - it is not a substring match. 'amount' is optional and narrows a
+# rule to one amount; currency formatting is accepted and the comparison is on
+# absolute value, so it ignores direction.
+#
+# Amount-only rules are rejected at startup. Exclusion is applied at fetch time,
+# so a match removes the transaction from every bucket in every command - a rule
+# with no description would drop every transaction of that amount, on any
+# account, in either direction.
 excludedTransactions:
-    # Example 1: Exclude by description only (any amount)
+    # Example 1: Exclude by description (any amount)
     - description: 'STOCK INVESTMENT'
       reason: 'Investment purchase - not a regular expense'
 
-    # Example 2: Exclude by description and amount (exact match)
+    # Example 2: Exclude by description, narrowed to one amount
     - description: 'Monthly Rent'
       amount: '1200.00'
       reason: 'Rent payment - already tracked elsewhere'
 
-    # Example 3: Exclude by amount only (any description)
-    - amount: '999.99'
-      reason: 'Specific amount to filter out'
-
-    # Example 4: Transfer to savings (description only)
+    # Example 3: Transfer to savings (description only)
     - description: 'TRANSFER TO SAVINGS'
       reason: 'Internal transfer, not an expense'
 

@@ -147,7 +147,7 @@ boundary rather than an income filter. Two distinct cases share the list:
 
 - **Excluded by necessity.** A brokerage carries the same `savingAsset` role as
   an ordinary savings account, but its outflows are fund transfers rather than
-  purchases. Firefly cannot tell them apart; listing it here keeps a six-figure
+  purchases. Firefly cannot tell them apart; listing it here keeps a large
   internal rebalance out of your spending total.
 - **Excluded by intent.** An account holding money you have deliberately put
   beyond the budget — a savings account that receives earmarked income and funds
@@ -291,27 +291,38 @@ excludedTransactions:
     - description: 'STOCK INVESTMENT'
       reason: 'Investment purchase'
 
-    # Match by description and amount (exact match)
+    # Match by description, narrowed to one amount
     - description: 'Monthly Rent'
       amount: '1200.00'
       reason: 'Rent payment'
-
-    # Match by amount only (any description)
-    - amount: '999.99'
-      reason: 'Specific amount to exclude'
 ```
 
-**Type:** `array of {description?: string, amount?: string, reason?: string}`
+**Type:** `array of {description: string, amount?: string, reason?: string}`
 **Default:** `[]`
 **Used by:** All commands
 
 **Matching Rules:**
 
-- At least one field (`description` or `amount`) is required
-- `reason` is optional but recommended for documentation
-- Description matching is case-insensitive substring matching
-- Amount matching is exact string comparison
-- Both fields must match if both are provided
+- `description` is **required**, and is matched as **whole-string equality** after
+  trimming and lower-casing — not a substring match. `'STOCK INVESTMENT'` does not
+  match `'STOCK INVESTMENT 401K'`
+- `amount` is optional and narrows a rule to a single amount. Currency formatting
+  is accepted (`'$1,200.00'`, `'(1200.00)'`), and the comparison is **numeric on
+  absolute value**, so it ignores direction — a $1200 refund matches a $1200 charge
+- When `amount` is given, both fields must match
+- `reason` is free text for your own benefit; nothing reads it
+
+**Amount-only rules are rejected at startup.** Exclusion is applied at fetch time, so
+a match removes the transaction from every bucket in every command. A rule with no
+description would drop every transaction of that amount, on any account, in either
+direction — the opposite of what this tool is for. A malformed `amount` is rejected
+too, rather than silently parsing to something that matches nothing:
+
+```
+Configuration validation failed:
+  - transactions.excludedTransactions[2]: 'description' is required (amount-only exclusions are not supported)
+  - transactions.excludedTransactions[3].amount must be a valid amount (got: twelve hundred)
+```
 
 ### Firefly III Settings
 
@@ -363,22 +374,12 @@ llm:
 - Lower `maxConcurrent` values prevent rate limiting
 - Higher `batchSize` improves efficiency but uses more tokens
 
-#### Retry Configuration
+#### Retries
 
-```yaml
-llm:
-```
-
-**Options:**
-
-| Setting | Type | Default | Description |
-| ------- | ---- | ------- | ----------- |
-
-**Behavior:**
-
-- Exponential backoff: 1s → 2s → 4s → 8s → 16s → 32s
-- Retries on network errors and rate limiting
-- Automatic retry with increasing delays
+Retries are **not** configurable from YAML. They are owned entirely by the
+Anthropic SDK, which applies exponential backoff and honors the `retry-after`
+header on rate-limit responses. The attempt count comes from
+`api.claude.maxRetries` (default `3`, set in `config.defaults.ts`).
 
 #### Rate Limiting
 
@@ -500,7 +501,7 @@ excludeDisposableIncome: true
 
 tags:
     disposableIncome: 'Fun Money'
-    bills: 'Monthly Bills'
+    paycheck: 'Salary'
 
 excludedTransactions:
     - description: 'STOCK PURCHASE'

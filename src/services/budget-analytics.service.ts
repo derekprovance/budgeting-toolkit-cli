@@ -204,7 +204,7 @@ export class BudgetAnalyticsService {
             // Most visits wins, but ties break on spend. Without that, a
             // category where every merchant was visited once reports whichever
             // happened to be first — a $5.00 corner-shop run standing in for a
-            // category dominated by a $678.09 charge.
+            // category dominated by a $400.00 charge.
             let topMerchant: MerchantInsight | undefined;
             let best: { count: number; total: number } | undefined;
             merchantCounts.forEach((value, key) => {

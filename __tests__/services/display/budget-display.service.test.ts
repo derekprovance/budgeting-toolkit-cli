@@ -566,7 +566,7 @@ describe('BudgetDisplayService', () => {
             const data = {
                 ...baseData(),
                 unbudgeted: [item('Coffee', '4.50')],
-                untracked: [item('VANGUARD BUY INVESTMENT', '550.27')],
+                untracked: [item('BROKERAGE BUY INVESTMENT', '300.00')],
             };
 
             const result = service.formatReport(data as never, false);
@@ -575,7 +575,7 @@ describe('BudgetDisplayService', () => {
             expect(result).toContain('UNTRACKED SPENDING');
             expect(result).toContain('Charged to no bucket');
             expect(result).toContain('Coffee');
-            expect(result).toContain('VANGUARD BUY INVESTMENT');
+            expect(result).toContain('BROKERAGE BUY INVESTMENT');
         });
 
         it('should omit the untracked section when nothing is untracked', () => {
@@ -590,7 +590,7 @@ describe('BudgetDisplayService', () => {
         it('should omit the unbudgeted section when the bucket is empty', () => {
             const data = {
                 ...baseData(),
-                untracked: [item('VANGUARD BUY INVESTMENT', '550.27')],
+                untracked: [item('BROKERAGE BUY INVESTMENT', '300.00')],
             };
 
             const result = service.formatReport(data as never, false);

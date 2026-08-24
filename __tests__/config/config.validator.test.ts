@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { AppConfig } from '../../src/config/config.types.js';
+import { AppConfig, ExcludedTransaction } from '../../src/config/config.types.js';
 
 // Mock fs module BEFORE importing ConfigValidator
 const mockExistsSync = jest.fn<() => boolean>();
@@ -54,6 +54,8 @@ describe('ConfigValidator', () => {
                 incomeDestinationAccounts: ['1'],
                 expenseSourceAccounts: ['3'],
                 expenseTransfers: [],
+                untrackedAccounts: [],
+                paycheckDestinationAccounts: [],
             },
             transactions: {
                 expectedMonthlyPaycheck: 5000,
@@ -62,7 +64,7 @@ describe('ConfigValidator', () => {
                 excludedTransactions: [],
                 tags: {
                     disposableIncome: 'Disposable Income',
-                    bills: 'Bills',
+                    paycheck: 'Paycheck',
                 },
             },
             llm: {
@@ -377,6 +379,84 @@ qZXQ
             const result = validator.validate(validConfig);
 
             expect(result.ok).toBe(true);
+        });
+    });
+
+    describe('excludedTransactions validation', () => {
+        /** Flattens a failed validation into one searchable string */
+        const errorsOf = (config: AppConfig): string => {
+            const result = validator.validate(config);
+            return result.ok
+                ? ''
+                : (result.error.details as { errors: string[] }).errors.join('\n');
+        };
+
+        it('should accept a description-only rule', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'STOCK INVESTMENT', reason: 'Investment purchase' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(true);
+        });
+
+        it('should accept a rule narrowed by amount', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Monthly Rent', amount: '1200.00' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(true);
+        });
+
+        it('should accept a currency-formatted amount', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Monthly Rent', amount: '$1,200.00' },
+                { description: 'Refunded Charge', amount: '(45.00)' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(true);
+        });
+
+        it('should reject an amount-only rule', () => {
+            validConfig.transactions.excludedTransactions = [
+                { amount: '999.99', reason: 'Specific amount' } as unknown as ExcludedTransaction,
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(errorsOf(validConfig)).toContain(
+                "transactions.excludedTransactions[0]: 'description' is required"
+            );
+        });
+
+        it('should reject a whitespace-only description', () => {
+            validConfig.transactions.excludedTransactions = [{ description: '   ' }];
+
+            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(errorsOf(validConfig)).toContain("'description' is required");
+        });
+
+        it('should reject an unparseable amount', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Monthly Rent', amount: 'twelve hundred' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(errorsOf(validConfig)).toContain(
+                'transactions.excludedTransactions[0].amount must be a valid amount'
+            );
+        });
+
+        it('should report the index of each offending rule', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Good Rule' },
+                { amount: '10.00' } as unknown as ExcludedTransaction,
+                { description: 'Bad Amount', amount: 'garbage' },
+            ];
+
+            const errors = errorsOf(validConfig);
+
+            expect(errors).toContain('transactions.excludedTransactions[1]');
+            expect(errors).toContain('transactions.excludedTransactions[2]');
+            expect(errors).not.toContain('transactions.excludedTransactions[0]');
         });
     });
 

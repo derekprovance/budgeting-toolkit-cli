@@ -40,7 +40,7 @@ const { UserInputService } = await import('../../src/services/user-input.service
 describe('UserInputService', () => {
     let service: UserInputService;
 
-    const mockBaseUrl = 'http://derek.pro';
+    const mockBaseUrl = 'http://firefly.example.com';
 
     beforeEach(() => {
         service = new UserInputService(mockBaseUrl);

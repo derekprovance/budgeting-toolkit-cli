@@ -1,6 +1,7 @@
 import { AppConfig, LOG_LEVELS } from './config.types.js';
 import { Result, ValidationError } from '../types/result.type.js';
 import { CertificateValidator } from '../utils/certificate-validator.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Validates application configuration format at startup.
@@ -10,8 +11,10 @@ import { CertificateValidator } from '../utils/certificate-validator.js';
  * - Numeric ranges (positive LLM batch/rate-limit values)
  * - Enum values (log levels)
  * - File path existence (for certificates)
+ * - Well-formed exclusion rules (see validateExcludedTransactions)
  *
- * Business logic validation (e.g., required fields) is performed by commands.
+ * Command-specific requirements (e.g. the Claude API key the categorize command
+ * needs) are validated by the commands themselves.
  */
 export class ConfigValidator {
     /**
@@ -33,6 +36,9 @@ export class ConfigValidator {
 
         // LLM Configuration Validation (zero/negative values cause hangs)
         this.validateLlmConfig(config, errors);
+
+        // Exclusion rules (a malformed rule would silently match nothing)
+        this.validateExcludedTransactions(config, errors);
 
         // Certificate Configuration Validation (optional but if present, must be valid)
         this.validateCertificates(config, errors, warnings);
@@ -109,6 +115,36 @@ export class ConfigValidator {
         if (typeof config.llm.model !== 'string' || !config.llm.model.trim()) {
             errors.push('llm.model must be a non-empty string');
         }
+    }
+
+    /**
+     * Validates the global exclusion rules.
+     *
+     * A rule matches at fetch time and removes the transaction from every bucket
+     * in every command, so a malformed one must not be allowed to sit in the
+     * config quietly matching nothing — or, worse, matching the wrong thing.
+     * `description` is required: an amount-only rule would drop every
+     * transaction of that amount on every account, in either direction.
+     */
+    private validateExcludedTransactions(config: AppConfig, errors: string[]): void {
+        config.transactions.excludedTransactions.forEach((entry, index) => {
+            const field = `transactions.excludedTransactions[${index}]`;
+
+            if (typeof entry.description !== 'string' || !entry.description.trim()) {
+                errors.push(
+                    `${field}: 'description' is required (amount-only exclusions are not supported)`
+                );
+            }
+
+            // Parsed with the same helper the matcher uses, so validation can
+            // never accept an amount that matching would then reject
+            if (entry.amount !== undefined) {
+                const parsed = TransactionCalculationUtils.parseAmountSafe(entry.amount, NaN);
+                if (Number.isNaN(parsed)) {
+                    errors.push(`${field}.amount must be a valid amount (got: ${entry.amount})`);
+                }
+            }
+        });
     }
 
     private validateLoggingConfig(config: AppConfig, errors: string[]): void {

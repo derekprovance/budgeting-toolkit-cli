@@ -8,14 +8,14 @@ const txn = (amount: string): TransactionSplit => ({ amount }) as TransactionSpl
 describe('TransactionCalculationUtils', () => {
     describe('parseAmountSafe', () => {
         it('should parse plain amounts', () => {
-            expect(TransactionCalculationUtils.parseAmountSafe('4400.00')).toBe(4400);
+            expect(TransactionCalculationUtils.parseAmountSafe('2000.00')).toBe(2000);
         });
 
         it('should strip currency symbols', () => {
-            expect(TransactionCalculationUtils.parseAmountSafe('$4,400.00')).toBe(4400);
-            expect(TransactionCalculationUtils.parseAmountSafe('€4,400.00')).toBe(4400);
-            expect(TransactionCalculationUtils.parseAmountSafe('£4,400.00')).toBe(4400);
-            expect(TransactionCalculationUtils.parseAmountSafe('¥4,400.00')).toBe(4400);
+            expect(TransactionCalculationUtils.parseAmountSafe('$2,000.00')).toBe(2000);
+            expect(TransactionCalculationUtils.parseAmountSafe('€2,000.00')).toBe(2000);
+            expect(TransactionCalculationUtils.parseAmountSafe('£2,000.00')).toBe(2000);
+            expect(TransactionCalculationUtils.parseAmountSafe('¥2,000.00')).toBe(2000);
         });
 
         it('should handle thousands separators', () => {
@@ -23,11 +23,11 @@ describe('TransactionCalculationUtils', () => {
         });
 
         it('should treat accounting parentheses as negative', () => {
-            expect(TransactionCalculationUtils.parseAmountSafe('($4,400.00)')).toBe(-4400);
+            expect(TransactionCalculationUtils.parseAmountSafe('($2,000.00)')).toBe(-2000);
         });
 
         it('should handle explicit negative amounts', () => {
-            expect(TransactionCalculationUtils.parseAmountSafe('-$4,400.00')).toBe(-4400);
+            expect(TransactionCalculationUtils.parseAmountSafe('-$2,000.00')).toBe(-2000);
         });
 
         it('should round to 2 decimal places', () => {

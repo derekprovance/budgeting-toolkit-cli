@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Tool Is For
 
-This tool measures **one isolated envelope: cost of living.** The owner pays
+This tool measures **one isolated envelope: cost of living.** The user pays
 themselves a fixed amount into checking, and the question is whether cost of
 living fit inside it. `Net Cash Flow` in the analyze report is that answer.
 Everything else in the report exists to explain it.
 
 **It is deliberately not a household cash-flow statement.** Total income is
-roughly double the envelope; the remainder is saved outside this tool's purview
-and must never appear in the report. If a change makes Net Cash Flow drift
-toward "all money in minus all money out," that change is wrong.
+larger than the envelope; the remainder is saved outside this tool's purview and
+must never appear in the report. If a change makes Net Cash Flow drift toward
+"all money in minus all money out," that change is wrong.
 
 Read this section before touching anything that decides which transactions count
-as income or spending. The model below is the owner's actual setup, and it has
-been re-derived incorrectly from the code before.
+as income or spending. The model below is the setup this tool assumes, and it
+has been re-derived incorrectly from the code before.
 
 ### The account boundary
 
@@ -44,8 +44,8 @@ list:
   that is cost of living, so neither side is counted.
 - **A brokerage is outside by necessity.** Firefly's `account_role` cannot
   distinguish it from an ordinary savings account — both are `savingAsset` —
-  while its outflows are six-figure fund transfers rather than purchases. Only
-  config can make that call.
+  while its outflows are large fund transfers rather than purchases. Only config
+  can make that call.
 
 Nothing is silently dropped. Withdrawals from untracked accounts surface under
 **Untracked Spending** in the `report` command: visible as a diagnostic,
@@ -57,22 +57,22 @@ them only when a Firefly role is wrong.
 
 ### Payroll is split, and only the checking half is income
 
-One deposit lands in checking and carries the `Paycheck` tag — that is the owner
-paying themselves, and it funds the envelope. A second, larger deposit lands in
-savings. **It is not income to this tool.** It never enters the envelope, it is
-saved, and counting it would inflate Net Cash Flow by thousands a month and hide
-the only number that matters.
+One deposit lands in checking and carries the `Paycheck` tag — that is the user
+paying themselves, and it funds the envelope. A second deposit lands in savings.
+**It is not income to this tool.** It never enters the envelope, it is saved, and
+counting it would inflate Net Cash Flow substantially and hide the only number
+that matters.
 
-Both halves carry the identical description (`LOBDOTCOM INC PAYROLL`), and every
-deposit arrives from Firefly's catch-all `(no name)` revenue account, so neither
-description nor payer can tell them apart. **Destination is the only working
-discriminator**, which is exactly what the account boundary keys on: savings is
-in `untrackedAccounts`, so `AdditionalIncomeService.hasValidDestinationAccount`
+Both halves carry an identical payroll description, and every deposit arrives
+from Firefly's catch-all `(no name)` revenue account, so neither description nor
+payer can tell them apart. **Destination is the only working discriminator**,
+which is exactly what the account boundary keys on: savings is in
+`untrackedAccounts`, so `AdditionalIncomeService.hasValidDestinationAccount`
 rejects the savings half.
 
 `paycheckDestinationAccounts` constrains the `Paycheck` tag by destination as
-well, so a stray tag on the savings half cannot inflate paycheck income. July
-2026 has exactly those stray tags, so this is load-bearing rather than
+well, so a stray tag on the savings half cannot inflate paycheck income. Real
+data has carried exactly those stray tags, so this is load-bearing rather than
 precautionary.
 
 **It is also the only thing protecting the paycheck bucket.** Unlike every other
@@ -80,7 +80,8 @@ bucket, `isPaycheck` and `PaycheckSurplusService` never consult
 `AccountScopeService` — the paycheck bucket does not know the account boundary
 exists. Empty `paycheckDestinationAccounts` (the documented default) and a
 Paycheck-tagged deposit into an untracked account would count as envelope income
-despite the account being outside the envelope. Keep `['1']` set.
+despite the account being outside the envelope. Keep it set to the checking
+account.
 
 **The savings half is therefore counted in no bucket at all — not paycheck, not
 additional income. That is intended, not a leak.** Earlier revisions of this
@@ -102,20 +103,38 @@ destination-less transfer out of a tracked account counts without being listed.)
 
 ### Disposable income
 
-There is a separate "guilt-free" pool account, deliberately outside the budget.
-The `Disposable Income` tag marks purchases made **on cards** that are mentally
-charged to that pool; at the end of a cycle the owner reads the tagged total and
-moves that much out of the pool into checking to cover it.
+There is a separate "guilt-free" pool account — a money-market account,
+deliberately outside the budget. The `Disposable Income` tag marks purchases
+made **on cards** that are charged to that pool; at the end of a cycle the user
+reads the tagged total and moves that much out of the pool into checking to
+cover it.
 
-**The tagged purchase is the expense.** Funding the pool and drawing from it are
-both movements between accounts the owner already holds — neither is income nor
-spending, and neither is modelled. Do not reintroduce a deduction for the draws:
-tagged transactions carry no budget, so netting the draws against them charges
-that spending to no bucket at all.
+**The tagged purchase is charged to the pool, not the envelope.** It is funded
+from the pool rather than from the paycheck, so — exactly like savings-sourced
+spending — it must not reduce `Net Cash Flow`. `netImpact` has no
+`- disposableIncome` term, and reintroducing one would re-answer the wrong
+question.
 
-One deliberate exception: an internet provider gives a discount for debit, so
-that bill is paid from the pool account. The pool is therefore a normal expense
-source, and that withdrawal is counted like any other.
+Instead the report **states the amount as an action**, below the net:
+
+```
+  → Transfer from disposable pool:   $250.00  [2 transactions]
+    Not included in the net — covers tagged card purchases.
+```
+
+That line is the entire point of the tag. `disposableIncome` is net of refunds
+and is **not** floored at zero, so a month whose refunds exceed its tagged
+spending reports a negative balance; the display inverts the instruction rather
+than printing a negative transfer.
+
+Funding the pool and drawing from it are movements between accounts the user
+already holds — neither is income nor spending, and neither is modelled. Do not
+reintroduce a deduction for the draws.
+
+One deliberate exception: a bill may be paid straight from the pool account, for
+instance when a provider discounts debit payment. The pool is therefore a normal
+expense source, and that withdrawal is counted like any other — it is a real
+bill, not a tagged card purchase.
 
 ### Averaged bills
 
@@ -204,14 +223,14 @@ Credit cards are excluded from income because deposits to them are refunds and s
 - `incomeDestinationAccounts` - **Override.** Empty (the default) derives the list. Non-empty replaces derivation entirely for that side. Set it only when a Firefly `account_role` is wrong and you would rather not fix it there
 - `expenseSourceAccounts` - **Override.** Same semantics as above
 - `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Note that a transfer funding a disposable pool does **not** belong here: the tagged purchase is already the expense (see "Disposable income" above)
-- `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded rather than inflating paycheck income. Where a rejected transaction lands depends on the account boundary, not on this setting: it reaches additional income only if its destination is still a derived income destination **and** it is a deposit **and** it does not match `excludedAdditionalIncomePatterns`. When the other half's account is in `untrackedAccounts` — the current setup — it is counted in no bucket at all, which is the intent
+- `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded rather than inflating paycheck income. Where a rejected transaction lands depends on the account boundary, not on this setting: it reaches additional income only if its destination is still a derived income destination **and** it is a deposit **and** it does not match `excludedAdditionalIncomePatterns`. When the other half's account is in `untrackedAccounts` — as this setup has it — it is counted in no bucket at all, which is the intent
 
 **Transaction Configuration:**
 
 - `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations
 - `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude. Matched **whole-word** by `StringUtils.matchesAnyPattern`, splitting on punctuation, so `transfer` will not swallow `Transferwise`. A pattern fused into a longer word (`ACHPAYROLLDEP`) therefore will not match — write patterns as they appear as words. Consulted **only** by `AdditionalIncomeService`, so a pattern here can never affect the paycheck bucket. Do not add `TRANSFER`: additional income already filters on deposit type, so the pattern can only discard legitimate deposits. Do not add `PAYROLL` either — prefer the account boundary. Description matching fixes only the income side and would leave savings-sourced spending charged against the checking paycheck; `untrackedAccounts` excludes the deposit symmetrically and covers savings interest and savings spending at the same time
 - `excludeDisposableIncome` - Whether to exclude disposable income transactions
-- `excludedTransactions` - Array of transactions to globally exclude; each entry requires `description` with optional `amount` and `reason` fields
+- `excludedTransactions` - Array of transactions to globally exclude; each entry requires `description`, with optional `amount` and `reason`. `description` is matched **whole-string** after trim and lower-case (not a substring), and `amount` narrows a rule to one amount, compared numerically on absolute value after currency cleaning. **Amount-only rules are rejected by `ConfigValidator` at startup**: exclusion is applied at fetch time (`TransactionService.getFromCacheOrFetch`), so a match removes the transaction from every bucket in every command, and a rule with no description would drop every transaction of that amount on any account in either direction. A malformed `amount` is rejected for the same reason — it would otherwise sit in the config matching nothing. Both the validator and the matcher parse amounts with `TransactionCalculationUtils.parseAmountSafe`, so they cannot disagree
 
 **Transaction Tags Configuration:**
 
@@ -305,17 +324,19 @@ Because direction lives in `type`, never total a mixed set of transactions with 
 
 Separately, `GET /v1/insight/expense/budget` returns `difference_float` **negative** per budget. Convert it by negating, never with `Math.abs` per budget: a budget whose refunds exceed its outflows reports a _positive_ value, and taking its absolute value would count that refund as spending.
 
-**Bucket precedence for the analyze report.** Each transaction must be charged exactly once, so the expense buckets are disjoint by construction, in the order **bill > disposable > unbudgeted** (`UnbudgetedExpenseService` excludes bills and disposable; `DisposableIncomeService` excludes bills). On the income side, **paycheck > additional income** (`AdditionalIncomeService` excludes paycheck-tagged transactions).
+**Bucket precedence for the analyze report.** Each transaction must be charged at most once, so the expense buckets are disjoint by construction, in the order **bill > disposable > unbudgeted** (`UnbudgetedExpenseService` excludes bills and disposable; `DisposableIncomeService` excludes bills). On the income side, **paycheck > additional income** (`AdditionalIncomeService` excludes paycheck-tagged transactions).
+
+Note the disposable bucket is disjoint but does **not** feed the net — it is charged to the pool and reported as an action instead. Its precedence still matters: it is what keeps a tagged purchase out of `unbudgetedExpenses`, which does feed the net.
 
 Bill-linked transactions are counted by `BillComparisonService` even when the bill is deactivated or missing from the bill list entirely — every other bucket rejects a bill-linked transaction, so without that they would be charged nowhere.
 
-The one overlap that cannot be filtered is `budgetSpent`: it comes from Firefly's server-side rollup (`insight/expense/budget`), which returns one number per budget with no per-transaction handle. A bill or disposable transaction that also carries a budget is therefore inside it. Those transactions are reported by `BillComparisonDto.budgetedTransactions` / `DisposableIncomeAnalysis.budgetedTransactions`, added back once in `AnalyzeReportDto` (`doubleCountedTotal`), and surfaced as a warning so the data can be corrected in Firefly.
+The one overlap that cannot be filtered is `budgetSpent`: it comes from Firefly's server-side rollup (`insight/expense/budget`), which returns one number per budget with no per-transaction handle. A bill or disposable transaction that also carries a budget is therefore inside it. Those transactions are reported by `BillComparisonDto.budgetedTransactions` / `DisposableIncomeAnalysis.budgetedTransactions`, added back once in `AnalyzeReportDto` (`budgetRollupCorrection`), and surfaced as a warning so the data can be corrected in Firefly.
 
-**The correction is bounded, and must stay bounded.** It credits back spending that was subtracted twice, so it can never exceed what each bucket actually subtracted, nor `budgetSpent` itself. The disposable bucket is the reason this matters: its balance is net of transfers and floored at zero, while its budgeted-transaction list is neither, so an uncapped add-back invents cash that was never spent.
+**The correction is bounded, and the two halves are bounded differently.** A **bill** carrying a budget is subtracted twice — once as a bill, once inside `budgetSpent` — so its credit back is capped at what the bill bucket actually subtracted; crediting more would invent income. A **disposable** transaction carrying a budget is a different defect: it is charged to the pool, so `netImpact` subtracts it nowhere and only `budgetSpent` still contains it. It is credited back **in full**, with no per-bucket cap — capping it at the disposable balance (as an earlier revision did) under-credits whenever refunds shrink that balance, because the balance is net of refunds and is not floored at zero. Both halves are bounded together by `budgetSpent` itself: the premise of the whole correction is that this spending sits inside that rollup, so it cannot credit back more than the rollup contains.
 
 The same rollup is also blind to `excludedTransactions`, which is filtered client-side. `AnalyzeCommand` subtracts excluded budgeted spending from `budgetSpent` so both sides describe the same set of transactions.
 
-**It is blind to account scope too, and that is not corrected today.** `BudgetService.getBudgetExpenseInsights` calls `insightExpenseBudget(start, end)` with no account filter, so the endpoint totals each budget across every account. A withdrawal from an `untrackedAccounts` entry that carries a `budget_id` therefore lands in `budgetSpent` and is charged to the envelope, despite its account being outside it. No savings withdrawal carries a budget today, and `categorize` is the likely way one would acquire one. Symptom: spending inside the net that appears in no bucket you can find, and not in Untracked Spending either. Workaround: clear the budget in Firefly. **Real fix, if this ever bites:** the SDK signature is `insightExpenseBudget(start, end, xTraceId?, budgetsArray?, accountsArray?)` — passing the derived expense sources as `accountsArray` would scope the rollup like every other bucket. Doing so would also shift `budgetSurplus` and the `doubleCountedTotal` inputs, so it needs its own verification pass.
+**It is blind to account scope too, and that is not corrected today.** `BudgetService.getBudgetExpenseInsights` calls `insightExpenseBudget(start, end)` with no account filter, so the endpoint totals each budget across every account. A withdrawal from an `untrackedAccounts` entry that carries a `budget_id` therefore lands in `budgetSpent` and is charged to the envelope, despite its account being outside it. No savings withdrawal carries a budget today, and `categorize` is the likely way one would acquire one. Symptom: spending inside the net that appears in no bucket you can find, and not in Untracked Spending either. Workaround: clear the budget in Firefly. **Real fix, if this ever bites:** the SDK signature is `insightExpenseBudget(start, end, xTraceId?, budgetsArray?, accountsArray?)` — passing the derived expense sources as `accountsArray` would scope the rollup like every other bucket. Doing so would also shift `budgetSurplus` and the `budgetRollupCorrection` inputs, so it needs its own verification pass.
 
 ### Transaction Splitting System
 

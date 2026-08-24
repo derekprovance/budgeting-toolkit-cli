@@ -180,7 +180,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([
                     txn('VENMO PAYMENT', '5.00'),
-                    txn('AMAZON MKTPL', '678.09'),
+                    txn('AMAZON MKTPL', '400.00'),
                     txn('CORNER STORE', '3.25'),
                 ] as never);
 
@@ -198,13 +198,13 @@ describe('BudgetAnalyticsService', () => {
                 .fn()
                 .mockResolvedValue([
                     txn('BIG ONE OFF', '900.00'),
-                    { ...txn('KING SOOPERS', '20.00'), transaction_journal_id: 'ks-1' },
-                    { ...txn('KING SOOPERS', '25.00'), transaction_journal_id: 'ks-2' },
+                    { ...txn('GROCERY MART', '20.00'), transaction_journal_id: 'ks-1' },
+                    { ...txn('GROCERY MART', '25.00'), transaction_journal_id: 'ks-2' },
                 ] as never);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
-            expect(result[0].transactionStats.topMerchant?.name).toBe('KING SOOPERS');
+            expect(result[0].transactionStats.topMerchant?.name).toBe('GROCERY MART');
             expect(result[0].transactionStats.topMerchant?.visitCount).toBe(2);
         });
     });

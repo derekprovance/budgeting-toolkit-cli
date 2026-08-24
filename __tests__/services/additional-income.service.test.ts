@@ -10,9 +10,9 @@ import { createMockAccountScopeService } from '../setup/mock-services.js';
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
     PRIMARY: 'test-primary-account',
-    CHASE_SAPPHIRE: 'test-chase-sapphire',
-    CHASE_AMAZON: 'test-chase-amazon',
-    CITIBANK_DOUBLECASH: 'test-citibank-doublecash',
+    CREDIT_CARD_A: 'test-credit-card-a',
+    CREDIT_CARD_B: 'test-credit-card-b',
+    CREDIT_CARD_C: 'test-credit-card-c',
     MONEY_MARKET: 'test-money-market',
 } as const;
 
@@ -63,9 +63,9 @@ describe('AdditionalIncomeService', () => {
             mockTransactionClassificationService,
             createMockAccountScopeService([
                 TestAccount.PRIMARY,
-                TestAccount.CHASE_SAPPHIRE,
-                TestAccount.CHASE_AMAZON,
-                TestAccount.CITIBANK_DOUBLECASH,
+                TestAccount.CREDIT_CARD_A,
+                TestAccount.CREDIT_CARD_B,
+                TestAccount.CREDIT_CARD_C,
             ]),
             ['PAYROLL'],
             true
@@ -185,9 +185,9 @@ describe('AdditionalIncomeService', () => {
                     mockTransactionClassificationService,
                     createMockAccountScopeService([
                         TestAccount.PRIMARY,
-                        TestAccount.CHASE_SAPPHIRE,
-                        TestAccount.CHASE_AMAZON,
-                        TestAccount.CITIBANK_DOUBLECASH,
+                        TestAccount.CREDIT_CARD_A,
+                        TestAccount.CREDIT_CARD_B,
+                        TestAccount.CREDIT_CARD_C,
                     ]),
                     ['PAYROLL'],
                     true
@@ -225,9 +225,9 @@ describe('AdditionalIncomeService', () => {
                     mockTransactionClassificationService,
                     createMockAccountScopeService([
                         TestAccount.PRIMARY,
-                        TestAccount.CHASE_SAPPHIRE,
-                        TestAccount.CHASE_AMAZON,
-                        TestAccount.CITIBANK_DOUBLECASH,
+                        TestAccount.CREDIT_CARD_A,
+                        TestAccount.CREDIT_CARD_B,
+                        TestAccount.CREDIT_CARD_C,
                     ]),
                     ['PAYROLL'],
                     true
@@ -450,7 +450,7 @@ describe('AdditionalIncomeService', () => {
                 // Regression: paychecks are counted by PaycheckSurplusService.
                 // Counting them here too double-counted income in the net.
                 const mockTransactions = [
-                    createMockTransaction({ description: 'ACME PAYROLL', amount: '2582.31' }),
+                    createMockTransaction({ description: 'ACME PAYROLL', amount: '1234.56' }),
                     createMockTransaction({ description: 'Side gig', amount: '100.00' }),
                 ];
 
@@ -523,9 +523,9 @@ describe('AdditionalIncomeService', () => {
             it('should handle all valid destination accounts', async () => {
                 const validAccounts = [
                     TestAccount.PRIMARY,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.CREDIT_CARD_A,
+                    TestAccount.CREDIT_CARD_B,
+                    TestAccount.CREDIT_CARD_C,
                 ];
 
                 const mockTransactions = validAccounts.map(account =>

@@ -104,7 +104,6 @@ export const createMockTransactionValidatorService =
  */
 export const createMockExcludedTransactionService = (): jest.Mocked<ExcludedTransactionService> => {
     return {
-        getExcludedTransactions: jest.fn().mockResolvedValue([]),
         isExcludedTransaction: jest.fn().mockReturnValue(false),
     } as unknown as jest.Mocked<ExcludedTransactionService>;
 };

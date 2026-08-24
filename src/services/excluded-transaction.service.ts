@@ -9,8 +9,9 @@ import { StringUtils } from '../utils/string.utils.js';
  * Service for managing excluded transactions.
  *
  * Excluded transactions are configured in the YAML file and injected via constructor.
- * This allows certain transactions to be filtered out from processing based on
- * description and/or amount.
+ * A rule matches on description, optionally narrowed to a single amount; see
+ * `ExcludedTransaction` for the full contract. Amount-only rules are not
+ * supported and are rejected by `ConfigValidator` before they reach here.
  */
 export class ExcludedTransactionService implements IExcludedTransactionService {
     private readonly excludedTransactions: ExcludedTransaction[];
@@ -27,29 +28,33 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
         const convertedAmount = TransactionCalculationUtils.parseAmountSafe(amount, NaN);
 
         const isExcluded = this.excludedTransactions.some(transaction => {
-            // Both description and amount must match
-            if (transaction.description && transaction.amount) {
-                return (
-                    StringUtils.normalizeForMatching(transaction.description) ===
-                        StringUtils.normalizeForMatching(description) &&
-                    Math.abs(parseFloat(transaction.amount)) === Math.abs(convertedAmount)
-                );
+            // Description is required. The validator rejects a rule without one,
+            // so this only guards against a service constructed directly — but
+            // matching on amount alone would drop every transaction of that
+            // amount on every account, so never fall back to it.
+            if (!transaction.description) {
+                return false;
             }
 
-            // Only description needs to match
-            if (transaction.description && !transaction.amount) {
-                return (
-                    StringUtils.normalizeForMatching(transaction.description) ===
-                    StringUtils.normalizeForMatching(description)
-                );
+            if (
+                StringUtils.normalizeForMatching(transaction.description) !==
+                StringUtils.normalizeForMatching(description)
+            ) {
+                return false;
             }
 
-            // Only amount needs to match
-            if (!transaction.description && transaction.amount) {
-                return Math.abs(parseFloat(transaction.amount)) === Math.abs(convertedAmount);
+            // No amount on the rule: description alone decides
+            if (!transaction.amount) {
+                return true;
             }
 
-            return false;
+            // Parse the configured amount the same way as the transaction's, so
+            // a currency-formatted rule ("$1,200.00") cannot silently mean
+            // something else than it reads. NaN keeps an unparseable rule
+            // non-matching rather than throwing mid-fetch.
+            const ruleAmount = TransactionCalculationUtils.parseAmountSafe(transaction.amount, NaN);
+
+            return Math.abs(ruleAmount) === Math.abs(convertedAmount);
         });
 
         if (isExcluded) {

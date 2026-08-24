@@ -35,8 +35,6 @@ describe('TransactionValidatorService', () => {
             hasBudget: jest.fn<(transaction: TransactionSplit) => boolean>(),
             isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
             isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
-            isExcludedTransaction:
-                jest.fn<(description: string, amount: string) => Promise<boolean>>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
