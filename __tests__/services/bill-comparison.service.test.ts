@@ -96,6 +96,141 @@ describe('BillComparisonService', () => {
         );
     });
 
+    describe('bills due more than once in a month', () => {
+        const withPayDates = (id: string, name: string, amount: string, payDates: string[]) =>
+            ({
+                type: 'bills',
+                id,
+                attributes: {
+                    name,
+                    active: true,
+                    amount_avg: amount,
+                    amount_min: amount,
+                    amount_max: amount,
+                    repeat_freq: 'weekly',
+                    skip: 1,
+                    currency_code: 'USD',
+                    currency_symbol: '$',
+                    pay_dates: payDates,
+                },
+            }) as unknown as BillRead;
+
+        it('should predict one payment per due date', async () => {
+            // A fortnightly bill falls due twice in a long month. Predicting a
+            // single payment understates the month by its whole amount.
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', ['2024-10-14', '2024-10-28']),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedTotal).toBe(260);
+                expect(result.value.bills[0].predicted).toBe(260);
+            }
+        });
+
+        it('should count only the due dates inside the requested month', async () => {
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [
+                    '2024-10-28',
+                    '2024-11-11', // next month
+                ]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.predictedTotal).toBe(130);
+            }
+        });
+
+        // "Upcoming" is relative to now, so these use a month that is always
+        // in the future rather than freezing a clock.
+        const FUTURE_YEAR = new Date().getFullYear() + 5;
+
+        it('should record the next still-future due date while nothing is paid', async () => {
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [
+                    `${FUTURE_YEAR}-10-14`,
+                    `${FUTURE_YEAR}-10-28`,
+                ]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, FUTURE_YEAR);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].dueDate?.toISOString()).toContain(
+                    `${FUTURE_YEAR}-10-14`
+                );
+                // both occurrences still ahead
+                expect(result.value.bills[0].upcomingAmount).toBe(260);
+            }
+        });
+
+        it('should not treat a past due date as upcoming', async () => {
+            // A bill past its date and unpaid is not "not yet due" -- it is
+            // simply unpaid, and judging it normally is the honest reading.
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', ['2024-10-14']),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].dueDate).toBeUndefined();
+                expect(result.value.bills[0].upcomingAmount).toBe(0);
+            }
+        });
+
+        it('should count only the occurrences still ahead', async () => {
+            // Half behind, half ahead: only the remaining half is "not yet due".
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [
+                    '2024-10-14', // past
+                    `${FUTURE_YEAR}-10-28`, // ahead, but outside the queried month
+                ]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+            const result = await billComparisonService.calculateBillComparison(10, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // only the October 2024 date counts toward the month at all
+                expect(result.value.bills[0].predicted).toBe(130);
+                expect(result.value.bills[0].upcomingAmount).toBe(0);
+            }
+        });
+
+        it('should drop the due date once a payment lands', async () => {
+            // With a real actual to judge, the row no longer needs to explain
+            // itself as merely upcoming.
+            mockBillService.getBillsForMonth.mockResolvedValue([
+                withPayDates('1', 'Fortnightly', '130', [`${FUTURE_YEAR}-10-14`]),
+            ]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction('Payment', '130.00', '1'),
+            ]);
+
+            const result = await billComparisonService.calculateBillComparison(10, FUTURE_YEAR);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.bills[0].dueDate).toBeUndefined();
+                expect(result.value.bills[0].upcomingAmount).toBe(0);
+            }
+        });
+    });
+
     describe('calculateBillComparison', () => {
         it('should calculate comparison with multiple bills due this month', async () => {
             const mockBills = [
@@ -214,8 +349,10 @@ describe('BillComparisonService', () => {
                 const quarterlyBill = result.value.bills.find(b => b.id === '3');
 
                 expect(monthlyBill?.predicted).toBe(100);
-                expect(yearlyBill?.predicted).toBe(0);
-                expect(quarterlyBill?.predicted).toBe(0);
+                // A bill that neither falls due nor sees activity gets no row
+                // at all -- "$0.00 (expected $0.00)" tells the reader nothing
+                expect(yearlyBill).toBeUndefined();
+                expect(quarterlyBill).toBeUndefined();
             }
         });
 
@@ -469,7 +606,7 @@ describe('BillComparisonService', () => {
                 // Only the bill due in October should be counted
                 expect(result.value.predictedTotal).toBe(100);
                 expect(result.value.bills.find(b => b.id === '1')?.predicted).toBe(100);
-                expect(result.value.bills.find(b => b.id === '2')?.predicted).toBe(0);
+                expect(result.value.bills.find(b => b.id === '2')).toBeUndefined();
             }
         });
 
@@ -564,9 +701,8 @@ describe('BillComparisonService', () => {
                 expect(result.value.predictedTotal).toBe(0);
                 expect(result.value.actualTotal).toBe(0);
 
-                const notDueBill = result.value.bills.find(b => b.id === '1');
-                expect(notDueBill?.predicted).toBe(0); // Stays 0
-                expect(notDueBill?.actual).toBe(0);
+                // No due date and no activity: no row rather than an empty one
+                expect(result.value.bills.find(b => b.id === '1')).toBeUndefined();
             }
         });
 
@@ -600,7 +736,7 @@ describe('BillComparisonService', () => {
 
                 expect(normalBill?.predicted).toBe(100);
                 expect(buggyBill?.predicted).toBe(200); // Fallback logic applied
-                expect(notDueBill?.predicted).toBe(0);
+                expect(notDueBill).toBeUndefined();
             }
         });
 

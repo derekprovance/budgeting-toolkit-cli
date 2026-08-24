@@ -12,7 +12,24 @@ export class BillDetailDto {
         public predicted: number,
         /** Actual payment amount this month */
         public actual: number,
-        public frequency: string
+        public frequency: string,
+        /**
+         * The next date this bill still falls due within the month, if nothing
+         * has been paid yet. Lets a display distinguish a bill that has not
+         * come around from one that was paid under budget — without it both
+         * render as `$0.00` against a non-zero expectation and look identical.
+         *
+         * Only dates still in the future count. A bill already past its date
+         * and unpaid is not "upcoming"; it is simply unpaid, and judging it
+         * normally is the honest reading.
+         */
+        public dueDate?: Date,
+        /**
+         * The part of {@link predicted} that has not fallen due yet. Usually
+         * all of it or none, but a bill due several times in a month can be
+         * partly behind and partly ahead.
+         */
+        public upcomingAmount: number = 0
     ) {}
 }
 

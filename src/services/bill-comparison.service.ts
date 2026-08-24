@@ -128,20 +128,28 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Check if a bill has a payment date within the requested month and year.
-     * Verifies that the pay_dates actually fall within the specified month/year.
+     * The pay dates a bill falls due on within the requested month, in order.
+     *
+     * Returned as a list rather than a yes/no because a bill can fall due more
+     * than once in a month — a weekly or fortnightly bill routinely does — and
+     * predicting a single payment for it understates the month. `Zest of Life`
+     * is fortnightly at $130 and falls due twice in August: $260, not $130.
      */
-    private isBillDueThisMonth(bill: BillRead, month: number, year: number): boolean {
+    private payDatesInMonth(bill: BillRead, month: number, year: number): Date[] {
         const payDates = bill.attributes.pay_dates;
         if (!Array.isArray(payDates) || payDates.length === 0) {
-            return false;
+            return [];
         }
 
-        // Check if any pay_date falls within the requested month/year
-        return payDates.some(dateStr => {
-            const date = new Date(dateStr);
-            return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
-        });
+        return payDates
+            .map(dateStr => new Date(dateStr))
+            .filter(
+                date =>
+                    !isNaN(date.getTime()) &&
+                    date.getUTCMonth() + 1 === month &&
+                    date.getUTCFullYear() === year
+            )
+            .sort((a, b) => a.getTime() - b.getTime());
     }
 
     /**
@@ -194,6 +202,7 @@ export class BillComparisonService implements IBillComparisonService {
         billDetails: BillDetailDto[];
         budgetedTransactions: TransactionSplit[];
     } {
+        const now = new Date();
         let predictedTotal = 0;
         let actualTotal = 0;
         const billDetails: BillDetailDto[] = [];
@@ -229,9 +238,13 @@ export class BillComparisonService implements IBillComparisonService {
             const billTransactions = billTransactionMap.get(billId) ?? [];
             const frequency = bill.attributes.repeat_freq ?? 'monthly';
             const isActive = bill.attributes.active ?? false;
+            const payDates = isActive ? this.payDatesInMonth(bill, month, year) : [];
 
-            // A deactivated bill with no activity this month is not worth a row
-            if (!isActive && billTransactions.length === 0) {
+            // A bill that neither falls due nor sees any activity this month is
+            // not worth a row: it would render as "$0.00 (expected $0.00)",
+            // which is eight of August's twenty rows and tells the reader
+            // nothing. Covers deactivated bills and yearly bills alike.
+            if (payDates.length === 0 && billTransactions.length === 0) {
                 billTransactionMap.delete(billId);
                 continue;
             }
@@ -256,8 +269,11 @@ export class BillComparisonService implements IBillComparisonService {
             // (represents what's actually owed this month, not the monthly budget equivalent)
             // A deactivated bill predicts nothing - it is only here so its
             // actual spending is not dropped on the floor
-            const isDue = isActive && this.isBillDueThisMonth(bill, month, year);
+            const isDue = payDates.length > 0;
             const hasActualTransactions = isActive && billTransactions.length > 0;
+            // Dates still ahead of us. A bill can be partly behind and partly
+            // ahead when it falls due several times in one month.
+            const upcomingDates = payDates.filter(date => date.getTime() > now.getTime());
 
             // Defensive logic: If bill has transactions but pay_dates is empty,
             // assume Firefly III bug and treat as due
@@ -265,8 +281,8 @@ export class BillComparisonService implements IBillComparisonService {
             let usedFallbackLogic = false;
 
             if (isDue) {
-                // Normal case: bill is marked as due in pay_dates
-                predictedAmount = this.getBillAmount(bill);
+                // Normal case: one payment expected per due date this month
+                predictedAmount = this.getBillAmount(bill) * payDates.length;
             } else if (!isDue && hasActualTransactions) {
                 // Defensive case: pay_dates is empty but transactions exist
                 // This handles Firefly III bug where pay_dates may not be populated
@@ -312,7 +328,11 @@ export class BillComparisonService implements IBillComparisonService {
                     bill.attributes.name ?? 'Unknown Bill',
                     predictedAmount,
                     actualAmount,
-                    frequency
+                    frequency,
+                    // Only meaningful while nothing has been paid: once a
+                    // payment lands the row has a real actual to judge.
+                    actualAmount === 0 ? upcomingDates[0] : undefined,
+                    actualAmount === 0 ? this.getBillAmount(bill) * upcomingDates.length : 0
                 )
             );
 

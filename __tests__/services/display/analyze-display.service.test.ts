@@ -282,6 +282,58 @@ describe('AnalyzeDisplayService', () => {
         });
     });
 
+    describe('status icons', () => {
+        it('should render exactly one status icon per expense line', () => {
+            // formatNetImpact already carries an icon; a second appended after
+            // it produced "-$550.27 ⚠ ⚠" on every expense line.
+            const data = {
+                ...createBasicReportData(),
+                unbudgetedExpenses: [createMockTransaction('Spend', 550.27, 'withdrawal')],
+                unbudgetedExpenseTotal: 550.27,
+            };
+            const line = stripAnsi(service.formatAnalysisReport(data, false))
+                .split('\n')
+                .find(l => l.includes('Unbudgeted Expenses') && l.includes('550.27'));
+
+            expect(line).toBeDefined();
+            expect((line!.match(/⚠/g) ?? []).length).toBe(1);
+        });
+
+        it('should judge disposable spending the same way as other expenses', () => {
+            // It is subtracted from the net exactly like bills and budget
+            // spending, so it must not render green while they render red.
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged', 1470.59, 'withdrawal'),
+                ],
+                disposableIncome: 1470.59,
+            };
+            const lines = stripAnsi(service.formatAnalysisReport(data, false)).split('\n');
+
+            const disposable = lines.find(l => l.includes('Disposable Spending:'));
+            const bills = lines.find(l => l.includes('Bills Paid:'));
+
+            expect(disposable).toBeDefined();
+            expect(bills).toBeDefined();
+            expect(disposable).toContain('⚠');
+            expect(disposable).not.toContain('✓');
+            // same treatment as its sibling
+            expect(bills).toContain('⚠');
+        });
+
+        it('should render one icon per summary line', () => {
+            const lines = stripAnsi(
+                service.formatAnalysisReport(createBasicReportData(), false)
+            ).split('\n');
+
+            const paycheck = lines.find(l => l.includes('Paycheck:') && l.includes('5000'));
+
+            expect(paycheck).toBeDefined();
+            expect((paycheck!.match(/✓/g) ?? []).length).toBe(1);
+        });
+    });
+
     describe('Disposable Income', () => {
         // Pool funding and draws are movement between accounts the owner
         // already holds, so there is no breakdown to print: the tagged

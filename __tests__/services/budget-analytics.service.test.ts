@@ -155,6 +155,60 @@ describe('BudgetAnalyticsService', () => {
         });
     });
 
+    describe('top merchant selection', () => {
+        const txn = (description: string, amount: string) =>
+            ({
+                transaction_journal_id: `t-${description}`,
+                description,
+                amount,
+                type: 'withdrawal',
+                budget_id: 'budget-1',
+                currency_symbol: '$',
+                date: '2024-01-15',
+            }) as Partial<TransactionSplit>;
+
+        it('should break a visit-count tie on amount spent', async () => {
+            // Every merchant visited once is the common case for a category.
+            // Without a tie-break the winner is whichever happened to be
+            // enumerated first -- a $5 corner-shop run standing in for a
+            // category dominated by a $678 charge.
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [mockBudget] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([
+                    txn('VENMO PAYMENT', '5.00'),
+                    txn('AMAZON MKTPL', '678.09'),
+                    txn('CORNER STORE', '3.25'),
+                ] as never);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].transactionStats.topMerchant?.name).toBe('AMAZON MKTPL');
+        });
+
+        it('should still prefer more visits over a larger single charge', async () => {
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [mockBudget] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([
+                    txn('BIG ONE OFF', '900.00'),
+                    { ...txn('KING SOOPERS', '20.00'), transaction_journal_id: 'ks-1' },
+                    { ...txn('KING SOOPERS', '25.00'), transaction_journal_id: 'ks-2' },
+                ] as never);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].transactionStats.topMerchant?.name).toBe('KING SOOPERS');
+            expect(result[0].transactionStats.topMerchant?.visitCount).toBe(2);
+        });
+    });
+
     describe('getTopExpenses', () => {
         it('should return top expenses sorted by amount descending', async () => {
             const transactions: Partial<TransactionSplit>[] = [
@@ -281,7 +335,7 @@ describe('BudgetAnalyticsService', () => {
             expect(result[0].budgetName).toBe('Groceries');
         });
 
-        it('should use Unbudgeted when budget name is missing', async () => {
+        it('should label a transaction with no budget explicitly', async () => {
             const transactions: Partial<TransactionSplit>[] = [
                 { ...mockTransaction, amount: '50.00', budget_name: null },
             ];
@@ -292,7 +346,10 @@ describe('BudgetAnalyticsService', () => {
 
             const result = await service.getTopExpenses(1, 2024, 1);
 
-            expect(result[0].budgetName).toBe('Unbudgeted');
+            // Not "Unbudgeted" -- the report has a section by that name meaning
+            // something narrower, and a bill would carry this label while never
+            // appearing in it
+            expect(result[0].budgetName).toBe('no budget');
         });
 
         it('should throw error when transaction service fails', async () => {

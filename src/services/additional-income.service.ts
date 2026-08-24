@@ -30,7 +30,6 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
         private readonly excludeDisposableIncome: boolean
     ) {
         super(transactionService, transactionClassificationService);
-        this.validateConfig();
     }
 
     /**
@@ -71,19 +70,6 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
 
     protected getOperationName(): string {
         return 'calculateAdditionalIncome';
-    }
-
-    /**
-     * Validates the configuration to ensure it's valid.
-     *
-     * Must have at least one valid destination account
-     */
-    private validateConfig(): void {
-        if (!this.excludedAdditionalIncomePatterns.length) {
-            this.logger.warn(
-                'No excluded descriptions specified - all deposits will be considered additional income'
-            );
-        }
     }
 
     /**

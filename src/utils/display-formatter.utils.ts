@@ -43,6 +43,18 @@ export class DisplayFormatterUtils {
     }
 
     /**
+     * Short "Aug 27" style date, for annotating a row without stealing width.
+     * Formatted in UTC to match Firefly's date handling.
+     */
+    static formatShortDate(date: Date): string {
+        return new Intl.DateTimeFormat('en', {
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC',
+        }).format(date);
+    }
+
+    /**
      * Builds a Firefly III transaction URL, tolerating a trailing slash on the
      * configured base URL.
      */
@@ -106,20 +118,35 @@ export class DisplayFormatterUtils {
      * @returns Formatted string with sign, color, and icon
      */
     static formatNetImpact(amount: number, symbol: string, positiveIsGood: boolean = true): string {
+        const icon = DisplayFormatterUtils.getStatusIcon(amount, positiveIsGood);
+        return `${DisplayFormatterUtils.formatSignedAmount(amount, symbol, positiveIsGood)} ${icon}`;
+    }
+
+    /**
+     * The same coloured, signed amount {@link formatNetImpact} renders, without
+     * the trailing status icon.
+     *
+     * For call sites that place the icon themselves — a leading icon column,
+     * say. Sharing the body keeps the two from disagreeing about sign or
+     * colour, and stops a caller appending a second icon to a string that
+     * already has one.
+     */
+    static formatSignedAmount(
+        amount: number,
+        symbol: string,
+        positiveIsGood: boolean = true
+    ): string {
         const absFormatted = CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
 
         if (amount === 0) {
-            return chalk.white(`${absFormatted} ○`);
+            return chalk.white(absFormatted);
         }
 
         const isGood = positiveIsGood ? amount > 0 : amount < 0;
         const sign = amount > 0 ? '+' : '-';
+        const color = isGood ? chalk.green : chalk.red;
 
-        if (isGood) {
-            return chalk.green(`${sign}${absFormatted} ✓`);
-        } else {
-            return chalk.red(`${sign}${absFormatted} ⚠`);
-        }
+        return color(`${sign}${absFormatted}`);
     }
 
     /**

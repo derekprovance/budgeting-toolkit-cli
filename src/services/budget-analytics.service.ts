@@ -140,7 +140,10 @@ export class BudgetAnalyticsService {
             const topExpenses = sorted.slice(0, limit).map((t, index) => ({
                 description: t.description || `Transaction ${index + 1}`,
                 amount: TransactionCalculationUtils.parseAmountSafe(t.amount),
-                budgetName: t.budget_name || 'Unbudgeted',
+                // Not "Unbudgeted": the report has a section by that name with a
+                // narrower meaning, and rent (a bill) would carry this label
+                // while never appearing there.
+                budgetName: t.budget_name || 'no budget',
                 date: (t.date || new Date().toISOString()).split('T')[0],
                 transactionId: t.transaction_journal_id || '',
                 currencySymbol: t.currency_symbol || '$',
@@ -198,11 +201,20 @@ export class BudgetAnalyticsService {
                 entry.total += Math.abs(TransactionCalculationUtils.parseAmountSafe(t.amount));
             });
 
+            // Most visits wins, but ties break on spend. Without that, a
+            // category where every merchant was visited once reports whichever
+            // happened to be first — a $5.00 corner-shop run standing in for a
+            // category dominated by a $678.09 charge.
             let topMerchant: MerchantInsight | undefined;
-            let maxCount = 0;
+            let best: { count: number; total: number } | undefined;
             merchantCounts.forEach((value, key) => {
-                if (value.count > maxCount) {
-                    maxCount = value.count;
+                const wins =
+                    !best ||
+                    value.count > best.count ||
+                    (value.count === best.count && value.total > best.total);
+
+                if (wins) {
+                    best = value;
                     topMerchant = {
                         name: key,
                         visitCount: value.count,

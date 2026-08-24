@@ -29,10 +29,12 @@ export class BudgetInsightService {
 
         if (overBudgets.length > 0) {
             const worst = overBudgets[0];
-            const overPercent = worst.percentageUsed - 100;
+            // Report the same figure the category row shows. "% over" and
+            // "% used" differ by exactly 100 and reading "1284% over" directly
+            // beneath "1384%" looks like one of them is wrong.
             insights.push({
                 type: 'warning',
-                message: `${worst.name} is your biggest issue - ${overPercent.toFixed(0)}% over budget`,
+                message: `${worst.name} is your biggest issue - ${worst.percentageUsed.toFixed(0)}% of its limit`,
                 priority: 1,
                 relatedBudget: worst.budgetId,
             });

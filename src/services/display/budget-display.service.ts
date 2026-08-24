@@ -27,6 +27,8 @@ interface ReportData {
     isCurrentMonth: boolean;
     daysInfo?: {
         daysLeft: number;
+        /** Date of the most recent imported transaction, if known */
+        dataThrough?: Date;
     };
 }
 
@@ -172,6 +174,12 @@ export class BudgetDisplayService {
         // Days remaining (for current month only)
         if (data.isCurrentMonth && data.daysInfo) {
             lines.push(`${chalk.bold('Days Remaining:')}   ${data.daysInfo.daysLeft} days`);
+            if (data.daysInfo.dataThrough) {
+                // A month looks cheap when the last few days have not imported
+                lines.push(
+                    `${chalk.bold('Data Through:')}     ${DisplayFormatterUtils.formatShortDate(data.daysInfo.dataThrough)}`
+                );
+            }
             const dailyBudget =
                 data.daysInfo.daysLeft > 0
                     ? (totalBudget - totalSpent) / data.daysInfo.daysLeft
@@ -385,7 +393,20 @@ export class BudgetDisplayService {
                 : billComparison.variance > 0
                   ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
                   : chalk.green(`${varianceEmoji} -${varianceFormatted}`);
-        const summaryLine = `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}`;
+        // A favourable variance is only good news once the month's bills have
+        // actually come around. Say how much of it is merely unpaid.
+        const notYetDue = billComparison.bills.reduce(
+            (sum, bill) => sum + (bill.upcomingAmount ?? 0),
+            0
+        );
+        const notYetDueNote =
+            notYetDue > 0
+                ? chalk.dim(
+                      `  (${CurrencyUtils.formatWithSymbol(notYetDue, billComparison.currencySymbol)} not yet due)`
+                  )
+                : '';
+
+        const summaryLine = `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${notYetDueNote}`;
 
         lines.push(summaryLine);
         lines.push('');
@@ -404,14 +425,24 @@ export class BudgetDisplayService {
                 billComparison.currencySymbol
             );
             const variance = bill.actual - bill.predicted;
-            const varianceEmoji = EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
+            const varianceEmoji = EmojiUtils.getBillVarianceEmoji(
+                variance,
+                bill.predicted,
+                bill.dueDate
+            );
+            const isUpcoming = !!bill.dueDate && bill.dueDate.getTime() > Date.now();
 
             // Truncate as well as pad — a longer name would otherwise shove the
             // amount column right and break alignment
             const name = bill.name
                 .substring(0, BudgetDisplayService.NAME_COLUMN_WIDTH)
                 .padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH);
-            const line = `${varianceEmoji} ${name} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${predictedFormatted})`;
+            const trailer = isUpcoming
+                ? chalk.dim(
+                      `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, billComparison.currencySymbol)} of ${predictedFormatted})`
+                  )
+                : `(expected ${predictedFormatted})`;
+            const line = `${varianceEmoji} ${name} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  ${trailer}`;
             lines.push(line);
         });
 

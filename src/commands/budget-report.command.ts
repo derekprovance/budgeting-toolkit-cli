@@ -42,11 +42,16 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
             // Get days left info for current month
-            let daysInfo: { daysLeft: number } | undefined;
+            let daysInfo: { daysLeft: number; dataThrough?: Date } | undefined;
             if (isCurrentMonth) {
-                const lastUpdatedOn =
-                    (await this.transactionService.getMostRecentTransactionDate()) || new Date();
-                daysInfo = this.getDaysLeftInfo(month, year, lastUpdatedOn);
+                daysInfo = {
+                    ...this.getDaysLeftInfo(month, year),
+                    // Kept as its own signal rather than folded into daysLeft:
+                    // a month can look cheap simply because the last few days
+                    // have not been imported yet.
+                    dataThrough:
+                        (await this.transactionService.getMostRecentTransactionDate()) ?? undefined,
+                };
             }
 
             // Fetch all data in parallel
@@ -139,10 +144,17 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     /**
      * Gets days left information for current month
      */
-    private getDaysLeftInfo(month: number, year: number, lastUpdatedOn: Date) {
+    /**
+     * Days left in the month, counted from today.
+     *
+     * Deliberately not from the most recent transaction's date: that answers
+     * "how stale is my data", not "how long do I have", and using it reported
+     * 12 days left on the 24th of a 31-day month while inflating the daily
+     * budget derived from it.
+     */
+    private getDaysLeftInfo(month: number, year: number, today: Date = new Date()) {
         const lastDay = new Date(year, month, 0).getDate();
-        const currentDay = lastUpdatedOn.getDate();
-        return { daysLeft: Math.max(0, lastDay - currentDay) };
+        return { daysLeft: Math.max(0, lastDay - today.getDate()) };
     }
 
     /**

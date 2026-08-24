@@ -235,11 +235,11 @@ export class AnalyzeDisplayService {
             this.formatSectionHeader('FINANCIAL SUMMARY'),
             '',
             chalk.bold('  Total Adjustments:'),
-            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatNetImpact(data.additionalIncomeTotal, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(data.actualPaycheck, true)} ${'Paycheck:'.padEnd(30)} ${this.formatNetImpact(data.actualPaycheck, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.billComparison.actualTotal, true)} ${'Bills Paid:'.padEnd(30)} ${this.formatNetImpact(-data.billComparison.actualTotal, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.budgetSpent, true)} ${'Budget Spent:'.padEnd(30)} ${this.formatNetImpact(-data.budgetSpent, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatNetImpact(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatSignedAmount(data.additionalIncomeTotal, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(data.actualPaycheck, true)} ${'Paycheck:'.padEnd(30)} ${this.formatSignedAmount(data.actualPaycheck, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.billComparison.actualTotal, true)} ${'Bills Paid:'.padEnd(30)} ${this.formatSignedAmount(-data.billComparison.actualTotal, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.budgetSpent, true)} ${'Budget Spent:'.padEnd(30)} ${this.formatSignedAmount(-data.budgetSpent, data.currencySymbol, true)}`,
+            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatSignedAmount(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
         ];
 
         // Gate on the value, not the transaction count: netImpact always
@@ -247,13 +247,16 @@ export class AnalyzeDisplayService {
         // whenever it is non-zero or the list stops summing to the total
         if (data.disposableIncome !== 0) {
             lines.push(
-                `    ${this.getStatusIcon(-data.disposableIncome, false)} ${'Disposable Spending:'.padEnd(30)} ${this.formatNetImpact(-data.disposableIncome, data.currencySymbol, false)}`
+                // Subtracted from the net exactly like the expense lines above,
+                // so it must be judged the same way — it used to pass
+                // positiveIsGood: false and render green while they rendered red
+                `    ${this.getStatusIcon(-data.disposableIncome, true)} ${'Disposable Spending:'.padEnd(30)} ${this.formatSignedAmount(-data.disposableIncome, data.currencySymbol, true)}`
             );
         }
 
         if (data.doubleCountedTotal && data.doubleCountedTotal > 0) {
             lines.push(
-                `    ${this.getStatusIcon(data.doubleCountedTotal, true)} ${'Double-Count Adj:'.padEnd(30)} ${this.formatNetImpact(data.doubleCountedTotal, data.currencySymbol, true)}`
+                `    ${this.getStatusIcon(data.doubleCountedTotal, true)} ${'Double-Count Adj:'.padEnd(30)} ${this.formatSignedAmount(data.doubleCountedTotal, data.currencySymbol, true)}`
             );
         }
 
@@ -360,14 +363,15 @@ export class AnalyzeDisplayService {
         symbol: string,
         count?: number
     ): string {
+        // formatNetImpact already carries the status icon; appending another
+        // renders every expense line as "-$550.27 ⚠ ⚠"
         const formattedAmount = this.formatNetImpact(-amount, symbol, true);
         const countText =
             count !== undefined
                 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
                 : '';
-        const icon = this.getStatusIcon(-amount, true);
 
-        return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount} ${icon}${countText}`;
+        return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount}${countText}`;
     }
 
     /**
@@ -402,19 +406,23 @@ export class AnalyzeDisplayService {
      * Formats a bill detail for verbose mode
      */
     private formatBillDetail(bill: BillDetailDto, symbol: string): string {
+        const isUpcoming = !!bill.dueDate && bill.dueDate.getTime() > Date.now();
         const variance = bill.actual - bill.predicted;
         const varianceColor = variance > 0 ? chalk.red : chalk.green;
         // formatCurrency renders the absolute value, so the sign must be explicit
         const sign = variance >= 0 ? '+' : '-';
-        const formattedVariance = varianceColor(
-            `(${sign}${this.formatCurrency(variance, symbol)})`
-        );
+
+        // An unpaid bill's "variance" is just its whole amount, which reads as
+        // a saving. Say when it is due instead.
+        const trailer = isUpcoming
+            ? chalk.dim(`(due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)})`)
+            : varianceColor(`(${sign}${this.formatCurrency(variance, symbol)})`);
 
         // Format frequency with capitalization
         const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);
         const freqBadge = chalk.dim(`[${freq}]`);
 
-        return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${formattedVariance}`;
+        return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${trailer}`;
     }
 
     /**
@@ -433,6 +441,15 @@ export class AnalyzeDisplayService {
         positiveIsGood: boolean = true
     ): string {
         return DisplayFormatterUtils.formatNetImpact(amount, symbol, positiveIsGood);
+    }
+
+    /** Signed amount without a trailing icon, for rows with an icon column */
+    private formatSignedAmount(
+        amount: number,
+        symbol: string,
+        positiveIsGood: boolean = true
+    ): string {
+        return DisplayFormatterUtils.formatSignedAmount(amount, symbol, positiveIsGood);
     }
 
     /**
