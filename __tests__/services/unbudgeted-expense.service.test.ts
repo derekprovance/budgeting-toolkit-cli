@@ -5,6 +5,7 @@ import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sd
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
+import { createMockAccountScopeService } from '../setup/mock-services.js';
 
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
@@ -56,12 +57,15 @@ describe('UnbudgetedExpenseService', () => {
         service = new UnbudgetedExpenseService(
             mockTransactionService,
             mockTransactionClassificationService,
-            [
-                TestAccount.CHASE_AMAZON,
-                TestAccount.CHASE_SAPPHIRE,
-                TestAccount.CITIBANK_DOUBLECASH,
-                TestAccount.PRIMARY,
-            ],
+            createMockAccountScopeService(
+                [],
+                [
+                    TestAccount.CHASE_AMAZON,
+                    TestAccount.CHASE_SAPPHIRE,
+                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.PRIMARY,
+                ]
+            ),
             [
                 {
                     source: TestAccount.PRIMARY,

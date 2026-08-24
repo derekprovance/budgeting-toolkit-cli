@@ -2,6 +2,74 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## What This Tool Is For
+
+It answers one question: **did I live within my income this cycle?** `Net Cash
+Flow` in the analyze report is that answer. Everything else in the report exists
+to explain it.
+
+Read this section before changing anything that touches which transactions count
+as income or spending. The model below is the owner's actual setup, and it has
+been re-derived incorrectly from the code before.
+
+### The account boundary
+
+Accounts are either inside the tracked world or outside it.
+
+- **Credit cards** are where nearly all spending happens. A card purchase is the
+  expense.
+- **Checking** receives the paycheck and pays the cards. A card payment is a
+  transfer between two tracked accounts, so it is **not** an expense — counting
+  it would charge the same purchase twice. The goal is for checking to net to
+  roughly zero each cycle.
+- **Savings** both receives income (see below) and sources real spending, such
+  as a tax payment. It is on both sides.
+- **A brokerage is outside the boundary.** Money crossing into it is spending;
+  activity inside it is invisible. This is the one distinction Firefly's
+  `account_role` cannot make — a brokerage and an ordinary savings account share
+  the `savingAsset` role — which is why `untrackedAccounts` exists in config.
+
+Income destinations and expense sources are **derived** from account roles by
+`AccountScopeService`, not hand-maintained. Leave the config lists empty; set
+them only to override derivation when a Firefly role is wrong.
+
+### Payroll is split, and both halves are income
+
+One deposit lands in checking and carries the `Paycheck` tag — that is the
+owner paying themselves, and it feeds the paycheck bucket. A second deposit
+lands in savings and is **additional income** earmarked for saving. Both are
+income; they are just different kinds.
+
+`paycheckDestinationAccounts` constrains the tag by destination so a stray
+`Paycheck` tag on the savings half is disregarded rather than inflating paycheck
+income. Because `isPaycheck` is what both `PaycheckSurplusService` and
+`AdditionalIncomeService` consult, a rejected transaction falls through to
+additional income rather than vanishing from both buckets.
+
+### Disposable income
+
+There is a separate "guilt-free" pool account, deliberately outside the budget.
+The `Disposable Income` tag marks purchases made **on cards** that are mentally
+charged to that pool; at the end of a cycle the owner reads the tagged total and
+moves that much out of the pool into checking to cover it.
+
+**The tagged purchase is the expense.** Funding the pool and drawing from it are
+both movements between accounts the owner already holds — neither is income nor
+spending, and neither is modelled. Do not reintroduce a deduction for the draws:
+tagged transactions carry no budget, so netting the draws against them charges
+that spending to no bucket at all.
+
+One deliberate exception: an internet provider gives a discount for debit, so
+that bill is paid from the pool account. The pool is therefore a normal expense
+source, and that withdrawal is counted like any other.
+
+### Averaged bills
+
+Bills are paid at a levelled average rather than the exact amount due, so
+checking runs slightly over or short each month by design. Do not read that
+drift as an error, and do not "fix" a bill whose actual differs from its
+`amount_avg`.
+
 ## Module System
 
 This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module standard.
@@ -68,10 +136,20 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 
 **Account Configuration:**
 
-- `incomeDestinationAccounts` - Array of account IDs that are valid deposit destinations for income
-- `expenseSourceAccounts` - Array of account IDs (asset accounts) that withdrawals must source from to count as expenses. Independent of `incomeDestinationAccounts` (checks the opposite side of different transaction types) — the same account ID often belongs in both lists
-- `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Do **not** list a transfer that funds a disposable/cash account: spending out of that account is already charged once via the disposable income tag, so listing the funding transfer charges the same dollars twice
-- `disposableIncomeAccounts` - Array of account IDs for discretionary/disposable spending accounts (e.g., a credit card for personal expenses); used by `DisposableIncomeService` for surplus calculations
+Income destinations and expense sources are **derived** from Firefly's account
+roles by `AccountScopeService` (`src/services/core/account-scope.service.ts`):
+
+```
+income destinations = active asset accounts, role != ccAsset, minus untracked
+expense sources     = active asset accounts,                  minus untracked
+```
+
+Credit cards are excluded from income because deposits to them are refunds and statement credits, never income. Inactive accounts are excluded from both — a closed account keeps its history but must not widen the scope.
+
+- `untrackedAccounts` - Array of account IDs outside the tracked boundary. Money crossing into them is spending; money generated inside them is not income. A brokerage is the case that forces this to be config: it carries the same `savingAsset` role as an ordinary savings account, but its outflows are fund transfers rather than purchases, and Firefly cannot tell those apart
+- `incomeDestinationAccounts` - **Override.** Empty (the default) derives the list. Non-empty replaces derivation entirely for that side. Set it only when a Firefly `account_role` is wrong and you would rather not fix it there
+- `expenseSourceAccounts` - **Override.** Same semantics as above
+- `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Note that a transfer funding a disposable pool does **not** belong here: the tagged purchase is already the expense (see "Disposable income" above)
 - `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded and falls through to additional income rather than inflating paycheck income
 
 **Transaction Configuration:**
@@ -128,7 +206,7 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
 2. **report** (alias: `st`) - Shows current budget report for a given month. Its two spending sections are deliberately different:
     - **Unbudgeted Expenses** - the bucket that feeds `netImpact`, from `UnbudgetedExpenseService`. Same definition `analyze` uses, so the two commands always agree
-    - **Untracked Spending** - withdrawals charged to _no_ bucket at all (not budget, bill, disposable, or unbudgeted). In practice this is spending from an account outside `expenseSourceAccounts`, which the cash-flow net deliberately ignores. It is a diagnostic, not part of the net
+    - **Untracked Spending** - withdrawals charged to _no_ bucket at all (not budget, bill, disposable, or unbudgeted). In practice this is spending from an account the derived scope excludes — an `untrackedAccounts` entry, or an inactive account. It is a diagnostic, not part of the net
 
 3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
     - By default, processes uncategorized transactions and transactions with category but no budget

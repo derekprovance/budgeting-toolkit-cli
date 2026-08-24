@@ -3,6 +3,7 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { StringUtils } from '../utils/string.utils.js';
+import { AccountScopeService } from './core/account-scope.service.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
@@ -24,7 +25,7 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
-        private readonly validDestinationAccounts: string[],
+        private readonly accountScope: AccountScopeService,
         private readonly excludedAdditionalIncomePatterns: readonly string[],
         private readonly excludeDisposableIncome: boolean
     ) {
@@ -48,13 +49,18 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * Analyzes transactions to identify additional income.
      * Implements domain-specific filtering logic.
      */
-    protected analyzeTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+    protected async analyzeTransactions(
+        transactions: TransactionSplit[]
+    ): Promise<TransactionSplit[]> {
         if (!transactions?.length) {
             this.logger.debug('No transactions provided for analysis');
             return [];
         }
 
-        const additionalIncome = this.filterTransactions(transactions);
+        // Resolved here rather than injected: the scope is derived from Firefly
+        // and the factory that builds this service is synchronous.
+        const validDestinationAccounts = await this.accountScope.getIncomeDestinations();
+        const additionalIncome = this.filterTransactions(transactions, validDestinationAccounts);
 
         if (!additionalIncome.length) {
             this.logger.debug('No additional income found after filtering');
@@ -73,10 +79,6 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * Must have at least one valid destination account
      */
     private validateConfig(): void {
-        if (!this.validDestinationAccounts.length) {
-            throw new Error('At least one valid destination account must be specified');
-        }
-
         if (!this.excludedAdditionalIncomePatterns.length) {
             this.logger.warn(
                 'No excluded descriptions specified - all deposits will be considered additional income'
@@ -95,11 +97,14 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 5. Must have a positive amount
      * 6. Must not be disposable income (if configured)
      */
-    private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+    private filterTransactions(
+        transactions: TransactionSplit[],
+        validDestinationAccounts: string[]
+    ): TransactionSplit[] {
         return transactions.filter(
             transaction =>
                 this.transactionClassificationService.isDeposit(transaction) &&
-                this.hasValidDestinationAccount(transaction) &&
+                this.hasValidDestinationAccount(transaction, validDestinationAccounts) &&
                 !this.transactionClassificationService.isPaycheck(transaction) &&
                 this.isNotPayroll(transaction) &&
                 TransactionCalculationUtils.parseAmountSafe(transaction.amount) > 0 &&
@@ -114,9 +119,12 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 1. Must have a destination account
      * 2. Destination account must be in the valid accounts list
      */
-    private hasValidDestinationAccount = (transaction: TransactionSplit): boolean =>
+    private hasValidDestinationAccount = (
+        transaction: TransactionSplit,
+        validDestinationAccounts: string[]
+    ): boolean =>
         transaction.destination_id != null &&
-        this.validDestinationAccounts.includes(transaction.destination_id);
+        validDestinationAccounts.includes(transaction.destination_id);
 
     /**
      * Checks if a transaction is not payroll.

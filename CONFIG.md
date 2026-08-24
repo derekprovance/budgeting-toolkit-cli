@@ -51,8 +51,9 @@ Use this quick reference to see what each command needs:
 **Required:**
 
 - `expectedMonthlyPaycheck` - Expected monthly income
-- `incomeDestinationAccounts[]` - At least one account ID
-- `expenseSourceAccounts[]` - At least one account ID
+
+Account scope is derived from Firefly and needs no configuration. See
+`untrackedAccounts` below if you hold a brokerage or similar.
 
 **Recommended:**
 
@@ -111,23 +112,47 @@ expectedMonthlyPaycheck: 5000.00
 **Default:** `undefined`
 **Used by:** Analyze command
 
-#### incomeDestinationAccounts
+#### Account scope (derived)
 
-List of account IDs that are valid destinations for income. Checked against the `destination_id` of **deposit** transactions only.
+Which accounts count as income destinations and expense sources is derived from
+Firefly's own `account_role`, so the lists cannot drift out of date as accounts
+are added:
+
+```
+income destinations = active asset accounts, role != ccAsset, minus untracked
+expense sources     = active asset accounts,                  minus untracked
+```
+
+Credit cards are excluded from income because deposits to them are refunds and
+statement credits, never income. Inactive accounts are excluded from both.
+
+#### untrackedAccounts
+
+Accounts outside the tracked boundary. Money crossing **into** them is spending;
+money generated **inside** them is not income.
 
 ```yaml
-incomeDestinationAccounts:
-    - '1' # Checking Account
-    - '2' # Savings Account
+untrackedAccounts:
+    - '27' # Brokerage
 ```
 
 **Type:** `string[]`
 **Default:** `[]`
-**Used by:** Additional income calculations
+**Used by:** Account scope derivation
 
-#### expenseSourceAccounts
+This is the one judgement Firefly cannot make for you. A brokerage carries the
+same `savingAsset` role as an ordinary savings account, but its outflows are
+fund transfers rather than purchases. Listing it here keeps a six-figure
+internal rebalance out of your spending total.
 
-List of account IDs (asset accounts) that expenses source from. Checked against the `source_id` of **withdrawal** transactions only — this is the account the money is withdrawn FROM (e.g., checking account), not the merchant destination.
+Note this does not hide money moving from a tracked account into one — a
+withdrawal from checking to buy an investment still counts as spending, which is
+correct: that money did leave the tracked world.
+
+#### incomeDestinationAccounts / expenseSourceAccounts (overrides)
+
+Both default to `[]`, which means "derive". Setting either to a non-empty list
+replaces derivation entirely **for that side**.
 
 ```yaml
 expenseSourceAccounts:
@@ -136,12 +161,11 @@ expenseSourceAccounts:
 ```
 
 **Type:** `string[]`
-**Default:** `[]`
-**Used by:** Unbudgeted expense calculations
+**Default:** `[]` (derive)
 
-**Important:** These should be asset-type accounts (checking, savings, credit cards) that money is withdrawn FROM, not expense-type merchant accounts.
-
-**Note on overlap:** `incomeDestinationAccounts` and `expenseSourceAccounts` are independent checks on different transaction fields (deposit destination vs. withdrawal source) — they are not two separate pools of accounts. The same account ID commonly belongs in both lists. For example, Checking Account `'1'` above appears in both because paychecks deposit into it _and_ debit purchases withdraw from it.
+Use these only when a Firefly `account_role` is wrong and you would rather not
+correct it there. Prefer fixing the role — an override is a second source of
+truth that has to be maintained by hand, which is what derivation replaced.
 
 #### expenseTransfers
 
@@ -416,14 +440,12 @@ If validation fails, you'll see:
 ```yaml
 # config.yaml (minimal)
 expectedMonthlyPaycheck: 5000.00
-incomeDestinationAccounts:
-    - '1'
-expenseSourceAccounts:
-    - '3'
 
 firefly:
     noNameExpenseAccountId: '5'
 ```
+
+Account scope is derived, so a minimal config names no accounts at all.
 
 ### Advanced Configuration
 
@@ -431,22 +453,18 @@ firefly:
 # config.yaml (advanced)
 expectedMonthlyPaycheck: 5500.00
 
-incomeDestinationAccounts:
-    - '1' # Checking
-    - '2' # Savings
+untrackedAccounts:
+    - '27' # Brokerage - outflows are fund transfers, not spending
 
-expenseSourceAccounts:
-    - '1' # Checking (debit purchases also withdraw from here)
-    - '3' # Credit Card
+paycheckDestinationAccounts:
+    - '1' # Only a deposit landing here counts as the paycheck
 
 expenseTransfers:
     - source: '10'
       destination: '1'
 
 excludedAdditionalIncomePatterns:
-    - 'PAYROLL'
     - 'ATM FEE'
-    - 'TRANSFER'
 
 excludeDisposableIncome: true
 

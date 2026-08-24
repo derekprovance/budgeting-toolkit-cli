@@ -33,7 +33,7 @@ export const DEFAULT_CONFIG: AppConfig = {
         incomeDestinationAccounts: [],
         expenseSourceAccounts: [],
         expenseTransfers: [],
-        disposableIncomeAccounts: [],
+        untrackedAccounts: [],
         paycheckDestinationAccounts: [],
     },
     transactions: {

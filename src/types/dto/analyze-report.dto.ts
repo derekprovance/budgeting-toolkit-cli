@@ -31,13 +31,6 @@ export class AnalyzeReportDto {
 
         // Disposable Income
         public disposableIncomeTransactions: TransactionSplit[],
-        public disposableIncomeTransfers: TransactionSplit[], // Transfers OUT that reduce balance
-        /**
-         * Tagged disposable spending before transfers are deducted, on the same
-         * basis as {@link disposableIncome}. Carried through so the display can
-         * print the breakdown without recomputing the first term.
-         */
-        public disposableIncomeTagged: number,
         public disposableIncome: number,
 
         // Double-counting correction
@@ -86,12 +79,10 @@ export class AnalyzeReportDto {
         actualPaycheck: number,
         paycheckSurplus: number,
         disposableIncomeTransactions: TransactionSplit[],
-        disposableIncomeTransfers: TransactionSplit[],
         disposableIncome: number,
         month: number,
         year: number,
-        disposableBudgetedTransactions: TransactionSplit[] = [],
-        disposableIncomeTagged: number = disposableIncome
+        disposableBudgetedTransactions: TransactionSplit[] = []
     ): AnalyzeReportDto {
         // Calculate totals
         const additionalIncomeTotal =
@@ -155,8 +146,6 @@ export class AnalyzeReportDto {
             actualPaycheck,
             paycheckSurplus,
             disposableIncomeTransactions,
-            disposableIncomeTransfers,
-            disposableIncomeTagged,
             disposableIncome,
             doubleCountedTransactions,
             doubleCountedTotal,

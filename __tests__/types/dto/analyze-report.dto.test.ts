@@ -37,7 +37,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [],
-                [],
                 disposableIncome,
                 11,
                 2025,
@@ -85,7 +84,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [],
-                [],
                 0,
                 11,
                 2025,
@@ -113,7 +111,6 @@ describe('AnalyzeReportDto', () => {
                 0,
                 0,
                 0,
-                [],
                 [],
                 0,
                 11,
@@ -197,7 +194,6 @@ describe('AnalyzeReportDto', () => {
                 5000, // actualPaycheck
                 0, // paycheckSurplus (unused in new formula)
                 [], // disposableIncomeTransactions
-                [], // disposableIncomeTransfers
                 0, // disposableIncome
                 11, // month
                 2025 // year
@@ -220,7 +216,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [],
-                [],
                 0,
                 11,
                 2025
@@ -241,7 +236,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 5000,
                 0,
-                [],
                 [],
                 0,
                 11,
@@ -264,7 +258,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [{ amount: '-300' }], // disposableIncomeTransactions
-                [],
                 300, // disposableIncome
                 11,
                 2025
@@ -285,7 +278,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 4800, // actualPaycheck less than expected
                 -200, // paycheckSurplus (calculated outside, not used in formula)
-                [],
                 [],
                 0,
                 11,
@@ -308,7 +300,6 @@ describe('AnalyzeReportDto', () => {
                 5300, // actualPaycheck more than expected
                 300, // paycheckSurplus (calculated outside, not used in formula)
                 [],
-                [],
                 0,
                 11,
                 2025
@@ -330,7 +321,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [{ amount: '-400' }],
-                [],
                 400,
                 11,
                 2025
@@ -351,7 +341,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 5000, // paycheck matches expected
                 0,
-                [],
                 [],
                 0,
                 11,
@@ -375,7 +364,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 200, // paycheckSurplus (now unused)
                 [],
-                [],
                 0,
                 11,
                 2025
@@ -391,7 +379,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 5000,
                 -9999, // different paycheckSurplus
-                [],
                 [],
                 0,
                 11,
@@ -417,7 +404,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [],
-                [],
                 0,
                 11,
                 2025
@@ -442,7 +428,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 5000,
                 0,
-                [],
                 [],
                 0,
                 11,
@@ -473,7 +458,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 0,
                 [],
-                [],
                 0,
                 11,
                 2025
@@ -500,7 +484,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 5000,
                 0,
-                [],
                 [],
                 0,
                 11,
@@ -531,7 +514,6 @@ describe('AnalyzeReportDto', () => {
                 5000,
                 5000,
                 0,
-                [],
                 [],
                 0,
                 11,

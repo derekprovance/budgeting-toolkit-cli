@@ -7,6 +7,7 @@ import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { ExcludedTransactionService } from '../services/excluded-transaction.service.js';
 import { TransactionClassificationService } from '../services/core/transaction-classification.service.js';
+import { AccountScopeService } from '../services/core/account-scope.service.js';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
 import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
@@ -40,6 +41,12 @@ export class ServiceFactory {
             config.transactions.excludedTransactions
         );
 
+        const accountScopeService = new AccountScopeService(apiClient, {
+            incomeDestinationAccounts: config.accounts.incomeDestinationAccounts,
+            expenseSourceAccounts: config.accounts.expenseSourceAccounts,
+            untrackedAccounts: config.accounts.untrackedAccounts,
+        });
+
         const transactionService = new TransactionService(
             excludedTransactionService,
             apiClient,
@@ -59,14 +66,14 @@ export class ServiceFactory {
         const additionalIncomeService = new AdditionalIncomeService(
             transactionService,
             transactionClassificationService,
-            config.accounts.incomeDestinationAccounts,
+            accountScopeService,
             config.transactions.excludedAdditionalIncomePatterns,
             config.transactions.excludeDisposableIncome
         );
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
             transactionClassificationService,
-            config.accounts.expenseSourceAccounts,
+            accountScopeService,
             config.accounts.expenseTransfers
         );
         const budgetReport = new BudgetReportService(
@@ -92,9 +99,7 @@ export class ServiceFactory {
         const transactionSplitService = new TransactionSplitService(apiClient);
         const disposableIncomeService = new DisposableIncomeService(
             transactionService,
-            transactionClassificationService,
-            config.accounts.disposableIncomeAccounts,
-            config.accounts.incomeDestinationAccounts
+            transactionClassificationService
         );
         const budgetSurplusService = new BudgetSurplusService(budgetService);
         const budgetAnalyticsService = new BudgetAnalyticsService(

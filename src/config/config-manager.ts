@@ -15,7 +15,7 @@ interface YamlConfig {
     incomeDestinationAccounts?: string[];
     expenseSourceAccounts?: string[];
     expenseTransfers?: ValidTransfer[];
-    disposableIncomeAccounts?: string[];
+    untrackedAccounts?: string[];
     paycheckDestinationAccounts?: string[];
     excludedAdditionalIncomePatterns?: string[];
     excludeDisposableIncome?: boolean;
@@ -346,8 +346,8 @@ export class ConfigManager {
         if (yamlConfig.expenseTransfers) {
             config.accounts.expenseTransfers = yamlConfig.expenseTransfers;
         }
-        if (yamlConfig.disposableIncomeAccounts) {
-            config.accounts.disposableIncomeAccounts = yamlConfig.disposableIncomeAccounts;
+        if (yamlConfig.untrackedAccounts) {
+            config.accounts.untrackedAccounts = yamlConfig.untrackedAccounts;
         }
         if (yamlConfig.paycheckDestinationAccounts) {
             config.accounts.paycheckDestinationAccounts = yamlConfig.paycheckDestinationAccounts;

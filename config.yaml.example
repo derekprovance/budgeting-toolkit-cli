@@ -4,18 +4,26 @@
 # Budget and Analysis Configuration
 expectedMonthlyPaycheck: 5000.00
 
-# Accounts where real income lands (checked on deposit transactions)
-incomeDestinationAccounts:
-    - '1' # Checking Account ID
-    - '2' # Savings Account ID
+# Income destinations and expense sources are DERIVED from Firefly's account
+# roles, so they stay correct as you add accounts:
+#
+#   income destinations = active asset accounts, role != ccAsset, minus untracked
+#   expense sources     = active asset accounts,                  minus untracked
+#
+# Credit cards are excluded from income because deposits to them are refunds and
+# statement credits, never income.
+#
+# Leave both empty to derive. Set one explicitly ONLY to override derivation
+# entirely for that side - useful when a Firefly account_role is wrong.
+incomeDestinationAccounts: []
+expenseSourceAccounts: []
 
-# Accounts that spending actually comes from (checked on withdrawal transactions)
-# Note: these lists are independent, not separate account pools - an account ID
-# commonly appears in both. Checking Account '1' is here too because debit
-# purchases withdraw from it, even though it's also an income destination above.
-expenseSourceAccounts:
-    - '1' # Checking Account ID (debit purchases)
-    - '3' # Credit Card Account ID
+# Accounts outside the tracked boundary: money crossing INTO them is not
+# spending, money generated INSIDE them is not income. A brokerage is the usual
+# case - its role is savingAsset, identical to an ordinary savings account, but
+# its outflows are fund transfers rather than purchases and Firefly cannot tell
+# those apart.
+untrackedAccounts: []
 
 # Accounts a Paycheck-tagged deposit must land in to count as the paycheck.
 #
@@ -47,13 +55,9 @@ expenseTransfers:
     - source: '5' # Remote Investment Account ID
       destination: '1' # Checking Account ID
 
-# Disposable income account IDs (optional)
-# Transfers OUT of these accounts INTO incomeDestinationAccounts will reduce
-# the disposable income total shown in the analysis report
-# If not configured, only tag-based calculation is used
-disposableIncomeAccounts:
-    - '6' # Cash Account ID
-    - '7' # Spending Account ID
+# Disposable income is identified by tag alone - there is no account list. The
+# tagged purchase is the expense; funding or drawing from a disposable pool is
+# movement between accounts you already own, so neither is income nor spending.
 
 excludeDisposableIncome: false
 

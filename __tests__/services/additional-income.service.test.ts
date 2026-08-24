@@ -5,6 +5,7 @@ import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sd
 import { AdditionalIncomeService } from '../../src/services/additional-income.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
+import { createMockAccountScopeService } from '../setup/mock-services.js';
 
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
@@ -60,36 +61,47 @@ describe('AdditionalIncomeService', () => {
         service = new AdditionalIncomeService(
             mockTransactionService,
             mockTransactionClassificationService,
-            [
+            createMockAccountScopeService([
                 TestAccount.PRIMARY,
                 TestAccount.CHASE_SAPPHIRE,
                 TestAccount.CHASE_AMAZON,
                 TestAccount.CITIBANK_DOUBLECASH,
-            ],
+            ]),
             ['PAYROLL'],
             true
         );
     });
 
     describe('configuration', () => {
-        it('should throw error for empty valid destination accounts', () => {
-            expect(
-                () =>
-                    new AdditionalIncomeService(
-                        mockTransactionService,
-                        mockTransactionClassificationService,
-                        [],
-                        ['PAYROLL'],
-                        true
-                    )
-            ).toThrow('At least one valid destination account must be specified');
+        it('should return nothing when the resolved scope has no destinations', async () => {
+            // No longer a constructor error: the scope is resolved at analysis
+            // time from Firefly, and AccountScopeService owns the empty case.
+            const emptyScopeService = new AdditionalIncomeService(
+                mockTransactionService,
+                mockTransactionClassificationService,
+                createMockAccountScopeService([]),
+                ['PAYROLL'],
+                true
+            );
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction({ description: 'Valid Income', amount: '50.00' }),
+            ] as never);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+
+            const result = await emptyScopeService.calculateAdditionalIncome(1, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual([]);
+            }
         });
 
         it('should accept custom configuration', async () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
                 mockTransactionClassificationService,
-                [TestAccount.PRIMARY],
+                createMockAccountScopeService([TestAccount.PRIMARY]),
                 ['PAYROLL'],
                 false
             );
@@ -171,12 +183,12 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    [
+                    createMockAccountScopeService([
                         TestAccount.PRIMARY,
                         TestAccount.CHASE_SAPPHIRE,
                         TestAccount.CHASE_AMAZON,
                         TestAccount.CITIBANK_DOUBLECASH,
-                    ],
+                    ]),
                     ['PAYROLL'],
                     true
                 );
@@ -211,12 +223,12 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    [
+                    createMockAccountScopeService([
                         TestAccount.PRIMARY,
                         TestAccount.CHASE_SAPPHIRE,
                         TestAccount.CHASE_AMAZON,
                         TestAccount.CITIBANK_DOUBLECASH,
-                    ],
+                    ]),
                     ['PAYROLL'],
                     true
                 );

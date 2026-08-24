@@ -53,10 +53,23 @@ export interface ClaudeApiConfig {
  * Account Configuration for transaction filtering
  */
 export interface AccountsConfig {
+    /**
+     * Explicit income destinations. Empty (the default) derives them from
+     * Firefly's account roles; non-empty overrides derivation entirely.
+     */
     incomeDestinationAccounts: string[];
+    /**
+     * Explicit expense sources. Empty (the default) derives them from Firefly's
+     * account roles; non-empty overrides derivation entirely.
+     */
     expenseSourceAccounts: string[];
     expenseTransfers: ValidTransfer[];
-    disposableIncomeAccounts: string[];
+    /**
+     * Accounts outside the tracked boundary. Money crossing into them is not
+     * spending and money generated inside them is not income — a brokerage is
+     * the usual case. Excluded from both derived lists.
+     */
+    untrackedAccounts: string[];
     /**
      * Accounts a paycheck-tagged deposit must land in to count as a paycheck.
      * Empty means no constraint — the tag alone decides.

@@ -114,12 +114,10 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
                 paycheck.actual,
                 paycheck.surplus,
                 disposableIncome.transactions,
-                disposableIncome.transfers,
                 disposableIncome.balance,
                 month,
                 year,
-                disposableIncome.budgetedTransactions,
-                disposableIncome.taggedTotal
+                disposableIncome.budgetedTransactions
             );
 
             // Display the comprehensive report

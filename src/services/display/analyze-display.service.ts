@@ -132,71 +132,27 @@ export class AnalyzeDisplayService {
         lines.push(...this.formatDoubleCountWarning(data));
 
         // Disposable income subsection
+        //
+        // A single line: the tagged purchases are the expense. Pool funding and
+        // draws are internal transfers between accounts the owner already
+        // holds, so there is nothing to net off and no breakdown to print.
         if (data.disposableIncomeTransactions.length > 0) {
             lines.push('');
+            lines.push(
+                this.formatExpenseItem(
+                    'Disposable Income',
+                    data.disposableIncome,
+                    data.currencySymbol,
+                    data.disposableIncomeTransactions.length
+                )
+            );
 
-            // Tagged spending on the same basis the service used to build the
-            // net. Never recompute it here: an absolute sum over every tagged
-            // transaction counts a refund as spending and counts a transfer the
-            // service excluded, so the printed subtraction stops adding up.
-            const taggedTotal = data.disposableIncomeTagged;
-
-            // Show breakdown format when transfers exist
-            if (data.disposableIncomeTransfers.length > 0) {
-                lines.push(chalk.bold('  Disposable Income'));
-                lines.push(
-                    `    Tagged:       ${this.formatCurrency(taggedTotal, data.currencySymbol)}`
-                );
-
-                // Calculate transfer total
-                const transferTotal = TransactionCalculationUtils.calculateTransactionTotal(
-                    data.disposableIncomeTransfers,
-                    false
-                );
-
-                lines.push(
-                    `    Transfers:    ${this.formatNetImpact(-transferTotal, data.currencySymbol, true)}`
-                );
-                lines.push(`    ${chalk.dim('────────────────────────')}`);
-                lines.push(
-                    `    Net:          ${this.formatNetImpact(data.disposableIncome, data.currencySymbol, true)}`
-                );
-
-                // The balance is floored at zero, so when transfers exceed
-                // tagged spending the column genuinely does not subtract to the
-                // printed net. Say so rather than letting it look like an error.
-                if (taggedTotal - transferTotal < 0) {
-                    lines.push(
-                        `    ${chalk.dim('(floored at 0 - transfers exceeded tagged spending)')}`
-                    );
-                }
-            } else {
-                // Original single-line format when no transfers
-                lines.push(
-                    this.formatExpenseItem(
-                        'Disposable Income',
-                        data.disposableIncome,
-                        data.currencySymbol,
-                        data.disposableIncomeTransactions.length
-                    )
-                );
-            }
-
-            // Verbose mode: transaction details (unchanged)
             if (verbose) {
                 lines.push('');
                 lines.push(chalk.dim('  Tagged Transactions:'));
                 data.disposableIncomeTransactions.forEach(transaction => {
                     lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
                 });
-
-                if (data.disposableIncomeTransfers.length > 0) {
-                    lines.push('');
-                    lines.push(chalk.dim('  Transfers (Reducing Balance):'));
-                    data.disposableIncomeTransfers.forEach(transaction => {
-                        lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
-                    });
-                }
             }
         }
 

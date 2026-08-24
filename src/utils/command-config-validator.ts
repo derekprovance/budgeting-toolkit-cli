@@ -22,23 +22,10 @@ export class CommandConfigValidator {
             );
         }
 
-        if (config.accounts.incomeDestinationAccounts.length === 0) {
-            errors.push(
-                'incomeDestinationAccounts is required for analyze command.\n' +
-                    '  Add to config.yaml:\n' +
-                    '    incomeDestinationAccounts:\n' +
-                    "      - '1'  # Your checking account ID from Firefly III"
-            );
-        }
-
-        if (config.accounts.expenseSourceAccounts.length === 0) {
-            errors.push(
-                'expenseSourceAccounts is required for analyze command.\n' +
-                    '  Add to config.yaml:\n' +
-                    '    expenseSourceAccounts:\n' +
-                    "      - '3'  # Your expense source account ID (asset account) from Firefly III"
-            );
-        }
+        // incomeDestinationAccounts and expenseSourceAccounts are no longer
+        // required: left empty they are derived from Firefly's account roles.
+        // They are validated at the point of derivation instead, where an empty
+        // result actually means something is wrong.
 
         if (errors.length > 0) {
             console.error(chalk.red.bold('\n❌ Configuration Error: analyze command\n'));

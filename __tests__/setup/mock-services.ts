@@ -17,6 +17,7 @@ import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.servi
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { ILogger } from '../../src/types/interface/logger.interface.js';
 import { TransactionSplitService } from '../../src/services/transaction-split.service.js';
+import { AccountScopeService } from '../../src/services/core/account-scope.service.js';
 import { SplitTransactionDisplayService } from '../../src/services/display/split-transaction-display.service.js';
 import { jest } from '@jest/globals';
 
@@ -213,4 +214,20 @@ export const resetServiceMocks = <T extends Record<string, unknown>>(service: T)
  */
 export const resetAllServiceMocks = (...services: Array<Record<string, unknown>>): void => {
     services.forEach(resetServiceMocks);
+};
+
+/**
+ * Account scope mock. Defaults mirror a typical derived scope so existing tests
+ * keep the account IDs they already use; pass explicit lists to vary it.
+ */
+export const createMockAccountScopeService = (
+    incomeDestinations: string[] = [],
+    expenseSources: string[] = []
+): jest.Mocked<AccountScopeService> => {
+    return {
+        getIncomeDestinations: jest
+            .fn<() => Promise<string[]>>()
+            .mockResolvedValue(incomeDestinations),
+        getExpenseSources: jest.fn<() => Promise<string[]>>().mockResolvedValue(expenseSources),
+    } as unknown as jest.Mocked<AccountScopeService>;
 };

@@ -6,6 +6,7 @@ import { AdditionalIncomeService } from '../../src/services/additional-income.se
 import { PaycheckSurplusService } from '../../src/services/paycheck-surplus.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
+import { createMockAccountScopeService } from '../setup/mock-services.js';
 
 const CHECKING = '1';
 const SAVINGS = '2';
@@ -49,7 +50,7 @@ describe('split payroll bucketing', () => {
             additionalIncome: new AdditionalIncomeService(
                 transactionService,
                 classification,
-                [CHECKING, SAVINGS],
+                createMockAccountScopeService([CHECKING, SAVINGS]),
                 [],
                 true
             ),
