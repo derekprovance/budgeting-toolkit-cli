@@ -15,9 +15,20 @@ import { TransactionCalculationUtils } from '../utils/transaction-calculation.ut
  * - It is a deposit (not a withdrawal or transfer)
  * - It goes to a valid destination account
  * - It is not tagged as a paycheck (PaycheckSurplusService owns those)
- * - It is not payroll
+ * - It does not match an excluded description pattern
  * - It is not disposable income (if configured)
  * - It is not in the excluded transactions list
+ *
+ * The destination check is what keeps income outside the tracked boundary out
+ * of the report: deposits into an `untrackedAccounts` entry are rejected here.
+ * When the paycheck bucket also turns them away they are charged to no bucket
+ * at all, which is intended — see CLAUDE.md, "The account boundary". This
+ * service is NOT a catch-all for whatever the paycheck bucket rejected.
+ *
+ * Note the paycheck bucket does NOT apply the account boundary itself: it is
+ * gated only by the tag and `paycheckDestinationAccounts`. A Paycheck-tagged
+ * deposit into an untracked account is excluded here but would still be counted
+ * as paycheck income unless `paycheckDestinationAccounts` rules it out.
  *
  * Description matching is normalized to handle variations (case insensitive, trimmed, etc.)
  */

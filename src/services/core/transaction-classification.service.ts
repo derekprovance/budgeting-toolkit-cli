@@ -61,16 +61,20 @@ export class TransactionClassificationService implements ITransactionClassificat
      * PaycheckSurplusService counts and what AdditionalIncomeService steps
      * aside for, so the two cannot both claim a transaction.
      *
-     * A rejected transaction reaches additional income only if it also passes
-     * that service's own filters. Two cases where it will not, and the money
-     * lands in no income bucket at all:
+     * Rejection here is NOT a promotion to additional income. A rejected
+     * transaction reaches that bucket only if it independently passes
+     * AdditionalIncomeService's own filters. Three cases where it will not, and
+     * the money is charged to no income bucket at all:
      *
-     * - it is a transfer. AdditionalIncomeService requires a deposit. This is
-     *   the right outcome — a transfer between accounts the owner already holds
-     *   is not income — but a paycheck-tagged transfer is silently uncounted.
-     * - its description matches `excludedAdditionalIncomePatterns`. A `PAYROLL`
-     *   entry there will match a payroll deposit by construction, so pairing
-     *   that pattern with this setting drops the rejected half entirely.
+     * - its destination is an untracked account. This is the current setup: the
+     *   savings half of payroll lands outside the tracked boundary, so it is
+     *   deliberately counted nowhere. Money outside the boundary belongs in no
+     *   bucket — do not "fix" this by widening the scope.
+     * - it is a transfer. AdditionalIncomeService requires a deposit. Also the
+     *   right outcome — a transfer between accounts the owner already holds is
+     *   not income — but a paycheck-tagged transfer is silently uncounted.
+     * - its description matches `excludedAdditionalIncomePatterns`. Prefer the
+     *   account boundary over a description pattern; see CLAUDE.md.
      *
      * Left empty the tag alone decides, which is the behaviour for anyone who
      * has not configured the accounts.

@@ -128,26 +128,39 @@ statement credits, never income. Inactive accounts are excluded from both.
 
 #### untrackedAccounts
 
-Accounts outside the tracked boundary. Money crossing **into** them is spending;
-money generated **inside** them is not income.
+Accounts outside the budget's boundary. Deposits to them are **not income** and
+withdrawals from them are **not spending** — both sides move together.
 
 ```yaml
 untrackedAccounts:
-    - '27' # Brokerage
+    - '27' # Brokerage - outflows are fund transfers, not spending
+    - '2' # Savings - outside the cost-of-living envelope by intent
 ```
 
 **Type:** `string[]`
 **Default:** `[]`
 **Used by:** Account scope derivation
 
-This is the one judgement Firefly cannot make for you. A brokerage carries the
-same `savingAsset` role as an ordinary savings account, but its outflows are
-fund transfers rather than purchases. Listing it here keeps a six-figure
-internal rebalance out of your spending total.
+That symmetry is the point. Excluding an account's income while still charging
+its spending manufactures a deficit that never happened, so this is an account
+boundary rather than an income filter. Two distinct cases share the list:
 
-Note this does not hide money moving from a tracked account into one — a
-withdrawal from checking to buy an investment still counts as spending, which is
-correct: that money did leave the tracked world.
+- **Excluded by necessity.** A brokerage carries the same `savingAsset` role as
+  an ordinary savings account, but its outflows are fund transfers rather than
+  purchases. Firefly cannot tell them apart; listing it here keeps a six-figure
+  internal rebalance out of your spending total.
+- **Excluded by intent.** An account holding money you have deliberately put
+  beyond the budget — a savings account that receives earmarked income and funds
+  investment buys or tax payments. None of that is the spending you are
+  measuring.
+
+Nothing disappears silently: withdrawals from these accounts are listed under
+**Untracked Spending** in the `report` command, a diagnostic that is explicitly
+not part of the net.
+
+Note this does not hide everything. A withdrawal whose **source** is a tracked
+account still counts as spending, even when the money is headed somewhere
+untracked — that money did leave the tracked world.
 
 #### incomeDestinationAccounts / expenseSourceAccounts (overrides)
 
@@ -191,15 +204,32 @@ Transaction description patterns to exclude from additional income.
 
 ```yaml
 excludedAdditionalIncomePatterns:
-    - 'PAYROLL'
     - 'ATM FEE'
-    - 'TRANSFER'
 ```
 
 **Type:** `string[]`
 **Default:** `[]`
-**Matching:** Case-insensitive substring matching
-**Used by:** Additional income calculations
+**Matching:** Case-insensitive **whole-word**, not substring (see below)
+**Used by:** Additional income calculations only
+
+`StringUtils.matchesAnyPattern` splits both the pattern and the description on
+non-alphanumeric characters and requires a contiguous run of whole words. So
+`TRANSFER` does **not** match `Transferwise`, and a pattern fused into a longer
+word (`ACHPAYROLLDEP`) does not match at all — write patterns as they appear as
+words.
+
+Two patterns to avoid:
+
+- **`TRANSFER`** — additional income already filters on deposit type, so real
+  transfers never reach this list. The pattern can only discard legitimate
+  deposits that happen to say "transfer", such as `STRIPE TRANSFER`.
+- **`PAYROLL`** — if a payroll deposit genuinely is not budget income to you,
+  exclude its destination account via `untrackedAccounts` instead. Description
+  matching fixes only the income side, leaving spending funded from that account
+  charged against your budget; the account boundary excludes both sides at once.
+
+This list is consulted only by `AdditionalIncomeService`, so a pattern here can
+never affect the paycheck bucket.
 
 #### excludeDisposableIncome
 

@@ -21,9 +21,20 @@ expenseSourceAccounts: []
 # Accounts outside the tracked boundary. Excluded from both derived lists, so
 # money leaving them is not spending and money arriving in them is not income.
 #
-# A brokerage is the usual case: its role is savingAsset, identical to an
-# ordinary savings account, but its outflows are fund transfers rather than
-# purchases and Firefly cannot tell those apart.
+# Both sides move together, and that symmetry matters: excluding an account's
+# income while still charging its spending manufactures a deficit that never
+# happened. Two cases belong here:
+#
+#   Excluded by necessity - a brokerage. Its role is savingAsset, identical to
+#   an ordinary savings account, but its outflows are fund transfers rather than
+#   purchases and Firefly cannot tell those apart.
+#
+#   Excluded by intent - an account holding money deliberately kept outside the
+#   budget, e.g. a savings account that receives earmarked income and funds
+#   investment buys or tax payments. Neither side is the spending you measure.
+#
+# Nothing vanishes: withdrawals from these accounts are listed under 'Untracked
+# Spending' in the report command, a diagnostic outside the net.
 #
 # This does NOT hide money moving into one from a tracked account - a withdrawal
 # from checking to buy an investment still counts as spending, because the
@@ -33,8 +44,14 @@ untrackedAccounts: []
 # Accounts a Paycheck-tagged deposit must land in to count as the paycheck.
 #
 # Useful when payroll is split across accounts and only one half is the
-# paycheck: a stray tag on the other half is then disregarded and falls through
-# to additional income, instead of inflating paycheck income.
+# paycheck: a stray tag on the other half is then disregarded instead of
+# inflating paycheck income.
+#
+# Where the rejected half lands is decided by the account boundary, not by this
+# setting. It reaches additional income only if it is a deposit AND its
+# destination is still a derived income destination. If that account is listed
+# in untrackedAccounts, it is counted in no bucket at all - which is the point
+# when the other half is money you keep outside the budget.
 #
 # Leave empty (the default) to let the tag alone decide.
 paycheckDestinationAccounts: []
@@ -45,9 +62,15 @@ paycheckDestinationAccounts: []
 # real transfers never reach this list, and the pattern can only discard
 # legitimate deposits that happen to say "transfer" (e.g. STRIPE TRANSFER).
 #
-# Think twice before adding 'PAYROLL' too. It only helps if a payroll deposit
-# genuinely is not income to you; a split paycheck usually has both halves
-# counted, and the Paycheck-tagged half is already excluded here by tag.
+# Think twice before adding 'PAYROLL' too. If a payroll deposit genuinely is
+# not budget income to you, exclude its DESTINATION via untrackedAccounts
+# instead: a description pattern fixes only the income side, leaving spending
+# funded from that account charged against your budget, while the account
+# boundary excludes both sides at once. Note also that both halves of a split
+# paycheck often share one description, so a pattern cannot separate them.
+#
+# This list is read only by AdditionalIncomeService, so nothing here can affect
+# the paycheck bucket.
 excludedAdditionalIncomePatterns:
     - 'ATM FEE'
 
