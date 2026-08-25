@@ -355,6 +355,62 @@ qZXQ
         });
     });
 
+    describe('Unknown and renamed YAML keys', () => {
+        let consoleWarnSpy: jest.Spied<typeof console.warn>;
+
+        beforeEach(() => {
+            process.env.FIREFLY_API_URL = 'http://localhost:8080';
+            process.env.FIREFLY_API_TOKEN = 'test-token';
+            consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+        });
+
+        afterEach(() => {
+            consoleWarnSpy.mockRestore();
+        });
+
+        it('should name the replacement for a renamed setting', () => {
+            // A config still carrying disposableIncomeAccounts would silently
+            // stop excluding savings, counting the savings half of payroll as
+            // envelope income. Being ignored quietly is the dangerous part.
+            mockYamlLoad.mockReturnValue({
+                disposableIncomeAccounts: ['39'],
+                expectedMonthlyPaycheck: 5000,
+            });
+
+            ConfigManager.getInstance();
+
+            const warnings = consoleWarnSpy.mock.calls.map(call => String(call[0])).join('\n');
+            expect(warnings).toContain('disposableIncomeAccounts');
+            expect(warnings).toContain('untrackedAccounts');
+        });
+
+        it('should warn about an unrecognised setting', () => {
+            mockYamlLoad.mockReturnValue({ untrackedAccounts: ['2'], notARealSetting: true });
+
+            ConfigManager.getInstance();
+
+            const warnings = consoleWarnSpy.mock.calls.map(call => String(call[0])).join('\n');
+            expect(warnings).toContain('notARealSetting');
+        });
+
+        it('should stay quiet when every key is known', () => {
+            mockYamlLoad.mockReturnValue({
+                untrackedAccounts: ['2'],
+                paycheckDestinationAccounts: ['1'],
+                expectedMonthlyPaycheck: 5000,
+                tags: { paycheck: 'Paycheck' },
+                llm: { model: 'claude-sonnet-5' },
+            });
+
+            ConfigManager.getInstance();
+
+            const warnings = consoleWarnSpy.mock.calls.map(call => String(call[0])).join('\n');
+            expect(warnings).not.toContain('ignored');
+        });
+    });
+
     describe('Singleton pattern', () => {
         beforeEach(() => {
             process.env.FIREFLY_API_URL = 'http://localhost:8080';

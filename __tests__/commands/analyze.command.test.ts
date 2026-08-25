@@ -87,7 +87,11 @@ describe('AnalyzeCommand', () => {
                 .fn<() => Promise<Result<DisposableIncomeAnalysis, TransactionAnalysisError>>>()
                 .mockResolvedValue({
                     ok: true,
-                    value: { transactions: [mockTransaction], transfers: [], balance: 150.0 },
+                    value: {
+                        transactions: [mockTransaction],
+                        balance: 150.0,
+                        budgetedTransactions: [],
+                    },
                 }),
         } as unknown as jest.Mocked<DisposableIncomeService>;
 
@@ -187,7 +191,7 @@ describe('AnalyzeCommand', () => {
             });
             disposableIncomeService.calculateDisposableIncome.mockResolvedValueOnce({
                 ok: true,
-                value: { transactions: [], transfers: [], balance: 0 },
+                value: { transactions: [], balance: 0, budgetedTransactions: [] },
             });
             const emptyBudgetSurplusResult: BudgetSurplusResult = {
                 totalAllocated: 0,
@@ -322,6 +326,53 @@ describe('AnalyzeCommand', () => {
 
             const reportData = analyzeDisplayService.formatAnalysisReport.mock.calls[0][0];
             expect(reportData.budgetSpent).toBe(800);
+        });
+    });
+
+    describe('disposable income wiring', () => {
+        it('should forward budgetedTransactions into the rollup correction', async () => {
+            // budgetedTransactions is the LAST positional arg to
+            // AnalyzeReportDto.create and carries a default, so dropping it
+            // fails silently rather than throwing
+            disposableIncomeService.calculateDisposableIncome.mockResolvedValueOnce({
+                ok: true,
+                value: {
+                    transactions: [
+                        { amount: '100.00', type: 'withdrawal', budget_id: 'b1' },
+                    ] as never,
+                    balance: 100,
+                    budgetedTransactions: [
+                        { amount: '100.00', type: 'withdrawal', budget_id: 'b1' },
+                    ] as never,
+                },
+            });
+
+            await command.execute({ month: 5, year: 2024, verbose: false });
+
+            const reportData = analyzeDisplayService.formatAnalysisReport.mock.calls[0][0];
+            expect(reportData.budgetRollupTransactions).toHaveLength(1);
+            expect(reportData.budgetRollupCorrection).toBe(100);
+        });
+
+        it('should keep disposable spending out of netImpact', async () => {
+            disposableIncomeService.calculateDisposableIncome.mockResolvedValueOnce({
+                ok: true,
+                value: { transactions: [], balance: 250.0, budgetedTransactions: [] },
+            });
+
+            await command.execute({ month: 5, year: 2024, verbose: false });
+
+            const reportData = analyzeDisplayService.formatAnalysisReport.mock.calls[0][0];
+            const withoutDisposable =
+                reportData.actualPaycheck +
+                reportData.additionalIncomeTotal -
+                reportData.billComparison.actualTotal -
+                reportData.budgetSpent -
+                reportData.unbudgetedExpenseTotal +
+                reportData.budgetRollupCorrection;
+
+            expect(reportData.disposableIncome).toBe(250.0);
+            expect(reportData.netImpact).toBeCloseTo(withoutDisposable, 2);
         });
     });
 });

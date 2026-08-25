@@ -52,6 +52,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
         // Resolved here rather than injected: the scope is derived from Firefly
         // and the factory that builds this service is synchronous.
         const validExpenseAccounts = await this.accountScope.getExpenseSources();
+        this.warnOnUnreachableTransfers(validExpenseAccounts);
         const expenses = this.filterExpenses(transactions, validExpenseAccounts);
 
         this.logger.debug(
@@ -85,6 +86,30 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
                       this.shouldCountTransfer(trx)
                 : this.isRegularExpenseTransaction(trx, validExpenseAccounts);
         });
+    }
+
+    /**
+     * Warns about configured transfers that can never match.
+     *
+     * A transfer must clear `isRegularExpenseTransaction` before
+     * `shouldCountTransfer` is ever consulted, so its SOURCE has to be a derived
+     * expense source. `AccountScopeService` subtracts `untrackedAccounts` from
+     * that list, which means an `expenseTransfers` entry pointing out of an
+     * untracked account is silently inert — the two settings look like they
+     * cooperate and instead cancel out.
+     */
+    private warnOnUnreachableTransfers(validExpenseAccounts: string[]): void {
+        const unreachable = this.validTransfers.filter(
+            transfer => !validExpenseAccounts.includes(transfer.source)
+        );
+
+        if (unreachable.length > 0) {
+            this.logger.warn(
+                { transfers: unreachable, validExpenseAccounts },
+                'Configured expenseTransfers whose source is not a tracked expense source ' +
+                    'will never match - check whether the source account is in untrackedAccounts'
+            );
+        }
     }
 
     /**

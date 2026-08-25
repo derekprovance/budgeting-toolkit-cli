@@ -120,6 +120,30 @@ describe('BudgetAnalyticsService', () => {
             expect(result[0].percentageUsed).toBe(60);
         });
 
+        it('should not mark a budget with no limit as over', async () => {
+            // BudgetReportService sets amount 0 when no budgetLimit matches the
+            // month. There is no limit to exceed, so spending against it is not
+            // "over budget" — it previously rendered an empty bar labelled over.
+            const noLimit: BudgetReportDto = {
+                ...mockBudget,
+                amount: 0,
+                spent: -120,
+            };
+
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [noLimit] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([mockTransaction] as any);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].percentageUsed).toBe(0);
+            expect(result[0].status).not.toBe('over');
+        });
+
         it('should mark budget as over when spent exceeds amount', async () => {
             const overBudget: BudgetReportDto = {
                 ...mockBudget,

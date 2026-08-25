@@ -33,15 +33,23 @@ export class AnalyzeReportDto {
         public disposableIncomeTransactions: TransactionSplit[],
         public disposableIncome: number,
 
-        // Double-counting correction
+        // Budget-rollup correction
         /**
-         * Transactions counted in the bills or disposable buckets that ALSO
-         * carry a budget. Firefly's budget total is a server-side rollup with
-         * no per-transaction handle, so these cannot be filtered out of
-         * budgetSpent — they are corrected arithmetically in netImpact instead.
+         * Transactions that carry a budget — and are therefore inside Firefly's
+         * server-side budgetSpent rollup — but should not be charged to the
+         * envelope through it. The rollup has no per-transaction handle, so it
+         * cannot be filtered locally; these are corrected arithmetically in
+         * netImpact instead.
+         *
+         * Two different defects are corrected here:
+         * - a **bill** is genuinely double-counted (subtracted as a bill AND
+         *   inside budgetSpent);
+         * - a **disposable** transaction is counted once too many, because it
+         *   is charged to the pool rather than the envelope and belongs to no
+         *   bucket at all.
          */
-        public doubleCountedTransactions: TransactionSplit[],
-        public doubleCountedTotal: number,
+        public budgetRollupTransactions: TransactionSplit[],
+        public budgetRollupCorrection: number,
 
         // Calculations
         public netImpact: number, // Total surplus/deficit from all sources
@@ -57,11 +65,25 @@ export class AnalyzeReportDto {
      * The portion of {@link budgeted} that a bucket genuinely double-counted.
      *
      * Bounded by what that bucket contributed to the net: crediting back more
-     * than was subtracted would invent income.
+     * than was subtracted would invent income. Only meaningful for a bucket
+     * that actually subtracts something — bills. Disposable no longer does, so
+     * it uses {@link fullCorrection} instead.
      */
     private static cappedCorrection(budgeted: TransactionSplit[], bucketTotal: number): number {
         const budgetedTotal = TransactionCalculationUtils.calculateNetSpend(budgeted);
         return Math.max(0, Math.min(budgetedTotal, bucketTotal));
+    }
+
+    /**
+     * The whole of {@link budgeted}, floored at zero.
+     *
+     * For spending that belongs to no bucket: nothing subtracted it besides the
+     * budget rollup, so there is no bucket total to bound against and capping
+     * would silently under-credit. The caller still bounds the sum by
+     * budgetSpent.
+     */
+    private static fullCorrection(budgeted: TransactionSplit[]): number {
+        return Math.max(0, TransactionCalculationUtils.calculateNetSpend(budgeted));
     }
 
     /**
@@ -91,43 +113,53 @@ export class AnalyzeReportDto {
         const unbudgetedExpenseTotal =
             TransactionCalculationUtils.calculateNetSpend(unbudgetedExpenses);
 
-        // Transactions counted in the bills or disposable buckets that also sit
-        // inside Firefly's server-side budgetSpent rollup. budgetSpent cannot be
-        // filtered locally, so the overlap is added back once below.
+        // Transactions that carry a budget and therefore sit inside Firefly's
+        // server-side budgetSpent rollup, which cannot be filtered locally.
         const billBudgetedTransactions = billComparison.budgetedTransactions ?? [];
-        const doubleCountedTransactions = [
+        const budgetRollupTransactions = [
             ...billBudgetedTransactions,
             ...disposableBudgetedTransactions,
         ];
 
-        // The correction credits back spending that was subtracted twice, so it
-        // can never exceed what each bucket actually subtracted. The disposable
-        // bucket in particular reports a balance that is net of transfers and
-        // floored at zero, while its budgeted-transaction list is neither — so
-        // an uncapped add-back can hand back more than was ever taken away and
-        // conjure cash out of nothing.
-        // Bounded a second time by budgetSpent itself: the whole premise of the
-        // correction is that this spending is already inside that rollup, so it
-        // cannot credit back more than the rollup contains.
-        const doubleCountedTotal = Math.min(
+        // Two corrections with genuinely different reasons, so they are bounded
+        // differently:
+        //
+        // - A BILL is subtracted twice — once as a bill, once inside
+        //   budgetSpent. Crediting back more than the bill bucket subtracted
+        //   would invent income, hence the cap.
+        // - A DISPOSABLE transaction is charged to the pool, not the envelope
+        //   (see CLAUDE.md, "Disposable income"), so netImpact subtracts it
+        //   nowhere. Only budgetSpent still contains it, and it must come back
+        //   out in full. There is no bucket total to cap against — capping it
+        //   at the disposable balance, as an earlier revision did, would
+        //   under-credit whenever refunds shrank that balance.
+        //
+        // Both bounded together by budgetSpent: the premise of the whole
+        // correction is that this spending is inside that rollup, so it cannot
+        // credit back more than the rollup contains.
+        const budgetRollupCorrection = Math.min(
             AnalyzeReportDto.cappedCorrection(
                 billBudgetedTransactions,
                 billComparison.actualTotal
-            ) + AnalyzeReportDto.cappedCorrection(disposableBudgetedTransactions, disposableIncome),
+            ) + AnalyzeReportDto.fullCorrection(disposableBudgetedTransactions),
             Math.max(0, budgetSpent)
         );
 
-        // Calculate net impact: true cash flow
-        // Income: actual paycheck + additional income
-        // Expenses: bills paid + budget spent + unbudgeted + disposable
+        // Calculate net impact: did cost of living fit inside the paycheck?
+        // Income:   actual paycheck + additional income
+        // Expenses: bills paid + budget spent + unbudgeted
+        //
+        // Disposable spending is deliberately absent: it is funded from the
+        // disposable pool rather than the paycheck, so it is reported as a
+        // transfer the owner still owes themselves, not as a charge against the
+        // envelope. Do not reintroduce a `- disposableIncome` term here.
         const netImpact =
             actualPaycheck +
             additionalIncomeTotal -
             billComparison.actualTotal -
             budgetSpent -
-            unbudgetedExpenseTotal -
-            disposableIncome +
-            doubleCountedTotal; // already inside budgetSpent above; charge it once
+            unbudgetedExpenseTotal +
+            budgetRollupCorrection; // inside budgetSpent above; charge it once
 
         // Extract currency from bill comparison (or use defaults)
         const currencySymbol = billComparison.currencySymbol || '$';
@@ -147,8 +179,8 @@ export class AnalyzeReportDto {
             paycheckSurplus,
             disposableIncomeTransactions,
             disposableIncome,
-            doubleCountedTransactions,
-            doubleCountedTotal,
+            budgetRollupTransactions,
+            budgetRollupCorrection,
             netImpact,
             month,
             year,

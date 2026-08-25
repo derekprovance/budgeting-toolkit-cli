@@ -129,21 +129,36 @@ export class AnalyzeDisplayService {
             });
         }
 
-        lines.push(...this.formatDoubleCountWarning(data));
+        lines.push(...this.formatBudgetRollupWarning(data));
 
         // Disposable income subsection
         //
-        // A single line: the tagged purchases are the expense. Pool funding and
-        // draws are internal transfers between accounts the owner already
-        // holds, so there is nothing to net off and no breakdown to print.
+        // Listed here for visibility, but deliberately NOT styled as a
+        // deduction: these purchases are charged to the disposable pool, not to
+        // the envelope, so they never reach netImpact. The amount the owner
+        // still owes themselves is stated in the summary instead. Pool funding
+        // and draws are internal transfers between accounts they already hold,
+        // so there is nothing to net off and no breakdown to print.
         if (data.disposableIncomeTransactions.length > 0) {
+            const count = data.disposableIncomeTransactions.length;
+            // Net of refunds and NOT floored at zero. formatCurrency takes an
+            // absolute value, so the number alone renders a refund-heavy month
+            // identically to a spending one — the caption below carries the
+            // direction instead. Deliberately not a negative amount: this
+            // section states an action, and formatDisposableAction inverts the
+            // instruction rather than printing a negative transfer.
+            const isReimbursement = data.disposableIncome >= 0;
             lines.push('');
             lines.push(
-                this.formatExpenseItem(
-                    'Disposable Income',
-                    data.disposableIncome,
-                    data.currencySymbol,
-                    data.disposableIncomeTransactions.length
+                `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
+                    `${this.formatCurrency(data.disposableIncome, data.currencySymbol)}` +
+                    `${chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)}`
+            );
+            lines.push(
+                chalk.dim(
+                    isReimbursement
+                        ? '    reimbursed from the disposable pool — not in the net'
+                        : '    refunds exceeded tagged spending — owed back to the pool, not in the net'
                 )
             );
 
@@ -180,29 +195,34 @@ export class AnalyzeDisplayService {
     }
 
     /**
-     * Warns when transactions are claimed by two buckets at once.
+     * Warns when the budget rollup contains spending charged elsewhere.
      *
      * Firefly's budget total is a server-side rollup, so a bill or disposable
-     * transaction that also carries a budget cannot be filtered out of it. The
-     * net is corrected arithmetically; this names the transactions so the data
-     * can be cleaned up in Firefly.
+     * transaction that also carries a budget cannot be filtered out of it. A
+     * bill is then subtracted twice; a disposable transaction is subtracted
+     * once when it should not be subtracted at all, being charged to the pool
+     * rather than the envelope. Either way the net is corrected arithmetically;
+     * this names the transactions so the data can be cleaned up in Firefly.
      */
-    private formatDoubleCountWarning(data: AnalyzeReportDto): string[] {
-        const transactions = data.doubleCountedTransactions ?? [];
-        // Gate on the transactions, never on the adjustment. The correction is
-        // capped by what each bucket actually subtracted, so a genuinely
-        // double-claimed transaction can carry a $0 adjustment — and that is
-        // precisely the case most worth telling the user to fix in Firefly.
+    private formatBudgetRollupWarning(data: AnalyzeReportDto): string[] {
+        const transactions = data.budgetRollupTransactions ?? [];
+        // Gate on the transactions, never on the adjustment. The bill half of
+        // the correction is capped by what that bucket actually subtracted, so
+        // a genuinely double-claimed transaction can carry a $0 adjustment —
+        // and that is precisely the case most worth telling the user to fix.
         if (transactions.length === 0) {
             return [];
         }
 
         const count = transactions.length;
         const noun = count === 1 ? 'transaction is' : 'transactions are';
-        const adjustment = this.formatCurrency(data.doubleCountedTotal ?? 0, data.currencySymbol);
+        const adjustment = this.formatCurrency(
+            data.budgetRollupCorrection ?? 0,
+            data.currencySymbol
+        );
         const lines = [
             '',
-            chalk.yellow(`  ⚠ ${count} ${noun} claimed by two sections`),
+            chalk.yellow(`  ⚠ ${count} budgeted ${noun} charged to another section`),
             chalk.dim(`    net adjustment applied: ${adjustment}`),
         ];
 
@@ -242,21 +262,14 @@ export class AnalyzeDisplayService {
             `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatSignedAmount(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
         ];
 
-        // Gate on the value, not the transaction count: netImpact always
-        // subtracts disposableIncome, so the itemized column must show it
-        // whenever it is non-zero or the list stops summing to the total
-        if (data.disposableIncome !== 0) {
-            lines.push(
-                // Subtracted from the net exactly like the expense lines above,
-                // so it must be judged the same way — it used to pass
-                // positiveIsGood: false and render green while they rendered red
-                `    ${this.getStatusIcon(-data.disposableIncome, true)} ${'Disposable Spending:'.padEnd(30)} ${this.formatSignedAmount(-data.disposableIncome, data.currencySymbol, true)}`
-            );
-        }
+        // Disposable spending is deliberately absent from this column. It is
+        // charged to the pool rather than the envelope, so netImpact does not
+        // subtract it — listing it here would stop the column summing to the
+        // total. It is stated below the net as an action instead.
 
-        if (data.doubleCountedTotal && data.doubleCountedTotal > 0) {
+        if (data.budgetRollupCorrection && data.budgetRollupCorrection > 0) {
             lines.push(
-                `    ${this.getStatusIcon(data.doubleCountedTotal, true)} ${'Double-Count Adj:'.padEnd(30)} ${this.formatSignedAmount(data.doubleCountedTotal, data.currencySymbol, true)}`
+                `    ${this.getStatusIcon(data.budgetRollupCorrection, true)} ${'Budget Rollup Adj:'.padEnd(30)} ${this.formatSignedAmount(data.budgetRollupCorrection, data.currencySymbol, true)}`
             );
         }
 
@@ -268,7 +281,45 @@ export class AnalyzeDisplayService {
             `    ${'Net Cash Flow:'.padEnd(30)} ${this.formatNetImpact(netPosition, data.currencySymbol, true)}`
         );
 
+        lines.push(...this.formatDisposableAction(data));
+
         return lines.join('\n');
+    }
+
+    /**
+     * States what the owner still owes themselves out of the disposable pool.
+     *
+     * This is an action, not an adjustment: the amount is outside netImpact by
+     * design, so it is printed below the rule rather than in the column above.
+     *
+     * `disposableIncome` is a net figure that is NOT floored at zero — a month
+     * whose refunds exceed its tagged spending reports a negative balance — so
+     * all three signs are handled rather than assuming a positive amount.
+     */
+    private formatDisposableAction(data: AnalyzeReportDto): string[] {
+        if (data.disposableIncome === 0) {
+            return [];
+        }
+
+        const count = data.disposableIncomeTransactions.length;
+        const countText =
+            count > 0 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`) : '';
+        const amount = this.formatCurrency(Math.abs(data.disposableIncome), data.currencySymbol);
+
+        if (data.disposableIncome > 0) {
+            return [
+                '',
+                `  ${chalk.cyan('→')} ${chalk.bold('Transfer from disposable pool:'.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
+                chalk.dim('    Not included in the net — covers tagged card purchases.'),
+            ];
+        }
+
+        // Refunds outran spending: the pool is owed money rather than owing it.
+        return [
+            '',
+            `  ${chalk.cyan('←')} ${chalk.bold('Return to disposable pool:'.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
+            chalk.dim('    Not included in the net — tagged refunds exceeded tagged spending.'),
+        ];
     }
 
     /**
@@ -364,7 +415,7 @@ export class AnalyzeDisplayService {
         count?: number
     ): string {
         // formatNetImpact already carries the status icon; appending another
-        // renders every expense line as "-$550.27 ⚠ ⚠"
+        // renders every expense line as "-$300.00 ⚠ ⚠"
         const formattedAmount = this.formatNetImpact(-amount, symbol, true);
         const countText =
             count !== undefined

@@ -84,11 +84,18 @@ export class BudgetAnalyticsService {
                     historicalData
                 );
 
-                // Budgets with no limit for the month have amount 0 — avoid Infinity/NaN
-                const percentageUsed =
-                    budget.amount > 0 ? (Math.abs(budget.spent) / budget.amount) * 100 : 0;
+                // A budget with no limit for the month has amount 0. There is
+                // no limit to divide by, and none to exceed either: without the
+                // `amount > 0` guard any spend at all made `remaining` negative,
+                // so the category rendered an empty bar labelled over budget and
+                // BudgetInsightService announced it as "your biggest issue -
+                // 0% of its limit".
+                const hasLimit = budget.amount > 0;
+                const percentageUsed = hasLimit
+                    ? (Math.abs(budget.spent) / budget.amount) * 100
+                    : 0;
                 const remaining = budget.amount + budget.spent;
-                const isOverBudget = remaining < 0;
+                const isOverBudget = hasLimit && remaining < 0;
 
                 return {
                     ...budget,

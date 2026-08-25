@@ -327,6 +327,63 @@ export class ConfigManager {
     }
 
     /**
+     * Every key this loader understands. Anything else in the YAML is either a
+     * typo or a setting that has been renamed or removed.
+     */
+    private static readonly KNOWN_YAML_KEYS: ReadonlySet<string> = new Set([
+        'incomeDestinationAccounts',
+        'expenseSourceAccounts',
+        'expenseTransfers',
+        'untrackedAccounts',
+        'paycheckDestinationAccounts',
+        'excludedAdditionalIncomePatterns',
+        'excludeDisposableIncome',
+        'expectedMonthlyPaycheck',
+        'excludedTransactions',
+        'tags',
+        'firefly',
+        'llm',
+    ]);
+
+    /**
+     * Settings that once existed, mapped to what replaced them.
+     *
+     * A removed key is worse than a misspelled one: the config still looks
+     * deliberate, but the boundary it used to draw is gone. `untrackedAccounts`
+     * defaults to empty, so a config still carrying `disposableIncomeAccounts`
+     * would silently start counting the savings half of payroll as envelope
+     * income — thousands of dollars of phantom Net Cash Flow, with nothing
+     * printed to say why.
+     */
+    private static readonly RENAMED_YAML_KEYS: Readonly<Record<string, string>> = {
+        disposableIncomeAccounts: 'untrackedAccounts',
+    };
+
+    /**
+     * Warns about YAML keys this loader does not read.
+     *
+     * Deliberately a warning rather than an error: an unknown key is often a
+     * config written for a newer or older build, and refusing to start would be
+     * a harsher failure than the problem warrants. It must never be silent
+     * though — a key that is ignored without comment reads as applied.
+     */
+    private warnOnUnknownYamlKeys(yamlConfig: YamlConfig): void {
+        for (const key of Object.keys(yamlConfig)) {
+            if (ConfigManager.KNOWN_YAML_KEYS.has(key)) {
+                continue;
+            }
+
+            const replacement = ConfigManager.RENAMED_YAML_KEYS[key];
+            console.warn(
+                replacement
+                    ? `⚠️  config.yaml: '${key}' is no longer used — it was replaced by '${replacement}'. ` +
+                          `Its value is being ignored; move it to '${replacement}' to restore the behaviour.`
+                    : `⚠️  config.yaml: unknown setting '${key}' is being ignored.`
+            );
+        }
+    }
+
+    /**
      * Applies YAML configuration to the config object
      */
     private applyYamlConfiguration(config: AppConfig): void {
@@ -335,6 +392,8 @@ export class ConfigManager {
         if (!yamlConfig) {
             return; // No YAML file or empty file
         }
+
+        this.warnOnUnknownYamlKeys(yamlConfig);
 
         // Accounts Configuration
         if (yamlConfig.incomeDestinationAccounts) {

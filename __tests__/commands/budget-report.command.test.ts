@@ -131,6 +131,36 @@ describe('BudgetReportCommand', () => {
         consoleLogSpy.mockRestore();
     });
 
+    describe('getDaysLeftInfo', () => {
+        // Private, but the off-by-one it guards is user-visible: excluding
+        // today divided the remaining budget by one day too few, and on the
+        // last day produced a zero that renders as "budget exhausted".
+        const daysLeft = (month: number, year: number, today: Date): number =>
+            (
+                command as unknown as {
+                    getDaysLeftInfo: (m: number, y: number, t: Date) => { daysLeft: number };
+                }
+            ).getDaysLeftInfo(month, year, today).daysLeft;
+
+        it('should count today as a day still remaining', () => {
+            // 31 January, a 31-day month: today is still spendable
+            expect(daysLeft(1, 2024, new Date(2024, 0, 31))).toBe(1);
+        });
+
+        it('should count the whole month on the first', () => {
+            expect(daysLeft(1, 2024, new Date(2024, 0, 1))).toBe(31);
+        });
+
+        it('should include today mid-month', () => {
+            // 24th of a 31-day month leaves the 24th through the 31st
+            expect(daysLeft(1, 2024, new Date(2024, 0, 24))).toBe(8);
+        });
+
+        it('should handle a short month', () => {
+            expect(daysLeft(2, 2024, new Date(2024, 1, 29))).toBe(1);
+        });
+    });
+
     describe('execute', () => {
         it('should display enhanced budget report for current month', async () => {
             const currentDate = new Date();

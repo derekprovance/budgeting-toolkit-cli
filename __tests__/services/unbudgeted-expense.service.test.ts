@@ -456,6 +456,56 @@ describe('UnbudgetedExpenseService', () => {
             });
         });
 
+        describe('unreachable expenseTransfers', () => {
+            // A transfer must clear isRegularExpenseTransaction before
+            // shouldCountTransfer is consulted, so its SOURCE has to be a
+            // derived expense source. untrackedAccounts is subtracted from that
+            // list, so configuring both against one account cancels out — the
+            // rule matches nothing and used to say nothing either.
+            const buildService = (transferSource: string) =>
+                new UnbudgetedExpenseService(
+                    mockTransactionService,
+                    mockTransactionClassificationService,
+                    createMockAccountScopeService([], [TestAccount.PRIMARY]),
+                    [{ source: transferSource, destination: TestAccount.PRIMARY }]
+                );
+
+            it('should warn when a configured transfer source is not a tracked expense source', async () => {
+                const service = buildService(TestAccount.MONEY_MARKET);
+                const warn = jest.spyOn(
+                    (service as unknown as { logger: { warn: (...args: unknown[]) => void } })
+                        .logger,
+                    'warn'
+                );
+                // Shared module-level logger: spyOn returns the same mock each
+                // time, so clear history the previous test left behind
+                warn.mockClear();
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+                await service.calculateUnbudgetedExpenses(1, 2024);
+
+                expect(warn).toHaveBeenCalled();
+                expect(String(warn.mock.calls[0][1])).toContain('expenseTransfers');
+            });
+
+            it('should stay quiet when the transfer source is tracked', async () => {
+                const service = buildService(TestAccount.PRIMARY);
+                const warn = jest.spyOn(
+                    (service as unknown as { logger: { warn: (...args: unknown[]) => void } })
+                        .logger,
+                    'warn'
+                );
+                // Shared module-level logger: spyOn returns the same mock each
+                // time, so clear history the previous test left behind
+                warn.mockClear();
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+                await service.calculateUnbudgetedExpenses(1, 2024);
+
+                expect(warn).not.toHaveBeenCalled();
+            });
+        });
+
         describe('account validation', () => {
             it('should handle transactions from all valid expense accounts', async () => {
                 const validAccounts = [

@@ -2,7 +2,7 @@ import { AnalyzeReportDto } from '../../../src/types/dto/analyze-report.dto.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
 
 describe('AnalyzeReportDto', () => {
-    describe('create() - double-count correction', () => {
+    describe('create() - budget rollup correction', () => {
         const txn = (amount: string, description: string) =>
             ({ amount, description, type: 'withdrawal' }) as never;
 
@@ -43,33 +43,44 @@ describe('AnalyzeReportDto', () => {
                 disposableBudgeted as never[]
             );
 
-        it('should not credit back more disposable spending than it subtracted', () => {
-            // $100 of disposable-tagged, budgeted spending, fully offset by a
-            // $100 transfer back out, so the service reports a balance of 0.
-            // The correction must not hand back $100 that was never subtracted.
+        it('should credit back budgeted disposable spending in full', () => {
+            // Disposable spending is charged to the pool, not the envelope, so
+            // netImpact subtracts it nowhere. budgetSpent is the only place it
+            // still sits, and all $100 of it must come back out.
             const budgeted = [txn('100.00', 'Tagged and budgeted')];
-            const dto = build(billComparisonWithBudgeted(0, []), budgeted, 0);
+            const dto = build(billComparisonWithBudgeted(0, []), budgeted, 100);
 
-            expect(dto.doubleCountedTotal).toBe(0);
-            // income 5000 - budgetSpent 1500, and nothing conjured from nowhere
-            expect(dto.netImpact).toBe(3500);
+            expect(dto.budgetRollupCorrection).toBe(100);
+            expect(dto.netImpact).toBe(5000 - 1500 + 100);
         });
 
-        it('should cap the disposable correction at the balance actually subtracted', () => {
-            // $100 tagged and budgeted, but only $40 survived the transfer
-            // deduction, so at most $40 can have been double-counted
+        it('should not cap the disposable correction at the reported balance', () => {
+            // The balance is net of refunds and is NOT floored at zero, so it
+            // is unrelated to how much budgeted spending sits in the rollup.
+            // Capping at it (as an earlier revision did) would under-credit.
             const budgeted = [txn('100.00', 'Tagged and budgeted')];
             const dto = build(billComparisonWithBudgeted(0, []), budgeted, 40);
 
-            expect(dto.doubleCountedTotal).toBe(40);
-            expect(dto.netImpact).toBe(5000 - 1500 - 40 + 40);
+            expect(dto.budgetRollupCorrection).toBe(100);
+            expect(dto.netImpact).toBe(5000 - 1500 + 100);
+        });
+
+        it('should never let a disposable refund credit back a negative amount', () => {
+            const refunded = [
+                txn('100.00', 'Tagged and budgeted'),
+                { amount: '250.00', description: 'Refund', type: 'deposit' } as never,
+            ];
+            const dto = build(billComparisonWithBudgeted(0, []), refunded, -150);
+
+            expect(dto.budgetRollupCorrection).toBe(0);
+            expect(dto.netImpact).toBe(5000 - 1500);
         });
 
         it('should cap the bill correction at the bill total actually subtracted', () => {
             // Budgeted bill transactions exceed what the bill bucket charged
             const dto = build(billComparisonWithBudgeted(30, [txn('80.00', 'Bill')]));
 
-            expect(dto.doubleCountedTotal).toBe(30);
+            expect(dto.budgetRollupCorrection).toBe(30);
         });
 
         it('should never credit back more than budgetSpent contains', () => {
@@ -90,7 +101,7 @@ describe('AnalyzeReportDto', () => {
                 []
             );
 
-            expect(dto.doubleCountedTotal).toBe(25);
+            expect(dto.budgetRollupCorrection).toBe(25);
         });
 
         it('should treat a refunded unbudgeted expense as reducing the total', () => {
@@ -127,7 +138,7 @@ describe('AnalyzeReportDto', () => {
             const dto = build(billComparisonWithBudgeted(950, [txn('39.00', 'LeetCode')]));
 
             // 5000 - 950 - 1500 = 2550, plus the $39 charged twice
-            expect(dto.doubleCountedTotal).toBe(39);
+            expect(dto.budgetRollupCorrection).toBe(39);
             expect(dto.netImpact).toBe(2589);
         });
 
@@ -138,17 +149,18 @@ describe('AnalyzeReportDto', () => {
                 100
             );
 
-            expect(dto.doubleCountedTotal).toBe(59);
-            expect(dto.doubleCountedTransactions).toHaveLength(2);
-            // 5000 - 950 - 1500 - 100 (disposable) + 59
-            expect(dto.netImpact).toBe(2509);
+            expect(dto.budgetRollupCorrection).toBe(59);
+            expect(dto.budgetRollupTransactions).toHaveLength(2);
+            // 5000 - 950 - 1500 + 59. The $100 disposable balance is charged to
+            // the pool, not the envelope, so it is absent from the net.
+            expect(dto.netImpact).toBe(2609);
         });
 
         it('should be a no-op when nothing overlaps', () => {
             const dto = build(billComparisonWithBudgeted(950, []));
 
-            expect(dto.doubleCountedTotal).toBe(0);
-            expect(dto.doubleCountedTransactions).toEqual([]);
+            expect(dto.budgetRollupCorrection).toBe(0);
+            expect(dto.budgetRollupTransactions).toEqual([]);
             expect(dto.netImpact).toBe(2550);
         });
 
@@ -164,7 +176,7 @@ describe('AnalyzeReportDto', () => {
 
             const dto = build(legacy);
 
-            expect(dto.doubleCountedTotal).toBe(0);
+            expect(dto.budgetRollupCorrection).toBe(0);
             expect(dto.netImpact).toBe(2550);
         });
     });
@@ -199,8 +211,9 @@ describe('AnalyzeReportDto', () => {
                 2025 // year
             );
 
-            // Formula: actualPaycheck + additionalIncome - actualBills - budgetSpent - unbudgeted - disposable
-            // = 5000 + 0 - 950 - 1500 - 0 - 0 = 2550
+            // Formula: actualPaycheck + additionalIncome - actualBills - budgetSpent - unbudgeted
+            // = 5000 + 0 - 950 - 1500 - 0 = 2550
+            // (disposable is charged to the pool and never appears here)
             expect(dto.netImpact).toBe(2550);
         });
 
@@ -246,7 +259,7 @@ describe('AnalyzeReportDto', () => {
             expect(dto.netImpact).toBe(2250);
         });
 
-        it('should subtract disposable income from netImpact', () => {
+        it('should NOT subtract disposable income from netImpact', () => {
             const dto = AnalyzeReportDto.create(
                 [],
                 [],
@@ -263,8 +276,12 @@ describe('AnalyzeReportDto', () => {
                 2025
             );
 
-            // = 5000 + 0 - 950 - 1500 - 0 - 300 = 2250
-            expect(dto.netImpact).toBe(2250);
+            // Tagged purchases are funded from the disposable pool, so they are
+            // reported as a transfer the owner owes themselves rather than as a
+            // charge against the envelope: = 5000 + 0 - 950 - 1500 - 0 = 2550
+            expect(dto.netImpact).toBe(2550);
+            // still surfaced on the DTO for the action line
+            expect(dto.disposableIncome).toBe(300);
         });
 
         it('should handle paycheck below expected (negative paycheckSurplus)', () => {
@@ -305,7 +322,7 @@ describe('AnalyzeReportDto', () => {
                 2025
             );
 
-            // = 5300 + 0 - 950 - 1500 - 0 - 0 = 2850 (full actual paycheck)
+            // = 5300 + 0 - 950 - 1500 - 0 = 2850 (full actual paycheck)
             expect(dto.netImpact).toBe(2850);
         });
 
@@ -326,8 +343,9 @@ describe('AnalyzeReportDto', () => {
                 2025
             );
 
-            // = 5000 + 0 - 1200 - 1800 - 500 - 400 = 1100 (still positive but tight margin)
-            expect(dto.netImpact).toBe(1100);
+            // = 5000 + 0 - 1200 - 1800 - 500 = 1500. The $400 of disposable
+            // spending is charged to the pool, not the envelope.
+            expect(dto.netImpact).toBe(1500);
         });
 
         it('should handle zero netImpact (break even)', () => {
@@ -347,7 +365,7 @@ describe('AnalyzeReportDto', () => {
                 2025
             );
 
-            // = 5000 + 0 - 1600 - 3400 - 0 - 0 = 0
+            // = 5000 + 0 - 1600 - 3400 - 0 = 0
             expect(dto.netImpact).toBe(0);
         });
 
