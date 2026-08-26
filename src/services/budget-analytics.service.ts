@@ -91,10 +91,8 @@ export class BudgetAnalyticsService {
                 // BudgetInsightService announced it as "your biggest issue -
                 // 0% of its limit".
                 const hasLimit = budget.amount > 0;
-                const percentageUsed = hasLimit
-                    ? (Math.abs(budget.spent) / budget.amount) * 100
-                    : 0;
-                const remaining = budget.amount + budget.spent;
+                const percentageUsed = hasLimit ? (budget.spent / budget.amount) * 100 : 0;
+                const remaining = budget.amount - budget.spent;
                 const isOverBudget = hasLimit && remaining < 0;
 
                 return {
@@ -192,9 +190,11 @@ export class BudgetAnalyticsService {
 
             // Calculate count and average
             const count = budgetTransactions.length;
-            const totalAmount = TransactionCalculationUtils.calculateTransactionTotal(
+            // Signed: budgetTransactions is filtered by budget_id alone, so a
+            // budgeted refund is in the set. useAbsolute would let that refund
+            // inflate the average instead of reducing it.
+            const totalAmount = TransactionCalculationUtils.calculateNetSpend(
                 budgetTransactions,
-                true,
                 logger
             );
             const average = totalAmount / count;
@@ -205,7 +205,7 @@ export class BudgetAnalyticsService {
                 const merchant = t.description || 'Unknown';
                 const entry = merchantCounts.getOrInsert(merchant, { count: 0, total: 0 });
                 entry.count += 1;
-                entry.total += Math.abs(TransactionCalculationUtils.parseAmountSafe(t.amount));
+                entry.total += TransactionCalculationUtils.calculateNetSpend([t]);
             });
 
             // Most visits wins, but ties break on spend. Without that, a
@@ -267,12 +267,12 @@ export class BudgetAnalyticsService {
             const historicalValues = historicalData
                 .map(budgets => budgets.find(b => b.budgetId === budgetId))
                 .filter((budget): budget is BudgetLimitDto => budget !== undefined)
-                .map(budget => Math.abs(budget.spent));
+                .map(budget => budget.spent);
 
             const previousMonthSpent = historicalValues.length > 0 ? historicalValues[0] : 0;
 
             // Calculate 3-month average (including current month if we have enough data)
-            const allValues = [Math.abs(currentSpent), ...historicalValues];
+            const allValues = [currentSpent, ...historicalValues];
             const averageWindow = allValues.slice(0, Math.min(3, allValues.length));
             const averageSpent =
                 averageWindow.length > 0

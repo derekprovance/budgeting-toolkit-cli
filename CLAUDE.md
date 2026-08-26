@@ -166,9 +166,9 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 
 - `npm run compile` - Compile TypeScript to ESM JavaScript in `/dist`
 - `npm start -- [command] [options]` - Run in development mode with tsx (use this for testing/development)
-- `./budget.sh [command] [options]` - Run compiled CLI (production mode, requires compilation first)
+- `btk [command] [options]` - Run the installed CLI (requires `npm run dev:install`; `npm run compile` alone only writes `dist/`)
 
-**Important:** For integration testing during development, always use `npm start` instead of `./budget.sh` to avoid compilation delays and ensure latest code changes are tested.
+**Important:** For integration testing during development, always use `npm start` instead of `btk` to avoid compilation delays and ensure latest code changes are tested.
 
 ### Testing
 
@@ -236,10 +236,6 @@ Credit cards are excluded from income because deposits to them are refunds and s
 
 - `tags.disposableIncome` - Tag name for identifying disposable income transactions (default: "Disposable Income")
 - `tags.paycheck` - Tag name for identifying paycheck transactions (default: "Paycheck")
-
-**Firefly Configuration:**
-
-- `firefly.noNameExpenseAccountId` - Account ID for transactions with no destination
 
 **LLM Configuration:**
 

@@ -27,10 +27,6 @@ interface YamlConfig {
         paycheck?: string;
     };
 
-    firefly?: {
-        noNameExpenseAccountId?: string;
-    };
-
     llm?: DeepPartial<LLMConfig>;
 }
 
@@ -341,7 +337,6 @@ export class ConfigManager {
         'expectedMonthlyPaycheck',
         'excludedTransactions',
         'tags',
-        'firefly',
         'llm',
     ]);
 
@@ -360,6 +355,17 @@ export class ConfigManager {
     };
 
     /**
+     * Settings that were removed outright, mapped to why.
+     *
+     * Distinct from a rename: there is nowhere to move the value to, so the
+     * warning has to explain that the behaviour never existed rather than point
+     * somewhere else.
+     */
+    private static readonly REMOVED_YAML_KEYS: Readonly<Record<string, string>> = {
+        firefly: "the only key it held, 'noNameExpenseAccountId', was never read by any code path",
+    };
+
+    /**
      * Warns about YAML keys this loader does not read.
      *
      * Deliberately a warning rather than an error: an unknown key is often a
@@ -374,10 +380,20 @@ export class ConfigManager {
             }
 
             const replacement = ConfigManager.RENAMED_YAML_KEYS[key];
+            if (replacement) {
+                console.warn(
+                    `⚠️  config.yaml: '${key}' is no longer used — it was replaced by ` +
+                        `'${replacement}'. Its value is being ignored; move it to ` +
+                        `'${replacement}' to restore the behaviour.`
+                );
+                continue;
+            }
+
+            const removedBecause = ConfigManager.REMOVED_YAML_KEYS[key];
             console.warn(
-                replacement
-                    ? `⚠️  config.yaml: '${key}' is no longer used — it was replaced by '${replacement}'. ` +
-                          `Its value is being ignored; move it to '${replacement}' to restore the behaviour.`
+                removedBecause
+                    ? `⚠️  config.yaml: '${key}' has been removed — ${removedBecause}. ` +
+                          `It is safe to delete from your config.`
                     : `⚠️  config.yaml: unknown setting '${key}' is being ignored.`
             );
         }
@@ -435,11 +451,6 @@ export class ConfigManager {
             if (yamlConfig.tags.paycheck != null) {
                 config.transactions.tags.paycheck = yamlConfig.tags.paycheck;
             }
-        }
-
-        // Firefly Configuration
-        if (yamlConfig.firefly?.noNameExpenseAccountId) {
-            config.api.firefly.noNameExpenseAccountId = yamlConfig.firefly.noNameExpenseAccountId;
         }
 
         // LLM Configuration - Use deep merge for nested structures

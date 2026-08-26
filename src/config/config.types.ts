@@ -27,7 +27,6 @@ export interface FireflyApiConfig {
     url: string;
     token: string;
     certificates?: CertificateConfig;
-    noNameExpenseAccountId: string;
 }
 
 /**

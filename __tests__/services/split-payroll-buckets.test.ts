@@ -34,7 +34,6 @@ describe('split payroll bucketing', () => {
 
     const buildServices = (transactions: TransactionSplit[], paycheckAccounts: string[]) => {
         const classification = new TransactionClassificationService(
-            '5',
             'Disposable Income',
             'Paycheck',
             paycheckAccounts

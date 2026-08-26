@@ -65,7 +65,14 @@ export class BudgetReportService implements IBudgetReportService {
                     budgetId: budgetId,
                     name: budgetName,
                     amount: budgetLimit ? Number(budgetLimit.attributes.amount) : 0.0,
-                    spent: insight ? (insight.difference_float ?? 0.0) : 0.0,
+                    // insight/expense/budget reports difference_float as a
+                    // NEGATIVE number per budget. Negate once here so `spent` is
+                    // positive-for-spending everywhere downstream, matching
+                    // BudgetSurplusService. Math.abs() per budget would be
+                    // wrong: a budget whose refunds exceed its outflows reports
+                    // a positive difference_float, and taking its absolute value
+                    // would count that refund as spending.
+                    spent: insight ? -(insight.difference_float ?? 0.0) : 0.0,
                 };
             });
 

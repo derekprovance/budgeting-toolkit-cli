@@ -74,11 +74,11 @@ describe('BudgetReportService', () => {
             const mockInsights = [
                 {
                     id: '1',
-                    difference_float: 50.0,
+                    difference_float: -50.0, // Firefly reports spend as negative
                 },
                 {
                     id: '2',
-                    difference_float: 150.0,
+                    difference_float: -150.0,
                 },
             ] as unknown as InsightGroup;
 

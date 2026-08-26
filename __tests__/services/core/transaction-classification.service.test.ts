@@ -8,11 +8,7 @@ describe('TransactionClassificationService', () => {
     let service: TransactionClassificationService;
 
     beforeEach(() => {
-        service = new TransactionClassificationService(
-            '5', // noNameExpenseAccountId
-            DISPOSABLE_INCOME_TAG,
-            PAYCHECK_TAG
-        );
+        service = new TransactionClassificationService(DISPOSABLE_INCOME_TAG, PAYCHECK_TAG);
     });
 
     describe('isTransfer', () => {
@@ -186,12 +182,7 @@ describe('TransactionClassificationService', () => {
 
         describe('paycheckDestinationAccounts', () => {
             const withAccounts = (accounts: string[]) =>
-                new TransactionClassificationService(
-                    '5',
-                    DISPOSABLE_INCOME_TAG,
-                    PAYCHECK_TAG,
-                    accounts
-                );
+                new TransactionClassificationService(DISPOSABLE_INCOME_TAG, PAYCHECK_TAG, accounts);
 
             it('should accept a tagged transaction landing in a configured account', () => {
                 const transaction = {
@@ -242,7 +233,6 @@ describe('TransactionClassificationService', () => {
         it('should support custom paycheck tag name', () => {
             const customPaycheckTag = 'Salary';
             const customService = new TransactionClassificationService(
-                '5',
                 DISPOSABLE_INCOME_TAG,
                 customPaycheckTag
             );
@@ -254,7 +244,6 @@ describe('TransactionClassificationService', () => {
         it('should not match wrong tag name for custom paycheck tag', () => {
             const customPaycheckTag = 'Salary';
             const customService = new TransactionClassificationService(
-                '5',
                 DISPOSABLE_INCOME_TAG,
                 customPaycheckTag
             );

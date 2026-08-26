@@ -49,7 +49,7 @@ export class BudgetInsightService {
                     BUSINESS_CONSTANTS.TRANSACTIONS.HIGH_FREQUENCY_COUNT &&
                 budget.spent !== 0
             ) {
-                const avgSpent = Math.abs(budget.spent) / budget.transactionStats.count;
+                const avgSpent = budget.spent / budget.transactionStats.count;
                 const avgFormatted = CurrencyUtils.formatWithSymbol(
                     avgSpent,
                     billComparison.currencySymbol

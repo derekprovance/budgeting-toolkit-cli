@@ -15,7 +15,6 @@ export const DEFAULT_CONFIG: AppConfig = {
         firefly: {
             url: '',
             token: '',
-            noNameExpenseAccountId: '5',
             certificates: {
                 caCertPath: undefined,
                 clientCertPath: undefined,

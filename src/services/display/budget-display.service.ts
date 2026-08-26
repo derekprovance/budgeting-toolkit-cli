@@ -10,6 +10,7 @@ import {
 } from '../../types/dto/bill-comparison.dto.js';
 import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
 
@@ -132,7 +133,7 @@ export class BudgetDisplayService {
      * Formats the overview section with summary and status
      */
     private formatOverviewSection(data: ReportData): string {
-        const totalSpent = Math.abs(data.budgets.reduce((sum, b) => sum + b.spent, 0));
+        const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
         const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
         const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
         const isOverBudget = totalSpent > totalBudget;
@@ -210,7 +211,7 @@ export class BudgetDisplayService {
             statusColor: chalk.red,
             statusEmoji: '🔴',
             formatRemaining: (budget: BudgetReportDto, formatted: string) => `${formatted} over`,
-            getRemainingAmount: (budget: BudgetReportDto) => Math.abs(budget.spent) - budget.amount,
+            getRemainingAmount: (budget: BudgetReportDto) => budget.spent - budget.amount,
         });
     }
 
@@ -256,10 +257,7 @@ export class BudgetDisplayService {
 
         // Display all budget lines
         sorted.forEach(budget => {
-            const spentFormatted = CurrencyUtils.formatWithSymbol(
-                Math.abs(budget.spent),
-                currencySymbol
-            );
+            const spentFormatted = CurrencyUtils.formatWithSymbol(budget.spent, currencySymbol);
             const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
             const remaining = config.getRemainingAmount(budget);
             const remainingFormatted = CurrencyUtils.formatWithSymbol(remaining, currencySymbol);
@@ -515,7 +513,10 @@ export class BudgetDisplayService {
         let total = 0;
 
         unbudgeted.forEach(item => {
-            const amount = Math.abs(parseFloat(item.transaction.amount));
+            // Signed: Firefly restricts transactions-without-budget to
+            // withdrawals server-side, but nothing local enforces that, so a
+            // refund must reduce the total rather than inflate it.
+            const amount = TransactionCalculationUtils.calculateNetSpend([item.transaction]);
             total += amount;
 
             const amountFormatted = CurrencyUtils.formatWithSymbol(

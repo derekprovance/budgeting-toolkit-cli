@@ -119,10 +119,6 @@ excludedTransactions:
     - description: 'TRANSFER TO SAVINGS'
       reason: 'Internal transfer, not an expense'
 
-# Firefly specific configurations
-firefly:
-    noNameExpenseAccountId: '5' # ID of the (no name) expense account that firefly creates automatically on installation
-
 # LLM Configuration (Advanced)
 llm:
     # Basic LLM Settings

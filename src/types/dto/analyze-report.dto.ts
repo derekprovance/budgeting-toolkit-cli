@@ -107,8 +107,11 @@ export class AnalyzeReportDto {
         disposableBudgetedTransactions: TransactionSplit[] = []
     ): AnalyzeReportDto {
         // Calculate totals
+        // Signed helper even though AdditionalIncomeService filters to deposits:
+        // this total feeds netImpact directly, so it must not depend on the
+        // upstream filter staying homogeneous.
         const additionalIncomeTotal =
-            TransactionCalculationUtils.calculateTransactionTotal(additionalIncome);
+            TransactionCalculationUtils.calculateNetIncome(additionalIncome);
 
         const unbudgetedExpenseTotal =
             TransactionCalculationUtils.calculateNetSpend(unbudgetedExpenses);

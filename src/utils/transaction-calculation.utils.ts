@@ -10,8 +10,16 @@ import { ILogger } from '../types/interface/logger.interface.js';
  *   never from the sign. Never filter spending with `amount < 0`; use
  *   `TransactionClassificationService.isWithdrawal()`.
  * - `GET /v1/insight/expense/budget` returns `difference_float` **negative**.
- *   Code reading `budget.spent` must account for that (existing call sites use
- *   `Math.abs`, or add it as in `amount + spent`).
+ *   Convert it by NEGATING, never with `Math.abs` per budget: a budget whose
+ *   refunds exceed its outflows reports a positive `difference_float`, and
+ *   taking its absolute value counts that refund as spending. Both consumers
+ *   negate once at the source — `BudgetSurplusService` for the analyze path and
+ *   `BudgetReportService` for the report path — so `BudgetLimitDto.spent` is
+ *   positive-for-spending everywhere downstream.
+ *
+ * Because direction lives in `type`, never total a MIXED set with
+ * `calculateTransactionTotal(..., useAbsolute)` — a refund would inflate the
+ * very bucket it should reduce. Use `calculateNetSpend` / `calculateNetIncome`.
  */
 export class TransactionCalculationUtils {
     /**

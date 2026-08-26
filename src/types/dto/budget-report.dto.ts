@@ -15,13 +15,14 @@ export interface BudgetReportDto extends BudgetLimitDto {
 
     /**
      * Percentage of budget that has been spent (0-100+)
-     * Calculated as: (Math.abs(spent) / amount) * 100
+     * Calculated as: (spent / amount) * 100. Negative when a budget's refunds
+     * exceeded its outflows — deliberately not floored, and never Math.abs()'d.
      */
     percentageUsed: number;
 
     /**
-     * Amount remaining in budget (can be negative if over budget)
-     * Calculated as: amount + spent (since spent is typically negative)
+     * Amount remaining in budget (negative if over budget)
+     * Calculated as: amount - spent (spent is positive-for-spending)
      */
     remaining: number;
 

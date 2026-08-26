@@ -41,7 +41,6 @@ describe('ConfigValidator', () => {
                 firefly: {
                     url: 'http://localhost:8080',
                     token: 'test-token',
-                    noNameExpenseAccountId: '5',
                 },
                 claude: {
                     apiKey: 'test-api-key',

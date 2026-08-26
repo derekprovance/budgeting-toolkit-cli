@@ -20,6 +20,11 @@ export interface BudgetLimitDto {
     budgetId: string;
     name: string;
     amount: number;
+    /**
+     * Amount spent, POSITIVE for spending — negated from Firefly's
+     * `difference_float` once in BudgetReportService. A budget whose refunds
+     * exceed its outflows is therefore negative, and must not be Math.abs()'d.
+     */
     spent: number;
     historicalComparison?: HistoricalComparisonDto;
     transactionStats?: TransactionStats;

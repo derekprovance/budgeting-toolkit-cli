@@ -17,21 +17,32 @@ The application uses two configuration files:
 # Firefly III API Configuration
 FIREFLY_API_URL=https://your-firefly-instance.com
 FIREFLY_API_TOKEN=your_api_token_here
-
-# Anthropic Claude API (required for AI categorization)
-ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 ### Optional Variables
 
 ```bash
-# Logging
+# Anthropic Claude API - required ONLY by the categorize command
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Logging. Default is `silent`, not `info`.
 LOG_LEVEL=info  # Options: trace, debug, info, warn, error, silent
 
-# mTLS Certificate Authentication (optional)
-CLIENT_CERT_CA_PATH=../certs/ca.pem
-CLIENT_CERT_PATH=../certs/client.p12
-CLIENT_CERT_PASSWORD=your_certificate_password
+# mTLS Certificate Authentication (optional).
+# Leave blank unless you use mTLS: a non-empty path that does not exist fails
+# startup validation.
+CLIENT_CERT_CA_PATH=
+CLIENT_CERT_PATH=
+CLIENT_CERT_PASSWORD=
+
+# Force or disable TLS certificate validation. Unset picks an intelligent
+# default: enabled when a CA cert is provided, disabled otherwise.
+STRICT_TLS=
+
+# Absolute path to a .env file. Highest priority in the .env search order,
+# ahead of ./.env and ~/.budget/.env. This is what `npm run start:dev`,
+# `npm run seed:docker`, and `npm run test:e2e:docker` use.
+ENV_FILE=
 ```
 
 **Notes:**
@@ -39,8 +50,6 @@ CLIENT_CERT_PASSWORD=your_certificate_password
 - The `FIREFLY_API_URL` should not include a trailing slash
 - The URL will have `/api` automatically appended
 - Certificate paths can be absolute or relative to the project root
-
-## YAML Configuration (config.yaml)
 
 ## Command-Specific Configuration Requirements
 
@@ -57,7 +66,7 @@ Account scope is derived from Firefly and needs no configuration. See
 
 **Recommended:**
 
-- `excludedAdditionalIncomePatterns[]` - Exclude patterns like "PAYROLL"
+- `excludedAdditionalIncomePatterns[]` - Descriptions that must not count as additional income (do **not** use `PAYROLL` — see below)
 - `excludeDisposableIncome` - true/false
 - `tags.*` - Custom tag names
 
@@ -161,6 +170,41 @@ not part of the net.
 Note this does not hide everything. A withdrawal whose **source** is a tracked
 account still counts as spending, even when the money is headed somewhere
 untracked — that money did leave the tracked world.
+
+#### paycheckDestinationAccounts
+
+Accounts a `Paycheck`-tagged transaction must be **destined for** to count as the
+paycheck.
+
+```yaml
+paycheckDestinationAccounts:
+    - '1' # Checking
+```
+
+**Type:** `string[]`
+**Default:** `[]` (the tag alone decides)
+**Used by:** `analyze`
+
+Use it when payroll is split across accounts and only one half is the paycheck. A
+stray tag on the other half is then disregarded instead of inflating paycheck
+income — real data has carried exactly those stray tags.
+
+The constraint lives inside `isPaycheck()`, so one predicate decides both what
+`PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside
+for; the two can never both claim a transaction.
+
+**Rejection from the paycheck bucket is not a promotion to additional income.** A
+rejected transaction lands there only if it independently passes that service's
+filters: it must be a deposit, its destination must still be a derived income
+destination, and it must not match `excludedAdditionalIncomePatterns`. When the
+other half's account is in `untrackedAccounts`, it is counted in **no bucket at
+all** — which is the point when that money is deliberately outside the budget.
+
+**This setting is also the only thing scoping the paycheck bucket.** Unlike every
+other bucket, `isPaycheck` and `PaycheckSurplusService` never consult the derived
+account scope. With the default empty list, a Paycheck-tagged deposit into an
+untracked account would count as income despite the account being outside the
+boundary. If your payroll is split, set this.
 
 #### incomeDestinationAccounts / expenseSourceAccounts (overrides)
 
@@ -323,27 +367,6 @@ Configuration validation failed:
   - transactions.excludedTransactions[2]: 'description' is required (amount-only exclusions are not supported)
   - transactions.excludedTransactions[3].amount must be a valid amount (got: twelve hundred)
 ```
-
-### Firefly III Settings
-
-#### noNameExpenseAccountId
-
-ID of the "(no name)" expense account that Firefly III creates automatically.
-
-```yaml
-firefly:
-    noNameExpenseAccountId: '5'
-```
-
-**Type:** `string`
-**Default:** `''`
-**Used by:** Transaction classification
-
-**How to find:**
-
-1. Go to Firefly III → Accounts
-2. Look for "(no name)" in expense accounts
-3. Note the account ID from the URL
 
 ### AI/LLM Configuration
 

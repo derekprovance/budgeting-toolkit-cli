@@ -22,7 +22,7 @@ describe('BudgetAnalyticsService', () => {
         budgetId: 'budget-1',
         budgetName: 'Groceries',
         amount: 500,
-        spent: -200,
+        spent: 200,
         currencyCode: 'USD',
         currencySymbol: '$',
     };
@@ -49,7 +49,7 @@ describe('BudgetAnalyticsService', () => {
             budgetReportService,
             budgetService,
             transactionService,
-            new TransactionClassificationService('5', 'Disposable Income', 'Paycheck')
+            new TransactionClassificationService('Disposable Income', 'Paycheck')
         );
     });
 
@@ -104,7 +104,7 @@ describe('BudgetAnalyticsService', () => {
         it('should calculate percentage used correctly', async () => {
             const budgetWithData: BudgetReportDto = {
                 ...mockBudget,
-                spent: -300, // 60% of 500
+                spent: 300, // 60% of 500
             };
 
             budgetReportService.getBudgetReport = jest
@@ -127,7 +127,7 @@ describe('BudgetAnalyticsService', () => {
             const noLimit: BudgetReportDto = {
                 ...mockBudget,
                 amount: 0,
-                spent: -120,
+                spent: 120,
             };
 
             budgetReportService.getBudgetReport = jest
@@ -144,10 +144,37 @@ describe('BudgetAnalyticsService', () => {
             expect(result[0].status).not.toBe('over');
         });
 
+        it('should not count a net refund as spending', async () => {
+            // Firefly reports difference_float POSITIVE for a budget whose
+            // refunds outran its outflows, which BudgetReportService negates to
+            // a negative `spent`. Math.abs() per budget used to turn that refund
+            // back into spending and report the budget as used.
+            const refunded: BudgetReportDto = {
+                ...mockBudget,
+                amount: 500,
+                spent: -50, // refunds exceeded outflows by 50
+            };
+
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [refunded] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([mockTransaction] as any);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].percentageUsed).toBe(-10);
+            expect(result[0].status).not.toBe('over');
+            // The whole limit is available, plus the refund
+            expect(result[0].remaining).toBe(550);
+        });
+
         it('should mark budget as over when spent exceeds amount', async () => {
             const overBudget: BudgetReportDto = {
                 ...mockBudget,
-                spent: -600, // Over 500 budget
+                spent: 600, // Over 500 budget
             };
 
             budgetReportService.getBudgetReport = jest

@@ -153,13 +153,13 @@ Compile and run:
 
 ```bash
 npm run compile
-./budget.sh report -m 1
+btk report -m 1
 ```
 
 ### Environment Separation
 
-- **Production**: `npm start` or `./budget.sh` (uses `.env`)
-- **Docker**: `npm start:dev` (uses `.env.dev`)
+- **Production**: `npm start` or `btk` (uses `.env`)
+- **Docker**: `npm run start:dev` (uses `.env.dev`)
 
 ## Docker Commands
 
@@ -312,17 +312,31 @@ docker compose up -d
 
 Match configuration to your test data:
 
+Account scope is **derived** from Firefly's account roles, so a test config
+names no accounts at all — leave the override lists empty and add only what your
+seeded data actually needs:
+
 ```yaml
 expectedMonthlyPaycheck: 3500
-incomeDestinationAccounts:
-    - '1' # Main Checking
+
+# Accounts outside the cost-of-living envelope. Deposits to them are not income
+# AND withdrawals from them are not spending — both sides move together.
+untrackedAccounts:
     - '2' # Savings
-expenseSourceAccounts:
-    - '1' # Main Checking (debit purchases)
-    - '3' # Credit Card
-excludedAdditionalIncomePatterns:
-    - PAYROLL
+
+# Accounts a Paycheck-tagged deposit must land in to count as the paycheck
+paycheckDestinationAccounts:
+    - '1' # Main Checking
 ```
+
+Do **not** add `PAYROLL` to `excludedAdditionalIncomePatterns` — use
+`untrackedAccounts` instead. A description pattern fixes only the income side and
+leaves spending from that account charged against your budget; the account
+boundary excludes both sides at once. See CONFIG.md.
+
+`incomeDestinationAccounts` / `expenseSourceAccounts` still exist but are
+**overrides that disable derivation entirely**. Set them only when a Firefly
+`account_role` is wrong and you would rather not fix it there.
 
 ## Typical Development Session
 

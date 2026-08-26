@@ -3,7 +3,6 @@ import { ITransactionClassificationService } from './transaction-classification.
 
 export class TransactionClassificationService implements ITransactionClassificationService {
     constructor(
-        private readonly noNameExpenseAccountId: string,
         private readonly disposableIncomeTag: string,
         private readonly paycheckTag: string,
         /**

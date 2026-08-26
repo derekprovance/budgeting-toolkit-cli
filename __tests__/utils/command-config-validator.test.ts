@@ -31,7 +31,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -81,7 +80,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -137,7 +135,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -185,7 +182,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -240,7 +236,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: 'test-api-key',
@@ -290,7 +285,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
