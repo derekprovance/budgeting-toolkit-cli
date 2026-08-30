@@ -31,7 +31,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -81,7 +80,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -129,13 +127,14 @@ describe('CommandConfigValidator', () => {
             expect(errorOutput).toContain('config.yaml');
         });
 
-        it('should exit when incomeDestinationAccounts is empty', () => {
+        it('should accept empty account lists now that they are derived', () => {
+            // Empty means "derive from Firefly's account roles". Requiring them
+            // here would make derivation unreachable.
             const config: AppConfig = {
                 api: {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -146,59 +145,6 @@ describe('CommandConfigValidator', () => {
                 },
                 accounts: {
                     incomeDestinationAccounts: [],
-                    expenseSourceAccounts: ['3'],
-                    expenseTransfers: [],
-                },
-                transactions: {
-                    expectedMonthlyPaycheck: 5000,
-                    excludedAdditionalIncomePatterns: [],
-                    excludeDisposableIncome: false,
-                    excludedTransactions: [],
-                    tags: { disposableIncome: 'Disposable Income', bills: 'Bills' },
-                },
-                llm: {
-                    model: 'claude-3-5-sonnet-20241022',
-                    temperature: 0.3,
-                    maxTokens: 1024,
-                    batchSize: 10,
-                    maxConcurrent: 3,
-                    retryDelayMs: 1000,
-                    maxRetryDelayMs: 10000,
-                    rateLimit: { maxTokensPerMinute: 50000, refillInterval: 1000 },
-                    circuitBreaker: {
-                        failureThreshold: 5,
-                        resetTimeout: 60000,
-                        halfOpenTimeout: 30000,
-                    },
-                },
-                logging: { level: 'info' },
-            };
-
-            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
-                'process.exit(1)'
-            );
-            expect(mockConsoleError).toHaveBeenCalled();
-            const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
-            expect(errorOutput).toContain('incomeDestinationAccounts is required');
-        });
-
-        it('should exit when expenseSourceAccounts is empty', () => {
-            const config: AppConfig = {
-                api: {
-                    firefly: {
-                        url: 'http://localhost',
-                        token: 'token',
-                        noNameExpenseAccountId: '5',
-                    },
-                    claude: {
-                        apiKey: '',
-                        baseURL: 'https://api.anthropic.com',
-                        timeout: 60000,
-                        maxRetries: 3,
-                    },
-                },
-                accounts: {
-                    incomeDestinationAccounts: ['1'],
                     expenseSourceAccounts: [],
                     expenseTransfers: [],
                 },
@@ -225,14 +171,9 @@ describe('CommandConfigValidator', () => {
                     },
                 },
                 logging: { level: 'info' },
-            };
+            } as unknown as AppConfig;
 
-            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
-                'process.exit(1)'
-            );
-            expect(mockConsoleError).toHaveBeenCalled();
-            const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
-            expect(errorOutput).toContain('expenseSourceAccounts is required');
+            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).not.toThrow();
         });
 
         it('should report multiple validation errors at once', () => {
@@ -241,7 +182,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',
@@ -285,8 +225,6 @@ describe('CommandConfigValidator', () => {
             );
             const errorOutput = mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
             expect(errorOutput).toContain('expectedMonthlyPaycheck is required');
-            expect(errorOutput).toContain('incomeDestinationAccounts is required');
-            expect(errorOutput).toContain('expenseSourceAccounts is required');
             expect(errorOutput).toContain('CONFIG.md');
         });
     });
@@ -298,7 +236,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: 'test-api-key',
@@ -348,7 +285,6 @@ describe('CommandConfigValidator', () => {
                     firefly: {
                         url: 'http://localhost',
                         token: 'token',
-                        noNameExpenseAccountId: '5',
                     },
                     claude: {
                         apiKey: '',

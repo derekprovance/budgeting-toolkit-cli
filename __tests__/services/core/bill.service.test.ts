@@ -1,7 +1,9 @@
+import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import { BillService } from '../../../src/services/core/bill.service.js';
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 import { IDateRangeService } from '../../../src/types/interface/date-range.service.interface.js';
+import { DateRangeService } from '../../../src/services/core/date-range.service.js';
 
 describe('BillService', () => {
     let billService: BillService;
@@ -46,10 +48,9 @@ describe('BillService', () => {
         } as any;
 
         mockDateRangeService = {
-            getDateRange: jest.fn((month: number, year: number) => ({
-                startDate: new Date(year, month - 1, 1),
-                endDate: new Date(year, month, 0),
-            })),
+            getDateRange: jest.fn((month: number, year: number) =>
+                new DateRangeService().getDateRange(month, year)
+            ),
         } as jest.Mocked<IDateRangeService>;
 
         billService = new BillService(mockClient, mockDateRangeService);
@@ -140,53 +141,6 @@ describe('BillService', () => {
         });
     });
 
-    describe('getBill', () => {
-        it('should fetch single bill by ID', async () => {
-            mockClient.bills.getBill.mockResolvedValue({
-                data: mockBill,
-            });
-
-            const result = await billService.getBill('1');
-
-            expect(mockClient.bills.getBill).toHaveBeenCalledWith('1');
-            expect(result).toEqual(mockBill);
-        });
-
-        it('should throw error for empty ID', async () => {
-            await expect(billService.getBill('')).rejects.toThrow(
-                'Bill ID is required and cannot be empty'
-            );
-
-            expect(mockClient.bills.getBill).not.toHaveBeenCalled();
-        });
-
-        it('should throw error for whitespace-only ID', async () => {
-            await expect(billService.getBill('   ')).rejects.toThrow(
-                'Bill ID is required and cannot be empty'
-            );
-
-            expect(mockClient.bills.getBill).not.toHaveBeenCalled();
-        });
-
-        it('should throw error when bill not found', async () => {
-            mockClient.bills.getBill.mockResolvedValue({
-                data: undefined,
-            } as any);
-
-            await expect(billService.getBill('999')).rejects.toThrow(
-                'Failed to fetch bill with ID: 999'
-            );
-        });
-
-        it('should throw error when API returns null', async () => {
-            mockClient.bills.getBill.mockResolvedValue(null as any);
-
-            await expect(billService.getBill('1')).rejects.toThrow(
-                'Failed to fetch bill with ID: 1'
-            );
-        });
-    });
-
     describe('getBillsForMonth', () => {
         it('should fetch bills with date range parameters', async () => {
             const billWithPayDates: BillRead = {
@@ -206,8 +160,8 @@ describe('BillService', () => {
             // Verify listBill was called with date range parameters
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined, // xTraceId
-                undefined, // limit
-                undefined, // page
+                PAGE_SIZE,
+                1, // page
                 '2024-10-01', // start date
                 '2024-10-31' // end date
             );
@@ -223,8 +177,8 @@ describe('BillService', () => {
 
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined,
-                undefined,
-                undefined,
+                PAGE_SIZE,
+                1,
                 '2024-02-01',
                 '2024-02-29' // 2024 is a leap year
             );
@@ -239,8 +193,8 @@ describe('BillService', () => {
 
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined,
-                undefined,
-                undefined,
+                PAGE_SIZE,
+                1,
                 '2024-12-01',
                 '2024-12-31'
             );
@@ -344,8 +298,8 @@ describe('BillService', () => {
 
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined,
-                undefined,
-                undefined,
+                PAGE_SIZE,
+                1,
                 '2025-06-01',
                 '2025-06-30'
             );

@@ -13,7 +13,7 @@ AI-powered command-line interface for Firefly III Personal Finance Manager with 
 
 ### Prerequisites
 
-- Node.js v24.x or later
+- Node.js v26.x or later
 - Firefly III instance with API access
 - Anthropic API key (for `categorize` command only)
 
@@ -34,13 +34,16 @@ cp config.yaml.example config.yaml
 ### First Run
 
 ```bash
-# Compile and run
-npm run compile
-./budget.sh categorize Import-2025-06-23
-
-# Or development mode (no compilation)
+# Development mode — no compilation step, runs from source
 npm start -- categorize Import-2025-06-23
+
+# Or install the `btk` binary globally, then use it anywhere
+npm run dev:install
+btk categorize Import-2025-06-23
 ```
+
+`npm run compile` alone only writes `dist/`; it does not put `btk` on your PATH.
+Use `npm run dev:install` for that, or invoke `node dist/index.js` directly.
 
 See [Configuration](#configuration) below for setup details.
 
@@ -67,7 +70,7 @@ The application searches for configuration files in this priority order:
 
 **Example:** Using a custom config path
 ```bash
-./budget.sh --config /etc/budgeting/config.yaml categorize Import-2025-06-23
+btk --config /etc/budgeting/config.yaml categorize Import-2025-06-23
 npm start -- --config ./custom-config.yaml categorize Import-2025-06-23
 ```
 
@@ -80,15 +83,15 @@ The `.env` file must contain your API credentials:
 | `FIREFLY_API_URL` | Firefly III API endpoint | All commands | - |
 | `FIREFLY_API_TOKEN` | API authentication token | All commands | - |
 | `ANTHROPIC_API_KEY` | Claude AI API key | `categorize` only | - |
-| `LOG_LEVEL` | Logging verbosity | Optional | `info` |
+| `LOG_LEVEL` | Logging verbosity (`trace`…`error`, `silent`) | Optional | `silent` |
 
 ### Optional YAML Configuration
 
 `config.yaml` contains application settings. **All fields are optional** with sensible defaults defined in `src/config/config.defaults.ts`.
 
 **Key defaults:**
-- LLM model: `claude-sonnet-4-5`
-- Temperature: `0.2`
+- LLM model: `claude-sonnet-5`
+- Max tokens: `16000`
 - Batch size: `10`
 - Tags: `Disposable Income`, `Paycheck`
 
@@ -96,21 +99,25 @@ See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) fo
 
 ## Commands
 
-| Command | Purpose | Example | Key Config |
-|---------|---------|---------|------------|
-| **`categorize <tag>`** | AI-powered transaction categorization | `./budget.sh categorize Import-2025-06-23` | `ANTHROPIC_API_KEY` |
-| `report` | Current budget status for a month | `./budget.sh report -m 8 -y 2024` | - |
-| `analyze` | Budget surplus/deficit analysis | `./budget.sh analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
-| `split <id>` | Interactive transaction splitting | `./budget.sh split 123` | - |
+| Command | Alias | Purpose | Example | Key Config |
+|---------|-------|---------|---------|------------|
+| **`categorize <tag>`** | `cat` | AI-powered transaction categorization | `btk categorize Import-2025-06-23` | `ANTHROPIC_API_KEY` |
+| `report` | `st` | Current budget status for a month | `btk report -m 8 -y 2024` | - |
+| `analyze` | `an` | Budget surplus/deficit analysis | `btk analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
+| `split <id>` | `sp` | Interactive transaction splitting | `btk split 123` | - |
 
 ### Common Options
 
-All commands support:
-- `-m, --month <1-12>` - Target month (default: current)
-- `-y, --year <year>` - Target year (default: current)
-- `-v, --verbose` - Detailed logging
+Per-command options:
+- `-m, --month <1-12>` - Target month (default: current) — `report`, `analyze`
+- `-y, --year <year>` - Target year (default: current) — `report`, `analyze`
 - `-h, --help` - Display help
+
+Program-level options — these go **before** the subcommand (`btk --verbose report`):
+- `-v, --verbose` - Detailed output
 - `--config <path>` - Custom config file path (priority over defaults)
+
+Note `split` has its own `-y, --yes` (skip confirmation), which is unrelated to `--year`.
 
 ### Categorize Command Options
 
@@ -118,23 +125,24 @@ The most popular command with additional options:
 
 ```bash
 # Preview without applying changes
-./budget.sh categorize Import-2025-06-23 --dry-run
+btk categorize Import-2025-06-23 --dry-run
 
-# Include already categorized transactions
-./budget.sh categorize Import-2025-06-23 --include-classified
+# Re-run the AI on transactions that already have both a category and a budget
+btk categorize Import-2025-06-23 --force
 
 # Update categories only or budgets only
-./budget.sh categorize Import-2025-06-23 --mode category
-./budget.sh categorize Import-2025-06-23 --mode budget
+btk categorize Import-2025-06-23 --mode category
+btk categorize Import-2025-06-23 --mode budget
 
-# Verbose logging for debugging
-./budget.sh categorize Import-2025-06-23 --verbose
+# Verbose logging for debugging (--verbose is a program-level flag, so it
+# goes BEFORE the subcommand)
+btk --verbose categorize Import-2025-06-23
 LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
 ```
 
 **Options:**
 - `-m, --mode <type>` - Update `category`, `budget`, or `both` (default: `both`)
-- `-i, --include-classified` - Include already categorized transactions
+- `-f, --force` - Re-run the AI on transactions that already have both a category and a budget. Also lets an AI category replace an existing one; without it an existing `category_id` is preserved
 - `-n, --dry-run` - Preview changes without applying
 
 **Note:** Transactions must be tagged in Firefly III with the specified tag.
@@ -143,13 +151,13 @@ LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
 
 ```bash
 # Fully interactive (prompts for amount and descriptions)
-./budget.sh split 123
+btk split 123
 
 # Provide amount via CLI
-./budget.sh split 123 --amount 50.00
+btk split 123 --amount 50.00
 
 # Skip confirmation
-./budget.sh split 123 -a 50.00 -d "- Groceries" -d "- Hardware" -y
+btk split 123 -a 50.00 -d "- Groceries" -d "- Hardware" -y
 ```
 
 **Options:**
@@ -164,7 +172,7 @@ LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
 ```bash
 # Production mode (compile first)
 npm run compile
-./budget.sh [command] [options]
+btk [command] [options]
 
 # Development mode (no compilation needed)
 npm start -- [command] [options]
@@ -173,7 +181,7 @@ npm start -- [command] [options]
 npm run start:dev -- [command] [options]
 
 # Verbose logging
-LOG_LEVEL=debug ./budget.sh categorize Import-2025-06-23
+LOG_LEVEL=debug btk categorize Import-2025-06-23
 LOG_LEVEL=trace npm start -- categorize Import-2025-06-23
 ```
 

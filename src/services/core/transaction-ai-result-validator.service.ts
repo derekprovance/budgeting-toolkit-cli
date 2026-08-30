@@ -84,12 +84,14 @@ export class TransactionAIResultValidator {
      * @param transaction The transaction being validated
      * @param aiCategory AI-suggested category name
      * @param aiBudget AI-suggested budget name
+     * @param force When true, AI suggestions replace an existing category (--force re-run)
      * @returns Result containing validated category/budget or error details
      */
     async validateAIResults(
         transaction: TransactionSplit,
         aiCategory?: string,
-        aiBudget?: string
+        aiBudget?: string,
+        force: boolean = false
     ): Promise<Result<AIValidationResult, TransactionValidationError>> {
         const transactionId = transaction.transaction_journal_id || 'unknown';
         const description = transaction.description || 'No description';
@@ -97,7 +99,7 @@ export class TransactionAIResultValidator {
         // Validate category if provided
         let category: CategoryProperties | undefined;
         if (aiCategory && aiCategory !== '') {
-            if (transaction.category_id) {
+            if (transaction.category_id && !force) {
                 logger.debug(
                     { transactionId, description, aiCategory },
                     'Skipping AI category - transaction already has category_id'

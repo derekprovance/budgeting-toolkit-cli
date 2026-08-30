@@ -2,13 +2,15 @@ import {
     BudgetLimitRead,
     BudgetRead,
     InsightGroup,
-    TransactionRead,
     TransactionSplit,
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
 import { IBudgetService } from './budget.service.interface.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
+import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
+import { logger } from '../../logger.js';
 
 export class BudgetService implements IBudgetService {
     constructor(
@@ -28,8 +30,8 @@ export class BudgetService implements IBudgetService {
         let results: InsightGroup | undefined;
         try {
             results = await this.client.insight.insightExpenseBudget(
-                range.startDate.toISOString().split('T')[0],
-                range.endDate.toISOString().split('T')[0]
+                range.startDateString,
+                range.endDateString
             );
         } catch (error) {
             throw new Error(
@@ -53,8 +55,8 @@ export class BudgetService implements IBudgetService {
         let results: Awaited<ReturnType<typeof this.client.budgets.listBudgetLimit>> | undefined;
         try {
             results = await this.client.budgets.listBudgetLimit(
-                range.startDate.toISOString().split('T')[0],
-                range.endDate.toISOString().split('T')[0]
+                range.startDateString,
+                range.endDateString
             );
         } catch (error) {
             throw new Error(
@@ -68,68 +70,48 @@ export class BudgetService implements IBudgetService {
                 `Failed to get budget limits for month ${month}: API returned empty response`
             );
         }
+
+        // The SDK's listBudgetLimit exposes no page parameter, so a month with
+        // more budget limits than one page holds cannot be drained here. Say so
+        // loudly rather than silently reporting a short allocation total.
+        const totalPages = results.meta?.pagination?.total_pages;
+        if (totalPages !== undefined && totalPages > 1) {
+            logger.warn(
+                {
+                    month,
+                    year,
+                    totalPages,
+                    returned: results.data.length,
+                    total: results.meta?.pagination?.total,
+                },
+                'Budget limits span multiple pages but the API client cannot request them - allocation total is incomplete'
+            );
+        }
+
         return results.data;
     }
 
     async getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]> {
-        const range = this.dateRangeService.getDateRange(month, year);
-        const response = await this.client.budgets.listTransactionWithoutBudget(
-            undefined, // xTraceId
-            undefined, // limit
-            undefined, // page
-            range.startDate.toISOString().split('T')[0],
-            range.endDate.toISOString().split('T')[0]
-        );
-        if (!response || !response.data) {
-            throw new Error(`Failed to fetch transactions for month: ${month}`);
-        }
-        return this.flattenTransactions(response.data);
-    }
-
-    /**
-     * Gets all transactions for a specific budget within a date range
-     * @param budgetId The budget ID
-     * @param month Month (1-12)
-     * @param year Year
-     * @returns Promise<TransactionSplit[]> Flattened transaction splits
-     * @throws Error when month/year validation fails
-     * @throws Error when API call fails or returns null/undefined
-     */
-    async getTransactionsForBudget(
-        budgetId: string,
-        month: number,
-        year: number
-    ): Promise<TransactionSplit[]> {
         DateUtils.validateMonthYear(month, year);
         const range = this.dateRangeService.getDateRange(month, year);
-
-        const response = await this.client.budgets.listTransactionByBudget(
-            budgetId,
-            undefined, // xTraceId
-            undefined, // limit
-            undefined, // page
-            range.startDate.toISOString().split('T')[0],
-            range.endDate.toISOString().split('T')[0]
+        const data = await fetchAllPages(
+            page =>
+                this.client.budgets.listTransactionWithoutBudget(
+                    undefined, // xTraceId
+                    PAGE_SIZE,
+                    page,
+                    range.startDateString,
+                    range.endDateString
+                ),
+            `fetch transactions without budget for month: ${month}`
         );
-
-        if (!response || !response.data) {
-            throw new Error(
-                `Failed to fetch transactions for budget ${budgetId} in month ${month}/${year}`
-            );
-        }
-
-        return this.flattenTransactions(response.data);
+        return TransactionCalculationUtils.flattenTransactions(data);
     }
 
     private async fetchBudgets(): Promise<BudgetRead[]> {
-        const results = await this.client.budgets.listBudget();
-        if (!results || !results.data) {
-            throw new Error('Failed to fetch budgets');
-        }
-        return results.data;
-    }
-
-    private flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
-        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
+        return fetchAllPages(
+            page => this.client.budgets.listBudget(undefined, PAGE_SIZE, page),
+            'fetch budgets'
+        );
     }
 }

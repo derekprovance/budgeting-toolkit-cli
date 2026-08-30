@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { AppConfig } from '../../src/config/config.types.js';
+import { AppConfig, ExcludedTransaction } from '../../src/config/config.types.js';
 
 // Mock fs module BEFORE importing ConfigValidator
 const mockExistsSync = jest.fn<() => boolean>();
@@ -41,7 +41,6 @@ describe('ConfigValidator', () => {
                 firefly: {
                     url: 'http://localhost:8080',
                     token: 'test-token',
-                    noNameExpenseAccountId: '5',
                 },
                 claude: {
                     apiKey: 'test-api-key',
@@ -54,6 +53,8 @@ describe('ConfigValidator', () => {
                 incomeDestinationAccounts: ['1'],
                 expenseSourceAccounts: ['3'],
                 expenseTransfers: [],
+                untrackedAccounts: [],
+                paycheckDestinationAccounts: [],
             },
             transactions: {
                 expectedMonthlyPaycheck: 5000,
@@ -62,17 +63,14 @@ describe('ConfigValidator', () => {
                 excludedTransactions: [],
                 tags: {
                     disposableIncome: 'Disposable Income',
-                    bills: 'Bills',
+                    paycheck: 'Paycheck',
                 },
             },
             llm: {
-                model: 'claude-3-5-sonnet-20241022',
-                temperature: 0.5,
+                model: 'claude-sonnet-5',
                 maxTokens: 1024,
                 batchSize: 10,
                 maxConcurrent: 3,
-                retryDelayMs: 1000,
-                maxRetryDelayMs: 10000,
                 rateLimit: {
                     maxTokensPerMinute: 50000,
                     refillInterval: 1000,
@@ -80,7 +78,6 @@ describe('ConfigValidator', () => {
                 circuitBreaker: {
                     failureThreshold: 5,
                     resetTimeout: 60000,
-                    halfOpenTimeout: 30000,
                 },
             },
             logging: {
@@ -324,6 +321,141 @@ qZXQ
             const result = validator.validate(validConfig);
 
             expect(result.ok).toBe(true);
+        });
+    });
+
+    describe('LLM configuration validation', () => {
+        it.each([
+            ['llm.batchSize', () => (validConfig.llm.batchSize = 0)],
+            ['llm.maxConcurrent', () => (validConfig.llm.maxConcurrent = 0)],
+            ['llm.maxTokens', () => (validConfig.llm.maxTokens = -1)],
+            [
+                'llm.rateLimit.maxTokensPerMinute',
+                () => (validConfig.llm.rateLimit.maxTokensPerMinute = 0),
+            ],
+            [
+                'llm.circuitBreaker.failureThreshold',
+                () => (validConfig.llm.circuitBreaker.failureThreshold = 0),
+            ],
+        ])('should reject %s of zero or less (hang prevention)', (key, mutate) => {
+            mutate();
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect((result.error.details as { errors: string[] }).errors.join('\n')).toContain(
+                    key
+                );
+            }
+        });
+
+        it('should reject non-integer batch size', () => {
+            validConfig.llm.batchSize = 2.5;
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+        });
+
+        it('should reject negative refill interval', () => {
+            validConfig.llm.rateLimit.refillInterval = -1;
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+        });
+
+        it('should reject an empty model string', () => {
+            validConfig.llm.model = '   ';
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+        });
+
+        it('should accept the default LLM configuration', () => {
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(true);
+        });
+    });
+
+    describe('excludedTransactions validation', () => {
+        /** Flattens a failed validation into one searchable string */
+        const errorsOf = (config: AppConfig): string => {
+            const result = validator.validate(config);
+            return result.ok
+                ? ''
+                : (result.error.details as { errors: string[] }).errors.join('\n');
+        };
+
+        it('should accept a description-only rule', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'STOCK INVESTMENT', reason: 'Investment purchase' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(true);
+        });
+
+        it('should accept a rule narrowed by amount', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Monthly Rent', amount: '1200.00' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(true);
+        });
+
+        it('should accept a currency-formatted amount', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Monthly Rent', amount: '$1,200.00' },
+                { description: 'Refunded Charge', amount: '(45.00)' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(true);
+        });
+
+        it('should reject an amount-only rule', () => {
+            validConfig.transactions.excludedTransactions = [
+                { amount: '999.99', reason: 'Specific amount' } as unknown as ExcludedTransaction,
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(errorsOf(validConfig)).toContain(
+                "transactions.excludedTransactions[0]: 'description' is required"
+            );
+        });
+
+        it('should reject a whitespace-only description', () => {
+            validConfig.transactions.excludedTransactions = [{ description: '   ' }];
+
+            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(errorsOf(validConfig)).toContain("'description' is required");
+        });
+
+        it('should reject an unparseable amount', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Monthly Rent', amount: 'twelve hundred' },
+            ];
+
+            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(errorsOf(validConfig)).toContain(
+                'transactions.excludedTransactions[0].amount must be a valid amount'
+            );
+        });
+
+        it('should report the index of each offending rule', () => {
+            validConfig.transactions.excludedTransactions = [
+                { description: 'Good Rule' },
+                { amount: '10.00' } as unknown as ExcludedTransaction,
+                { description: 'Bad Amount', amount: 'garbage' },
+            ];
+
+            const errors = errorsOf(validConfig);
+
+            expect(errors).toContain('transactions.excludedTransactions[1]');
+            expect(errors).toContain('transactions.excludedTransactions[2]');
+            expect(errors).not.toContain('transactions.excludedTransactions[0]');
         });
     });
 

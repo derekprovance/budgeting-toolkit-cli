@@ -1,22 +1,15 @@
-import { ConfigManager } from './config/config-manager.js';
 import pino from 'pino';
 
 /**
- * Get the configured logging level, with fallback to 'info' if config unavailable
- * This defers ConfigManager initialization to avoid errors at module import time
+ * Application logger.
+ *
+ * Initialized from LOG_LEVEL (default 'info') so importing this module never
+ * constructs the ConfigManager singleton — config isn't resolved until the CLI
+ * parses --config. Once configuration is loaded, `createCli` applies the
+ * configured level via `logger.level = config.logging.level`.
  */
-const getLoggingLevel = (): string => {
-    try {
-        return ConfigManager.getInstance().getConfig().logging.level;
-    } catch {
-        // If ConfigManager initialization fails (e.g., missing .env),
-        // use default log level. The error will be properly handled by the CLI.
-        return 'info';
-    }
-};
-
 export const logger = pino({
-    level: getLoggingLevel(),
+    level: process.env.LOG_LEVEL || 'info',
     formatters: {
         level: label => {
             return { level: label };

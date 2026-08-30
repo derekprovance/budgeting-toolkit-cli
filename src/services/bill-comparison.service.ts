@@ -3,6 +3,7 @@ import { logger } from '../logger.js';
 import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
 import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { BillService } from './core/bill.service.js';
 import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
@@ -30,27 +31,22 @@ export class BillComparisonService implements IBillComparisonService {
     ): Promise<Result<BillComparisonDto, BillError>> {
         const operation = 'calculateBillComparison';
 
-        // Validate date
-        try {
-            DateUtils.validateMonthYear(month, year);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
-
-            return Result.err(
-                BillErrorFactory.create(BillErrorType.INVALID_DATE, month, year, operation, err)
-            );
+        const dateValidation = DateUtils.validateMonthYearResult(
+            month,
+            year,
+            operation,
+            (m, y, op, err) => BillErrorFactory.create(BillErrorType.INVALID_DATE, m, y, op, err)
+        );
+        if (!dateValidation.ok) {
+            return Result.err(dateValidation.error);
         }
 
         try {
-            // Get active bills with pay_dates populated for this month
-            const activeBills = await this.billService.getActiveBillsForMonth(month, year);
-
-            if (activeBills.length === 0) {
-                logger.debug('No active bills found for year ' + year);
-                // Not an error - just return empty result
-                return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
-            }
+            // All bills with pay_dates populated for this month. Deactivated
+            // bills are kept: they predict nothing, but spending still linked
+            // to them has to be counted somewhere, and every other bucket
+            // rejects a bill-linked transaction.
+            const bills = await this.billService.getBillsForMonth(month, year);
 
             // Get actual transactions for the specific month
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
@@ -60,22 +56,28 @@ export class BillComparisonService implements IBillComparisonService {
                 this.transactionClassificationService.isBill(t)
             );
 
+            // Bail out only when there is genuinely nothing to report. Returning
+            // early on `bills.length === 0` alone would skip the orphan path
+            // below, and bill-linked spending would then be charged nowhere at
+            // all — every other bucket rejects a bill-linked transaction.
+            if (bills.length === 0 && billTransactions.length === 0) {
+                logger.debug('No bills or bill-linked transactions found for year ' + year);
+                // Not an error - just return empty result
+                return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
+            }
+
             // Calculate bill details with predicted amounts based on pay_dates
-            const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
-                activeBills,
-                billTransactions,
-                month,
-                year
-            );
+            const { predictedTotal, actualTotal, billDetails, budgetedTransactions } =
+                this.calculateBillDetails(bills, billTransactions, month, year);
 
             // Get currency info from first bill or use default
             const currencyCode =
-                activeBills[0]?.attributes.currency_code ??
-                activeBills[0]?.attributes.primary_currency_code ??
+                bills[0]?.attributes.currency_code ??
+                bills[0]?.attributes.primary_currency_code ??
                 'USD';
             const currencySymbol =
-                activeBills[0]?.attributes.currency_symbol ??
-                activeBills[0]?.attributes.primary_currency_symbol ??
+                bills[0]?.attributes.currency_symbol ??
+                bills[0]?.attributes.primary_currency_symbol ??
                 '$';
 
             const result = BillComparisonDto.create(
@@ -83,14 +85,15 @@ export class BillComparisonService implements IBillComparisonService {
                 actualTotal,
                 billDetails,
                 currencyCode,
-                currencySymbol
+                currencySymbol,
+                budgetedTransactions
             );
 
             logger.debug(
                 {
                     month,
                     year,
-                    billCount: activeBills.length,
+                    billCount: bills.length,
                     predictedTotal,
                     actualTotal,
                 },
@@ -125,40 +128,28 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Gets the top N bills by actual amount spent
-     * @param comparison Bill comparison data
-     * @param limit Number of bills to return (default: 4)
-     * @returns Top N bills sorted by actual amount descending
+     * The pay dates a bill falls due on within the requested month, in order.
+     *
+     * Returned as a list rather than a yes/no because a bill can fall due more
+     * than once in a month — a weekly or fortnightly bill routinely does — and
+     * predicting a single payment for it understates the month. `Zest of Life`
+     * is fortnightly at $130 and falls due twice in August: $260, not $130.
      */
-    getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
-        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(0, limit);
-    }
-
-    /**
-     * Gets the remaining bills after top N
-     * @param comparison Bill comparison data
-     * @param limit Number of top bills (default: 4)
-     * @returns Remaining bills (those not in top N)
-     */
-    getRemainingBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
-        return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(limit);
-    }
-
-    /**
-     * Check if a bill has a payment date within the requested month and year.
-     * Verifies that the pay_dates actually fall within the specified month/year.
-     */
-    private isBillDueThisMonth(bill: BillRead, month: number, year: number): boolean {
+    private payDatesInMonth(bill: BillRead, month: number, year: number): Date[] {
         const payDates = bill.attributes.pay_dates;
         if (!Array.isArray(payDates) || payDates.length === 0) {
-            return false;
+            return [];
         }
 
-        // Check if any pay_date falls within the requested month/year
-        return payDates.some(dateStr => {
-            const date = new Date(dateStr);
-            return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
-        });
+        return payDates
+            .map(dateStr => new Date(dateStr))
+            .filter(
+                date =>
+                    !isNaN(date.getTime()) &&
+                    date.getUTCMonth() + 1 === month &&
+                    date.getUTCFullYear() === year
+            )
+            .sort((a, b) => a.getTime() - b.getTime());
     }
 
     /**
@@ -205,10 +196,20 @@ export class BillComparisonService implements IBillComparisonService {
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): { predictedTotal: number; actualTotal: number; billDetails: BillDetailDto[] } {
+    ): {
+        predictedTotal: number;
+        actualTotal: number;
+        billDetails: BillDetailDto[];
+        budgetedTransactions: TransactionSplit[];
+    } {
+        const now = new Date();
         let predictedTotal = 0;
         let actualTotal = 0;
         const billDetails: BillDetailDto[] = [];
+        // Bill transactions that also carry a budget. Collected only for bills
+        // actually summed into actualTotal, so the analyze report's correction
+        // matches what was counted rather than what merely exists.
+        const budgetedTransactions: TransactionSplit[] = [];
 
         logger.debug(
             `Calculating bill details from ${transactions.length} bill-linked transactions for ${bills.length} bills`
@@ -220,10 +221,7 @@ export class BillComparisonService implements IBillComparisonService {
             // Use bill_id or subscription_id
             const billId = transaction.bill_id ?? transaction.subscription_id;
             if (billId) {
-                if (!billTransactionMap.has(billId)) {
-                    billTransactionMap.set(billId, []);
-                }
-                billTransactionMap.get(billId)!.push(transaction);
+                billTransactionMap.getOrInsert(billId, []).push(transaction);
 
                 logger.debug({
                     transactionDesc: transaction.description,
@@ -239,21 +237,43 @@ export class BillComparisonService implements IBillComparisonService {
             const billId = bill.id;
             const billTransactions = billTransactionMap.get(billId) ?? [];
             const frequency = bill.attributes.repeat_freq ?? 'monthly';
+            const isActive = bill.attributes.active ?? false;
+            const payDates = isActive ? this.payDatesInMonth(bill, month, year) : [];
 
-            // Calculate actual amount for this bill (sum of all transactions)
-            const actualAmount = billTransactions.reduce((sum, t) => {
-                return sum + Math.abs(parseFloat(t.amount));
-            }, 0);
+            // A bill that neither falls due nor sees any activity this month is
+            // not worth a row: it would render as "$0.00 (expected $0.00)",
+            // which is eight of August's twenty rows and tells the reader
+            // nothing. Covers deactivated bills and yearly bills alike.
+            if (payDates.length === 0 && billTransactions.length === 0) {
+                billTransactionMap.delete(billId);
+                continue;
+            }
+
+            // Net spend for this bill: a refund or returned payment linked to
+            // the bill reduces what was actually paid, it does not add to it
+            const actualAmount = TransactionCalculationUtils.calculateNetSpend(
+                billTransactions,
+                logger
+            );
 
             actualTotal += actualAmount;
+
+            budgetedTransactions.push(
+                ...billTransactions.filter(t => this.transactionClassificationService.hasBudget(t))
+            );
 
             // Predicted amount determination with defensive logic:
             // 1. If bill is marked as due (has pay_dates) → use full bill amount
             // 2. If bill is NOT marked as due BUT has actual transactions → use full bill amount (Firefly III bug workaround)
             // 3. If bill is NOT marked as due AND has no transactions → use 0
             // (represents what's actually owed this month, not the monthly budget equivalent)
-            const isDue = this.isBillDueThisMonth(bill, month, year);
-            const hasActualTransactions = billTransactions.length > 0;
+            // A deactivated bill predicts nothing - it is only here so its
+            // actual spending is not dropped on the floor
+            const isDue = payDates.length > 0;
+            const hasActualTransactions = isActive && billTransactions.length > 0;
+            // Dates still ahead of us. A bill can be partly behind and partly
+            // ahead when it falls due several times in one month.
+            const upcomingDates = payDates.filter(date => date.getTime() > now.getTime());
 
             // Defensive logic: If bill has transactions but pay_dates is empty,
             // assume Firefly III bug and treat as due
@@ -261,8 +281,8 @@ export class BillComparisonService implements IBillComparisonService {
             let usedFallbackLogic = false;
 
             if (isDue) {
-                // Normal case: bill is marked as due in pay_dates
-                predictedAmount = this.getBillAmount(bill);
+                // Normal case: one payment expected per due date this month
+                predictedAmount = this.getBillAmount(bill) * payDates.length;
             } else if (!isDue && hasActualTransactions) {
                 // Defensive case: pay_dates is empty but transactions exist
                 // This handles Firefly III bug where pay_dates may not be populated
@@ -289,6 +309,21 @@ export class BillComparisonService implements IBillComparisonService {
 
             predictedTotal += predictedAmount;
 
+            // What is still ahead of us, capped by what is actually unpaid.
+            //
+            // Both halves matter. Without the cap, a bill paid early still
+            // reports its next date as outstanding, because Firefly's pay_dates
+            // is payment-unaware and cannot say which occurrence was settled.
+            // Without the per-occurrence bound, a bill due twice and paid once
+            // would report the whole remainder rather than the one payment left.
+            const outstanding = Math.max(
+                0,
+                Math.min(
+                    predictedAmount - actualAmount,
+                    this.getBillAmount(bill) * upcomingDates.length
+                )
+            );
+
             logger.debug({
                 billName: bill.attributes.name,
                 billId,
@@ -308,13 +343,49 @@ export class BillComparisonService implements IBillComparisonService {
                     bill.attributes.name ?? 'Unknown Bill',
                     predictedAmount,
                     actualAmount,
-                    frequency
+                    frequency,
+                    upcomingDates.length > 0 && outstanding > 0 ? upcomingDates[0] : undefined,
+                    outstanding
                 )
+            );
+
+            billTransactionMap.delete(billId);
+        }
+
+        // Anything still in the map links to a bill this month's bill list does
+        // not contain - a deleted bill, most often. Every other bucket rejects a
+        // bill-linked transaction, so without this it would vanish from the net.
+        for (const [billId, orphanTransactions] of billTransactionMap) {
+            const orphanAmount = TransactionCalculationUtils.calculateNetSpend(
+                orphanTransactions,
+                logger
+            );
+
+            actualTotal += orphanAmount;
+            budgetedTransactions.push(
+                ...orphanTransactions.filter(t =>
+                    this.transactionClassificationService.hasBudget(t)
+                )
+            );
+
+            logger.warn(
+                {
+                    billId,
+                    transactionCount: orphanTransactions.length,
+                    orphanAmount,
+                    month,
+                    year,
+                },
+                'Transactions reference a bill that is not in the bill list - counted as bills paid with no prediction'
+            );
+
+            billDetails.push(
+                new BillDetailDto(billId, `Unknown Bill (#${billId})`, 0, orphanAmount, 'unknown')
             );
         }
 
         logger.debug({ predictedTotal, actualTotal, billDetailsCount: billDetails.length });
 
-        return { predictedTotal, actualTotal, billDetails };
+        return { predictedTotal, actualTotal, billDetails, budgetedTransactions };
     }
 }

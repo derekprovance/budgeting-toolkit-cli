@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as os from 'os';
 import dotenv from 'dotenv';
-import { AppConfig, ExcludedTransaction } from './config.types.js';
+import { AppConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
 import { ValidTransfer } from '../types/common.types.js';
@@ -15,7 +15,8 @@ interface YamlConfig {
     incomeDestinationAccounts?: string[];
     expenseSourceAccounts?: string[];
     expenseTransfers?: ValidTransfer[];
-    disposableIncomeAccounts?: string[];
+    untrackedAccounts?: string[];
+    paycheckDestinationAccounts?: string[];
     excludedAdditionalIncomePatterns?: string[];
     excludeDisposableIncome?: boolean;
     expectedMonthlyPaycheck?: number;
@@ -26,28 +27,7 @@ interface YamlConfig {
         paycheck?: string;
     };
 
-    firefly?: {
-        noNameExpenseAccountId?: string;
-    };
-
-    llm?: {
-        maxTokens?: number;
-        batchSize?: number;
-        maxConcurrent?: number;
-        temperature?: number;
-        model?: string;
-        retryDelayMs?: number;
-        maxRetryDelayMs?: number;
-        rateLimit?: {
-            maxTokensPerMinute?: number;
-            refillInterval?: number;
-        };
-        circuitBreaker?: {
-            failureThreshold?: number;
-            resetTimeout?: number;
-            halfOpenTimeout?: number;
-        };
-    };
+    llm?: DeepPartial<LLMConfig>;
 }
 
 /**
@@ -71,6 +51,10 @@ type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } 
 export class ConfigManager {
     private static instance: ConfigManager | undefined;
     private static configFilePath: string | null = null;
+    /** The configPath argument passed on first initialization (for mismatch detection) */
+    private static initConfigPathArg: string | undefined;
+    /** Resolved .env path, captured statically so it survives a validation throw */
+    private static resolvedEnvPath: string | null = null;
     private config: AppConfig;
     private loadedEnvPath: string | null = null;
 
@@ -90,13 +74,36 @@ export class ConfigManager {
 
     /**
      * Gets the singleton ConfigManager instance
-     * @param configPath Optional path to config file (only used on first initialization)
+     * @param configPath Optional path to config file (only honored on first initialization).
+     * Passing a different path after initialization throws — silently using the
+     * wrong config for financial data would be far worse than a loud error.
      */
     static getInstance(configPath?: string): ConfigManager {
-        if (!ConfigManager.instance) {
-            ConfigManager.instance = new ConfigManager(configPath);
+        if (ConfigManager.instance) {
+            if (configPath !== undefined && configPath !== ConfigManager.initConfigPathArg) {
+                throw new Error(
+                    'ConfigManager already initialized with a different config path; ' +
+                        '--config must be handled before first use'
+                );
+            }
+            return ConfigManager.instance;
         }
+
+        ConfigManager.initConfigPathArg = configPath;
+        ConfigManager.instance = new ConfigManager(configPath);
         return ConfigManager.instance;
+    }
+
+    /**
+     * Gets the config/env paths resolved during initialization — populated even
+     * when the constructor later throws on validation, so error reporting can
+     * show which files were loaded.
+     */
+    static getResolvedPaths(): { configPath: string | null; envPath: string | null } {
+        return {
+            configPath: ConfigManager.configFilePath,
+            envPath: ConfigManager.resolvedEnvPath,
+        };
     }
 
     /**
@@ -128,6 +135,8 @@ export class ConfigManager {
     static resetInstance(): void {
         ConfigManager.instance = undefined;
         ConfigManager.configFilePath = null;
+        ConfigManager.initConfigPathArg = undefined;
+        ConfigManager.resolvedEnvPath = null;
     }
 
     /**
@@ -139,7 +148,7 @@ export class ConfigManager {
     }
 
     /**
-     * Gets the default config file path (~/.budgeting/config.yaml)
+     * Gets the default config file path (~/.budget/config.yaml)
      * @returns Absolute path to default config.yaml
      */
     static getDefaultConfigPath(): string {
@@ -147,7 +156,7 @@ export class ConfigManager {
     }
 
     /**
-     * Gets the default .env file path (~/.budgeting/.env)
+     * Gets the default .env file path (~/.budget/.env)
      * @returns Absolute path to default .env
      */
     static getDefaultEnvPath(): string {
@@ -184,7 +193,7 @@ export class ConfigManager {
             return cwdPath;
         }
 
-        // Priority 3: User home directory ~/.budgeting/config.yaml
+        // Priority 3: User home directory ~/.budget/config.yaml
         const homePath = ConfigManager.getDefaultConfigPath();
         if (fs.existsSync(homePath)) {
             return homePath;
@@ -192,7 +201,7 @@ export class ConfigManager {
 
         // Priority 4: No config file found (use defaults)
         console.warn(
-            'No config.yaml found. Using defaults. Run "budgeting-toolkit init" to create configuration.'
+            'No config.yaml found. Using defaults. Copy config.yaml.example to ~/.budget/config.yaml to create configuration.'
         );
         return null;
     }
@@ -201,7 +210,7 @@ export class ConfigManager {
      * Loads the .env file into process.env from multiple possible locations:
      * 1. ENV_FILE environment variable (if set)
      * 2. Current working directory: ./.env
-     * 3. User home directory: ~/.budgeting/.env
+     * 3. User home directory: ~/.budget/.env
      *
      * Uses dotenv.config which silently ignores missing files (quiet: true)
      * Tracks which .env file was loaded in this.loadedEnvPath
@@ -214,6 +223,7 @@ export class ConfigManager {
                 quiet: true,
             });
             this.loadedEnvPath = process.env.ENV_FILE;
+            ConfigManager.resolvedEnvPath = process.env.ENV_FILE;
             return;
         }
 
@@ -226,10 +236,11 @@ export class ConfigManager {
                 quiet: true,
             });
             this.loadedEnvPath = cwdEnv;
+            ConfigManager.resolvedEnvPath = cwdEnv;
             return;
         }
 
-        // Priority 3: User home directory ~/.budgeting/.env
+        // Priority 3: User home directory ~/.budget/.env
         const homeEnv = ConfigManager.getDefaultEnvPath();
         if (fs.existsSync(homeEnv)) {
             dotenv.config({
@@ -237,6 +248,7 @@ export class ConfigManager {
                 quiet: true,
             });
             this.loadedEnvPath = homeEnv;
+            ConfigManager.resolvedEnvPath = homeEnv;
             return;
         }
 
@@ -311,6 +323,83 @@ export class ConfigManager {
     }
 
     /**
+     * Every key this loader understands. Anything else in the YAML is either a
+     * typo or a setting that has been renamed or removed.
+     */
+    private static readonly KNOWN_YAML_KEYS: ReadonlySet<string> = new Set([
+        'incomeDestinationAccounts',
+        'expenseSourceAccounts',
+        'expenseTransfers',
+        'untrackedAccounts',
+        'paycheckDestinationAccounts',
+        'excludedAdditionalIncomePatterns',
+        'excludeDisposableIncome',
+        'expectedMonthlyPaycheck',
+        'excludedTransactions',
+        'tags',
+        'llm',
+    ]);
+
+    /**
+     * Settings that once existed, mapped to what replaced them.
+     *
+     * A removed key is worse than a misspelled one: the config still looks
+     * deliberate, but the boundary it used to draw is gone. `untrackedAccounts`
+     * defaults to empty, so a config still carrying `disposableIncomeAccounts`
+     * would silently start counting the savings half of payroll as envelope
+     * income — thousands of dollars of phantom Net Cash Flow, with nothing
+     * printed to say why.
+     */
+    private static readonly RENAMED_YAML_KEYS: Readonly<Record<string, string>> = {
+        disposableIncomeAccounts: 'untrackedAccounts',
+    };
+
+    /**
+     * Settings that were removed outright, mapped to why.
+     *
+     * Distinct from a rename: there is nowhere to move the value to, so the
+     * warning has to explain that the behaviour never existed rather than point
+     * somewhere else.
+     */
+    private static readonly REMOVED_YAML_KEYS: Readonly<Record<string, string>> = {
+        firefly: "the only key it held, 'noNameExpenseAccountId', was never read by any code path",
+    };
+
+    /**
+     * Warns about YAML keys this loader does not read.
+     *
+     * Deliberately a warning rather than an error: an unknown key is often a
+     * config written for a newer or older build, and refusing to start would be
+     * a harsher failure than the problem warrants. It must never be silent
+     * though — a key that is ignored without comment reads as applied.
+     */
+    private warnOnUnknownYamlKeys(yamlConfig: YamlConfig): void {
+        for (const key of Object.keys(yamlConfig)) {
+            if (ConfigManager.KNOWN_YAML_KEYS.has(key)) {
+                continue;
+            }
+
+            const replacement = ConfigManager.RENAMED_YAML_KEYS[key];
+            if (replacement) {
+                console.warn(
+                    `⚠️  config.yaml: '${key}' is no longer used — it was replaced by ` +
+                        `'${replacement}'. Its value is being ignored; move it to ` +
+                        `'${replacement}' to restore the behaviour.`
+                );
+                continue;
+            }
+
+            const removedBecause = ConfigManager.REMOVED_YAML_KEYS[key];
+            console.warn(
+                removedBecause
+                    ? `⚠️  config.yaml: '${key}' has been removed — ${removedBecause}. ` +
+                          `It is safe to delete from your config.`
+                    : `⚠️  config.yaml: unknown setting '${key}' is being ignored.`
+            );
+        }
+    }
+
+    /**
      * Applies YAML configuration to the config object
      */
     private applyYamlConfiguration(config: AppConfig): void {
@@ -319,6 +408,8 @@ export class ConfigManager {
         if (!yamlConfig) {
             return; // No YAML file or empty file
         }
+
+        this.warnOnUnknownYamlKeys(yamlConfig);
 
         // Accounts Configuration
         if (yamlConfig.incomeDestinationAccounts) {
@@ -330,8 +421,11 @@ export class ConfigManager {
         if (yamlConfig.expenseTransfers) {
             config.accounts.expenseTransfers = yamlConfig.expenseTransfers;
         }
-        if (yamlConfig.disposableIncomeAccounts) {
-            config.accounts.disposableIncomeAccounts = yamlConfig.disposableIncomeAccounts;
+        if (yamlConfig.untrackedAccounts) {
+            config.accounts.untrackedAccounts = yamlConfig.untrackedAccounts;
+        }
+        if (yamlConfig.paycheckDestinationAccounts) {
+            config.accounts.paycheckDestinationAccounts = yamlConfig.paycheckDestinationAccounts;
         }
 
         // Transaction Configuration
@@ -339,10 +433,10 @@ export class ConfigManager {
             config.transactions.excludedAdditionalIncomePatterns =
                 yamlConfig.excludedAdditionalIncomePatterns;
         }
-        if (yamlConfig.excludeDisposableIncome !== undefined) {
+        if (yamlConfig.excludeDisposableIncome != null) {
             config.transactions.excludeDisposableIncome = yamlConfig.excludeDisposableIncome;
         }
-        if (yamlConfig.expectedMonthlyPaycheck !== undefined) {
+        if (yamlConfig.expectedMonthlyPaycheck != null) {
             config.transactions.expectedMonthlyPaycheck = yamlConfig.expectedMonthlyPaycheck;
         }
         if (yamlConfig.excludedTransactions) {
@@ -351,17 +445,12 @@ export class ConfigManager {
 
         // Tags Configuration
         if (yamlConfig.tags) {
-            if (yamlConfig.tags.disposableIncome !== undefined) {
+            if (yamlConfig.tags.disposableIncome != null) {
                 config.transactions.tags.disposableIncome = yamlConfig.tags.disposableIncome;
             }
-            if (yamlConfig.tags.paycheck !== undefined) {
+            if (yamlConfig.tags.paycheck != null) {
                 config.transactions.tags.paycheck = yamlConfig.tags.paycheck;
             }
-        }
-
-        // Firefly Configuration
-        if (yamlConfig.firefly?.noNameExpenseAccountId) {
-            config.api.firefly.noNameExpenseAccountId = yamlConfig.firefly.noNameExpenseAccountId;
         }
 
         // LLM Configuration - Use deep merge for nested structures
@@ -375,7 +464,8 @@ export class ConfigManager {
      */
     private deepMerge<T extends object>(target: T, source: DeepPartial<T>): void {
         for (const [key, value] of Object.entries(source)) {
-            if (value === undefined) {
+            // Empty YAML scalars parse to null — never let them clobber defaults
+            if (value === undefined || value === null) {
                 continue;
             }
 

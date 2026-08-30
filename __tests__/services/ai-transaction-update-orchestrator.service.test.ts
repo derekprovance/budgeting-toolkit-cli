@@ -24,7 +24,6 @@ import { BudgetService } from '../../src/services/core/budget.service.js';
 import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
-import { TransactionAIResultValidator } from '../../src/services/core/transaction-ai-result-validator.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
 import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
@@ -39,7 +38,6 @@ describe('AITransactionUpdateOrchestrator', () => {
     let mockInteractiveTransactionUpdater: jest.Mocked<InteractiveTransactionUpdater>;
     let mockCategoryService: jest.Mocked<CategoryService>;
     let mockBudgetService: jest.Mocked<BudgetService>;
-    let mockAIValidator: jest.Mocked<TransactionAIResultValidator>;
     let mockLLMService: jest.Mocked<LLMTransactionProcessingService>;
     let mockPropertyService: jest.Mocked<TransactionClassificationService>;
     let mockValidator: jest.Mocked<TransactionValidatorService>;
@@ -143,16 +141,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             getBudgets: jest.fn(),
         } as unknown as jest.Mocked<BudgetService>;
 
-        mockAIValidator = {
-            initialize: jest.fn().mockResolvedValue(undefined),
-            validateAIResults: jest.fn(),
-            getCategoryByName: jest.fn(),
-            getBudgetByName: jest.fn(),
-            getAvailableCategoryNames: jest.fn().mockReturnValue([]),
-            getAvailableBudgetNames: jest.fn().mockReturnValue([]),
-            refresh: jest.fn(),
-        } as unknown as jest.Mocked<TransactionAIResultValidator>;
-
         mockLLMService = {
             processTransactions: jest.fn(),
         } as unknown as jest.Mocked<LLMTransactionProcessingService>;
@@ -194,7 +182,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockInteractiveTransactionUpdater,
             mockCategoryService,
             mockBudgetService,
-            mockAIValidator,
             mockLLMService,
             mockValidator
         );
@@ -373,7 +360,6 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
-                mockAIValidator,
                 mockLLMService,
                 mockValidator,
                 false
@@ -408,7 +394,6 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
-                mockAIValidator,
                 mockLLMService,
                 mockValidator,
                 false
@@ -440,7 +425,6 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockInteractiveTransactionUpdater,
                 mockCategoryService,
                 mockBudgetService,
-                mockAIValidator,
                 mockLLMService,
                 mockValidator,
                 false
@@ -514,8 +498,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
-                [mockCategory.name, '(no category)'],
-                [mockBudget.attributes.name, '(no budget)']
+                [mockCategory.name],
+                [mockBudget.attributes.name]
             );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,
@@ -584,8 +568,8 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockBudgetService.getBudgets).toHaveBeenCalled();
             expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
                 [mockTransaction],
-                [mockCategory.name, '(no category)'],
-                [mockBudget.attributes.name, '(no budget)']
+                [mockCategory.name],
+                [mockBudget.attributes.name]
             );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 mockTransaction,

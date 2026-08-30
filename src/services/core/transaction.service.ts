@@ -9,6 +9,8 @@ import { IDateRangeService } from '../../types/interface/date-range.service.inte
 import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
 import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
+import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 
 class TransactionError extends Error {
     constructor(
@@ -20,12 +22,14 @@ class TransactionError extends Error {
     }
 }
 
-type TransactionCache = Map<string, TransactionSplit[]>;
+type TransactionCache = Map<string, Promise<TransactionSplit[]>>;
 type TransactionSplitIndex = Map<string, TransactionRead>;
 export class TransactionService implements ITransactionService {
     private readonly cache: TransactionCache;
     private readonly splitTransactionIdx: TransactionSplitIndex;
     private readonly logger: ILogger;
+    /** Splits removed by the exclusion list, per cache key */
+    private readonly excludedByKey: Map<string, TransactionSplit[]>;
 
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
@@ -37,6 +41,7 @@ export class TransactionService implements ITransactionService {
         this.cache = cacheImplementation;
         this.splitTransactionIdx = new Map();
         this.logger = logger;
+        this.excludedByKey = new Map();
     }
 
     /**
@@ -55,15 +60,37 @@ export class TransactionService implements ITransactionService {
         }
     }
 
+    /**
+     * Retrieves the transactions for a month that the exclusion list removed.
+     * Shares the same fetch as getTransactionsForMonth.
+     */
+    async getExcludedTransactionsForMonth(
+        month: number,
+        year: number
+    ): Promise<TransactionSplit[]> {
+        const cacheKey = `month-${month}-year-${year}`;
+        // Awaiting the normal fetch guarantees the excluded set is populated
+        await this.getTransactionsForMonth(month, year);
+        return this.excludedByKey.get(cacheKey) ?? [];
+    }
+
+    /**
+     * The date of the most recent transaction, for reporting how current the
+     * data is.
+     *
+     * Deliberately the transaction's own `date`, not the record's `created_at`.
+     * Firefly lists newest-by-date first, so `created_at` would answer "when
+     * was this imported" — importing a backdated batch today would report data
+     * current as of today, which is the false reassurance this exists to
+     * prevent.
+     */
     async getMostRecentTransactionDate(): Promise<Date | null> {
         const response = await this.client.transactions.listTransaction(undefined, 1);
         if (!response || !response.data || response.data.length === 0) {
             throw new Error(`Failed to fetch transactions`);
         }
-        const transaction = response.data[0];
-        return transaction.attributes && transaction.attributes.created_at
-            ? new Date(transaction.attributes.created_at)
-            : null;
+        const date = response.data[0]?.attributes?.transactions?.[0]?.date;
+        return date ? new Date(date) : null;
     }
 
     /**
@@ -124,7 +151,7 @@ export class TransactionService implements ITransactionService {
         );
 
         try {
-            const transactionRead = await this.getTransactionReadBySplit(transaction);
+            const transactionRead = this.getTransactionReadBySplit(transaction);
             if (!transactionRead?.id) {
                 this.logger.error(
                     {
@@ -184,35 +211,51 @@ export class TransactionService implements ITransactionService {
         return result;
     }
 
-    /**
-     * Clears the transaction cache
-     */
-    clearCache(): void {
-        this.cache.clear();
-        this.splitTransactionIdx.clear();
-    }
-
-    private async getFromCacheOrFetch(
+    private getFromCacheOrFetch(
         key: string,
         fetchFn: () => Promise<TransactionRead[]>
     ): Promise<TransactionSplit[]> {
-        const cached = this.cache.get(key);
-        if (cached) {
-            return cached;
+        // Cache the in-flight promise, not the resolved value: concurrent callers
+        // with the same key (e.g. the analyze command's parallel services) share
+        // one API fetch instead of stampeding.
+        const inflight = this.cache.get(key);
+        if (inflight) {
+            return inflight;
         }
 
-        const data = await fetchFn();
+        const promise = (async () => {
+            const data = await fetchFn();
 
-        let transactions = this.flattenTransactions(data);
-        transactions = transactions.filter(
-            trx =>
-                !this.excludedTransactionService.isExcludedTransaction(trx.description, trx.amount)
-        );
+            const transactions: TransactionSplit[] = [];
+            const excluded: TransactionSplit[] = [];
 
-        this.cache.set(key, transactions);
-        this.storeTransactionSplitInIndex(data);
+            for (const trx of TransactionCalculationUtils.flattenTransactions(data)) {
+                if (
+                    this.excludedTransactionService.isExcludedTransaction(
+                        trx.description,
+                        trx.amount
+                    )
+                ) {
+                    excluded.push(trx);
+                } else {
+                    transactions.push(trx);
+                }
+            }
 
-        return transactions;
+            this.excludedByKey.set(key, excluded);
+            this.storeTransactionSplitInIndex(data);
+
+            return transactions;
+        })();
+
+        this.cache.set(key, promise);
+        // Don't cache failures — let the next caller retry
+        promise.catch(() => {
+            this.cache.delete(key);
+            this.excludedByKey.delete(key);
+        });
+
+        return promise;
     }
 
     private storeTransactionSplitInIndex(transactions: TransactionRead[]) {
@@ -243,11 +286,11 @@ export class TransactionService implements ITransactionService {
     }
 
     private async fetchTransactionsByTag(tag: string): Promise<TransactionRead[]> {
-        const response = await this.client.tags.listTransactionByTag(tag);
-        if (!response || !response.data) {
-            throw new Error(`Failed to fetch transactions for tag: ${tag}`);
-        }
-        return response.data;
+        return fetchAllPages(
+            page => this.client.tags.listTransactionByTag(tag, undefined, PAGE_SIZE, page),
+            `fetch transactions for tag: ${tag}`,
+            this.logger
+        );
     }
 
     private async fetchTransactionsFromAPIByMonth(
@@ -255,21 +298,18 @@ export class TransactionService implements ITransactionService {
         year: number
     ): Promise<TransactionRead[]> {
         const range = this.dateRangeService.getDateRange(month, year);
-        const response = await this.client.transactions.listTransaction(
-            undefined, // xTraceId
-            undefined, // limit
-            undefined, // page
-            range.startDate.toISOString().split('T')[0],
-            range.endDate.toISOString().split('T')[0]
+        return fetchAllPages(
+            page =>
+                this.client.transactions.listTransaction(
+                    undefined, // xTraceId
+                    PAGE_SIZE,
+                    page,
+                    range.startDateString,
+                    range.endDateString
+                ),
+            `fetch transactions for month: ${month}`,
+            this.logger
         );
-        if (!response || !response.data) {
-            throw new Error(`Failed to fetch transactions for month: ${month}`);
-        }
-        return response.data;
-    }
-
-    private flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
-        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
     }
 
     private generateSplitTransactionKey(tx: TransactionSplit): string {

@@ -17,21 +17,32 @@ The application uses two configuration files:
 # Firefly III API Configuration
 FIREFLY_API_URL=https://your-firefly-instance.com
 FIREFLY_API_TOKEN=your_api_token_here
-
-# Anthropic Claude API (required for AI categorization)
-ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 ### Optional Variables
 
 ```bash
-# Logging
+# Anthropic Claude API - required ONLY by the categorize command
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Logging. Default is `silent`, not `info`.
 LOG_LEVEL=info  # Options: trace, debug, info, warn, error, silent
 
-# mTLS Certificate Authentication (optional)
-CLIENT_CERT_CA_PATH=../certs/ca.pem
-CLIENT_CERT_PATH=../certs/client.p12
-CLIENT_CERT_PASSWORD=your_certificate_password
+# mTLS Certificate Authentication (optional).
+# Leave blank unless you use mTLS: a non-empty path that does not exist fails
+# startup validation.
+CLIENT_CERT_CA_PATH=
+CLIENT_CERT_PATH=
+CLIENT_CERT_PASSWORD=
+
+# Force or disable TLS certificate validation. Unset picks an intelligent
+# default: enabled when a CA cert is provided, disabled otherwise.
+STRICT_TLS=
+
+# Absolute path to a .env file. Highest priority in the .env search order,
+# ahead of ./.env and ~/.budget/.env. This is what `npm run start:dev`,
+# `npm run seed:docker`, and `npm run test:e2e:docker` use.
+ENV_FILE=
 ```
 
 **Notes:**
@@ -39,8 +50,6 @@ CLIENT_CERT_PASSWORD=your_certificate_password
 - The `FIREFLY_API_URL` should not include a trailing slash
 - The URL will have `/api` automatically appended
 - Certificate paths can be absolute or relative to the project root
-
-## YAML Configuration (config.yaml)
 
 ## Command-Specific Configuration Requirements
 
@@ -51,12 +60,13 @@ Use this quick reference to see what each command needs:
 **Required:**
 
 - `expectedMonthlyPaycheck` - Expected monthly income
-- `incomeDestinationAccounts[]` - At least one account ID
-- `expenseSourceAccounts[]` - At least one account ID
+
+Account scope is derived from Firefly and needs no configuration. See
+`untrackedAccounts` below if you hold a brokerage or similar.
 
 **Recommended:**
 
-- `excludedAdditionalIncomePatterns[]` - Exclude patterns like "PAYROLL"
+- `excludedAdditionalIncomePatterns[]` - Descriptions that must not count as additional income (do **not** use `PAYROLL` — see below)
 - `excludeDisposableIncome` - true/false
 - `tags.*` - Custom tag names
 
@@ -84,7 +94,6 @@ Use this quick reference to see what each command needs:
 **Recommended:**
 
 - `llm.model` - Claude model to use
-- `llm.temperature` - 0.1-0.3 for consistent categorization
 - `llm.batchSize` - Transactions per batch (default: 10)
 - `llm.maxConcurrent` - Concurrent requests (default: 3)
 
@@ -112,23 +121,95 @@ expectedMonthlyPaycheck: 5000.00
 **Default:** `undefined`
 **Used by:** Analyze command
 
-#### incomeDestinationAccounts
+#### Account scope (derived)
 
-List of account IDs that are valid destinations for income. Checked against the `destination_id` of **deposit** transactions only.
+Which accounts count as income destinations and expense sources is derived from
+Firefly's own `account_role`, so the lists cannot drift out of date as accounts
+are added:
+
+```
+income destinations = active asset accounts, role != ccAsset, minus untracked
+expense sources     = active asset accounts,                  minus untracked
+```
+
+Credit cards are excluded from income because deposits to them are refunds and
+statement credits, never income. Inactive accounts are excluded from both.
+
+#### untrackedAccounts
+
+Accounts outside the budget's boundary. Deposits to them are **not income** and
+withdrawals from them are **not spending** — both sides move together.
 
 ```yaml
-incomeDestinationAccounts:
-    - '1' # Checking Account
-    - '2' # Savings Account
+untrackedAccounts:
+    - '27' # Brokerage - outflows are fund transfers, not spending
+    - '2' # Savings - outside the cost-of-living envelope by intent
 ```
 
 **Type:** `string[]`
 **Default:** `[]`
-**Used by:** Additional income calculations
+**Used by:** Account scope derivation
 
-#### expenseSourceAccounts
+That symmetry is the point. Excluding an account's income while still charging
+its spending manufactures a deficit that never happened, so this is an account
+boundary rather than an income filter. Two distinct cases share the list:
 
-List of account IDs (asset accounts) that expenses source from. Checked against the `source_id` of **withdrawal** transactions only — this is the account the money is withdrawn FROM (e.g., checking account), not the merchant destination.
+- **Excluded by necessity.** A brokerage carries the same `savingAsset` role as
+  an ordinary savings account, but its outflows are fund transfers rather than
+  purchases. Firefly cannot tell them apart; listing it here keeps a large
+  internal rebalance out of your spending total.
+- **Excluded by intent.** An account holding money you have deliberately put
+  beyond the budget — a savings account that receives earmarked income and funds
+  investment buys or tax payments. None of that is the spending you are
+  measuring.
+
+Nothing disappears silently: withdrawals from these accounts are listed under
+**Untracked Spending** in the `report` command, a diagnostic that is explicitly
+not part of the net.
+
+Note this does not hide everything. A withdrawal whose **source** is a tracked
+account still counts as spending, even when the money is headed somewhere
+untracked — that money did leave the tracked world.
+
+#### paycheckDestinationAccounts
+
+Accounts a `Paycheck`-tagged transaction must be **destined for** to count as the
+paycheck.
+
+```yaml
+paycheckDestinationAccounts:
+    - '1' # Checking
+```
+
+**Type:** `string[]`
+**Default:** `[]` (the tag alone decides)
+**Used by:** `analyze`
+
+Use it when payroll is split across accounts and only one half is the paycheck. A
+stray tag on the other half is then disregarded instead of inflating paycheck
+income — real data has carried exactly those stray tags.
+
+The constraint lives inside `isPaycheck()`, so one predicate decides both what
+`PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside
+for; the two can never both claim a transaction.
+
+**Rejection from the paycheck bucket is not a promotion to additional income.** A
+rejected transaction lands there only if it independently passes that service's
+filters: it must be a deposit, its destination must still be a derived income
+destination, and it must not match `excludedAdditionalIncomePatterns`. When the
+other half's account is in `untrackedAccounts`, it is counted in **no bucket at
+all** — which is the point when that money is deliberately outside the budget.
+
+**This setting is also the only thing scoping the paycheck bucket.** Unlike every
+other bucket, `isPaycheck` and `PaycheckSurplusService` never consult the derived
+account scope. With the default empty list, a Paycheck-tagged deposit into an
+untracked account would count as income despite the account being outside the
+boundary. If your payroll is split, set this.
+
+#### incomeDestinationAccounts / expenseSourceAccounts (overrides)
+
+Both default to `[]`, which means "derive". Setting either to a non-empty list
+replaces derivation entirely **for that side**.
 
 ```yaml
 expenseSourceAccounts:
@@ -137,12 +218,11 @@ expenseSourceAccounts:
 ```
 
 **Type:** `string[]`
-**Default:** `[]`
-**Used by:** Unbudgeted expense calculations
+**Default:** `[]` (derive)
 
-**Important:** These should be asset-type accounts (checking, savings, credit cards) that money is withdrawn FROM, not expense-type merchant accounts.
-
-**Note on overlap:** `incomeDestinationAccounts` and `expenseSourceAccounts` are independent checks on different transaction fields (deposit destination vs. withdrawal source) — they are not two separate pools of accounts. The same account ID commonly belongs in both lists. For example, Checking Account `'1'` above appears in both because paychecks deposit into it *and* debit purchases withdraw from it.
+Use these only when a Firefly `account_role` is wrong and you would rather not
+correct it there. Prefer fixing the role — an override is a second source of
+truth that has to be maintained by hand, which is what derivation replaced.
 
 #### expenseTransfers
 
@@ -168,15 +248,32 @@ Transaction description patterns to exclude from additional income.
 
 ```yaml
 excludedAdditionalIncomePatterns:
-    - 'PAYROLL'
     - 'ATM FEE'
-    - 'TRANSFER'
 ```
 
 **Type:** `string[]`
 **Default:** `[]`
-**Matching:** Case-insensitive substring matching
-**Used by:** Additional income calculations
+**Matching:** Case-insensitive **whole-word**, not substring (see below)
+**Used by:** Additional income calculations only
+
+`StringUtils.matchesAnyPattern` splits both the pattern and the description on
+non-alphanumeric characters and requires a contiguous run of whole words. So
+`TRANSFER` does **not** match `Transferwise`, and a pattern fused into a longer
+word (`ACHPAYROLLDEP`) does not match at all — write patterns as they appear as
+words.
+
+Two patterns to avoid:
+
+- **`TRANSFER`** — additional income already filters on deposit type, so real
+  transfers never reach this list. The pattern can only discard legitimate
+  deposits that happen to say "transfer", such as `STRIPE TRANSFER`.
+- **`PAYROLL`** — if a payroll deposit genuinely is not budget income to you,
+  exclude its destination account via `untrackedAccounts` instead. Description
+  matching fixes only the income side, leaving spending funded from that account
+  charged against your budget; the account boundary excludes both sides at once.
+
+This list is consulted only by `AdditionalIncomeService`, so a pattern here can
+never affect the paycheck bucket.
 
 #### excludeDisposableIncome
 
@@ -238,48 +335,38 @@ excludedTransactions:
     - description: 'STOCK INVESTMENT'
       reason: 'Investment purchase'
 
-    # Match by description and amount (exact match)
+    # Match by description, narrowed to one amount
     - description: 'Monthly Rent'
       amount: '1200.00'
       reason: 'Rent payment'
-
-    # Match by amount only (any description)
-    - amount: '999.99'
-      reason: 'Specific amount to exclude'
 ```
 
-**Type:** `array of {description?: string, amount?: string, reason?: string}`
+**Type:** `array of {description: string, amount?: string, reason?: string}`
 **Default:** `[]`
 **Used by:** All commands
 
 **Matching Rules:**
 
-- At least one field (`description` or `amount`) is required
-- `reason` is optional but recommended for documentation
-- Description matching is case-insensitive substring matching
-- Amount matching is exact string comparison
-- Both fields must match if both are provided
+- `description` is **required**, and is matched as **whole-string equality** after
+  trimming and lower-casing — not a substring match. `'STOCK INVESTMENT'` does not
+  match `'STOCK INVESTMENT 401K'`
+- `amount` is optional and narrows a rule to a single amount. Currency formatting
+  is accepted (`'$1,200.00'`, `'(1200.00)'`), and the comparison is **numeric on
+  absolute value**, so it ignores direction — a $1200 refund matches a $1200 charge
+- When `amount` is given, both fields must match
+- `reason` is free text for your own benefit; nothing reads it
 
-### Firefly III Settings
+**Amount-only rules are rejected at startup.** Exclusion is applied at fetch time, so
+a match removes the transaction from every bucket in every command. A rule with no
+description would drop every transaction of that amount, on any account, in either
+direction — the opposite of what this tool is for. A malformed `amount` is rejected
+too, rather than silently parsing to something that matches nothing:
 
-#### noNameExpenseAccountId
-
-ID of the "(no name)" expense account that Firefly III creates automatically.
-
-```yaml
-firefly:
-    noNameExpenseAccountId: '5'
 ```
-
-**Type:** `string`
-**Default:** `''`
-**Used by:** Transaction classification
-
-**How to find:**
-
-1. Go to Firefly III → Accounts
-2. Look for "(no name)" in expense accounts
-3. Note the account ID from the URL
+Configuration validation failed:
+  - transactions.excludedTransactions[2]: 'description' is required (amount-only exclusions are not supported)
+  - transactions.excludedTransactions[3].amount must be a valid amount (got: twelve hundred)
+```
 
 ### AI/LLM Configuration
 
@@ -289,50 +376,33 @@ Advanced settings for Claude AI integration.
 
 ```yaml
 llm:
-    model: 'claude-sonnet-4-5'
-    temperature: 0.2
-    maxTokens: 1000
+    model: 'claude-sonnet-5'
+    maxTokens: 16000
     batchSize: 10
     maxConcurrent: 3
 ```
 
 **Options:**
 
-| Setting         | Type     | Default               | Description                                           |
-| --------------- | -------- | --------------------- | ----------------------------------------------------- |
-| `model`         | `string` | `'claude-sonnet-4-5'` | Claude model version to use                           |
-| `temperature`   | `number` | `0.2`                 | Response randomness (0-1, lower = more deterministic) |
-| `maxTokens`     | `number` | `2048`                | Maximum tokens per API response                       |
-| `batchSize`     | `number` | `10`                  | Number of transactions processed per batch            |
-| `maxConcurrent` | `number` | `2`                   | Maximum concurrent API requests                       |
+| Setting         | Type     | Default             | Description                                |
+| --------------- | -------- | ------------------- | ------------------------------------------ |
+| `model`         | `string` | `'claude-sonnet-5'` | Claude model version to use                |
+| `maxTokens`     | `number` | `16000`             | Maximum tokens per API response            |
+| `batchSize`     | `number` | `10`                | Number of transactions processed per batch |
+| `maxConcurrent` | `number` | `3`                 | Maximum concurrent API requests            |
 
 **Performance Notes:**
 
 - Batch processing reduces API calls by 80-90%
 - Lower `maxConcurrent` values prevent rate limiting
 - Higher `batchSize` improves efficiency but uses more tokens
-- `temperature` of 0.1-0.3 recommended for consistent categorization
 
-#### Retry Configuration
+#### Retries
 
-```yaml
-llm:
-    retryDelayMs: 1000
-    maxRetryDelayMs: 32000
-```
-
-**Options:**
-
-| Setting           | Type     | Default | Description                               |
-| ----------------- | -------- | ------- | ----------------------------------------- |
-| `retryDelayMs`    | `number` | `1000`  | Initial retry delay in milliseconds       |
-| `maxRetryDelayMs` | `number` | `32000` | Maximum retry delay (exponential backoff) |
-
-**Behavior:**
-
-- Exponential backoff: 1s → 2s → 4s → 8s → 16s → 32s
-- Retries on network errors and rate limiting
-- Automatic retry with increasing delays
+Retries are **not** configurable from YAML. They are owned entirely by the
+Anthropic SDK, which applies exponential backoff and honors the `retry-after`
+header on rate-limit responses. The attempt count comes from
+`api.claude.maxRetries` (default `3`, set in `config.defaults.ts`).
 
 #### Rate Limiting
 
@@ -363,7 +433,6 @@ llm:
     circuitBreaker:
         failureThreshold: 5
         resetTimeout: 60000
-        halfOpenTimeout: 30000
 ```
 
 **Options:**
@@ -372,7 +441,6 @@ llm:
 | ------------------ | -------- | ------- | --------------------------------- |
 | `failureThreshold` | `number` | `5`     | Failures before opening circuit   |
 | `resetTimeout`     | `number` | `60000` | Time before attempting reset (ms) |
-| `halfOpenTimeout`  | `number` | `30000` | Time in half-open state (ms)      |
 
 **States:**
 
@@ -401,7 +469,7 @@ Configuration is validated at two levels:
 **Startup Validation (ConfigValidator):**
 
 - Format validation: URLs are valid, numbers in correct ranges
-- Type validation: temperature 0-1, positive numbers, valid log levels
+- Type validation: positive numeric LLM settings, valid log levels
 - File existence: Certificate paths if specified
 - Firefly API credentials present
 
@@ -426,14 +494,12 @@ If validation fails, you'll see:
 ```yaml
 # config.yaml (minimal)
 expectedMonthlyPaycheck: 5000.00
-incomeDestinationAccounts:
-    - '1'
-expenseSourceAccounts:
-    - '3'
 
 firefly:
     noNameExpenseAccountId: '5'
 ```
+
+Account scope is derived, so a minimal config names no accounts at all.
 
 ### Advanced Configuration
 
@@ -441,28 +507,24 @@ firefly:
 # config.yaml (advanced)
 expectedMonthlyPaycheck: 5500.00
 
-incomeDestinationAccounts:
-    - '1' # Checking
-    - '2' # Savings
+untrackedAccounts:
+    - '27' # Brokerage - outflows are fund transfers, not spending
 
-expenseSourceAccounts:
-    - '1' # Checking (debit purchases also withdraw from here)
-    - '3' # Credit Card
+paycheckDestinationAccounts:
+    - '1' # Only a deposit landing here counts as the paycheck
 
 expenseTransfers:
     - source: '10'
       destination: '1'
 
 excludedAdditionalIncomePatterns:
-    - 'PAYROLL'
     - 'ATM FEE'
-    - 'TRANSFER'
 
 excludeDisposableIncome: true
 
 tags:
     disposableIncome: 'Fun Money'
-    bills: 'Monthly Bills'
+    paycheck: 'Salary'
 
 excludedTransactions:
     - description: 'STOCK PURCHASE'
@@ -477,13 +539,10 @@ firefly:
     noNameExpenseAccountId: '5'
 
 llm:
-    model: 'claude-sonnet-4-5'
-    temperature: 0.15
-    maxTokens: 2000
+    model: 'claude-sonnet-5'
+    maxTokens: 16000
     batchSize: 15
     maxConcurrent: 3
-    retryDelayMs: 1000
-    maxRetryDelayMs: 32000
 
     rateLimit:
         maxTokensPerMinute: 40000
@@ -492,7 +551,6 @@ llm:
     circuitBreaker:
         failureThreshold: 5
         resetTimeout: 60000
-        halfOpenTimeout: 30000
 ```
 
 ## Troubleshooting

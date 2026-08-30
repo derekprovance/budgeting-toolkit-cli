@@ -3,6 +3,8 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { StringUtils } from '../utils/string.utils.js';
+import { AccountScopeService } from './core/account-scope.service.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
  * Service for calculating additional income.
@@ -12,10 +14,21 @@ import { StringUtils } from '../utils/string.utils.js';
  * A transaction is considered additional income if:
  * - It is a deposit (not a withdrawal or transfer)
  * - It goes to a valid destination account
- * - It is not payroll
- * - It meets the minimum amount requirement (if specified)
+ * - It is not tagged as a paycheck (PaycheckSurplusService owns those)
+ * - It does not match an excluded description pattern
  * - It is not disposable income (if configured)
  * - It is not in the excluded transactions list
+ *
+ * The destination check is what keeps income outside the tracked boundary out
+ * of the report: deposits into an `untrackedAccounts` entry are rejected here.
+ * When the paycheck bucket also turns them away they are charged to no bucket
+ * at all, which is intended — see CLAUDE.md, "The account boundary". This
+ * service is NOT a catch-all for whatever the paycheck bucket rejected.
+ *
+ * Note the paycheck bucket does NOT apply the account boundary itself: it is
+ * gated only by the tag and `paycheckDestinationAccounts`. A Paycheck-tagged
+ * deposit into an untracked account is excluded here but would still be counted
+ * as paycheck income unless `paycheckDestinationAccounts` rules it out.
  *
  * Description matching is normalized to handle variations (case insensitive, trimmed, etc.)
  */
@@ -23,12 +36,11 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
-        private readonly validDestinationAccounts: string[],
+        private readonly accountScope: AccountScopeService,
         private readonly excludedAdditionalIncomePatterns: readonly string[],
         private readonly excludeDisposableIncome: boolean
     ) {
         super(transactionService, transactionClassificationService);
-        this.validateConfig();
     }
 
     /**
@@ -47,13 +59,18 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * Analyzes transactions to identify additional income.
      * Implements domain-specific filtering logic.
      */
-    protected analyzeTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+    protected async analyzeTransactions(
+        transactions: TransactionSplit[]
+    ): Promise<TransactionSplit[]> {
         if (!transactions?.length) {
             this.logger.debug('No transactions provided for analysis');
             return [];
         }
 
-        const additionalIncome = this.filterTransactions(transactions);
+        // Resolved here rather than injected: the scope is derived from Firefly
+        // and the factory that builds this service is synchronous.
+        const validDestinationAccounts = await this.accountScope.getIncomeDestinations();
+        const additionalIncome = this.filterTransactions(transactions, validDestinationAccounts);
 
         if (!additionalIncome.length) {
             this.logger.debug('No additional income found after filtering');
@@ -67,39 +84,27 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
     }
 
     /**
-     * Validates the configuration to ensure it's valid.
-     *
-     * Must have at least one valid destination account
-     */
-    private validateConfig(): void {
-        if (!this.validDestinationAccounts.length) {
-            throw new Error('At least one valid destination account must be specified');
-        }
-
-        if (!this.excludedAdditionalIncomePatterns.length) {
-            this.logger.warn(
-                'No excluded descriptions specified - all deposits will be considered additional income'
-            );
-        }
-    }
-
-    /**
      * Filters transactions to find additional income.
      *
      * 1. Must be a deposit
      * 2. Must go to a valid destination account
-     * 3. Must not be payroll
-     * 4. Must meet minimum amount requirement
-     * 5. Must not be disposable income (if configured)
-     * 6. Must not be in excluded transactions list
+     * 3. Must not be a paycheck — those are counted by PaycheckSurplusService,
+     *    and counting them here too would double-count income in the net
+     * 4. Must not match an excluded description pattern
+     * 5. Must have a positive amount
+     * 6. Must not be disposable income (if configured)
      */
-    private filterTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
+    private filterTransactions(
+        transactions: TransactionSplit[],
+        validDestinationAccounts: string[]
+    ): TransactionSplit[] {
         return transactions.filter(
             transaction =>
                 this.transactionClassificationService.isDeposit(transaction) &&
-                this.hasValidDestinationAccount(transaction) &&
+                this.hasValidDestinationAccount(transaction, validDestinationAccounts) &&
+                !this.transactionClassificationService.isPaycheck(transaction) &&
                 this.isNotPayroll(transaction) &&
-                Number(transaction.amount) > 0 &&
+                TransactionCalculationUtils.parseAmountSafe(transaction.amount) > 0 &&
                 (!this.excludeDisposableIncome ||
                     !this.transactionClassificationService.isDisposableIncome(transaction))
         );
@@ -111,9 +116,12 @@ export class AdditionalIncomeService extends BaseTransactionAnalysisService<Tran
      * 1. Must have a destination account
      * 2. Destination account must be in the valid accounts list
      */
-    private hasValidDestinationAccount = (transaction: TransactionSplit): boolean =>
+    private hasValidDestinationAccount = (
+        transaction: TransactionSplit,
+        validDestinationAccounts: string[]
+    ): boolean =>
         transaction.destination_id != null &&
-        this.validDestinationAccounts.includes(transaction.destination_id);
+        validDestinationAccounts.includes(transaction.destination_id);
 
     /**
      * Checks if a transaction is not payroll.

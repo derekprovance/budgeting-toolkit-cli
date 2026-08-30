@@ -6,11 +6,27 @@ import { ILogger } from '../types/interface/logger.interface.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /**
+ * Paycheck figures for a month, reported together.
+ *
+ * `actual` is returned directly rather than left to be rebuilt from
+ * `expected + surplus`: that reconstruction only works while the caller's copy
+ * of the expected amount matches this service's, which nothing enforces.
+ */
+export interface PaycheckAnalysis {
+    /** Total actually received, net of any paycheck-tagged clawbacks */
+    actual: number;
+    /** Expected monthly paycheck from configuration, or 0 when unset */
+    expected: number;
+    /** actual - expected; positive means earned more than expected */
+    surplus: number;
+}
+
+/**
  * Service for calculating paycheck surplus (difference between actual and expected paychecks).
  *
  * Extends BaseTransactionAnalysisService for consistent error handling and Result types.
  */
-export class PaycheckSurplusService extends BaseTransactionAnalysisService<number> {
+export class PaycheckSurplusService extends BaseTransactionAnalysisService<PaycheckAnalysis> {
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
@@ -26,7 +42,7 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
      *
      * @param month - The month to calculate for (1-12)
      * @param year - The year to calculate for
-     * @returns Result containing surplus amount or error
+     * @returns Result containing the actual, expected and surplus amounts
      */
     async calculatePaycheckSurplus(month: number, year: number) {
         return this.executeAnalysis(month, year);
@@ -40,26 +56,26 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): number {
+    ): PaycheckAnalysis {
         const paycheckCandidates = this.findPaychecks(transactions);
-        const expectedPaycheckAmount = this.getExpectedPaycheckAmount();
-        const totalPaycheckAmount = this.calculateTotalPaycheckAmount(paycheckCandidates);
+        const expected = this.getExpectedPaycheckAmount();
+        const actual = this.calculateTotalPaycheckAmount(paycheckCandidates);
 
-        const surplus = totalPaycheckAmount - expectedPaycheckAmount;
+        const surplus = actual - expected;
 
         this.logger.debug(
             {
                 month,
                 year,
-                expectedPaycheckAmount,
-                totalPaycheckAmount,
+                expected,
+                actual,
                 surplus,
                 paycheckCount: paycheckCandidates.length,
             },
             'Calculated paycheck surplus'
         );
 
-        return surplus;
+        return { actual, expected, surplus };
     }
 
     protected getOperationName(): string {
@@ -84,7 +100,7 @@ export class PaycheckSurplusService extends BaseTransactionAnalysisService<numbe
      * Calculates total paycheck amount from a list of paycheck transactions.
      */
     private calculateTotalPaycheckAmount(paychecks: TransactionSplit[]): number {
-        return TransactionCalculationUtils.calculateTransactionTotal(paychecks, false, this.logger);
+        return TransactionCalculationUtils.calculateNetIncome(paychecks, this.logger);
     }
 
     /**

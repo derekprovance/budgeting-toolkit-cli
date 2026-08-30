@@ -1,461 +1,329 @@
 import '../../__tests__/setup/mock-logger';
-import { mockLogger } from '../setup/mock-logger.js';
-import { ClaudeClient, ChatMessage } from '../../src/api/claude.client.js';
+import {
+    ClaudeClient,
+    ChatMessage,
+    CircuitOpenError,
+    ClaudeResponseError,
+} from '../../src/api/claude.client.js';
+import { LLMConfig } from '../../src/config/config.types.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { jest } from '@jest/globals';
+
+const testLlmConfig: LLMConfig = {
+    model: 'claude-sonnet-5',
+    maxTokens: 2000,
+    batchSize: 10,
+    maxConcurrent: 3,
+    rateLimit: {
+        maxTokensPerMinute: 1000,
+        refillInterval: 60000,
+    },
+    circuitBreaker: {
+        failureThreshold: 5,
+        resetTimeout: 60000,
+    },
+};
+
+const textResponse = (text: string): Anthropic.Message =>
+    ({
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text }],
+        model: 'claude-sonnet-5',
+        stop_reason: 'end_turn',
+        stop_sequence: null,
+        usage: { input_tokens: 10, output_tokens: 10 },
+    }) as unknown as Anthropic.Message;
 
 describe('ClaudeClient', () => {
     let client: ClaudeClient;
     let mockAnthropicClient: jest.Mocked<Anthropic>;
     let mockMessagesCreate: jest.Mock<() => Promise<Anthropic.Message>>;
 
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+
     beforeEach(() => {
         jest.clearAllMocks();
-        mockLogger.debug.mockClear();
-        mockLogger.info.mockClear();
-        mockLogger.warn.mockClear();
-        mockLogger.error.mockClear();
 
-        // Create mock for Anthropic client
         mockMessagesCreate = jest.fn<() => Promise<Anthropic.Message>>();
         mockAnthropicClient = {
             messages: {
                 create: mockMessagesCreate,
             },
         } as unknown as jest.Mocked<Anthropic>;
-    });
 
-    describe('constructor', () => {
-        it('should initialize with default configuration', () => {
-            client = new ClaudeClient({}, mockAnthropicClient);
-
-            expect(client).toBeDefined();
-            const config = client.getConfig();
-            expect(config.model).toBe('claude-sonnet-4-5');
-        });
-
-        it('should initialize with custom configuration', () => {
-            client = new ClaudeClient(
-                {
-                    apiKey: 'test-api-key',
-                    model: 'claude-opus-4',
-                    maxTokens: 4000,
-                    temperature: 0.5,
-                },
-                mockAnthropicClient
-            );
-
-            expect(client).toBeDefined();
-            const config = client.getConfig();
-            expect(config.model).toBe('claude-opus-4');
-            expect(config.maxTokens).toBe(4000);
-            expect(config.temperature).toBe(0.5);
-        });
-
-        it('should filter out undefined values from config', () => {
-            client = new ClaudeClient(
-                {
-                    apiKey: 'test-key',
-                    topP: undefined,
-                    topK: undefined,
-                },
-                mockAnthropicClient
-            );
-
-            const config = client.getConfig();
-            expect(config.topP).toBeUndefined();
-            expect(config.topK).toBeUndefined();
-        });
+        client = new ClaudeClient({}, mockAnthropicClient, testLlmConfig);
     });
 
     describe('chat', () => {
-        beforeEach(() => {
-            client = new ClaudeClient({ apiKey: 'test-key' }, mockAnthropicClient);
+        it('should successfully make a chat request and return text', async () => {
+            mockMessagesCreate.mockResolvedValue(textResponse('Hello there'));
+
+            const result = await client.chat(messages);
+
+            expect(result).toBe('Hello there');
+            expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
         });
 
-        it('should successfully make a chat request', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Hello, Claude!' }];
-
+        it('should join multiple text blocks', async () => {
             mockMessagesCreate.mockResolvedValue({
+                ...textResponse(''),
                 content: [
-                    {
-                        type: 'text',
-                        text: 'Hello! How can I help you?',
-                    },
+                    { type: 'text', text: 'First' },
+                    { type: 'text', text: 'Second' },
                 ],
-            });
+            } as unknown as Anthropic.Message);
 
-            const response = await client.chat(messages);
+            const result = await client.chat(messages);
 
-            expect(response).toBe('Hello! How can I help you?');
-            expect(mockMessagesCreate).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    model: 'claude-sonnet-4-5',
-                    messages,
-                    max_tokens: 2000,
-                    temperature: 0.2,
-                })
-            );
+            expect(result).toBe('First\nSecond');
         });
 
-        it('should handle multiple text blocks in response', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
+        it('should not send temperature, top_p, top_k, or stop_sequences', async () => {
+            mockMessagesCreate.mockResolvedValue(textResponse('ok'));
 
-            mockMessagesCreate.mockResolvedValue({
-                content: [
-                    { type: 'text', text: 'First part' },
-                    { type: 'text', text: 'Second part' },
-                ],
-            });
+            await client.chat(messages);
 
-            const response = await client.chat(messages);
-
-            expect(response).toBe('First part\nSecond part');
+            const params = mockMessagesCreate.mock.calls[0][0] as unknown as Record<
+                string,
+                unknown
+            >;
+            expect(params).not.toHaveProperty('temperature');
+            expect(params).not.toHaveProperty('top_p');
+            expect(params).not.toHaveProperty('top_k');
+            expect(params).not.toHaveProperty('stop_sequences');
+            expect(params).not.toHaveProperty('metadata');
         });
 
-        it('should handle tool_use response blocks', async () => {
-            const messages: ChatMessage[] = [
-                { role: 'user', content: 'Categorize these transactions' },
-            ];
-
+        it('should include system prompt, tools, and tool_choice when provided', async () => {
             mockMessagesCreate.mockResolvedValue({
+                ...textResponse(''),
                 content: [
                     {
                         type: 'tool_use',
-                        input: {
-                            categories: ['Groceries', 'Healthcare'],
-                        },
+                        id: 'tu_1',
+                        name: 'assign_categories',
+                        input: { categories: [] },
                     },
                 ],
+                stop_reason: 'tool_use',
+            } as unknown as Anthropic.Message);
+
+            const tool: Anthropic.Tool = {
+                name: 'assign_categories',
+                description: 'Assign categories',
+                input_schema: { type: 'object', properties: {}, required: [] },
+            };
+
+            await client.chat(messages, {
+                systemPrompt: 'You are helpful',
+                tools: [tool],
+                toolChoice: { type: 'tool', name: 'assign_categories' },
             });
 
-            const response = await client.chat(messages);
-
-            expect(response).toBe(
-                JSON.stringify({
-                    categories: ['Groceries', 'Healthcare'],
+            expect(mockMessagesCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    system: 'You are helpful',
+                    tools: [tool],
+                    tool_choice: { type: 'tool', name: 'assign_categories' },
                 })
             );
         });
 
-        it('should throw error when response has no text content', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
-
+        it('should throw when the response has no text content', async () => {
             mockMessagesCreate.mockResolvedValue({
+                ...textResponse(''),
                 content: [],
-            });
+            } as unknown as Anthropic.Message);
 
             await expect(client.chat(messages)).rejects.toThrow(
                 'No text content found in response'
             );
         });
+    });
 
-        it('should use override configuration', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
+    describe('forced tool extraction', () => {
+        const toolChoice = { type: 'tool', name: 'assign_categories' } as const;
 
+        it('should return only the tool_use input, ignoring preamble text', async () => {
+            // Regression: preamble text used to be joined with the JSON,
+            // corrupting the payload and silently degrading the whole batch
             mockMessagesCreate.mockResolvedValue({
-                content: [{ type: 'text', text: 'Response' }],
-            });
-
-            await client.chat(messages, {
-                temperature: 0.8,
-                maxTokens: 4000,
-            });
-
-            expect(mockMessagesCreate).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    temperature: 0.8,
-                    max_tokens: 4000,
-                })
-            );
-        });
-
-        it('should include system prompt when provided', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
-
-            mockMessagesCreate.mockResolvedValue({
-                content: [{ type: 'text', text: 'Response' }],
-            });
-
-            await client.chat(messages, {
-                systemPrompt: 'You are a helpful assistant',
-            });
-
-            expect(mockMessagesCreate).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    system: 'You are a helpful assistant',
-                })
-            );
-        });
-
-        it('should include functions as tools when provided', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
-
-            mockMessagesCreate.mockResolvedValue({
-                content: [{ type: 'tool_use', input: { result: 'success' } }],
-            });
-
-            await client.chat(messages, {
-                functions: [
+                ...textResponse(''),
+                content: [
+                    { type: 'text', text: 'Here are the assignments:' },
                     {
+                        type: 'tool_use',
+                        id: 'tu_1',
                         name: 'assign_categories',
-                        description: 'Assign categories',
-                        parameters: {
-                            type: 'object',
-                            properties: {
-                                categories: {
-                                    type: 'array',
-                                    enum: ['Groceries', 'Healthcare'],
-                                },
-                            },
-                            required: ['categories'],
-                        },
+                        input: { categories: ['Groceries'] },
                     },
                 ],
-            });
+                stop_reason: 'tool_use',
+            } as unknown as Anthropic.Message);
+
+            const result = await client.chat(messages, { toolChoice });
+
+            expect(JSON.parse(result)).toEqual({ categories: ['Groceries'] });
+        });
+
+        it('should throw when the forced tool was not used', async () => {
+            mockMessagesCreate.mockResolvedValue(textResponse('I cannot do that'));
+
+            await expect(client.chat(messages, { toolChoice })).rejects.toThrow(
+                ClaudeResponseError
+            );
+            await expect(
+                client.chat(messages, { toolChoice }).catch((e: ClaudeResponseError) => e.reason)
+            ).resolves.toBe('missing_tool_use');
+        });
+    });
+
+    describe('reasoning spend', () => {
+        it('should cap effort so adaptive thinking cannot consume max_tokens', async () => {
+            // Current models run adaptive thinking whenever `thinking` is
+            // omitted, and those tokens come out of max_tokens. Left uncapped,
+            // a forced-tool classification can spend its whole budget thinking
+            // and come back truncated with no answer at all.
+            mockMessagesCreate.mockResolvedValue(
+                textResponse('ok') as unknown as Anthropic.Message
+            );
+
+            await client.chat(messages);
 
             expect(mockMessagesCreate).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    tools: [
-                        {
-                            name: 'assign_categories',
-                            description: 'Assign categories',
-                            input_schema: {
-                                type: 'object',
-                                properties: {
-                                    categories: {
-                                        type: 'array',
-                                        enum: ['Groceries', 'Healthcare'],
-                                    },
-                                },
-                                required: ['categories'],
-                            },
-                        },
-                    ],
-                })
+                expect.objectContaining({ output_config: { effort: 'low' } })
             );
         });
 
-        it('should include tool_choice when function_call is specified', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
+        it('should let a caller override the effort level', async () => {
+            mockMessagesCreate.mockResolvedValue(
+                textResponse('ok') as unknown as Anthropic.Message
+            );
 
-            mockMessagesCreate.mockResolvedValue({
-                content: [{ type: 'tool_use', input: { result: 'success' } }],
-            });
-
-            await client.chat(messages, {
-                functions: [
-                    {
-                        name: 'assign_categories',
-                        description: 'Assign categories',
-                        parameters: {
-                            type: 'object',
-                            properties: {},
-                            required: [],
-                        },
-                    },
-                ],
-                function_call: { name: 'assign_categories' },
-            });
+            await client.chat(messages, { effort: 'high' });
 
             expect(mockMessagesCreate).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    tool_choice: {
-                        type: 'tool',
-                        name: 'assign_categories',
-                    },
-                })
+                expect.objectContaining({ output_config: { effort: 'high' } })
             );
         });
     });
 
-    describe('retry logic', () => {
-        beforeEach(() => {
-            client = new ClaudeClient(
-                {
-                    apiKey: 'test-key',
-                    maxRetries: 3,
-                    retryDelayMs: 10, // Use very short delay for tests
-                },
-                mockAnthropicClient
-            );
+    describe('stop_reason handling', () => {
+        it('should throw a truncation error on max_tokens', async () => {
+            mockMessagesCreate.mockResolvedValue({
+                ...textResponse('partial'),
+                stop_reason: 'max_tokens',
+            } as unknown as Anthropic.Message);
+
+            await expect(client.chat(messages)).rejects.toThrow(/truncated/i);
+            expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
         });
 
-        it('should retry on failure and eventually succeed', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
+        it('should throw on refusal', async () => {
+            mockMessagesCreate.mockResolvedValue({
+                ...textResponse(''),
+                stop_reason: 'refusal',
+            } as unknown as Anthropic.Message);
 
-            mockMessagesCreate
-                .mockRejectedValueOnce(new Error('API error'))
-                .mockRejectedValueOnce(new Error('API error'))
-                .mockResolvedValueOnce({
-                    content: [{ type: 'text', text: 'Success' }],
-                });
-
-            const response = await client.chat(messages);
-
-            expect(response).toBe('Success');
-            expect(mockMessagesCreate).toHaveBeenCalledTimes(3);
-        }, 10000); // Increase timeout for retry delays
-
-        it('should throw error after max retries exceeded', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
-
-            mockMessagesCreate.mockRejectedValue(new Error('Persistent API error'));
-
-            await expect(client.chat(messages)).rejects.toThrow('Persistent API error');
-            expect(mockMessagesCreate).toHaveBeenCalledTimes(3);
-        }, 10000); // Increase timeout for retry delays
+            await expect(client.chat(messages)).rejects.toThrow(/refused/i);
+        });
     });
 
     describe('circuit breaker', () => {
-        beforeEach(() => {
-            client = new ClaudeClient(
-                {
-                    apiKey: 'test-key',
-                    maxRetries: 1,
-                },
-                mockAnthropicClient
-            );
+        it('should count one failure per chat call and open at the threshold', async () => {
+            mockMessagesCreate.mockRejectedValue(new Error('API Error'));
+
+            // threshold is 5 — each chat() is one HTTP-logical failure
+            for (let i = 0; i < 5; i++) {
+                await expect(client.chat(messages)).rejects.toThrow('API Error');
+            }
+            expect(mockMessagesCreate).toHaveBeenCalledTimes(5);
+
+            // 6th call is rejected by the breaker without any HTTP call
+            await expect(client.chat(messages)).rejects.toThrow(CircuitOpenError);
+            expect(mockMessagesCreate).toHaveBeenCalledTimes(5);
         });
 
-        it('should open circuit breaker after failure threshold', async () => {
-            const messages: ChatMessage[] = [{ role: 'user', content: 'Test' }];
+        it('should not count extraction failures as breaker failures', async () => {
+            // 5 semantic failures (transport OK, empty content) must not open it
+            mockMessagesCreate.mockResolvedValue({
+                ...textResponse(''),
+                content: [],
+            } as unknown as Anthropic.Message);
 
-            mockMessagesCreate.mockRejectedValue(new Error('API error'));
-
-            // Generate 5 failures to trigger circuit breaker
             for (let i = 0; i < 5; i++) {
-                try {
-                    await client.chat(messages);
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                } catch (_error) {
-                    // Expected to fail
-                }
+                await expect(client.chat(messages)).rejects.toThrow(ClaudeResponseError);
             }
 
-            // Next request should fail immediately due to circuit breaker
-            await expect(client.chat(messages)).rejects.toThrow('Circuit breaker is OPEN');
+            mockMessagesCreate.mockResolvedValue(textResponse('recovered'));
+            await expect(client.chat(messages)).resolves.toBe('recovered');
+        });
+
+        describe('HALF_OPEN probe', () => {
+            beforeEach(async () => {
+                jest.useFakeTimers();
+                mockMessagesCreate.mockRejectedValue(new Error('API Error'));
+                for (let i = 0; i < 5; i++) {
+                    await expect(client.chat(messages)).rejects.toThrow('API Error');
+                }
+                mockMessagesCreate.mockClear();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it('should close after a successful probe', async () => {
+                jest.advanceTimersByTime(61000);
+                mockMessagesCreate.mockResolvedValue(textResponse('probe ok'));
+
+                await expect(client.chat(messages)).resolves.toBe('probe ok');
+
+                // Circuit is closed again — subsequent calls flow normally
+                await expect(client.chat(messages)).resolves.toBe('probe ok');
+                expect(mockMessagesCreate).toHaveBeenCalledTimes(2);
+            });
+
+            it('should reopen when the probe fails', async () => {
+                jest.advanceTimersByTime(61000);
+                mockMessagesCreate.mockRejectedValue(new Error('still down'));
+
+                await expect(client.chat(messages)).rejects.toThrow('still down');
+
+                // Immediately OPEN again — no HTTP call
+                await expect(client.chat(messages)).rejects.toThrow(CircuitOpenError);
+                expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
+            });
+
+            it('should allow only one concurrent probe', async () => {
+                jest.advanceTimersByTime(61000);
+                let resolveProbe: (value: Anthropic.Message) => void;
+                mockMessagesCreate.mockReturnValue(
+                    new Promise<Anthropic.Message>(resolve => {
+                        resolveProbe = resolve;
+                    })
+                );
+
+                const probe = client.chat(messages);
+
+                // Second call during the in-flight probe is rejected
+                await expect(client.chat(messages)).rejects.toThrow(CircuitOpenError);
+
+                resolveProbe!(textResponse('probe ok'));
+                await expect(probe).resolves.toBe('probe ok');
+                expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
+            });
         });
     });
 
-    describe('chatBatch', () => {
-        beforeEach(() => {
-            client = new ClaudeClient(
-                {
-                    apiKey: 'test-key',
-                    batchSize: 2,
-                    maxConcurrent: 2,
-                },
-                mockAnthropicClient
-            );
-        });
+    describe('SDK error propagation', () => {
+        it('should propagate SDK errors untouched', async () => {
+            const apiError = Object.assign(new Error('rate limited'), { status: 429 });
+            mockMessagesCreate.mockRejectedValue(apiError);
 
-        it('should process multiple message batches', async () => {
-            const messageBatches: ChatMessage[][] = [
-                [{ role: 'user', content: 'Request 1' }],
-                [{ role: 'user', content: 'Request 2' }],
-                [{ role: 'user', content: 'Request 3' }],
-            ];
-
-            mockMessagesCreate
-                .mockResolvedValueOnce({
-                    content: [{ type: 'text', text: 'Response 1' }],
-                })
-                .mockResolvedValueOnce({
-                    content: [{ type: 'text', text: 'Response 2' }],
-                })
-                .mockResolvedValueOnce({
-                    content: [{ type: 'text', text: 'Response 3' }],
-                });
-
-            const responses = await client.chatBatch(messageBatches);
-
-            expect(responses).toEqual(['Response 1', 'Response 2', 'Response 3']);
-            expect(mockMessagesCreate).toHaveBeenCalledTimes(3);
-        });
-
-        it('should respect batch size configuration', async () => {
-            const messageBatches: ChatMessage[][] = Array.from({ length: 10 }, (_, i) => [
-                { role: 'user', content: `Request ${i}` },
-            ]);
-
-            mockMessagesCreate.mockResolvedValue({
-                content: [{ type: 'text', text: 'Response' }],
-            });
-
-            await client.chatBatch(messageBatches);
-
-            // With batchSize 2 and maxConcurrent 2, should make 10 total calls
-            expect(mockMessagesCreate).toHaveBeenCalledTimes(10);
-        });
-    });
-
-    describe('updateConfig', () => {
-        beforeEach(() => {
-            client = new ClaudeClient({ apiKey: 'old-key' }, mockAnthropicClient);
-        });
-
-        it('should update configuration', () => {
-            client.updateConfig({
-                temperature: 0.9,
-                maxTokens: 4000,
-            });
-
-            const config = client.getConfig();
-            expect(config.temperature).toBe(0.9);
-            expect(config.maxTokens).toBe(4000);
-        });
-
-        it('should update API configuration', () => {
-            client.updateConfig({
-                apiKey: 'new-key',
-                baseURL: 'https://custom-api.com',
-            });
-
-            const config = client.getConfig();
-            expect(config.baseURL).toBe('https://custom-api.com');
-        });
-
-        it('should update non-API config changes', () => {
-            client.updateConfig({
-                temperature: 0.8,
-                maxTokens: 3000,
-            });
-
-            const config = client.getConfig();
-            expect(config.temperature).toBe(0.8);
-            expect(config.maxTokens).toBe(3000);
-        });
-    });
-
-    describe('getConfig', () => {
-        beforeEach(() => {
-            client = new ClaudeClient(
-                {
-                    apiKey: 'secret-key',
-                    model: 'claude-opus-4',
-                    temperature: 0.7,
-                },
-                mockAnthropicClient
-            );
-        });
-
-        it('should return configuration without API key', () => {
-            const config = client.getConfig();
-
-            expect(config).not.toHaveProperty('apiKey');
-            expect(config.model).toBe('claude-opus-4');
-            expect(config.temperature).toBe(0.7);
-        });
-
-        it('should include all non-sensitive configuration', () => {
-            const config = client.getConfig();
-
-            expect(config).toHaveProperty('model');
-            expect(config).toHaveProperty('maxTokens');
-            expect(config).toHaveProperty('temperature');
-            expect(config).toHaveProperty('batchSize');
-            expect(config).toHaveProperty('maxConcurrent');
+            await expect(client.chat(messages)).rejects.toBe(apiError);
         });
     });
 });

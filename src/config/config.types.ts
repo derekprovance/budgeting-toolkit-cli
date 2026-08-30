@@ -27,7 +27,6 @@ export interface FireflyApiConfig {
     url: string;
     token: string;
     certificates?: CertificateConfig;
-    noNameExpenseAccountId: string;
 }
 
 /**
@@ -53,10 +52,33 @@ export interface ClaudeApiConfig {
  * Account Configuration for transaction filtering
  */
 export interface AccountsConfig {
+    /**
+     * Explicit income destinations. Empty (the default) derives them from
+     * Firefly's account roles; non-empty overrides derivation entirely.
+     */
     incomeDestinationAccounts: string[];
+    /**
+     * Explicit expense sources. Empty (the default) derives them from Firefly's
+     * account roles; non-empty overrides derivation entirely.
+     */
     expenseSourceAccounts: string[];
     expenseTransfers: ValidTransfer[];
-    disposableIncomeAccounts: string[];
+    /**
+     * Accounts outside the tracked boundary: excluded from both derived lists,
+     * so money leaving them is not spending and money arriving in them is not
+     * income. A brokerage is the usual case.
+     *
+     * This does NOT hide money moving into one from a tracked account — a
+     * withdrawal from checking to buy an investment still counts as spending,
+     * because the source is tracked. Only activity whose tracked side is the
+     * untracked account itself disappears.
+     */
+    untrackedAccounts: string[];
+    /**
+     * Accounts a paycheck-tagged deposit must land in to count as a paycheck.
+     * Empty means no constraint — the tag alone decides.
+     */
+    paycheckDestinationAccounts: string[];
 }
 
 /**
@@ -71,7 +93,23 @@ export interface TransactionsConfig {
 }
 
 /**
- * Excluded Transaction Configuration
+ * A rule that removes matching transactions from every report.
+ *
+ * Exclusion is applied at fetch time, so a match drops the transaction from
+ * every bucket in every command — not just the one you had in mind. The schema
+ * is deliberately narrow to keep that blunt instrument aimed:
+ *
+ * - `description` is REQUIRED and matched as whole-string equality, after
+ *   trimming and lower-casing (`StringUtils.normalizeForMatching`). It is not a
+ *   substring match.
+ * - `amount` is optional and narrows a rule to a single amount. Currency
+ *   formatting (`$`, thousands separators, accounting parentheses) is accepted,
+ *   and the comparison is on absolute value, so it ignores direction.
+ * - `reason` is free text for your own benefit; nothing reads it.
+ *
+ * Amount-only rules are NOT supported: they would silently drop every
+ * transaction of that amount, on any account, in either direction.
+ * `ConfigValidator` rejects them at startup.
  */
 export interface ExcludedTransaction {
     description: string;
@@ -92,12 +130,9 @@ export interface TagsConfig {
  */
 export interface LLMConfig {
     model: string;
-    temperature: number;
     maxTokens: number;
     batchSize: number;
     maxConcurrent: number;
-    retryDelayMs: number;
-    maxRetryDelayMs: number;
     rateLimit: RateLimitConfig;
     circuitBreaker: CircuitBreakerConfig;
 }
@@ -116,7 +151,6 @@ export interface RateLimitConfig {
 export interface CircuitBreakerConfig {
     failureThreshold: number;
     resetTimeout: number;
-    halfOpenTimeout: number;
 }
 
 /**

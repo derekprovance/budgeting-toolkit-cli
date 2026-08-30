@@ -16,7 +16,7 @@ describe('prompt-templates', () => {
                 name: 'assign_categories',
                 description:
                     'Assign the closest matching category from the available options to each transaction in the exact order provided. Return "(no category)" if no category fits.',
-                parameters: {
+                input_schema: {
                     type: 'object',
                     properties: {
                         categories: {
@@ -42,7 +42,7 @@ describe('prompt-templates', () => {
                 name: 'assign_budgets',
                 description:
                     'Assign the closest matching budget from the available options to each transaction in the exact order provided. Return "(no budget)" if no budget fits.',
-                parameters: {
+                input_schema: {
                     type: 'object',
                     properties: {
                         budgets: {
@@ -60,16 +60,24 @@ describe('prompt-templates', () => {
             });
         });
 
-        it('should handle single valid option', () => {
+        it('should append the sentinel when the options lack it', () => {
             const schema = getFunctionSchema('category', ['OnlyOption']);
 
-            expect(schema.parameters.properties.categories.items.enum).toEqual(['OnlyOption']);
+            const properties = schema.input_schema.properties as Record<
+                string,
+                { items: { enum: string[] } }
+            >;
+            expect(properties.categories.items.enum).toEqual(['OnlyOption', '(no category)']);
         });
 
-        it('should handle empty array (edge case)', () => {
+        it('should offer only the sentinel for an empty options list', () => {
             const schema = getFunctionSchema('category', []);
 
-            expect(schema.parameters.properties.categories.items.enum).toEqual([]);
+            const properties = schema.input_schema.properties as Record<
+                string,
+                { items: { enum: string[] } }
+            >;
+            expect(properties.categories.items.enum).toEqual(['(no category)']);
         });
     });
 

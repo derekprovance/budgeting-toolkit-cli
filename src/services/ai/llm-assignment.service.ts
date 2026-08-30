@@ -1,9 +1,11 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ClaudeClient } from '../../api/claude.client.js';
+import { ClaudeClient, CircuitOpenError, ClaudeResponseError } from '../../api/claude.client.js';
 import { logger as defaultLogger } from '../../logger.js';
 import {
     AssignmentType,
     getFunctionSchema,
+    getNoMatchValue,
     getSystemPrompt,
     getUserPrompt,
     parseAssignmentResponse,
@@ -11,24 +13,21 @@ import {
 import { mapTransactionForLLM, LLMTransactionData } from './utils/transaction-mapper.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
 
+/** One chunk's assignments, plus whether they are real or a degraded fallback */
+interface ChunkResult {
+    values: string[];
+    /** True when the chunk failed and was filled with the no-match sentinel */
+    degraded: boolean;
+}
+
 /**
- * Function schema for Claude's function calling API
+ * Batching options for LLM assignment requests
  */
-export interface FunctionSchema {
-    name: string;
-    description: string;
-    parameters: {
-        type: string;
-        properties: Record<
-            string,
-            {
-                type: string;
-                description?: string;
-                enum?: string[];
-            }
-        >;
-        required: string[];
-    };
+export interface LLMBatchOptions {
+    /** Transactions per request — keeps responses well under maxTokens */
+    batchSize: number;
+    /** Concurrent in-flight requests */
+    maxConcurrent: number;
 }
 
 /**
@@ -42,7 +41,7 @@ export interface LLMAssignmentDependencies {
         transactions: LLMTransactionData[],
         validOptions: string[]
     ) => string;
-    getFunctionSchema: (type: AssignmentType, validOptions: string[]) => FunctionSchema;
+    getFunctionSchema: (type: AssignmentType, validOptions: string[]) => Anthropic.Tool;
     parseAssignmentResponse: (
         type: AssignmentType,
         responseText: string,
@@ -56,19 +55,23 @@ export interface LLMAssignmentDependencies {
  * Unified service for LLM-powered transaction assignments.
  * Handles both category and budget assignments using the same underlying logic.
  *
- * Key design principles:
- * - Single responsibility: Only handles LLM assignment logic
- * - No batching: Batching is delegated to ClaudeClient
- * - No retries: Retry logic is handled by ClaudeClient
- * - DRY: Shared logic for both categories and budgets
+ * Batching: transactions are chunked by batchSize and processed by a bounded
+ * worker pool. A recoverable failure degrades only its own chunk to the
+ * no-match sentinel; critical errors (auth, bad request) abort the whole run.
  */
 export class LLMAssignmentService {
     private readonly deps: LLMAssignmentDependencies;
+    private readonly batchOptions: LLMBatchOptions;
 
     constructor(
         private readonly claudeClient: ClaudeClient,
+        batchOptions?: Partial<LLMBatchOptions>,
         deps?: Partial<LLMAssignmentDependencies>
     ) {
+        this.batchOptions = {
+            batchSize: batchOptions?.batchSize ?? 10,
+            maxConcurrent: batchOptions?.maxConcurrent ?? 3,
+        };
         this.deps = {
             mapTransactionForLLM,
             getSystemPrompt,
@@ -85,12 +88,9 @@ export class LLMAssignmentService {
      *
      * @param type - The assignment type: 'category' or 'budget'
      * @param transactions - Array of transactions to process
-     * @param validOptions - Array of valid categories or budgets
+     * @param validOptions - Array of valid categories or budgets (the no-match
+     * sentinel is handled internally — callers should not append it)
      * @returns Array of assigned values in the same order as transactions
-     *
-     * Note: This method delegates batching to ClaudeClient. All transactions
-     * are processed but ClaudeClient handles the optimal batch size and
-     * concurrent request management.
      */
     async assign(
         type: AssignmentType,
@@ -112,91 +112,172 @@ export class LLMAssignmentService {
                 type,
                 transactionCount: transactions.length,
                 optionCount: validOptions.length,
+                batchSize: this.batchOptions.batchSize,
+                maxConcurrent: this.batchOptions.maxConcurrent,
             },
             `Starting ${type} assignment`
         );
 
-        try {
-            // Map transactions to LLM format
-            const transactionData = transactions.map(this.deps.mapTransactionForLLM);
+        // Map transactions to LLM format and chunk them
+        const transactionData = transactions.map(this.deps.mapTransactionForLLM);
+        const chunks = LLMAssignmentService.chunk(transactionData, this.batchOptions.batchSize);
 
-            // Generate prompts
-            const systemPrompt = this.deps.getSystemPrompt(type);
-            const userPrompt = this.deps.getUserPrompt(type, transactionData, validOptions);
-            const functionSchema = this.deps.getFunctionSchema(type, validOptions);
+        // Built once — identical across chunks (stable prompt prefix)
+        const systemPrompt = this.deps.getSystemPrompt(type);
+        const functionSchema = this.deps.getFunctionSchema(type, validOptions);
 
-            // Call Claude
-            const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
-                systemPrompt,
-                functions: [functionSchema],
-                function_call: { name: functionSchema.name },
-            });
+        // Bounded worker pool with order-preserving results
+        const results: ChunkResult[] = new Array(chunks.length);
+        let nextChunk = 0;
+        const workerCount = Math.min(this.batchOptions.maxConcurrent, chunks.length);
 
-            // Parse and validate response
-            const assignments = this.deps.parseAssignmentResponse(
-                type,
-                result,
-                transactions.length,
-                validOptions
-            );
-
-            // Log each transaction's AI assignment for debugging
-            assignments.forEach((assignment, index) => {
-                this.deps.logger.trace(
-                    {
-                        index,
-                        transactionDescription: transactionData[index]?.description,
-                        aiResponse: assignment,
-                        isPlaceholder: assignment === `(no ${type})`,
-                    },
-                    `AI ${type} assignment result`
+        const worker = async (): Promise<void> => {
+            for (;;) {
+                const chunkIndex = nextChunk++;
+                if (chunkIndex >= chunks.length) {
+                    return;
+                }
+                results[chunkIndex] = await this.processChunk(
+                    type,
+                    chunks[chunkIndex],
+                    validOptions,
+                    systemPrompt,
+                    functionSchema,
+                    chunkIndex
                 );
-            });
+            }
+        };
 
-            this.deps.logger.debug(
+        await Promise.all(Array.from({ length: workerCount }, worker));
+
+        const assignments = results.flatMap(result => result.values);
+
+        // A degraded chunk yields sentinels indistinguishable from a genuine
+        // "no match", so the count has to be carried out rather than inferred.
+        // Without this the run reports success while some transactions were
+        // never actually looked at.
+        const degradedTransactionCount = results
+            .filter(result => result.degraded)
+            .reduce((sum, result) => sum + result.values.length, 0);
+
+        if (degradedTransactionCount > 0) {
+            this.deps.logger.warn(
                 {
                     type,
-                    assignedCount: assignments.length,
-                    successRate: this.calculateSuccessRate(assignments, type),
+                    degradedTransactionCount,
+                    totalTransactions: transactions.length,
+                    degradedChunks: results.filter(r => r.degraded).length,
+                    totalChunks: chunks.length,
                 },
-                `${type} assignment completed`
+                `${type} assignment degraded - ${degradedTransactionCount} of ${transactions.length} transactions were not processed and will be left unassigned`
             );
+        }
 
-            return assignments;
+        // Log each transaction's AI assignment for debugging
+        assignments.forEach((assignment, index) => {
+            this.deps.logger.trace(
+                {
+                    index,
+                    transactionDescription: transactionData[index]?.description,
+                    aiResponse: assignment,
+                    isPlaceholder: assignment === getNoMatchValue(type),
+                },
+                `AI ${type} assignment result`
+            );
+        });
+
+        this.deps.logger.debug(
+            {
+                type,
+                assignedCount: assignments.length,
+                successRate: this.calculateSuccessRate(assignments, type),
+            },
+            `${type} assignment completed`
+        );
+
+        return assignments;
+    }
+
+    /**
+     * Processes one chunk. Recoverable failures fill only this chunk with the
+     * sentinel; critical errors propagate and abort the run.
+     */
+    private async processChunk(
+        type: AssignmentType,
+        chunk: LLMTransactionData[],
+        validOptions: string[],
+        systemPrompt: string,
+        functionSchema: Anthropic.Tool,
+        chunkIndex: number
+    ): Promise<ChunkResult> {
+        try {
+            const userPrompt = this.deps.getUserPrompt(type, chunk, validOptions);
+
+            const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
+                systemPrompt,
+                tools: [functionSchema],
+                toolChoice: { type: 'tool', name: functionSchema.name },
+            });
+
+            return {
+                values: this.deps.parseAssignmentResponse(type, result, chunk.length, validOptions),
+                degraded: false,
+            };
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-
-            // Critical errors that should propagate (authentication, configuration issues)
-            if (
-                errorMessage.includes('API key') ||
-                errorMessage.includes('authentication') ||
-                errorMessage.includes('unauthorized') ||
-                errorMessage.includes('forbidden')
-            ) {
+            if (this.isCriticalError(error)) {
                 this.deps.logger.error(
                     {
-                        error: errorMessage,
+                        error: error instanceof Error ? error.message : String(error),
                         type,
-                        transactionCount: transactions.length,
+                        chunkIndex,
+                        chunkSize: chunk.length,
                     },
-                    `Critical authentication error in ${type} assignment`
+                    `Critical error in ${type} assignment`
                 );
                 throw error;
             }
 
-            // Recoverable errors - log and return defaults
             this.deps.logger.warn(
                 {
-                    error: errorMessage,
+                    error: error instanceof Error ? error.message : String(error),
                     type,
-                    transactionCount: transactions.length,
+                    chunkIndex,
+                    chunkSize: chunk.length,
                 },
-                `${type} assignment failed, returning defaults`
+                `${type} assignment chunk failed, using defaults for this chunk`
             );
 
-            const defaultValue = type === 'category' ? '(no category)' : '(no budget)';
-            return new Array(transactions.length).fill(defaultValue);
+            return {
+                values: new Array<string>(chunk.length).fill(getNoMatchValue(type)),
+                degraded: true,
+            };
         }
+    }
+
+    /**
+     * Critical errors abort the whole run rather than degrading a chunk to the
+     * sentinel. Degrading is only ever the right call for a failure the *next*
+     * chunk might survive; for everything below, carrying on would quietly
+     * sentinel-fill the rest of the run and still report success.
+     *
+     * - auth / permission: will not heal on retry
+     * - bad request: a config bug that silent degradation would hide
+     * - circuit open: the breaker has already given up, so every remaining
+     *   chunk would be rejected without even reaching the API
+     * - truncated: the response outgrew `llm.maxTokens`, which is a
+     *   configuration problem that every subsequent chunk will hit too
+     */
+    private isCriticalError(error: unknown): boolean {
+        if (error instanceof ClaudeResponseError) {
+            return error.reason === 'truncated';
+        }
+
+        return (
+            error instanceof Anthropic.AuthenticationError ||
+            error instanceof Anthropic.PermissionDeniedError ||
+            error instanceof Anthropic.BadRequestError ||
+            error instanceof CircuitOpenError
+        );
     }
 
     /**
@@ -221,6 +302,14 @@ export class LLMAssignmentService {
         return this.assign('budget', transactions, validBudgets);
     }
 
+    private static chunk<T>(array: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < array.length; i += size) {
+            chunks.push(array.slice(i, i + size));
+        }
+        return chunks;
+    }
+
     /**
      * Calculates the success rate of assignments (non-default values)
      */
@@ -229,7 +318,7 @@ export class LLMAssignmentService {
             return '0.0%';
         }
 
-        const defaultValue = type === 'category' ? '(no category)' : '(no budget)';
+        const defaultValue = getNoMatchValue(type);
         const successCount = assignments.filter(a => a !== defaultValue).length;
         const rate = (successCount / assignments.length) * 100;
         return `${rate.toFixed(1)}%`;

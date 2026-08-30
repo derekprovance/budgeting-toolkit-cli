@@ -98,28 +98,6 @@ describe('StringUtils', () => {
         });
     });
 
-    describe('containsNormalized', () => {
-        it('should match case-insensitively', () => {
-            expect(StringUtils.containsNormalized('HELLO WORLD', 'hello')).toBe(true);
-            expect(StringUtils.containsNormalized('hello world', 'WORLD')).toBe(true);
-        });
-
-        it('should match with special characters', () => {
-            expect(StringUtils.containsNormalized('My-String_Test', 'string')).toBe(true);
-            expect(StringUtils.containsNormalized('test@example.com', 'example')).toBe(true);
-        });
-
-        it('should match with normalized spaces', () => {
-            expect(StringUtils.containsNormalized('HELLO_WORLD', 'hello world')).toBe(true);
-            expect(StringUtils.containsNormalized('hello-world', 'hello world')).toBe(true);
-        });
-
-        it('should not match when needle not in haystack', () => {
-            expect(StringUtils.containsNormalized('hello', 'world')).toBe(false);
-            expect(StringUtils.containsNormalized('test', 'testing')).toBe(false);
-        });
-    });
-
     describe('matchesAnyPattern', () => {
         it('should match against any pattern', () => {
             expect(StringUtils.matchesAnyPattern('PAYROLL_2024', ['payroll', 'salary'])).toBe(true);
@@ -145,6 +123,34 @@ describe('StringUtils', () => {
 
         it('should handle special characters in patterns', () => {
             expect(StringUtils.matchesAnyPattern('test@example.com', ['example.com'])).toBe(true);
+        });
+    });
+
+    describe('matchesAnyPattern word boundaries', () => {
+        it('should not match a pattern that is only part of a longer word', () => {
+            // 'transfer' must not swallow every deposit from Transferwise
+            expect(StringUtils.matchesAnyPattern('TRANSFERWISE INC', ['transfer'])).toBe(false);
+            expect(StringUtils.matchesAnyPattern('Funds transferred', ['transfer'])).toBe(false);
+        });
+
+        it('should still match the pattern as a whole word', () => {
+            expect(StringUtils.matchesAnyPattern('Zelle TRANSFER from Mom', ['transfer'])).toBe(
+                true
+            );
+            expect(StringUtils.matchesAnyPattern('MY_PAYROLL', ['payroll'])).toBe(true);
+        });
+
+        it('should require multi-word patterns to appear contiguously', () => {
+            expect(
+                StringUtils.matchesAnyPattern('direct deposit payroll', ['deposit payroll'])
+            ).toBe(true);
+            expect(
+                StringUtils.matchesAnyPattern('deposit from the payroll', ['deposit payroll'])
+            ).toBe(false);
+        });
+
+        it('should ignore empty patterns', () => {
+            expect(StringUtils.matchesAnyPattern('anything', [''])).toBe(false);
         });
     });
 });

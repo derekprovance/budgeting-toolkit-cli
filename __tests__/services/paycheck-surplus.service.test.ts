@@ -77,13 +77,13 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(1000.0);
+                expect(result.value.surplus).toBe(1000.0);
                 expect(mockLogger.debug).toHaveBeenCalledWith(
                     expect.objectContaining({
                         month: 1,
                         year: 2024,
-                        expectedPaycheckAmount: 5000.0,
-                        totalPaycheckAmount: 6000.0,
+                        expected: 5000.0,
+                        actual: 6000.0,
                         surplus: 1000.0,
                         paycheckCount: 2,
                     }),
@@ -106,7 +106,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-3000.0);
+                expect(result.value.surplus).toBe(-3000.0);
             }
         });
 
@@ -121,7 +121,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-5000.0);
+                expect(result.value.surplus).toBe(-5000.0);
             }
         });
 
@@ -155,7 +155,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(3000.0);
+                expect(result.value.surplus).toBe(3000.0);
                 expect(testMockLogger.warn).toHaveBeenCalledWith(
                     'Expected monthly paycheck amount not configured'
                 );
@@ -184,7 +184,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-2000.0);
+                expect(result.value.surplus).toBe(-2000.0);
                 expect(mockLogger.warn).toHaveBeenCalledWith(
                     {
                         transaction: {
@@ -260,7 +260,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-2000.0); // 3000 - 5000
+                expect(result.value.surplus).toBe(-2000.0); // 3000 - 5000
             }
         });
 
@@ -283,7 +283,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-2000.0); // 3000 - 5000
+                expect(result.value.surplus).toBe(-2000.0); // 3000 - 5000
             }
         });
 
@@ -317,7 +317,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(0); // 2000 + 3000 = 5000 (matches expected)
+                expect(result.value.surplus).toBe(0); // 2000 + 3000 = 5000 (matches expected)
             }
         });
 
@@ -340,7 +340,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-5000.0); // No paychecks found
+                expect(result.value.surplus).toBe(-5000.0); // No paychecks found
             }
         });
 
@@ -364,7 +364,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-2000.0); // 3000 - 5000
+                expect(result.value.surplus).toBe(-2000.0); // 3000 - 5000
             }
         });
 
@@ -386,7 +386,7 @@ describe('PaycheckSurplusService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value).toBe(-5000.0); // No paychecks identified
+                expect(result.value.surplus).toBe(-5000.0); // No paychecks identified
             }
         });
 
@@ -423,7 +423,7 @@ describe('PaycheckSurplusService', () => {
             expect(result.ok).toBe(true);
             if (result.ok) {
                 // 1000 + 4000 = 5000 - 5000 = 0
-                expect(result.value).toBe(0);
+                expect(result.value.surplus).toBe(0);
                 // Verify that debug logging was called with the paycheck identification info
                 expect(mockLogger.debug).toHaveBeenCalledWith(
                     expect.objectContaining({
@@ -431,6 +431,54 @@ describe('PaycheckSurplusService', () => {
                     }),
                     'Paycheck search completed'
                 );
+            }
+        });
+    });
+
+    describe('transaction direction', () => {
+        const tagged = (amount: string, type: string): TransactionSplit =>
+            ({
+                amount,
+                type,
+                tags: ['Paycheck'],
+                transaction_journal_id: '900',
+            }) as TransactionSplit;
+
+        beforeEach(() => {
+            mockTransactionClassificationService.isPaycheck.mockImplementation(
+                (t: TransactionSplit) => t.tags?.includes('Paycheck') ?? false
+            );
+        });
+
+        it('should subtract a paycheck-tagged withdrawal instead of counting it as income', async () => {
+            // A clawback or payroll correction recorded as a withdrawal must
+            // reduce income; Firefly reports its amount unsigned, so summing
+            // by magnitude alone would inflate the paycheck
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                tagged('5000.00', 'deposit'),
+                tagged('200.00', 'withdrawal'),
+            ]);
+
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.actual).toBe(4800);
+                expect(result.value.expected).toBe(5000);
+                expect(result.value.surplus).toBe(-200);
+            }
+        });
+
+        it('should report actual directly rather than leaving it to be rebuilt', async () => {
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                tagged('5500.00', 'deposit'),
+            ]);
+
+            const result = await service.calculatePaycheckSurplus(1, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual({ actual: 5500, expected: 5000, surplus: 500 });
             }
         });
     });

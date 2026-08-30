@@ -79,7 +79,7 @@ export abstract class BaseTransactionAnalysisService<TResult> {
 
         // Step 4: Execute domain-specific analysis
         try {
-            const result = this.analyzeTransactions(transactions, month, year);
+            const result = await this.analyzeTransactions(transactions, month, year);
 
             this.logger.debug(
                 {
@@ -217,11 +217,18 @@ export abstract class BaseTransactionAnalysisService<TResult> {
      * @param year - Year being analyzed
      * @returns Analysis result (type defined by subclass)
      */
+    /**
+     * Domain-specific filtering and calculation.
+     *
+     * May be async: a subclass whose scope depends on data it has to fetch (the
+     * account scope, say) resolves it here rather than in the constructor, so
+     * the factory that builds these services can stay synchronous.
+     */
     protected abstract analyzeTransactions(
         transactions: TransactionSplit[],
         month: number,
         year: number
-    ): TResult;
+    ): TResult | Promise<TResult>;
 
     /**
      * Operation name for logging and error messages.

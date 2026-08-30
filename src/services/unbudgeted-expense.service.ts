@@ -2,6 +2,7 @@ import { ITransactionService } from './core/transaction.service.interface.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
+import { AccountScopeService } from './core/account-scope.service.js';
 import { ValidTransfer } from '../types/common.types.js';
 
 /**
@@ -23,7 +24,7 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
     constructor(
         transactionService: ITransactionService,
         transactionClassificationService: ITransactionClassificationService,
-        private readonly validExpenseAccounts: string[],
+        private readonly accountScope: AccountScopeService,
         private readonly validTransfers: ValidTransfer[]
     ) {
         super(transactionService, transactionClassificationService);
@@ -45,8 +46,14 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * Analyzes transactions to identify unbudgeted expenses.
      * Implements domain-specific filtering logic.
      */
-    protected analyzeTransactions(transactions: TransactionSplit[]): TransactionSplit[] {
-        const expenses = this.filterExpenses(transactions);
+    protected async analyzeTransactions(
+        transactions: TransactionSplit[]
+    ): Promise<TransactionSplit[]> {
+        // Resolved here rather than injected: the scope is derived from Firefly
+        // and the factory that builds this service is synchronous.
+        const validExpenseAccounts = await this.accountScope.getExpenseSources();
+        this.warnOnUnreachableTransfers(validExpenseAccounts);
+        const expenses = this.filterExpenses(transactions, validExpenseAccounts);
 
         this.logger.debug(
             {
@@ -70,14 +77,39 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      *    - If it's a transfer, check transfer criteria
      *    - Otherwise, check regular expense criteria
      */
-    private filterExpenses(transactions: TransactionSplit[]) {
+    private filterExpenses(transactions: TransactionSplit[], validExpenseAccounts: string[]) {
         return transactions.filter(trx => {
             const isTransfer = this.transactionClassificationService.isTransfer(trx);
 
             return isTransfer
-                ? this.shouldCountExpense(trx) && this.shouldCountTransfer(trx)
-                : this.shouldCountExpense(trx);
+                ? this.isRegularExpenseTransaction(trx, validExpenseAccounts) &&
+                      this.shouldCountTransfer(trx)
+                : this.isRegularExpenseTransaction(trx, validExpenseAccounts);
         });
+    }
+
+    /**
+     * Warns about configured transfers that can never match.
+     *
+     * A transfer must clear `isRegularExpenseTransaction` before
+     * `shouldCountTransfer` is ever consulted, so its SOURCE has to be a derived
+     * expense source. `AccountScopeService` subtracts `untrackedAccounts` from
+     * that list, which means an `expenseTransfers` entry pointing out of an
+     * untracked account is silently inert — the two settings look like they
+     * cooperate and instead cancel out.
+     */
+    private warnOnUnreachableTransfers(validExpenseAccounts: string[]): void {
+        const unreachable = this.validTransfers.filter(
+            transfer => !validExpenseAccounts.includes(transfer.source)
+        );
+
+        if (unreachable.length > 0) {
+            this.logger.warn(
+                { transfers: unreachable, validExpenseAccounts },
+                'Configured expenseTransfers whose source is not a tracked expense source ' +
+                    'will never match - check whether the source account is in untrackedAccounts'
+            );
+        }
     }
 
     /**
@@ -99,14 +131,6 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
     }
 
     /**
-     * Checks if a transaction should be counted as an expense.
-     * Checks regular expense criteria (bills are handled separately by BillComparisonService).
-     */
-    private shouldCountExpense(transaction: TransactionSplit): boolean {
-        return this.isRegularExpenseTransaction(transaction);
-    }
-
-    /**
      * Checks if a transaction is a regular unbudgeted expense.
      *
      * 1. Must have no budget assigned
@@ -115,13 +139,19 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      * 4. Must not be in excluded transactions list
      * 5. Must be from a valid expense account
      */
-    private isRegularExpenseTransaction(transaction: TransactionSplit): boolean {
+    private isRegularExpenseTransaction(
+        transaction: TransactionSplit,
+        validExpenseAccounts: string[]
+    ): boolean {
         const conditions = {
             hasNoBudget: !transaction.budget_id,
             isNotBill: !this.transactionClassificationService.isBill(transaction),
             isNotDisposableSupplemented:
                 !this.transactionClassificationService.isSupplementedByDisposable(transaction.tags),
-            isFromExpenseAccount: this.isExpenseAccount(transaction.source_id),
+            isFromExpenseAccount: this.isExpenseAccount(
+                transaction.source_id,
+                validExpenseAccounts
+            ),
         };
 
         this.logger.debug(
@@ -146,11 +176,11 @@ export class UnbudgetedExpenseService extends BaseTransactionAnalysisService<Tra
      *
      * Uses configuration from YAML file (expenseSourceAccounts) with fallback to defaults.
      */
-    private isExpenseAccount(accountId: string | null): boolean {
+    private isExpenseAccount(accountId: string | null, validExpenseAccounts: string[]): boolean {
         if (!accountId) {
             return false;
         }
 
-        return this.validExpenseAccounts.includes(accountId);
+        return validExpenseAccounts.includes(accountId);
     }
 }

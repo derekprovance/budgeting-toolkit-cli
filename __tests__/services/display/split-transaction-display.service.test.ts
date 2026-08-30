@@ -147,21 +147,6 @@ describe('SplitTransactionDisplayService', () => {
         });
     });
 
-    describe('formatAmountPrompt', () => {
-        it('should format amount prompt with currency symbol', () => {
-            const result = service.formatAmountPrompt(100.5, '$');
-
-            expect(result).toContain('Enter amount for first split');
-            expect(result).toContain('original: $100.5');
-        });
-
-        it('should handle different currency symbols', () => {
-            const result = service.formatAmountPrompt(75.25, '€');
-
-            expect(result).toContain('original: €75.25');
-        });
-    });
-
     describe('formatRemainder', () => {
         it('should format remainder with currency symbol', () => {
             const result = service.formatRemainder(40.5, '$');
@@ -173,15 +158,6 @@ describe('SplitTransactionDisplayService', () => {
             const result = service.formatRemainder(33.333, '$');
 
             expect(result).toContain('$33.33');
-        });
-    });
-
-    describe('formatValidationError', () => {
-        it('should format validation error message', () => {
-            const result = service.formatValidationError('Amount must be greater than zero');
-
-            expect(result).toContain('✗');
-            expect(result).toContain('Amount must be greater than zero');
         });
     });
 

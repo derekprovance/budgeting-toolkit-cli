@@ -12,6 +12,8 @@ import { TransactionService } from './core/transaction.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
+import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
+import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 
 /**
  * Service for aggregating and analyzing budget data with historical context
@@ -21,7 +23,8 @@ export class BudgetAnalyticsService {
     constructor(
         private readonly budgetReportService: BudgetReportService,
         private readonly budgetService: IBudgetService,
-        private readonly transactionService: TransactionService
+        private readonly transactionService: TransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService
     ) {}
 
     /**
@@ -47,58 +50,60 @@ export class BudgetAnalyticsService {
             }
             const currentBudgets = currentResult.value;
 
-            // Fetch historical months data in parallel
-            const historicalData: Map<string, BudgetLimitDto[]> = new Map();
-            const historicalPromises = [];
-
-            for (let i = 1; i <= historyMonths; i++) {
-                const { prevMonth, prevYear } = this.getPreviousMonthYear(month, year, i);
-                const promise = this.budgetReportService.getBudgetReport(prevMonth, prevYear);
-                historicalPromises.push(
-                    promise.then(result => {
-                        if (result.ok) {
-                            historicalData.set(`${prevMonth}-${prevYear}`, result.value);
-                        }
-                    })
-                );
-            }
-
-            await Promise.all(historicalPromises);
+            // Fetch historical months in parallel, but keep them in chronological
+            // order (index 0 = most recent previous month) rather than the order
+            // their API calls happened to finish in
+            const historicalMonths = Array.from({ length: historyMonths }, (_, i) =>
+                this.getPreviousMonthYear(month, year, i + 1)
+            );
+            const historicalResults = await Promise.all(
+                historicalMonths.map(({ prevMonth, prevYear }) =>
+                    this.budgetReportService.getBudgetReport(prevMonth, prevYear)
+                )
+            );
+            const historicalData: BudgetLimitDto[][] = historicalResults.map(result =>
+                result.ok ? result.value : []
+            );
 
             // Get all transactions for statistics
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
             // Enhance each budget with statistics and historical data
-            const enhanced = await Promise.all(
-                currentBudgets.map(async budget => {
-                    const stats = await this.calculateBudgetStatistics(
-                        budget.budgetId,
-                        month,
-                        year,
-                        transactions
-                    );
+            const enhanced = currentBudgets.map(budget => {
+                const stats = this.calculateBudgetStatistics(
+                    budget.budgetId,
+                    month,
+                    year,
+                    transactions
+                );
 
-                    const historical = this.calculateHistoricalComparison(
-                        budget.budgetId,
-                        budget.amount,
-                        budget.spent,
-                        historicalData
-                    );
+                const historical = this.calculateHistoricalComparison(
+                    budget.budgetId,
+                    budget.amount,
+                    budget.spent,
+                    historicalData
+                );
 
-                    const percentageUsed = (Math.abs(budget.spent) / budget.amount) * 100;
-                    const remaining = budget.amount + budget.spent;
-                    const isOverBudget = remaining < 0;
+                // A budget with no limit for the month has amount 0. There is
+                // no limit to divide by, and none to exceed either: without the
+                // `amount > 0` guard any spend at all made `remaining` negative,
+                // so the category rendered an empty bar labelled over budget and
+                // BudgetInsightService announced it as "your biggest issue -
+                // 0% of its limit".
+                const hasLimit = budget.amount > 0;
+                const percentageUsed = hasLimit ? (budget.spent / budget.amount) * 100 : 0;
+                const remaining = budget.amount - budget.spent;
+                const isOverBudget = hasLimit && remaining < 0;
 
-                    return {
-                        ...budget,
-                        status: this.determineStatus(percentageUsed, isOverBudget),
-                        percentageUsed: percentageUsed || 0,
-                        remaining: remaining,
-                        historicalComparison: historical,
-                        transactionStats: stats,
-                    };
-                })
-            );
+                return {
+                    ...budget,
+                    status: this.determineStatus(percentageUsed, isOverBudget),
+                    percentageUsed: percentageUsed,
+                    remaining: remaining,
+                    historicalComparison: historical,
+                    transactionStats: stats,
+                };
+            });
 
             logger.debug({ count: enhanced.length }, 'Budget report generated');
             return enhanced;
@@ -123,24 +128,27 @@ export class BudgetAnalyticsService {
         try {
             const transactions = await this.transactionService.getTransactionsForMonth(month, year);
 
-            // Filter to withdrawal/expenses only (negative amounts)
-            const expenses = transactions.filter(t => {
-                const amount = parseFloat(t.amount);
-                return amount < 0;
-            });
+            // Firefly returns all amounts positive — spending is identified by
+            // type, not by sign
+            const expenses = transactions.filter(t =>
+                this.transactionClassificationService.isWithdrawal(t)
+            );
 
-            // Sort by absolute amount descending
-            const sorted = expenses.sort((a, b) => {
-                const amountA = Math.abs(parseFloat(a.amount));
-                const amountB = Math.abs(parseFloat(b.amount));
-                return amountB - amountA;
-            });
+            // Sort by amount descending
+            const sorted = expenses.sort(
+                (a, b) =>
+                    TransactionCalculationUtils.parseAmountSafe(b.amount) -
+                    TransactionCalculationUtils.parseAmountSafe(a.amount)
+            );
 
             // Map to TopExpenseDto and limit
             const topExpenses = sorted.slice(0, limit).map((t, index) => ({
                 description: t.description || `Transaction ${index + 1}`,
-                amount: Math.abs(parseFloat(t.amount)),
-                budgetName: t.budget_name || 'Unbudgeted',
+                amount: TransactionCalculationUtils.parseAmountSafe(t.amount),
+                // Not "Unbudgeted": the report has a section by that name with a
+                // narrower meaning, and rent (a bill) would carry this label
+                // while never appearing there.
+                budgetName: t.budget_name || 'no budget',
                 date: (t.date || new Date().toISOString()).split('T')[0],
                 transactionId: t.transaction_journal_id || '',
                 currencySymbol: t.currency_symbol || '$',
@@ -163,12 +171,12 @@ export class BudgetAnalyticsService {
      * @param allTransactions All transactions for the month (for efficiency)
      * @returns Transaction statistics
      */
-    private async calculateBudgetStatistics(
+    private calculateBudgetStatistics(
         budgetId: string,
         month: number,
         year: number,
         allTransactions: TransactionSplit[]
-    ): Promise<TransactionStats> {
+    ): TransactionStats {
         try {
             // Filter transactions for this budget
             const budgetTransactions = allTransactions.filter(t => t.budget_id === budgetId);
@@ -182,27 +190,38 @@ export class BudgetAnalyticsService {
 
             // Calculate count and average
             const count = budgetTransactions.length;
-            const totalAmount = budgetTransactions.reduce((sum, t) => {
-                return sum + Math.abs(parseFloat(t.amount));
-            }, 0);
+            // Signed: budgetTransactions is filtered by budget_id alone, so a
+            // budgeted refund is in the set. useAbsolute would let that refund
+            // inflate the average instead of reducing it.
+            const totalAmount = TransactionCalculationUtils.calculateNetSpend(
+                budgetTransactions,
+                logger
+            );
             const average = totalAmount / count;
 
             // Find top merchant (most frequent description)
             const merchantCounts = new Map<string, { count: number; total: number }>();
             budgetTransactions.forEach(t => {
                 const merchant = t.description || 'Unknown';
-                const existing = merchantCounts.get(merchant) || { count: 0, total: 0 };
-                merchantCounts.set(merchant, {
-                    count: existing.count + 1,
-                    total: existing.total + Math.abs(parseFloat(t.amount)),
-                });
+                const entry = merchantCounts.getOrInsert(merchant, { count: 0, total: 0 });
+                entry.count += 1;
+                entry.total += TransactionCalculationUtils.calculateNetSpend([t]);
             });
 
+            // Most visits wins, but ties break on spend. Without that, a
+            // category where every merchant was visited once reports whichever
+            // happened to be first — a $5.00 corner-shop run standing in for a
+            // category dominated by a $400.00 charge.
             let topMerchant: MerchantInsight | undefined;
-            let maxCount = 0;
+            let best: { count: number; total: number } | undefined;
             merchantCounts.forEach((value, key) => {
-                if (value.count > maxCount) {
-                    maxCount = value.count;
+                const wins =
+                    !best ||
+                    value.count > best.count ||
+                    (value.count === best.count && value.total > best.total);
+
+                if (wins) {
+                    best = value;
                     topMerchant = {
                         name: key,
                         visitCount: value.count,
@@ -241,33 +260,28 @@ export class BudgetAnalyticsService {
         budgetId: string,
         budgetAmount: number,
         currentSpent: number,
-        historicalData: Map<string, BudgetLimitDto[]>
+        historicalData: BudgetLimitDto[][]
     ): HistoricalComparisonDto {
         try {
-            const historicalValues: number[] = [];
+            // In chronological order: index 0 is the most recent previous month
+            const historicalValues = historicalData
+                .map(budgets => budgets.find(b => b.budgetId === budgetId))
+                .filter((budget): budget is BudgetLimitDto => budget !== undefined)
+                .map(budget => budget.spent);
 
-            // Collect historical spending amounts
-            historicalData.forEach(budgets => {
-                const budget = budgets.find(b => b.budgetId === budgetId);
-                if (budget) {
-                    historicalValues.push(Math.abs(budget.spent));
-                }
-            });
-
-            // Get previous month spent (most recent in historicalValues)
             const previousMonthSpent = historicalValues.length > 0 ? historicalValues[0] : 0;
 
             // Calculate 3-month average (including current month if we have enough data)
-            const allValues = [Math.abs(currentSpent), ...historicalValues];
-            const threeMonthValues = allValues.slice(0, Math.min(3, allValues.length));
-            const threeMonthAvg =
-                threeMonthValues.length > 0
-                    ? threeMonthValues.reduce((sum, val) => sum + val, 0) / threeMonthValues.length
+            const allValues = [currentSpent, ...historicalValues];
+            const averageWindow = allValues.slice(0, Math.min(3, allValues.length));
+            const averageSpent =
+                averageWindow.length > 0
+                    ? averageWindow.reduce((sum, val) => sum + val, 0) / averageWindow.length
                     : 0;
 
             return {
                 previousMonthSpent,
-                threeMonthAvg,
+                averageSpent,
             };
         } catch (error) {
             logger.warn(
@@ -276,7 +290,7 @@ export class BudgetAnalyticsService {
             );
             return {
                 previousMonthSpent: 0,
-                threeMonthAvg: 0,
+                averageSpent: 0,
             };
         }
     }

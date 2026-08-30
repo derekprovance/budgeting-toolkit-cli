@@ -2,9 +2,15 @@ import chalk from 'chalk';
 import { BudgetReportDto } from '../../types/dto/budget-report.dto.js';
 import { TopExpenseDto } from '../../types/dto/top-expense.dto.js';
 import { BudgetInsight } from '../../types/dto/budget-insight.dto.js';
-import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
+import {
+    BillComparisonDto,
+    getTopBills,
+    getRemainingBills,
+    isBillUpcoming,
+} from '../../types/dto/bill-comparison.dto.js';
 import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
+import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
 
@@ -16,15 +22,15 @@ interface ReportData {
     topExpenses: TopExpenseDto[];
     billComparison: BillComparisonDto;
     unbudgeted: CategorizedUnbudgetedDto[];
+    untracked: CategorizedUnbudgetedDto[];
     insights: BudgetInsight[];
     month: number;
     year: number;
     isCurrentMonth: boolean;
     daysInfo?: {
         daysLeft: number;
-        percentageLeft: number;
-        currentDay: number;
-        totalDays: number;
+        /** Date of the most recent imported transaction, if known */
+        dataThrough?: Date;
     };
 }
 
@@ -35,6 +41,7 @@ interface ReportData {
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
     private static readonly NAME_COLUMN_WIDTH = 25;
+    private static readonly AMOUNT_COLUMN_WIDTH = 12;
     private static readonly SECTION_WIDTH = 79;
     private static readonly DESCRIPTION_MAX_LENGTH = 60;
 
@@ -87,10 +94,27 @@ export class BudgetDisplayService {
         // Bills section
         sections.push(this.formatBillsSection(data.billComparison, verbose));
 
-        // Unbudgeted expenses
+        // Unbudgeted expenses — spending the cash-flow net charges to the
+        // unbudgeted bucket, the same definition the analyze command uses
         if (data.unbudgeted.length > 0) {
             sections.push(
-                this.formatUnbudgetedSection(data.unbudgeted, data.billComparison.currencySymbol)
+                this.formatUnbudgetedSection(
+                    data.unbudgeted,
+                    data.billComparison.currencySymbol,
+                    'UNBUDGETED EXPENSES'
+                )
+            );
+        }
+
+        // Spending no bucket accounts for at all
+        if (data.untracked.length > 0) {
+            sections.push(
+                this.formatUnbudgetedSection(
+                    data.untracked,
+                    data.billComparison.currencySymbol,
+                    'UNTRACKED SPENDING',
+                    'Charged to no bucket - not counted in the cash-flow net'
+                )
             );
         }
 
@@ -109,11 +133,7 @@ export class BudgetDisplayService {
      * Formats the overview section with summary and status
      */
     private formatOverviewSection(data: ReportData): string {
-        const monthName = new Date(data.year, data.month - 1).toLocaleString('default', {
-            month: 'long',
-        });
-
-        const totalSpent = Math.abs(data.budgets.reduce((sum, b) => sum + b.spent, 0));
+        const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
         const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
         const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
         const isOverBudget = totalSpent > totalBudget;
@@ -121,7 +141,7 @@ export class BudgetDisplayService {
         const statusEmoji = EmojiUtils.getStatusEmoji(percentageUsed, isOverBudget);
 
         const header = DisplayFormatterUtils.createBoxHeader(
-            `BUDGET REPORT - ${monthName.toUpperCase()} ${data.year}`
+            `BUDGET REPORT - ${DisplayFormatterUtils.formatMonthYear(data.month, data.year).toUpperCase()}`
         );
 
         const lines: string[] = [header, ''];
@@ -156,17 +176,22 @@ export class BudgetDisplayService {
         // Days remaining (for current month only)
         if (data.isCurrentMonth && data.daysInfo) {
             lines.push(`${chalk.bold('Days Remaining:')}   ${data.daysInfo.daysLeft} days`);
+            if (data.daysInfo.dataThrough) {
+                // A month looks cheap when the last few days have not imported
+                lines.push(
+                    `${chalk.bold('Data Through:')}     ${DisplayFormatterUtils.formatShortDate(data.daysInfo.dataThrough)}`
+                );
+            }
             const dailyBudget =
                 data.daysInfo.daysLeft > 0
                     ? (totalBudget - totalSpent) / data.daysInfo.daysLeft
                     : 0;
-            const dailyFormatted = CurrencyUtils.formatWithSymbol(
-                Math.max(0, dailyBudget),
-                data.billComparison.currencySymbol
-            );
-            lines.push(
-                `${chalk.bold('Daily Budget:')}     ${dailyBudget > 0 ? dailyFormatted : chalk.red('$0.00 (budget exhausted)')}`
-            );
+            const symbol = data.billComparison.currencySymbol;
+            const dailyFormatted =
+                dailyBudget > 0
+                    ? CurrencyUtils.formatWithSymbol(dailyBudget, symbol)
+                    : chalk.red(`${CurrencyUtils.formatWithSymbol(0, symbol)} (budget exhausted)`);
+            lines.push(`${chalk.bold('Daily Budget:')}     ${dailyFormatted}`);
         }
 
         lines.push('');
@@ -186,7 +211,7 @@ export class BudgetDisplayService {
             statusColor: chalk.red,
             statusEmoji: '🔴',
             formatRemaining: (budget: BudgetReportDto, formatted: string) => `${formatted} over`,
-            getRemainingAmount: (budget: BudgetReportDto) => Math.abs(budget.spent) - budget.amount,
+            getRemainingAmount: (budget: BudgetReportDto) => budget.spent - budget.amount,
         });
     }
 
@@ -232,10 +257,7 @@ export class BudgetDisplayService {
 
         // Display all budget lines
         sorted.forEach(budget => {
-            const spentFormatted = CurrencyUtils.formatWithSymbol(
-                Math.abs(budget.spent),
-                currencySymbol
-            );
+            const spentFormatted = CurrencyUtils.formatWithSymbol(budget.spent, currencySymbol);
             const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
             const remaining = config.getRemainingAmount(budget);
             const remainingFormatted = CurrencyUtils.formatWithSymbol(remaining, currencySymbol);
@@ -328,43 +350,12 @@ export class BudgetDisplayService {
             );
         }
 
-        // Spending Trend (if available)
-        if (budget.transactionStats.spendingTrend) {
-            const { direction, difference, percentageChange } =
-                budget.transactionStats.spendingTrend;
-
-            let trendEmoji = '➡️';
-            let trendText = 'Stable';
-            let trendColor = chalk.gray;
-
-            if (direction === 'increasing') {
-                trendEmoji = '📈 ↑';
-                trendText = 'Increasing';
-                trendColor = chalk.red;
-            } else if (direction === 'decreasing') {
-                trendEmoji = '📉 ↓';
-                trendText = 'Decreasing';
-                trendColor = chalk.green;
-            }
-
-            const diffFormatted = CurrencyUtils.formatWithSymbol(
-                Math.abs(difference),
-                currencySymbol
-            );
-            const pctFormatted = Math.abs(percentageChange).toFixed(1);
-            const sign = difference >= 0 ? '+' : '-';
-
-            lines.push(
-                `${indent}${trendEmoji} Trend: ${trendColor(`${trendText} vs last month (${sign}${diffFormatted}, ${sign}${pctFormatted}%)`)}`
-            );
-        }
-
         // Historical Comparison (always available)
-        const threeMonthAvgFormatted = CurrencyUtils.formatWithSymbol(
-            budget.historicalComparison.threeMonthAvg,
+        const averageSpentFormatted = CurrencyUtils.formatWithSymbol(
+            budget.historicalComparison.averageSpent,
             currencySymbol
         );
-        lines.push(`${indent}📊 Avg Spending: ${threeMonthAvgFormatted}`);
+        lines.push(`${indent}📊 Avg Spending: ${averageSpentFormatted}`);
 
         return lines.join('\n');
     }
@@ -395,18 +386,33 @@ export class BudgetDisplayService {
             billComparison.currencySymbol
         );
 
-        const summaryLine =
-            `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ` +
-            (billComparison.variance > 0
-                ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
-                : chalk.green(`${varianceEmoji} -${varianceFormatted}`));
+        const varianceDisplay =
+            billComparison.variance === 0
+                ? chalk.white(`${varianceEmoji} ${varianceFormatted}`)
+                : billComparison.variance > 0
+                  ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
+                  : chalk.green(`${varianceEmoji} -${varianceFormatted}`);
+        // A favourable variance is only good news once the month's bills have
+        // actually come around. Say how much of it is merely unpaid.
+        const notYetDue = billComparison.bills.reduce(
+            (sum, bill) => sum + (bill.upcomingAmount ?? 0),
+            0
+        );
+        const notYetDueNote =
+            notYetDue > 0
+                ? chalk.dim(
+                      `  (${CurrencyUtils.formatWithSymbol(notYetDue, billComparison.currencySymbol)} not yet due)`
+                  )
+                : '';
+
+        const summaryLine = `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${notYetDueNote}`;
 
         lines.push(summaryLine);
         lines.push('');
 
-        // Determine how many bills to show individually
-        const billsToShow = verbose ? billComparison.bills : billComparison.bills.slice(0, 4);
-        const otherBills = verbose ? [] : billComparison.bills.slice(4);
+        // Determine how many bills to show individually (top bills by actual spend)
+        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
+        const otherBills = verbose ? [] : getRemainingBills(billComparison);
 
         billsToShow.forEach(bill => {
             const predictedFormatted = CurrencyUtils.formatWithSymbol(
@@ -418,9 +424,24 @@ export class BudgetDisplayService {
                 billComparison.currencySymbol
             );
             const variance = bill.actual - bill.predicted;
-            const varianceEmoji = EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
+            const isUpcoming = isBillUpcoming(bill);
+            const varianceEmoji = EmojiUtils.getBillVarianceEmoji(
+                variance,
+                bill.predicted,
+                isUpcoming
+            );
 
-            const line = `${varianceEmoji} ${bill.name.padEnd(25)} ${actualFormatted.padStart(12)}  (expected ${predictedFormatted})`;
+            // Truncate as well as pad — a longer name would otherwise shove the
+            // amount column right and break alignment
+            const name = bill.name
+                .substring(0, BudgetDisplayService.NAME_COLUMN_WIDTH)
+                .padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH);
+            const trailer = isUpcoming
+                ? chalk.dim(
+                      `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, billComparison.currencySymbol)} of ${predictedFormatted})`
+                  )
+                : `(expected ${predictedFormatted})`;
+            const line = `${varianceEmoji} ${name} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  ${trailer}`;
             lines.push(line);
         });
 
@@ -443,9 +464,10 @@ export class BudgetDisplayService {
                 billComparison.currencySymbol
             );
 
-            const line = `${otherVarianceEmoji} Others (${otherBills.length})${' '.repeat(
-                20 - String(otherBills.length).length
-            )}${otherActualFormatted.padStart(12)}  (expected ${otherPredictedFormatted})`;
+            // Same shape as the per-bill rows so the amount column lines up
+            const line = `${otherVarianceEmoji} ${`Others (${otherBills.length})`.padEnd(
+                BudgetDisplayService.NAME_COLUMN_WIDTH
+            )} ${otherActualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${otherPredictedFormatted})`;
 
             lines.push(line);
         }
@@ -466,7 +488,7 @@ export class BudgetDisplayService {
 
         const url =
             this.baseUrl && transactionId
-                ? `${this.baseUrl}/transactions/show/${transactionId}`
+                ? DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId)
                 : undefined;
         return DisplayFormatterUtils.createHyperlink(truncated, url);
     }
@@ -476,16 +498,25 @@ export class BudgetDisplayService {
      */
     private formatUnbudgetedSection(
         unbudgeted: CategorizedUnbudgetedDto[],
-        currencySymbol: string
+        currencySymbol: string,
+        header: string,
+        subtitle?: string
     ): string {
         const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader('UNBUDGETED EXPENSES'));
+        lines.push(DisplayFormatterUtils.createSectionHeader(header));
         lines.push('');
+        if (subtitle) {
+            lines.push(chalk.dim(`  ${subtitle}`));
+            lines.push('');
+        }
 
         let total = 0;
 
         unbudgeted.forEach(item => {
-            const amount = Math.abs(parseFloat(item.transaction.amount));
+            // Signed: Firefly restricts transactions-without-budget to
+            // withdrawals server-side, but nothing local enforces that, so a
+            // refund must reduce the total rather than inflate it.
+            const amount = TransactionCalculationUtils.calculateNetSpend([item.transaction]);
             total += amount;
 
             const amountFormatted = CurrencyUtils.formatWithSymbol(
@@ -527,8 +558,7 @@ export class BudgetDisplayService {
         lines.push('');
 
         insights.forEach(insight => {
-            const iconColor = this.getInsightColor(insight.type);
-            const icon = this.getInsightIcon(insight.type);
+            const { color: iconColor, icon } = BudgetDisplayService.INSIGHT_STYLES[insight.type];
             const line = iconColor(`${icon} ${insight.message}`);
             lines.push(line);
         });
@@ -580,36 +610,16 @@ export class BudgetDisplayService {
     }
 
     /**
-     * Gets color for insight type
+     * Color and icon for each insight type. Keyed by the union so a new
+     * insight type is a compile error rather than a silent fallback.
      */
-    private getInsightColor(type: string): (s: string) => string {
-        switch (type) {
-            case 'warning':
-                return chalk.yellow;
-            case 'success':
-                return chalk.green;
-            case 'alert':
-                return chalk.red;
-            case 'info':
-            default:
-                return chalk.cyan;
-        }
-    }
-
-    /**
-     * Gets icon for insight type
-     */
-    private getInsightIcon(type: string): string {
-        switch (type) {
-            case 'warning':
-                return '⚠';
-            case 'success':
-                return '✓';
-            case 'alert':
-                return '🔴';
-            case 'info':
-            default:
-                return '•';
-        }
-    }
+    private static readonly INSIGHT_STYLES: Record<
+        BudgetInsight['type'],
+        { color: (s: string) => string; icon: string }
+    > = {
+        warning: { color: chalk.yellow, icon: '⚠' },
+        success: { color: chalk.green, icon: '✓' },
+        alert: { color: chalk.red, icon: '🔴' },
+        info: { color: chalk.cyan, icon: '•' },
+    };
 }

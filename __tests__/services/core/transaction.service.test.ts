@@ -1,3 +1,4 @@
+import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import '../../setup/mock-logger.js'; // Must be first to mock logger module
 import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
@@ -30,6 +31,8 @@ describe('TransactionService', () => {
             getDateRange: jest.fn().mockReturnValue({
                 startDate: new Date('2024-01-01'),
                 endDate: new Date('2024-01-31'),
+                startDateString: '2024-01-01',
+                endDateString: '2024-01-31',
             }),
         } as jest.Mocked<IDateRangeService>;
         service = new TransactionService(
@@ -78,7 +81,12 @@ describe('TransactionService', () => {
                 date: '2024-01-01',
                 type: 'withdrawal',
             });
-            expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledWith('test-tag');
+            expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledWith(
+                'test-tag',
+                undefined,
+                PAGE_SIZE,
+                1
+            );
         });
 
         it('should throw error when tag is empty', async () => {
@@ -318,10 +326,10 @@ describe('TransactionService', () => {
         it('should filter excluded transactions via ExcludedTransactionService', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const includedTransaction: TransactionSplit = {
@@ -345,7 +353,7 @@ describe('TransactionService', () => {
 
             mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
                 (desc, amount) => {
-                    return desc === 'VANGUARD BUY INVESTMENT' && amount === '4400.00';
+                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
                 }
             );
 
@@ -388,10 +396,10 @@ describe('TransactionService', () => {
         it('should not add excluded transactions to split index', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const mockTransactionRead: TransactionRead = {
@@ -435,14 +443,17 @@ describe('TransactionService', () => {
     });
 
     describe('getMostRecentTransactionDate', () => {
-        it('should return date from most recent transaction', async () => {
-            const mockTransaction: TransactionRead = {
+        it('should return the transaction date, not the import timestamp', async () => {
+            // The two differ whenever a backdated batch is imported, and
+            // created_at would report the data as current as of the import --
+            // the false reassurance this figure exists to prevent.
+            const mockTransaction = {
                 id: '1',
                 attributes: {
-                    created_at: '2024-01-15T10:30:00Z',
-                    transactions: [],
+                    created_at: '2024-03-02T09:00:00Z', // imported in March
+                    transactions: [{ date: '2024-01-15T10:30:00Z' }],
                 },
-            } as TransactionRead;
+            } as unknown as TransactionRead;
 
             (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
                 data: [mockTransaction],
@@ -453,14 +464,11 @@ describe('TransactionService', () => {
             expect(result).toEqual(new Date('2024-01-15T10:30:00Z'));
         });
 
-        it('should return null when created_at is undefined', async () => {
-            const mockTransaction: TransactionRead = {
+        it('should return null when the group carries no splits', async () => {
+            const mockTransaction = {
                 id: '1',
-                attributes: {
-                    created_at: undefined,
-                    transactions: [],
-                },
-            } as TransactionRead;
+                attributes: { created_at: '2024-01-15T10:30:00Z', transactions: [] },
+            } as unknown as TransactionRead;
 
             (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
                 data: [mockTransaction],
@@ -676,10 +684,10 @@ describe('TransactionService', () => {
         it('should exclude transactions matching description and amount', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const mockTransactionRead: TransactionRead = {
@@ -695,7 +703,7 @@ describe('TransactionService', () => {
 
             mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
                 (desc, amount) => {
-                    return desc === 'VANGUARD BUY INVESTMENT' && amount === '4400.00';
+                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
                 }
             );
 
@@ -733,10 +741,10 @@ describe('TransactionService', () => {
             expect(result).toHaveLength(0);
         });
 
-        it('should exclude transactions matching amount only', async () => {
+        it('should exclude a transaction the service matches on description and amount', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'Any Description',
+                description: 'Monthly Rent',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
                 amount: '999.99',
@@ -753,9 +761,9 @@ describe('TransactionService', () => {
                 data: [mockTransactionRead],
             } as TransactionArray);
 
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation((_, amount) => {
-                return amount === '999.99';
-            });
+            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
+                (description, amount) => description === 'Monthly Rent' && amount === '999.99'
+            );
 
             const result = await service.getTransactionsByTag('test-tag');
 
@@ -793,10 +801,10 @@ describe('TransactionService', () => {
         it('should handle mixed excluded and included transactions', async () => {
             const excludedTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
-                description: 'VANGUARD BUY INVESTMENT',
+                description: 'BROKERAGE BUY INVESTMENT',
                 date: '2024-01-15',
                 type: 'withdrawal' as TransactionTypeProperty,
-                amount: '4400.00',
+                amount: '2000.00',
             } as TransactionSplit;
 
             const includedTransaction1: TransactionSplit = {
@@ -828,7 +836,7 @@ describe('TransactionService', () => {
 
             mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
                 (desc, amount) => {
-                    return desc === 'VANGUARD BUY INVESTMENT' && amount === '4400.00';
+                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
                 }
             );
 
@@ -894,25 +902,6 @@ describe('TransactionService', () => {
     });
 
     describe('Cache Management', () => {
-        it('should clear the transaction cache', () => {
-            const mockCache = new Map();
-            const mockSplitIndex = new Map();
-            const serviceWithCache = new TransactionService(
-                mockExcludedTransactionService,
-                mockApiClient,
-                mockDateRangeService,
-                mockCache
-            );
-
-            // @ts-expect-error - accessing private property for test
-            serviceWithCache.splitTransactionIdx = mockSplitIndex;
-
-            serviceWithCache.clearCache();
-
-            expect(mockCache.size).toBe(0);
-            expect(mockSplitIndex.size).toBe(0);
-        });
-
         it('should return cached data on subsequent calls (cache hit)', async () => {
             const mockTransaction: TransactionSplit = {
                 transaction_journal_id: '1',
@@ -972,6 +961,51 @@ describe('TransactionService', () => {
             // Second call should not make API call
             await service.getTransactionsByTag('test-tag');
             expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledTimes(1);
+        });
+
+        it('should share one API fetch across concurrent callers (no stampede)', async () => {
+            const mockTransaction: TransactionSplit = {
+                transaction_journal_id: '1',
+                description: 'Test Transaction',
+                date: '2024-01-15',
+                type: 'withdrawal' as TransactionTypeProperty,
+            } as TransactionSplit;
+
+            const mockTransactionRead: TransactionRead = {
+                id: '1',
+                attributes: {
+                    transactions: [mockTransaction],
+                },
+            } as TransactionRead;
+
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [mockTransactionRead],
+            } as TransactionArray);
+
+            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+
+            // Fire concurrent requests before any has resolved (analyze command pattern)
+            const results = await Promise.all([
+                service.getTransactionsForMonth(1, 2024),
+                service.getTransactionsForMonth(1, 2024),
+                service.getTransactionsForMonth(1, 2024),
+            ]);
+
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
+            expect(results[0]).toEqual(results[1]);
+            expect(results[1]).toEqual(results[2]);
+        });
+
+        it('should not cache failed fetches', async () => {
+            (mockApiClient.transactions.listTransaction as jest.Mock)
+                .mockRejectedValueOnce(new Error('network down'))
+                .mockResolvedValueOnce({ data: [] } as unknown as TransactionArray);
+
+            await expect(service.getTransactionsForMonth(1, 2024)).rejects.toThrow();
+
+            // Retry after failure should hit the API again and succeed
+            await expect(service.getTransactionsForMonth(1, 2024)).resolves.toEqual([]);
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(2);
         });
 
         it('should use different cache keys for different months', async () => {
@@ -1121,24 +1155,88 @@ describe('TransactionService', () => {
         });
     });
 
-    describe('clearCache', () => {
-        it('should clear the transaction cache', () => {
-            const mockCache = new Map();
-            const mockSplitIndex = new Map();
-            const serviceWithCache = new TransactionService(
-                mockExcludedTransactionService,
-                mockApiClient,
-                mockDateRangeService,
-                mockCache
+    describe('pagination and exclusions', () => {
+        const split = (id: string, amount: string, budgetId?: string) =>
+            ({
+                transaction_journal_id: id,
+                description: `txn-${id}`,
+                amount,
+                date: '2024-01-15',
+                type: 'withdrawal',
+                budget_id: budgetId,
+            }) as unknown as TransactionSplit;
+
+        const group = (splits: TransactionSplit[]) =>
+            ({
+                id: splits[0].transaction_journal_id,
+                attributes: { transactions: splits },
+            }) as unknown as TransactionRead;
+
+        it('should fetch every page, not just the first', async () => {
+            // Firefly defaults to 50 items per page; reading only response.data
+            // silently truncates any busy month
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockImplementation((async (
+                _trace: unknown,
+                _limit: number,
+                page: number
+            ) => ({
+                data: [group([split(`p${page}`, '10.00')])],
+                meta: { pagination: { current_page: page, total_pages: 3 } },
+            })) as never);
+
+            const result = await service.getTransactionsForMonth(1, 2024);
+
+            expect(result).toHaveLength(3);
+            expect(result.map(t => t.transaction_journal_id)).toEqual(['p1', 'p2', 'p3']);
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(3);
+        });
+
+        it('should request a page size instead of relying on the API default', async () => {
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [],
+                meta: { pagination: { current_page: 1, total_pages: 1 } },
+            } as never);
+
+            await service.getTransactionsForMonth(1, 2024);
+
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledWith(
+                undefined,
+                PAGE_SIZE,
+                1,
+                '2024-01-01',
+                '2024-01-31'
+            );
+        });
+
+        it('should expose the transactions the exclusion list removed', async () => {
+            const kept = split('1', '10.00');
+            const dropped = split('2', '99.00', 'budget-7');
+
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [group([kept, dropped])],
+                meta: { pagination: { current_page: 1, total_pages: 1 } },
+            } as never);
+            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
+                (description: string) => description === 'txn-2'
             );
 
-            // @ts-expect-error - accessing private property for test
-            serviceWithCache.splitTransactionIdx = mockSplitIndex;
+            const included = await service.getTransactionsForMonth(1, 2024);
+            const excluded = await service.getExcludedTransactionsForMonth(1, 2024);
 
-            serviceWithCache.clearCache();
+            expect(included.map(t => t.transaction_journal_id)).toEqual(['1']);
+            expect(excluded.map(t => t.transaction_journal_id)).toEqual(['2']);
+            // shares the cached fetch rather than hitting the API again
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
+        });
 
-            expect(mockCache.size).toBe(0);
-            expect(mockSplitIndex.size).toBe(0);
+        it('should report no exclusions when nothing was filtered', async () => {
+            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+                data: [group([split('1', '10.00')])],
+                meta: { pagination: { current_page: 1, total_pages: 1 } },
+            } as never);
+            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+
+            await expect(service.getExcludedTransactionsForMonth(1, 2024)).resolves.toEqual([]);
         });
     });
 });

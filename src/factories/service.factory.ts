@@ -7,6 +7,7 @@ import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { ExcludedTransactionService } from '../services/excluded-transaction.service.js';
 import { TransactionClassificationService } from '../services/core/transaction-classification.service.js';
+import { AccountScopeService } from '../services/core/account-scope.service.js';
 import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
 import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
@@ -17,7 +18,6 @@ import { LLMConfig } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
 import { ConfigManager } from '../config/config-manager.js';
-import { BaseTransactionDisplayService } from '../services/display/base-transaction-display.service.js';
 import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { BillService } from '../services/core/bill.service.js';
@@ -41,6 +41,12 @@ export class ServiceFactory {
             config.transactions.excludedTransactions
         );
 
+        const accountScopeService = new AccountScopeService(apiClient, {
+            incomeDestinationAccounts: config.accounts.incomeDestinationAccounts,
+            expenseSourceAccounts: config.accounts.expenseSourceAccounts,
+            untrackedAccounts: config.accounts.untrackedAccounts,
+        });
+
         const transactionService = new TransactionService(
             excludedTransactionService,
             apiClient,
@@ -48,9 +54,9 @@ export class ServiceFactory {
         );
 
         const transactionClassificationService = new TransactionClassificationService(
-            config.api.firefly.noNameExpenseAccountId,
             config.transactions.tags.disposableIncome,
-            config.transactions.tags.paycheck
+            config.transactions.tags.paycheck,
+            config.accounts.paycheckDestinationAccounts
         );
 
         const transactionValidatorService = new TransactionValidatorService(
@@ -59,28 +65,25 @@ export class ServiceFactory {
         const additionalIncomeService = new AdditionalIncomeService(
             transactionService,
             transactionClassificationService,
-            config.accounts.incomeDestinationAccounts,
+            accountScopeService,
             config.transactions.excludedAdditionalIncomePatterns,
             config.transactions.excludeDisposableIncome
         );
         const unbudgetedExpenseService = new UnbudgetedExpenseService(
             transactionService,
             transactionClassificationService,
-            config.accounts.expenseSourceAccounts,
+            accountScopeService,
             config.accounts.expenseTransfers
         );
         const budgetReport = new BudgetReportService(
             budgetService,
-            transactionClassificationService
+            transactionClassificationService,
+            excludedTransactionService
         );
         const paycheckSurplusService = new PaycheckSurplusService(
             transactionService,
             transactionClassificationService,
             config.transactions.expectedMonthlyPaycheck
-        );
-        const baseTransactionDisplayService = new BaseTransactionDisplayService(
-            transactionClassificationService,
-            config.api.firefly.url
         );
         const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
@@ -95,15 +98,14 @@ export class ServiceFactory {
         const transactionSplitService = new TransactionSplitService(apiClient);
         const disposableIncomeService = new DisposableIncomeService(
             transactionService,
-            transactionClassificationService,
-            config.accounts.disposableIncomeAccounts,
-            config.accounts.incomeDestinationAccounts
+            transactionClassificationService
         );
         const budgetSurplusService = new BudgetSurplusService(budgetService);
         const budgetAnalyticsService = new BudgetAnalyticsService(
             budgetReport,
             budgetService,
-            transactionService
+            transactionService,
+            transactionClassificationService
         );
         const budgetInsightService = new BudgetInsightService();
         const budgetDisplayService = new BudgetDisplayService(config.api.firefly.url);
@@ -120,7 +122,6 @@ export class ServiceFactory {
             excludedTransactionService,
             paycheckSurplusService,
             transactionValidatorService,
-            baseTransactionDisplayService,
             analyzeDisplayService,
             splitTransactionDisplayService,
             billService,
@@ -135,14 +136,17 @@ export class ServiceFactory {
     }
 
     static async createAITransactionUpdateOrchestrator(
-        apiClient: FireflyClientWithCerts,
+        services: ReturnType<typeof ServiceFactory.createServices>,
         force: boolean = false,
         dryRun: boolean = false
     ): Promise<AITransactionUpdateOrchestrator> {
-        const services = this.createServices(apiClient);
         const claudeClient = LLMConfig.createClient();
 
-        const llmAssignmentService = new LLMAssignmentService(claudeClient);
+        const llmConfig = ConfigManager.getInstance().getConfig().llm;
+        const llmAssignmentService = new LLMAssignmentService(claudeClient, {
+            batchSize: llmConfig.batchSize,
+            maxConcurrent: llmConfig.maxConcurrent,
+        });
         const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
         // Create AI validator service using factory method
@@ -158,7 +162,8 @@ export class ServiceFactory {
             services.transactionValidatorService,
             aiValidator,
             services.userInputService,
-            dryRun
+            dryRun,
+            force
         );
 
         return new AITransactionUpdateOrchestrator(
@@ -166,7 +171,6 @@ export class ServiceFactory {
             interactiveTransactionUpdater,
             services.categoryService,
             services.budgetService,
-            aiValidator,
             llmProcessingService,
             services.transactionValidatorService,
             force,

@@ -5,6 +5,7 @@ import { BudgetDisplayService } from '../../src/services/display/budget-display.
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
@@ -25,6 +26,7 @@ describe('BudgetReportCommand', () => {
     let budgetReportService: jest.Mocked<BudgetReportService>;
     let billComparisonService: jest.Mocked<BillComparisonService>;
     let transactionService: jest.Mocked<TransactionService>;
+    let unbudgetedExpenseService: jest.Mocked<UnbudgetedExpenseService>;
     let consoleLogSpy: jest.Spied<typeof console.log>;
 
     const mockBudgets: BudgetReportDto[] = [
@@ -36,7 +38,7 @@ describe('BudgetReportCommand', () => {
             status: 'under',
             percentageUsed: 50,
             remaining: 500,
-            historicalComparison: { previousMonthSpent: 400, threeMonthAvg: 450 },
+            historicalComparison: { previousMonthSpent: 400, averageSpent: 450 },
             transactionStats: { count: 5, average: 100 },
         },
         {
@@ -47,7 +49,7 @@ describe('BudgetReportCommand', () => {
             status: 'on-track',
             percentageUsed: 50,
             remaining: 1000,
-            historicalComparison: { previousMonthSpent: 900, threeMonthAvg: 950 },
+            historicalComparison: { previousMonthSpent: 900, averageSpent: 950 },
             transactionStats: { count: 8, average: 125 },
         },
     ];
@@ -104,6 +106,12 @@ describe('BudgetReportCommand', () => {
                 .mockResolvedValue(new Date('2024-05-15')),
         } as unknown as jest.Mocked<TransactionService>;
 
+        unbudgetedExpenseService = {
+            calculateUnbudgetedExpenses: jest
+                .fn<(month: number, year: number) => Promise<any>>()
+                .mockResolvedValue({ ok: true, value: [] }),
+        } as unknown as jest.Mocked<UnbudgetedExpenseService>;
+
         // Create command instance with new signature
         command = new BudgetReportCommand(
             budgetAnalyticsService,
@@ -111,7 +119,8 @@ describe('BudgetReportCommand', () => {
             budgetDisplayService,
             budgetReportService,
             billComparisonService,
-            transactionService
+            transactionService,
+            unbudgetedExpenseService
         );
 
         // Spy on console.log
@@ -120,6 +129,36 @@ describe('BudgetReportCommand', () => {
 
     afterEach(() => {
         consoleLogSpy.mockRestore();
+    });
+
+    describe('getDaysLeftInfo', () => {
+        // Private, but the off-by-one it guards is user-visible: excluding
+        // today divided the remaining budget by one day too few, and on the
+        // last day produced a zero that renders as "budget exhausted".
+        const daysLeft = (month: number, year: number, today: Date): number =>
+            (
+                command as unknown as {
+                    getDaysLeftInfo: (m: number, y: number, t: Date) => { daysLeft: number };
+                }
+            ).getDaysLeftInfo(month, year, today).daysLeft;
+
+        it('should count today as a day still remaining', () => {
+            // 31 January, a 31-day month: today is still spendable
+            expect(daysLeft(1, 2024, new Date(2024, 0, 31))).toBe(1);
+        });
+
+        it('should count the whole month on the first', () => {
+            expect(daysLeft(1, 2024, new Date(2024, 0, 1))).toBe(31);
+        });
+
+        it('should include today mid-month', () => {
+            // 24th of a 31-day month leaves the 24th through the 31st
+            expect(daysLeft(1, 2024, new Date(2024, 0, 24))).toBe(8);
+        });
+
+        it('should handle a short month', () => {
+            expect(daysLeft(2, 2024, new Date(2024, 1, 29))).toBe(1);
+        });
     });
 
     describe('execute', () => {

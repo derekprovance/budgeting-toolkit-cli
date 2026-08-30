@@ -21,11 +21,6 @@ export interface ITransactionClassificationService {
     isDisposableIncome(transaction: TransactionSplit): boolean;
 
     /**
-     * Checks if destination account matches the "no name" expense account
-     */
-    hasNoDestination(destinationId: string | null): boolean;
-
-    /**
      * Checks if transaction is supplemented by disposable income
      */
     isSupplementedByDisposable(tags: string[] | null | undefined): boolean;
@@ -34,6 +29,12 @@ export interface ITransactionClassificationService {
      * Checks if transaction is a deposit
      */
     isDeposit(transaction: TransactionSplit): boolean;
+
+    /**
+     * Checks if transaction is a withdrawal (spending).
+     * Firefly returns amounts unsigned, so direction must come from the type.
+     */
+    isWithdrawal(transaction: TransactionSplit): boolean;
 
     /**
      * Checks if transaction has a category assigned

@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/common.types.js';
 import { logger } from '../logger.js';
@@ -10,6 +11,8 @@ import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { EmojiUtils } from '../utils/emoji.utils.js';
 import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
+import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 /**
  * Command for displaying budget report with insights and categorized sections
@@ -23,7 +26,8 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
         private readonly budgetDisplayService: BudgetDisplayService,
         private readonly budgetReportService: BudgetReportService,
         private readonly billComparisonService: BillComparisonService,
-        private readonly transactionService: TransactionService
+        private readonly transactionService: TransactionService,
+        private readonly unbudgetedExpenseService: UnbudgetedExpenseService
     ) {}
 
     /**
@@ -39,40 +43,64 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
             // Get days left info for current month
-            let daysInfo:
-                | {
-                      daysLeft: number;
-                      percentageLeft: number;
-                      currentDay: number;
-                      totalDays: number;
-                  }
-                | undefined;
+            let daysInfo: { daysLeft: number; dataThrough?: Date } | undefined;
             if (isCurrentMonth) {
-                const lastUpdatedOn =
-                    (await this.transactionService.getMostRecentTransactionDate()) || new Date();
-                daysInfo = this.getDaysLeftInfo(month, year, lastUpdatedOn);
+                daysInfo = {
+                    ...this.getDaysLeftInfo(month, year),
+                    // Kept as its own signal rather than folded into daysLeft:
+                    // a month can look cheap simply because the last few days
+                    // have not been imported yet.
+                    dataThrough:
+                        (await this.transactionService.getMostRecentTransactionDate()) ?? undefined,
+                };
             }
 
             // Fetch all data in parallel
             spinner.text = 'Fetching budget data...';
-            const [budgets, topExpenses, billComparisonResult, untrackedTransactions] =
+            const [budgets, topExpenses, billComparisonResult, unbudgetedResult] =
                 await Promise.all([
                     this.budgetAnalyticsService.getBudgetReport(month, year, 1),
                     this.budgetAnalyticsService.getTopExpenses(month, year, 5),
                     this.billComparisonService.calculateBillComparison(month, year),
-                    this.budgetReportService.getUntrackedTransactions(month, year),
+                    this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
                 ]);
 
-            // Map untracked transactions with emoji indicators
-            const categorizedUnbudgeted: CategorizedUnbudgetedDto[] = untrackedTransactions.map(
-                transaction => ({
+            // Not a warning: the untracked list below is derived by subtracting
+            // this one, so an empty stand-in does not degrade the report -- it
+            // inverts it, re-labelling every unbudgeted withdrawal as "untracked"
+            // and rendering the unbudgeted section empty. A plausible-looking
+            // report built on a failed calculation is worse than no report.
+            if (!unbudgetedResult.ok) {
+                spinner.fail('Failed to generate budget report');
+                console.error(
+                    chalk.red('Error calculating unbudgeted expenses:'),
+                    chalk.red.bold(unbudgetedResult.error.userMessage)
+                );
+                throw new Error(unbudgetedResult.error.message);
+            }
+
+            // The bucket that feeds the cash-flow net, same definition analyze uses
+            const unbudgetedExpenses = unbudgetedResult.value;
+
+            // Spending no bucket accounts for. Depends on the list above, so it
+            // cannot join the parallel fetch.
+            const untrackedTransactions = await this.budgetReportService.getUntrackedTransactions(
+                month,
+                year,
+                unbudgetedExpenses
+            );
+
+            const categorize = (transactions: TransactionSplit[]): CategorizedUnbudgetedDto[] =>
+                transactions.map(transaction => ({
                     transaction,
                     categoryEmoji: EmojiUtils.getCategoryEmoji(
                         transaction.category_name || undefined
                     ),
                     categoryName: transaction.category_name || undefined,
-                })
-            );
+                }));
+
+            const categorizedUnbudgeted = categorize(unbudgetedExpenses);
+            const categorizedUntracked = categorize(untrackedTransactions);
 
             if (!billComparisonResult.ok) {
                 spinner.warn('Warning: Bill comparison data unavailable');
@@ -84,13 +112,12 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             spinner.text = 'Generating insights...';
 
+            const billComparison = billComparisonResult.ok
+                ? billComparisonResult.value
+                : this.createEmptyBillComparison();
+
             // Generate insights from budget data
-            const insights = this.budgetInsightService.generateInsights(
-                budgets,
-                billComparisonResult.ok
-                    ? billComparisonResult.value
-                    : this.createEmptyBillComparison()
-            );
+            const insights = this.budgetInsightService.generateInsights(budgets, billComparison);
 
             spinner.succeed('Budget report generated');
 
@@ -98,10 +125,9 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             const reportData = {
                 budgets: budgets,
                 topExpenses,
-                billComparison: billComparisonResult.ok
-                    ? billComparisonResult.value
-                    : this.createEmptyBillComparison(),
+                billComparison,
                 unbudgeted: categorizedUnbudgeted,
+                untracked: categorizedUntracked,
                 insights,
                 month,
                 year,
@@ -123,20 +149,21 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
     }
 
     /**
-     * Gets days left information for current month
+     * Days left in the month, counted from today and INCLUDING today.
+     *
+     * Today is a day you can still spend, so the last day of the month has one
+     * day left, not zero. Excluding it divided the remaining budget by one day
+     * too few every day, and on the final day produced a zero that
+     * BudgetDisplayService renders as "budget exhausted" no matter how much is
+     * actually left.
+     *
+     * Deliberately not derived from the most recent transaction's date: that
+     * answers "how stale is my data", not "how long do I have", and using it
+     * reported 12 days left on the 24th of a 31-day month.
      */
-    private getDaysLeftInfo(month: number, year: number, lastUpdatedOn: Date) {
+    private getDaysLeftInfo(month: number, year: number, today: Date = new Date()) {
         const lastDay = new Date(year, month, 0).getDate();
-        const currentDay = lastUpdatedOn.getDate();
-        const daysLeft = Math.max(0, lastDay - currentDay);
-        const percentageLeft = ((lastDay - currentDay) / lastDay) * 100;
-
-        return {
-            daysLeft,
-            percentageLeft,
-            currentDay,
-            totalDays: lastDay,
-        };
+        return { daysLeft: Math.max(0, lastDay - today.getDate() + 1) };
     }
 
     /**

@@ -29,10 +29,12 @@ export class BudgetInsightService {
 
         if (overBudgets.length > 0) {
             const worst = overBudgets[0];
-            const overPercent = worst.percentageUsed - 100;
+            // Report the same figure the category row shows. "% over" and
+            // "% used" differ by exactly 100 and reading "1284% over" directly
+            // beneath "1384%" looks like one of them is wrong.
             insights.push({
                 type: 'warning',
-                message: `${worst.name} is your biggest issue - ${overPercent.toFixed(0)}% over budget`,
+                message: `${worst.name} is your biggest issue - ${worst.percentageUsed.toFixed(0)}% of its limit`,
                 priority: 1,
                 relatedBudget: worst.budgetId,
             });
@@ -47,7 +49,7 @@ export class BudgetInsightService {
                     BUSINESS_CONSTANTS.TRANSACTIONS.HIGH_FREQUENCY_COUNT &&
                 budget.spent !== 0
             ) {
-                const avgSpent = Math.abs(budget.spent) / budget.transactionStats.count;
+                const avgSpent = budget.spent / budget.transactionStats.count;
                 const avgFormatted = CurrencyUtils.formatWithSymbol(
                     avgSpent,
                     billComparison.currencySymbol
@@ -81,8 +83,8 @@ export class BudgetInsightService {
             });
         }
 
-        // Rule 5: Significant bill variance
-        if (billComparison.variance > 0) {
+        // Rule 4: Significant bill variance (predictedTotal of 0 would yield Infinity%)
+        if (billComparison.predictedTotal > 0 && billComparison.variance > 0) {
             const percentageOver = (billComparison.variance / billComparison.predictedTotal) * 100;
             if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.CRITICAL_VARIANCE_PERCENT) {
                 insights.push({

@@ -2,93 +2,62 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '../logger.js';
 import { LLMConfig as LLMConfigType } from '../config/config.types.js';
 
-export interface ChatMessage {
-    role: 'user' | 'assistant';
-    content: string;
-}
+/** Kept as an alias so call sites and tests keep their import */
+export type ChatMessage = Anthropic.MessageParam;
 
-interface ClaudeConfig {
-    // API and Client Configuration
+export interface ClaudeClientConfig {
     apiKey?: string;
     baseURL?: string;
+    /** Forwarded to the SDK client */
     timeout?: number;
-    maxRetries: number;
-
-    // Model Configuration
+    /** Retries after the first attempt — owned entirely by the SDK, which
+     * honors retry-after and only retries retryable failures */
+    maxRetries?: number;
     model: string;
-
-    // Message Parameters
     maxTokens: number;
-    temperature: number;
-    topP?: number;
-    topK?: number;
-    stopSequences: string[];
-
-    // System Configuration
-    systemPrompt?: string;
-    metadata?: Record<string, string>;
-
-    // Batch Processing Configuration
-    batchSize: number;
-    maxConcurrent: number;
-    retryDelayMs: number;
-    maxRetryDelayMs: number;
-
-    // Function Calling Configuration
-    functions?: Array<{
-        name: string;
-        description: string;
-        parameters: {
-            type: string;
-            properties: Record<
-                string,
-                {
-                    type: string;
-                    description?: string;
-                    enum?: string[];
-                }
-            >;
-            required: string[];
-        };
-    }>;
-    function_call?: { name: string };
 }
 
-type RequiredClaudeConfig = Omit<ClaudeConfig, 'functions' | 'function_call'> & {
-    functions?: ClaudeConfig['functions'];
-    function_call?: ClaudeConfig['function_call'];
-};
+export interface ChatOptions {
+    systemPrompt?: string;
+    tools?: Anthropic.Tool[];
+    toolChoice?: Anthropic.ToolChoice;
+    maxTokens?: number;
+    model?: string;
+    /** Overrides {@link DEFAULT_EFFORT} for a single request */
+    effort?: NonNullable<Anthropic.OutputConfig['effort']>;
+}
 
-interface MessageCreateParams {
-    model: string;
-    messages: ChatMessage[];
-    max_tokens: number;
-    temperature: number;
-    top_p?: number;
-    top_k?: number;
-    stop_sequences: string[];
-    system?: string;
-    metadata?: Record<string, string>;
-    tools?: Array<{
-        name: string;
-        description?: string;
-        input_schema: {
-            type: 'object';
-            properties: Record<
-                string,
-                {
-                    type: string;
-                    description?: string;
-                    enum?: string[];
-                }
-            >;
-            required: string[];
-        };
-    }>;
-    tool_choice?: {
-        type: 'tool';
-        name: string;
-    };
+/**
+ * Current models run adaptive thinking whenever `thinking` is omitted, and
+ * thinking tokens are drawn from `max_tokens`. Every request this client makes
+ * is a forced-tool classification against a fixed enum — the schema does the
+ * structuring, so deep reasoning buys nothing and can consume the whole budget
+ * before a single answer is emitted.
+ *
+ * `effort` is the model-agnostic lever for that: `thinking: { type: 'disabled' }`
+ * is rejected outright on some current models, whereas every one of them accepts
+ * a low effort level.
+ */
+const DEFAULT_EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
+
+/** Thrown when the circuit breaker rejects a request without calling the API */
+export class CircuitOpenError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'CircuitOpenError';
+    }
+}
+
+/** Thrown when a transport-successful response is unusable (truncated,
+ * refused, or missing the forced tool call) */
+export class ClaudeResponseError extends Error {
+    constructor(
+        public readonly reason: 'truncated' | 'refusal' | 'missing_tool_use' | 'empty',
+        message: string
+    ) {
+        super(message);
+        this.name = 'ClaudeResponseError';
+    }
 }
 
 interface RateLimitState {
@@ -100,46 +69,43 @@ interface CircuitBreakerState {
     failures: number;
     lastFailureTime: number;
     state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+    probeInFlight: boolean;
 }
 
 export class ClaudeClient {
+    /** Set once a model rejects output_config, so later chunks skip it */
+    private effortUnsupported = false;
+
     private client: Anthropic;
-    private config: RequiredClaudeConfig;
-    private requestQueue: Promise<string>[] = [];
+    private config: Required<Pick<ClaudeClientConfig, 'model' | 'maxTokens'>> &
+        Omit<ClaudeClientConfig, 'model' | 'maxTokens'>;
     private rateLimitState: RateLimitState;
     private circuitBreaker: CircuitBreakerState = {
         failures: 0,
         lastFailureTime: 0,
         state: 'CLOSED',
+        probeInFlight: false,
     };
 
-    private static DEFAULT_CONFIG: RequiredClaudeConfig = {
-        apiKey: process.env.ANTHROPIC_API_KEY || '',
-        baseURL: 'https://api.anthropic.com',
-        timeout: 30000,
-        maxRetries: 3,
-        model: 'claude-sonnet-4-5',
-        maxTokens: 2000,
-        temperature: 0.2,
-        stopSequences: [],
-        systemPrompt: '',
-        metadata: {},
-        batchSize: 10,
-        maxConcurrent: 3,
-        retryDelayMs: 1500,
-        maxRetryDelayMs: 32000,
-    };
+    // Minimal fallbacks for direct construction in tests; production always
+    // passes model/maxTokens from configuration (see llm.config.ts)
+    private static readonly DEFAULT_MODEL = 'claude-sonnet-5';
+    private static readonly DEFAULT_MAX_TOKENS = 2000;
 
     constructor(
-        config: Partial<ClaudeConfig> = {},
+        config: Partial<ClaudeClientConfig> = {},
         client?: Anthropic,
         private readonly llmConfig?: LLMConfigType
     ) {
-        this.config = { ...ClaudeClient.DEFAULT_CONFIG, ...this.clearUndefined(config) };
+        this.config = {
+            ...config,
+            model: config.model ?? ClaudeClient.DEFAULT_MODEL,
+            maxTokens: config.maxTokens ?? ClaudeClient.DEFAULT_MAX_TOKENS,
+        };
         this.client =
             client ||
             new Anthropic({
-                apiKey: this.config.apiKey,
+                apiKey: this.config.apiKey || process.env.ANTHROPIC_API_KEY || '',
                 baseURL: this.config.baseURL,
                 maxRetries: this.config.maxRetries,
                 timeout: this.config.timeout,
@@ -155,256 +121,194 @@ export class ClaudeClient {
         logger.debug(`Initializing AI Client with model: ${this.config.model}`);
     }
 
-    async chatBatch(
-        messageBatches: ChatMessage[][],
-        overrideConfig?: Partial<ClaudeConfig>
-    ): Promise<string[]> {
-        const config = { ...this.config, ...overrideConfig };
-        const results: string[] = [];
-        const batches = this.chunkArray(messageBatches, config.batchSize);
+    /**
+     * Sends one chat request. Transport retries are handled by the SDK; the
+     * circuit breaker sees one failure per exhausted logical request.
+     *
+     * When a tool is forced via toolChoice, only the matching tool_use block
+     * is returned (as JSON), ignoring any preamble text — mixed content must
+     * never corrupt the structured payload.
+     */
+    async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+        this.assertCircuitAllows();
+        await this.waitForRateLimit();
 
-        for (const batch of batches) {
-            const batchPromises = batch.map(messages => this.processSingleChat(messages, config));
-
-            while (batchPromises.length > 0) {
-                const chunk = batchPromises.splice(0, config.maxConcurrent);
-                const chunkResults = await Promise.all(chunk);
-                results.push(...chunkResults);
-            }
-        }
-
-        return results;
-    }
-
-    async chat(messages: ChatMessage[], overrideConfig?: Partial<ClaudeConfig>): Promise<string> {
-        const config = { ...this.config, ...overrideConfig };
-        const response = await this.processSingleChat(messages, config);
-
-        return response;
-    }
-
-    updateConfig(newConfig: Partial<ClaudeConfig>): void {
-        this.config = { ...this.config, ...newConfig };
-
-        if (newConfig.apiKey || newConfig.baseURL || newConfig.timeout || newConfig.maxRetries) {
-            this.client = new Anthropic({
-                apiKey: this.config.apiKey,
-                baseURL: this.config.baseURL,
-                maxRetries: this.config.maxRetries,
-                timeout: this.config.timeout,
-            });
-        }
-    }
-
-    getConfig(): Omit<RequiredClaudeConfig, 'apiKey'> {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { apiKey, ...safeConfig } = this.config;
-        return safeConfig;
-    }
-
-    private async processSingleChat(
-        messages: ChatMessage[],
-        config: RequiredClaudeConfig
-    ): Promise<string> {
-        await this.checkCircuitBreaker();
-
-        let attempt = 0;
-        let request: Promise<string>;
-
-        while (true) {
-            try {
-                await this.waitForRateLimit();
-
-                if (this.requestQueue.length >= config.maxConcurrent) {
-                    await Promise.race(this.requestQueue);
-                }
-
-                request = this.makeRequest(messages, config);
-                this.requestQueue.push(request);
-
-                const response = await request;
-
-                this.onRequestSuccess();
-
-                return response;
-            } catch (error) {
-                this.onRequestFailure();
-                attempt++;
-
-                if (attempt >= config.maxRetries) {
-                    throw error;
-                }
-
-                const delay = this.calculateBackoffDelay(
-                    attempt,
-                    config.retryDelayMs,
-                    config.maxRetryDelayMs
-                );
-
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } finally {
-                const index = this.requestQueue.findIndex(r => r === request);
-                if (index !== -1) {
-                    this.requestQueue.splice(index, 1);
-                }
-            }
-        }
-    }
-
-    private calculateBackoffDelay(attempt: number, baseDelay: number, maxDelay: number): number {
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        const jitter = Math.random() * (baseDelay * 0.1);
-        return Math.min(delay + jitter, maxDelay);
-    }
-
-    private async makeRequest(
-        messages: ChatMessage[],
-        config: RequiredClaudeConfig
-    ): Promise<string> {
-        const requestParams: MessageCreateParams = {
-            model: config.model,
-            messages: messages,
-            max_tokens: config.maxTokens,
-            temperature: config.temperature,
-            top_p: config.topP,
-            top_k: config.topK,
-            stop_sequences: config.stopSequences,
-            system: config.systemPrompt,
-            metadata: config.metadata,
+        const request: Anthropic.MessageCreateParamsNonStreaming = {
+            model: options.model ?? this.config.model,
+            max_tokens: options.maxTokens ?? this.config.maxTokens,
+            messages,
+            ...(options.systemPrompt && { system: options.systemPrompt }),
+            ...(options.tools && { tools: options.tools }),
+            ...(options.toolChoice && { tool_choice: options.toolChoice }),
         };
 
-        if (config.functions) {
-            requestParams.tools = config.functions.map(fn => ({
-                name: fn.name,
-                description: fn.description,
-                input_schema: {
-                    type: 'object',
-                    properties: fn.parameters.properties,
-                    required: fn.parameters.required,
-                },
-            }));
+        let response: Anthropic.Message;
+        try {
+            response = await this.client.messages.create(
+                this.effortUnsupported
+                    ? request
+                    : { ...request, output_config: { effort: options.effort ?? DEFAULT_EFFORT } }
+            );
+        } catch (error) {
+            // `llm.model` is user-configurable and validated only as a non-empty
+            // string, and `output_config.effort` is rejected outright by models
+            // older than this client assumes. Since a bad request now aborts the
+            // whole run, an unrecognised parameter would take a working
+            // configuration down with it — so drop it and try once more before
+            // giving up. Any other bad request fails again immediately.
+            if (error instanceof Anthropic.BadRequestError && !this.effortUnsupported) {
+                this.effortUnsupported = true;
+                logger.warn(
+                    { model: request.model, error: error.message },
+                    'Model rejected output_config.effort - retrying without it for the rest of this run'
+                );
+
+                try {
+                    response = await this.client.messages.create(request);
+                } catch (retryError) {
+                    this.onRequestFailure();
+                    throw retryError;
+                }
+            } else {
+                this.onRequestFailure();
+                throw error;
+            }
         }
 
-        if (config.function_call) {
-            requestParams.tool_choice = {
-                type: 'tool',
-                name: config.function_call.name,
-            };
+        // Transport succeeded — the breaker only tracks transport health.
+        // Extraction failures below are semantic and must not open it.
+        this.onRequestSuccess();
+
+        const forcedToolName =
+            options.toolChoice?.type === 'tool' ? options.toolChoice.name : undefined;
+        return this.extractResult(response, forcedToolName);
+    }
+
+    private extractResult(response: Anthropic.Message, expectedToolName?: string): string {
+        if (response.stop_reason === 'max_tokens') {
+            throw new ClaudeResponseError(
+                'truncated',
+                'Response truncated at max_tokens — raise llm.maxTokens or lower llm.batchSize'
+            );
+        }
+        if (response.stop_reason === 'refusal') {
+            throw new ClaudeResponseError('refusal', 'Claude refused the request');
         }
 
-        const response = await this.client.messages.create(requestParams);
+        if (expectedToolName) {
+            const toolBlock = response.content.find(
+                (block): block is Anthropic.ToolUseBlock =>
+                    block.type === 'tool_use' && block.name === expectedToolName
+            );
+            if (!toolBlock) {
+                throw new ClaudeResponseError(
+                    'missing_tool_use',
+                    `Forced tool "${expectedToolName}" was not used in the response`
+                );
+            }
+            return JSON.stringify(toolBlock.input);
+        }
 
-        const textContent = response.content
-            .map(block => this.getTextFromContentBlock(block))
-            .filter(text => text.length > 0)
+        const text = response.content
+            .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+            .map(block => block.text)
             .join('\n');
 
-        if (!textContent) {
-            throw new Error('No text content found in response');
+        if (!text) {
+            throw new ClaudeResponseError('empty', 'No text content found in response');
         }
 
-        return textContent;
-    }
-
-    private getTextFromContentBlock(block: unknown): string {
-        if (typeof block === 'object' && block !== null) {
-            const b = block as {
-                type?: string;
-                text?: string;
-                input?: unknown;
-            };
-            if (b.type === 'text' && typeof b.text === 'string') {
-                return b.text;
-            }
-            if (b.type === 'tool_use' && b.input) {
-                return JSON.stringify(b.input);
-            }
-        }
-        return '';
-    }
-
-    private chunkArray<T>(array: T[], size: number): T[][] {
-        const chunks: T[][] = [];
-        for (let i = 0; i < array.length; i += size) {
-            chunks.push(array.slice(i, i + size));
-        }
-        return chunks;
+        return text;
     }
 
     private async waitForRateLimit(): Promise<void> {
-        const now = Date.now();
-        const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
         const REFILL_INTERVAL = this.llmConfig?.rateLimit?.refillInterval ?? 60000;
         const MAX_TOKENS = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
-        const REFILL_RATE = MAX_TOKENS;
 
-        if (timeSinceLastRefill >= REFILL_INTERVAL) {
-            this.rateLimitState.tokens = Math.min(
-                MAX_TOKENS,
-                this.rateLimitState.tokens + REFILL_RATE
-            );
-            this.rateLimitState.lastRefill = now;
-        }
+        for (;;) {
+            const now = Date.now();
+            const timeSinceLastRefill = now - this.rateLimitState.lastRefill;
 
-        if (this.rateLimitState.tokens <= 0) {
-            const waitTime = REFILL_INTERVAL - timeSinceLastRefill;
+            if (timeSinceLastRefill >= REFILL_INTERVAL) {
+                this.rateLimitState.tokens = MAX_TOKENS;
+                this.rateLimitState.lastRefill = now;
+            }
+
+            if (this.rateLimitState.tokens > 0) {
+                this.rateLimitState.tokens--;
+                return;
+            }
+
+            const waitTime = Math.max(1, REFILL_INTERVAL - timeSinceLastRefill);
             logger.debug(
                 { waitTime, tokens: this.rateLimitState.tokens },
                 'Rate limit reached, waiting for refill'
             );
             await new Promise(resolve => setTimeout(resolve, waitTime));
-            return this.waitForRateLimit();
         }
-
-        this.rateLimitState.tokens--;
     }
 
-    private async checkCircuitBreaker(): Promise<void> {
+    /**
+     * Circuit breaker, consulted once per chat call:
+     * - OPEN: reject until resetTimeout elapses, then allow one HALF_OPEN probe
+     * - HALF_OPEN: exactly one probe in flight; success closes, failure reopens
+     * - CLOSED: track consecutive failures; threshold opens the circuit
+     */
+    private assertCircuitAllows(): void {
         const now = Date.now();
-        const FAILURE_THRESHOLD = this.llmConfig?.circuitBreaker?.failureThreshold ?? 5;
         const RESET_TIMEOUT = this.llmConfig?.circuitBreaker?.resetTimeout ?? 60000;
-        const HALF_OPEN_TIMEOUT = this.llmConfig?.circuitBreaker?.halfOpenTimeout ?? 30000;
 
         switch (this.circuitBreaker.state) {
             case 'OPEN':
                 if (now - this.circuitBreaker.lastFailureTime > RESET_TIMEOUT) {
                     this.circuitBreaker.state = 'HALF_OPEN';
-                    logger.debug('Circuit breaker moved to HALF_OPEN state');
-                } else {
-                    throw new Error('Circuit breaker is OPEN - API requests are blocked');
+                    this.circuitBreaker.probeInFlight = true;
+                    logger.debug('Circuit breaker moved to HALF_OPEN state (probe)');
+                    return;
                 }
-                break;
+                throw new CircuitOpenError('Circuit breaker is OPEN - API requests are blocked');
 
             case 'HALF_OPEN':
-                if (now - this.circuitBreaker.lastFailureTime > HALF_OPEN_TIMEOUT) {
-                    this.circuitBreaker.state = 'CLOSED';
-                    this.circuitBreaker.failures = 0;
-                    logger.debug('Circuit breaker moved to CLOSED state');
+                if (this.circuitBreaker.probeInFlight) {
+                    throw new CircuitOpenError(
+                        'Circuit breaker is HALF_OPEN - probe already in flight'
+                    );
                 }
-                break;
+                this.circuitBreaker.probeInFlight = true;
+                return;
 
             case 'CLOSED':
-                if (this.circuitBreaker.failures >= FAILURE_THRESHOLD) {
-                    this.circuitBreaker.state = 'OPEN';
-                    this.circuitBreaker.lastFailureTime = now;
-                    logger.warn('Circuit breaker moved to OPEN state due to failures');
-                    throw new Error('Circuit breaker is OPEN - too many failures');
-                }
-                break;
+                return;
         }
     }
 
     private onRequestSuccess(): void {
         if (this.circuitBreaker.state === 'HALF_OPEN') {
-            this.circuitBreaker.state = 'CLOSED';
-            this.circuitBreaker.failures = 0;
-            logger.debug('Circuit breaker reset to CLOSED after successful request');
+            logger.debug('Circuit breaker reset to CLOSED after successful probe');
         }
+        this.circuitBreaker.state = 'CLOSED';
+        this.circuitBreaker.failures = 0;
+        this.circuitBreaker.probeInFlight = false;
     }
 
     private onRequestFailure(): void {
-        this.circuitBreaker.failures++;
+        const FAILURE_THRESHOLD = this.llmConfig?.circuitBreaker?.failureThreshold ?? 5;
         this.circuitBreaker.lastFailureTime = Date.now();
+        this.circuitBreaker.probeInFlight = false;
+
+        if (this.circuitBreaker.state === 'HALF_OPEN') {
+            this.circuitBreaker.state = 'OPEN';
+            logger.warn('Circuit breaker probe failed, back to OPEN');
+            return;
+        }
+
+        this.circuitBreaker.failures++;
+        if (this.circuitBreaker.failures >= FAILURE_THRESHOLD) {
+            this.circuitBreaker.state = 'OPEN';
+            logger.warn('Circuit breaker moved to OPEN state due to failures');
+            return;
+        }
+
         logger.warn(
             {
                 failures: this.circuitBreaker.failures,
@@ -412,12 +316,5 @@ export class ClaudeClient {
             },
             'Request failed, updating circuit breaker'
         );
-    }
-
-    private clearUndefined<T extends object>(obj: T): Partial<T> {
-        return Object.fromEntries(
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            Object.entries(obj).filter(([_, v]) => v !== undefined)
-        ) as Partial<T>;
     }
 }

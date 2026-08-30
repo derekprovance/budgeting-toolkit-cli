@@ -56,14 +56,18 @@ describe('DisposableIncomeService', () => {
             hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
             isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isWithdrawal: jest
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockImplementation((t: TransactionSplit) => t.type === 'withdrawal'),
+            hasBudget: jest
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockImplementation((t: TransactionSplit) => !!t.budget_id),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
 
         service = new DisposableIncomeService(
             mockTransactionService,
-            mockTransactionClassificationService,
-            [], // disposableIncomeAccounts - empty for existing tests
-            [] // incomeDestinationAccounts - empty for existing tests
+            mockTransactionClassificationService
         );
     });
 
@@ -88,9 +92,9 @@ describe('DisposableIncomeService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.length).toBe(2);
-                expect(result.value[0].description).toBe('Transaction 1');
-                expect(result.value[1].description).toBe('Transaction 2');
+                expect(result.value.transactions.length).toBe(2);
+                expect(result.value.transactions[0].description).toBe('Transaction 1');
+                expect(result.value.transactions[1].description).toBe('Transaction 2');
             }
 
             expect(mockTransactionService.getTransactionsForMonth).toHaveBeenCalledWith(5, 2024);
@@ -116,9 +120,9 @@ describe('DisposableIncomeService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.length).toBe(2);
-                expect(result.value[0].description).toBe('Disposable 1');
-                expect(result.value[1].description).toBe('Disposable 2');
+                expect(result.value.transactions.length).toBe(2);
+                expect(result.value.transactions[0].description).toBe('Disposable 1');
+                expect(result.value.transactions[1].description).toBe('Disposable 2');
             }
 
             expect(mockTransactionClassificationService.isDisposableIncome).toHaveBeenCalledTimes(
@@ -137,7 +141,7 @@ describe('DisposableIncomeService', () => {
             // Assert
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.value.length).toBe(0);
+                expect(result.value.transactions.length).toBe(0);
             }
         });
 
@@ -212,528 +216,146 @@ describe('DisposableIncomeService', () => {
         });
     });
 
-    describe('Transfer Deduction Logic', () => {
-        it('should not deduct transfers when disposableIncomeAccounts is empty', async () => {
-            // Arrange - service created with empty arrays (default)
-            const transactions = [createMockTransaction({ amount: '-100.00' })];
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '50.00',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                ...transfers,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-
-            // Act
-            const result = await service.calculateDisposableIncomeBalance(5, 2024);
-
-            // Assert - should only use tag-based calculation
-            expect(result).toBe(100.0); // No deduction
-        });
-
-        it('should deduct qualifying transfers from disposable income balance', async () => {
-            // Arrange - create service with config
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'], // disposableIncomeAccounts
-                ['1'] // incomeDestinationAccounts
-            );
-
-            const transactions = [createMockTransaction({ amount: '-250.00' })];
-            const transfer = createMockTransaction({
-                type: 'transfer',
-                source_id: '6',
-                destination_id: '1',
-                amount: '50.00',
+    describe('bucket disjointness and budget overlap', () => {
+        it('should exclude bill-linked transactions (BillComparisonService owns those)', async () => {
+            const tagged = createMockTransaction({ description: 'Coffee', amount: '10.00' });
+            const taggedBill = createMockTransaction({
+                description: 'Streaming bill',
+                amount: '15.00',
+                bill_id: '7',
             });
 
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                transfer,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true);
-
-            // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
-
-            // Assert - $250 - $50 = $200
-            expect(result).toBe(200.0);
-        });
-
-        it('should not deduct transfers to non-valid destination accounts', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([tagged, taggedBill]);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockImplementation(
+                (t: TransactionSplit) => !!t.bill_id
             );
 
-            const transactions = [createMockTransaction({ amount: '-100.00' })];
-            const transfer = createMockTransaction({
-                type: 'transfer',
-                source_id: '6',
-                destination_id: '99',
-                amount: '50.00',
+            const result = await service.calculateDisposableIncome(5, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.transactions).toHaveLength(1);
+                expect(result.value.transactions[0].description).toBe('Coffee');
+            }
+        });
+
+        it('should report counted transactions that also carry a budget', async () => {
+            const plain = createMockTransaction({ description: 'Coffee', amount: '10.00' });
+            const budgeted = createMockTransaction({
+                description: 'Dinner',
+                amount: '40.00',
+                budget_id: 'budget-1',
             });
 
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                transfer,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([plain, budgeted]);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
 
-            // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
+            const result = await service.calculateDisposableIncome(5, 2024);
 
-            // Assert - No deduction because destination is not valid
-            expect(result).toBe(100.0);
-        });
-
-        it('should not deduct transfers from non-disposable accounts', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
-
-            const transactions = [createMockTransaction({ amount: '-100.00' })];
-            const transfer = createMockTransaction({
-                type: 'transfer',
-                source_id: '99',
-                destination_id: '1',
-                amount: '50.00',
-            });
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                transfer,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true);
-
-            // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
-
-            // Assert - No deduction because source is not disposable account
-            expect(result).toBe(100.0);
-        });
-
-        it('should return 0 when transfers exceed tagged total', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
-
-            const transactions = [createMockTransaction({ amount: '-100.00' })];
-            const transfer = createMockTransaction({
-                type: 'transfer',
-                source_id: '6',
-                destination_id: '1',
-                amount: '150.00',
-            });
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                transfer,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true);
-
-            // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
-
-            // Assert - Math.max(0, 100 - 150) = 0
-            expect(result).toBe(0);
-        });
-
-        it('should handle multiple qualifying transfers', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6', '7'],
-                ['1', '2']
-            );
-
-            const transactions = [createMockTransaction({ amount: '-500.00' })];
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '7',
-                    destination_id: '2',
-                    amount: '50.00',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '2',
-                    amount: '75.00',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                ...transfers,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(true);
-
-            // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
-
-            // Assert - $500 - ($100 + $50 + $75) = $275
-            expect(result).toBe(275.0);
-        });
-
-        it('should handle transfers with missing source or destination', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
-
-            const transactions = [createMockTransaction({ amount: '-100.00' })];
-            const invalidTransfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: null,
-                    destination_id: '1',
-                    amount: '50.00',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: null,
-                    amount: '25.00',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                ...transactions,
-                ...invalidTransfers,
-            ]);
-            mockTransactionClassificationService.isDisposableIncome
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(false);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true)
-                .mockReturnValueOnce(true);
-
-            // Act
-            const result = await serviceWithConfig.calculateDisposableIncomeBalance(5, 2024);
-
-            // Assert - Invalid transfers should be skipped
-            expect(result).toBe(100.0); // No deduction
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                // Firefly's budgetSpent already counts the budgeted one
+                expect(result.value.budgetedTransactions).toHaveLength(1);
+                expect(result.value.budgetedTransactions[0].description).toBe('Dinner');
+                expect(result.value.budgetedTransactions[0].amount).toBe('40.00');
+            }
         });
     });
 
-    describe('getDisposableIncomeTransfers', () => {
-        it('should return qualifying transfers when configured', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'], // disposableIncomeAccounts
-                ['1'] // incomeDestinationAccounts
-            );
-
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                    description: 'Qualifying transfer 1',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '50.00',
-                    description: 'Qualifying transfer 2',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(transfers);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-
-            // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
-
-            // Assert
-            expect(result.length).toBe(2);
-            expect(result[0].description).toBe('Qualifying transfer 1');
-            expect(result[1].description).toBe('Qualifying transfer 2');
-            expect(mockTransactionService.getTransactionsForMonth).toHaveBeenCalledWith(5, 2024);
-        });
-
-        it('should return empty array when disposableIncomeAccounts not configured', async () => {
-            // Arrange - service created with empty arrays
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(transfers);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-
-            // Act
-            const result = await service.getDisposableIncomeTransfers(5, 2024);
-
-            // Assert - should return empty due to no config
-            expect(result.length).toBe(0);
-            expect(mockTransactionService.getTransactionsForMonth).toHaveBeenCalledWith(5, 2024);
-        });
-
-        it('should filter out transfers to non-valid destinations', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1'] // Only account 1 is valid
-            );
-
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                    description: 'Valid destination',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '2',
-                    amount: '50.00',
-                    description: 'Invalid destination',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(transfers);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-
-            // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
-
-            // Assert - only first transfer should be included
-            expect(result.length).toBe(1);
-            expect(result[0].description).toBe('Valid destination');
-        });
-
-        it('should filter out transfers from non-disposable accounts', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'], // Only account 6 is disposable
-                ['1']
-            );
-
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                    description: 'From disposable account',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '7',
-                    destination_id: '1',
-                    amount: '50.00',
-                    description: 'From non-disposable account',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(transfers);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-
-            // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
-
-            // Assert - only first transfer should be included
-            expect(result.length).toBe(1);
-            expect(result[0].description).toBe('From disposable account');
-        });
-
-        it('should handle missing source or destination IDs', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
-
-            const transfers = [
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: null,
-                    destination_id: '1',
-                    amount: '50.00',
-                    description: 'Missing source',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: null,
-                    amount: '50.00',
-                    description: 'Missing destination',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                    description: 'Valid transfer',
-                }),
-            ];
-
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue(transfers);
-            mockTransactionClassificationService.isTransfer.mockReturnValue(true);
-
-            // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
-
-            // Assert - only valid transfer should be included
-            expect(result.length).toBe(1);
-            expect(result[0].description).toBe('Valid transfer');
-        });
-
-        it('should filter out non-transfer transactions', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
-
+    describe('transaction direction', () => {
+        it('should let a refund reduce disposable spending rather than inflate it', async () => {
             const transactions = [
-                createMockTransaction({
-                    type: 'withdrawal',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '50.00',
-                    description: 'Withdrawal (not transfer)',
-                }),
-                createMockTransaction({
-                    type: 'transfer',
-                    source_id: '6',
-                    destination_id: '1',
-                    amount: '100.00',
-                    description: 'Transfer',
-                }),
-            ];
+                { amount: '100.00', type: 'withdrawal', tags: ['Disposable Income'] },
+                { amount: '25.00', type: 'deposit', tags: ['Disposable Income'] },
+            ] as never;
 
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(transactions);
-            mockTransactionClassificationService.isTransfer
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(true);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
 
-            // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
+            const result = await service.calculateDisposableIncome(1, 2024);
 
-            // Assert - only transfer should be included
-            expect(result.length).toBe(1);
-            expect(result[0].description).toBe('Transfer');
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.balance).toBe(75);
+            }
+        });
+    });
+
+    describe('pool movement is ignored', () => {
+        // Funding a disposable pool and drawing from it to settle a tagged
+        // purchase are both movements between accounts the owner already holds.
+        // Neither is spending, so neither may touch the total. An earlier
+        // version deducted the draws, which drove the total to zero on exactly
+        // the months the workflow was followed -- and since tagged transactions
+        // carry no budget, that spending was then charged to no bucket at all.
+        it('should ignore a tagged transfer entirely', () => {
+            const spend = { amount: '100.00', type: 'withdrawal', tags: ['Disposable Income'] };
+            const transferOut = {
+                amount: '40.00',
+                type: 'transfer',
+                tags: ['Disposable Income'],
+                source_id: '39',
+                destination_id: '1',
+            };
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                spend,
+                transferOut,
+            ] as never);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockImplementation(
+                (t: TransactionSplit) => t.type === 'transfer'
+            );
+
+            return service.calculateDisposableIncome(5, 2024).then(result => {
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value.balance).toBe(100);
+                    expect(result.value.transactions).toHaveLength(1);
+                }
+            });
         });
 
-        it('should return empty array when no transfers exist', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
+        it('should net a tagged refund against tagged spending', () => {
+            const spend = { amount: '100.00', type: 'withdrawal', tags: ['Disposable Income'] };
+            const refund = { amount: '40.00', type: 'deposit', tags: ['Disposable Income'] };
 
-            mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                spend,
+                refund,
+            ] as never);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
 
-            // Act
-            const result = await serviceWithConfig.getDisposableIncomeTransfers(5, 2024);
-
-            // Assert
-            expect(result.length).toBe(0);
+            return service.calculateDisposableIncome(5, 2024).then(result => {
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value.balance).toBe(60);
+                }
+            });
         });
 
-        it('should handle API errors gracefully', async () => {
-            // Arrange
-            const serviceWithConfig = new DisposableIncomeService(
-                mockTransactionService,
-                mockTransactionClassificationService,
-                ['6'],
-                ['1']
-            );
+        it('should not floor a net-negative month at zero', () => {
+            // Refunds exceeding spending is a real outcome, not an error.
+            const refund = { amount: '250.00', type: 'deposit', tags: ['Disposable Income'] };
 
-            mockTransactionService.getTransactionsForMonth.mockRejectedValue(
-                new Error('API connection failed')
-            );
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([refund] as never);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(true);
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isTransfer.mockReturnValue(false);
 
-            // Act & Assert
-            await expect(serviceWithConfig.getDisposableIncomeTransfers(5, 2024)).rejects.toThrow(
-                'API connection failed'
-            );
+            return service.calculateDisposableIncome(5, 2024).then(result => {
+                expect(result.ok).toBe(true);
+                if (result.ok) {
+                    expect(result.value.balance).toBe(-250);
+                }
+            });
         });
     });
 });

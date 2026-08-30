@@ -1,3 +1,7 @@
+// Pin a UTC+ timezone before any Date is constructed: this is the zone family
+// where toISOString()-based serialization shifted ranges by one day.
+process.env.TZ = 'Europe/Berlin';
+
 import { describe, it, expect } from '@jest/globals';
 import { DateRangeService } from '../../../src/services/core/date-range.service.js';
 
@@ -65,6 +69,22 @@ describe('DateRangeService', () => {
 
             expect(result.startDate instanceof Date).toBe(true);
             expect(result.endDate instanceof Date).toBe(true);
+        });
+
+        it('should produce correct date strings regardless of timezone', () => {
+            // Regression: toISOString() converts local midnight to the previous
+            // day in UTC+ zones (Berlin/Tokyo), shifting every month query.
+            const result = service.getDateRange(3, 2024);
+
+            expect(result.startDateString).toBe('2024-03-01');
+            expect(result.endDateString).toBe('2024-03-31');
+        });
+
+        it('should zero-pad single-digit months and days in date strings', () => {
+            const result = service.getDateRange(2, 2023);
+
+            expect(result.startDateString).toBe('2023-02-01');
+            expect(result.endDateString).toBe('2023-02-28');
         });
     });
 });

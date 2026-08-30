@@ -27,7 +27,19 @@ export class EmojiUtils {
      * @param predictedAmount The expected/predicted bill amount
      * @returns Emoji indicating bill variance status
      */
-    static getBillVarianceEmoji(variance: number, predictedAmount: number): string {
+    static getBillVarianceEmoji(
+        variance: number,
+        predictedAmount: number,
+        isUpcoming: boolean = false
+    ): string {
+        // A bill that has not come around yet is not "under budget" — it is
+        // simply unpaid, and rendering it green alongside genuinely cheap bills
+        // invites the reader to bank money they still owe. Whether it counts as
+        // upcoming is BillDetailDto's call, not ours.
+        if (isUpcoming) {
+            return '⏳';
+        }
+
         // Handle zero predicted amount case
         if (predictedAmount === 0) {
             return variance > 0 ? '🔴' : '🟢';

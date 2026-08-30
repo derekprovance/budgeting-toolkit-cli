@@ -1,5 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { LLMAssignmentService } from './llm-assignment.service.js';
+import { isNoMatch } from './utils/prompt-templates.js';
 import { logger } from '../../logger.js';
 
 interface ITransactionProcessor {
@@ -65,8 +66,8 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
             const budget = assignedBudgets[index];
 
             // Filter out placeholder values
-            const hasValidCategory = category && category !== '(no category)';
-            const hasValidBudget = budget && budget !== '(no budget)';
+            const hasValidCategory = !isNoMatch('category', category);
+            const hasValidBudget = !isNoMatch('budget', budget);
 
             // Log filtering decision for debugging
             logger.trace(
@@ -122,7 +123,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
             logger.debug(
                 {
-                    totalProcessed: results.filter(r => r && r !== '(no category)').length,
+                    totalProcessed: results.filter(r => !isNoMatch('category', r)).length,
                     totalTransactions: transactions.length,
                 },
                 'Category processing complete'
@@ -159,7 +160,7 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
 
             logger.debug(
                 {
-                    totalProcessed: results.filter(r => r && r !== '(no budget)').length,
+                    totalProcessed: results.filter(r => !isNoMatch('budget', r)).length,
                     totalTransactions: transactions.length,
                 },
                 'Budget processing complete'

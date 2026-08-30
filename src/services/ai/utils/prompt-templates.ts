@@ -1,26 +1,60 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { LLMTransactionData } from './transaction-mapper.js';
 import { StringUtils } from '../../../utils/string.utils.js';
 
 export type AssignmentType = 'category' | 'budget';
 
 /**
- * Generates the function schema for Claude's function calling API
+ * The "no match" sentinel the LLM returns when no option fits.
+ * Single source of truth — the schema, prompts, and response validation all
+ * derive from this record, so callers never need to append it themselves.
  */
-export function getFunctionSchema(type: AssignmentType, validOptions: string[]) {
+export const NO_MATCH_SENTINEL: Record<AssignmentType, string> = {
+    category: '(no category)',
+    budget: '(no budget)',
+};
+
+/**
+ * Gets the no-match sentinel value for an assignment type
+ */
+export function getNoMatchValue(type: AssignmentType): string {
+    return NO_MATCH_SENTINEL[type];
+}
+
+/**
+ * Checks whether a value is the no-match sentinel (or empty)
+ */
+export function isNoMatch(type: AssignmentType, value: string | undefined): boolean {
+    return !value || value === NO_MATCH_SENTINEL[type];
+}
+
+/**
+ * Returns the options list with the no-match sentinel appended (if absent)
+ */
+export function withSentinel(type: AssignmentType, validOptions: string[]): string[] {
+    const sentinel = NO_MATCH_SENTINEL[type];
+    return validOptions.includes(sentinel) ? validOptions : [...validOptions, sentinel];
+}
+
+/**
+ * Generates the tool schema for Claude's tool-use API.
+ * The sentinel is always included in the enum so the model can decline a match.
+ */
+export function getFunctionSchema(type: AssignmentType, validOptions: string[]): Anthropic.Tool {
     const fieldName = `${type === 'category' ? 'categories' : 'budgets'}`;
     const functionName = `assign_${fieldName}`;
 
     return {
         name: functionName,
-        description: `Assign the closest matching ${type} from the available options to each transaction in the exact order provided. Return "${type === 'category' ? '(no category)' : '(no budget)'}" if no ${type} fits.`,
-        parameters: {
-            type: 'object' as const,
+        description: `Assign the closest matching ${type} from the available options to each transaction in the exact order provided. Return "${NO_MATCH_SENTINEL[type]}" if no ${type} fits.`,
+        input_schema: {
+            type: 'object',
             properties: {
                 [fieldName]: {
-                    type: 'array' as const,
+                    type: 'array',
                     items: {
-                        type: 'string' as const,
-                        enum: validOptions,
+                        type: 'string',
+                        enum: withSentinel(type, validOptions),
                     },
                     description: `Array of ${fieldName} corresponding to each transaction in order`,
                 },
@@ -46,7 +80,7 @@ export function getUserPrompt(
     validOptions: string[]
 ): string {
     const fieldName = type === 'category' ? 'categories' : 'budgets';
-    const noMatchValue = type === 'category' ? '(no category)' : '(no budget)';
+    const noMatchValue = NO_MATCH_SENTINEL[type];
 
     const transactionList = transactions
         .map(
@@ -105,9 +139,11 @@ export function parseAssignmentResponse(
         throw new Error(`Expected ${expectedCount} ${fieldName}, got ${results.length}`);
     }
 
-    // Create normalized lookup map for case-insensitive matching
+    // Create normalized lookup map for case-insensitive matching.
+    // The sentinel is always accepted — the schema offers it even when the
+    // caller's option list doesn't include it.
     const normalizedOptions = new Map<string, string>();
-    for (const option of validOptions) {
+    for (const option of withSentinel(type, validOptions)) {
         const normalized = StringUtils.normalizeForMatching(option);
         normalizedOptions.set(normalized, option);
     }

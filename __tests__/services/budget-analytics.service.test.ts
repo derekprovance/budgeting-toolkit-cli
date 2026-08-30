@@ -5,6 +5,7 @@ import { TransactionService } from '../../src/services/core/transaction.service.
 import { BudgetService } from '../../src/services/core/budget.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 
 // Mock the services
 jest.mock('../../src/services/budget-report.service.js');
@@ -21,15 +22,17 @@ describe('BudgetAnalyticsService', () => {
         budgetId: 'budget-1',
         budgetName: 'Groceries',
         amount: 500,
-        spent: -200,
+        spent: 200,
         currencyCode: 'USD',
         currencySymbol: '$',
     };
 
+    // Firefly returns amounts unsigned; direction comes from `type`
     const mockTransaction: Partial<TransactionSplit> = {
         transaction_journal_id: 'trans-1',
         description: 'Walmart',
-        amount: '-50.00',
+        amount: '50.00',
+        type: 'withdrawal',
         budget_id: 'budget-1',
         currency_symbol: '$',
         date: '2024-01-15',
@@ -45,7 +48,8 @@ describe('BudgetAnalyticsService', () => {
         service = new BudgetAnalyticsService(
             budgetReportService,
             budgetService,
-            transactionService
+            transactionService,
+            new TransactionClassificationService('Disposable Income', 'Paycheck')
         );
     });
 
@@ -100,7 +104,7 @@ describe('BudgetAnalyticsService', () => {
         it('should calculate percentage used correctly', async () => {
             const budgetWithData: BudgetReportDto = {
                 ...mockBudget,
-                spent: -300, // 60% of 500
+                spent: 300, // 60% of 500
             };
 
             budgetReportService.getBudgetReport = jest
@@ -116,10 +120,61 @@ describe('BudgetAnalyticsService', () => {
             expect(result[0].percentageUsed).toBe(60);
         });
 
+        it('should not mark a budget with no limit as over', async () => {
+            // BudgetReportService sets amount 0 when no budgetLimit matches the
+            // month. There is no limit to exceed, so spending against it is not
+            // "over budget" — it previously rendered an empty bar labelled over.
+            const noLimit: BudgetReportDto = {
+                ...mockBudget,
+                amount: 0,
+                spent: 120,
+            };
+
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [noLimit] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([mockTransaction] as any);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].percentageUsed).toBe(0);
+            expect(result[0].status).not.toBe('over');
+        });
+
+        it('should not count a net refund as spending', async () => {
+            // Firefly reports difference_float POSITIVE for a budget whose
+            // refunds outran its outflows, which BudgetReportService negates to
+            // a negative `spent`. Math.abs() per budget used to turn that refund
+            // back into spending and report the budget as used.
+            const refunded: BudgetReportDto = {
+                ...mockBudget,
+                amount: 500,
+                spent: -50, // refunds exceeded outflows by 50
+            };
+
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [refunded] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([mockTransaction] as any);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].percentageUsed).toBe(-10);
+            expect(result[0].status).not.toBe('over');
+            // The whole limit is available, plus the refund
+            expect(result[0].remaining).toBe(550);
+        });
+
         it('should mark budget as over when spent exceeds amount', async () => {
             const overBudget: BudgetReportDto = {
                 ...mockBudget,
-                spent: -600, // Over 500 budget
+                spent: 600, // Over 500 budget
             };
 
             budgetReportService.getBudgetReport = jest
@@ -151,13 +206,67 @@ describe('BudgetAnalyticsService', () => {
         });
     });
 
+    describe('top merchant selection', () => {
+        const txn = (description: string, amount: string) =>
+            ({
+                transaction_journal_id: `t-${description}`,
+                description,
+                amount,
+                type: 'withdrawal',
+                budget_id: 'budget-1',
+                currency_symbol: '$',
+                date: '2024-01-15',
+            }) as Partial<TransactionSplit>;
+
+        it('should break a visit-count tie on amount spent', async () => {
+            // Every merchant visited once is the common case for a category.
+            // Without a tie-break the winner is whichever happened to be
+            // enumerated first -- a $5 corner-shop run standing in for a
+            // category dominated by a $678 charge.
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [mockBudget] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([
+                    txn('VENMO PAYMENT', '5.00'),
+                    txn('AMAZON MKTPL', '400.00'),
+                    txn('CORNER STORE', '3.25'),
+                ] as never);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].transactionStats.topMerchant?.name).toBe('AMAZON MKTPL');
+        });
+
+        it('should still prefer more visits over a larger single charge', async () => {
+            budgetReportService.getBudgetReport = jest
+                .fn()
+                .mockResolvedValue({ ok: true, value: [mockBudget] });
+
+            transactionService.getTransactionsForMonth = jest
+                .fn()
+                .mockResolvedValue([
+                    txn('BIG ONE OFF', '900.00'),
+                    { ...txn('GROCERY MART', '20.00'), transaction_journal_id: 'ks-1' },
+                    { ...txn('GROCERY MART', '25.00'), transaction_journal_id: 'ks-2' },
+                ] as never);
+
+            const result = await service.getBudgetReport(1, 2024, 0);
+
+            expect(result[0].transactionStats.topMerchant?.name).toBe('GROCERY MART');
+            expect(result[0].transactionStats.topMerchant?.visitCount).toBe(2);
+        });
+    });
+
     describe('getTopExpenses', () => {
         it('should return top expenses sorted by amount descending', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', description: 'Walmart' },
-                { ...mockTransaction, amount: '-25.00', description: 'Gas Station' },
-                { ...mockTransaction, amount: '-100.00', description: 'Restaurant' },
-                { ...mockTransaction, amount: '-10.00', description: 'Coffee' },
+                { ...mockTransaction, amount: '50.00', description: 'Walmart' },
+                { ...mockTransaction, amount: '25.00', description: 'Gas Station' },
+                { ...mockTransaction, amount: '100.00', description: 'Restaurant' },
+                { ...mockTransaction, amount: '10.00', description: 'Coffee' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -173,11 +282,24 @@ describe('BudgetAnalyticsService', () => {
             expect(result[2].amount).toBe(25);
         });
 
-        it('should filter out positive amounts (deposits)', async () => {
+        it('should filter out deposits and transfers, keeping withdrawals', async () => {
+            // Regression: amounts are all positive, so the old `amount < 0`
+            // filter matched nothing and this section never rendered
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', description: 'Expense' },
-                { ...mockTransaction, amount: '100.00', description: 'Income' }, // Should be filtered
-                { ...mockTransaction, amount: '-25.00', description: 'Another Expense' },
+                { ...mockTransaction, amount: '50.00', description: 'Expense' },
+                {
+                    ...mockTransaction,
+                    amount: '100.00',
+                    type: 'deposit',
+                    description: 'Income',
+                },
+                {
+                    ...mockTransaction,
+                    amount: '75.00',
+                    type: 'transfer',
+                    description: 'Moved money',
+                },
+                { ...mockTransaction, amount: '25.00', description: 'Another Expense' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -187,13 +309,19 @@ describe('BudgetAnalyticsService', () => {
             const result = await service.getTopExpenses(1, 2024, 10);
 
             expect(result).toHaveLength(2);
+            expect(result.map(e => e.description)).toEqual(['Expense', 'Another Expense']);
             expect(result.every(e => e.amount > 0)).toBe(true);
         });
 
         it('should return empty array when no expenses exist', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '100.00', description: 'Income' },
-                { ...mockTransaction, amount: '50.00', description: 'More Income' },
+                { ...mockTransaction, amount: '100.00', type: 'deposit', description: 'Income' },
+                {
+                    ...mockTransaction,
+                    amount: '50.00',
+                    type: 'deposit',
+                    description: 'More Income',
+                },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -207,11 +335,11 @@ describe('BudgetAnalyticsService', () => {
 
         it('should respect the limit parameter', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-10.00', description: 'Exp1' },
-                { ...mockTransaction, amount: '-20.00', description: 'Exp2' },
-                { ...mockTransaction, amount: '-30.00', description: 'Exp3' },
-                { ...mockTransaction, amount: '-40.00', description: 'Exp4' },
-                { ...mockTransaction, amount: '-50.00', description: 'Exp5' },
+                { ...mockTransaction, amount: '10.00', description: 'Exp1' },
+                { ...mockTransaction, amount: '20.00', description: 'Exp2' },
+                { ...mockTransaction, amount: '30.00', description: 'Exp3' },
+                { ...mockTransaction, amount: '40.00', description: 'Exp4' },
+                { ...mockTransaction, amount: '50.00', description: 'Exp5' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -246,7 +374,7 @@ describe('BudgetAnalyticsService', () => {
 
         it('should include budget name for each expense', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', budget_name: 'Groceries' },
+                { ...mockTransaction, amount: '50.00', budget_name: 'Groceries' },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -258,9 +386,9 @@ describe('BudgetAnalyticsService', () => {
             expect(result[0].budgetName).toBe('Groceries');
         });
 
-        it('should use Unbudgeted when budget name is missing', async () => {
+        it('should label a transaction with no budget explicitly', async () => {
             const transactions: Partial<TransactionSplit>[] = [
-                { ...mockTransaction, amount: '-50.00', budget_name: null },
+                { ...mockTransaction, amount: '50.00', budget_name: null },
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -269,7 +397,10 @@ describe('BudgetAnalyticsService', () => {
 
             const result = await service.getTopExpenses(1, 2024, 1);
 
-            expect(result[0].budgetName).toBe('Unbudgeted');
+            // Not "Unbudgeted" -- the report has a section by that name meaning
+            // something narrower, and a bill would carry this label while never
+            // appearing in it
+            expect(result[0].budgetName).toBe('no budget');
         });
 
         it('should throw error when transaction service fails', async () => {
@@ -284,7 +415,7 @@ describe('BudgetAnalyticsService', () => {
             const transactions: Partial<TransactionSplit>[] = [
                 {
                     ...mockTransaction,
-                    amount: '-50.00',
+                    amount: '50.00',
                     date: '2024-01-20',
                     transaction_journal_id: 'journal-123',
                 },

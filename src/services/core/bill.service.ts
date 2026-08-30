@@ -2,6 +2,7 @@ import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
+import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 
 export class BillService {
     constructor(
@@ -10,28 +11,15 @@ export class BillService {
     ) {}
 
     async getBills(): Promise<BillRead[]> {
-        const results = await this.client.bills.listBill();
-        if (!results || !results.data) {
-            throw new Error('Failed to fetch bills');
-        }
-        return results.data;
+        return fetchAllPages(
+            page => this.client.bills.listBill(undefined, PAGE_SIZE, page),
+            'fetch bills'
+        );
     }
 
     async getActiveBills(): Promise<BillRead[]> {
         const bills = await this.getBills();
         return bills.filter(bill => bill.attributes.active ?? false);
-    }
-
-    async getBill(id: string): Promise<BillRead> {
-        if (!id || id.trim() === '') {
-            throw new Error('Bill ID is required and cannot be empty');
-        }
-
-        const result = await this.client.bills.getBill(id);
-        if (!result || !result.data) {
-            throw new Error(`Failed to fetch bill with ID: ${id}`);
-        }
-        return result.data;
     }
 
     /**
@@ -47,20 +35,13 @@ export class BillService {
     async getBillsForMonth(month: number, year: number): Promise<BillRead[]> {
         DateUtils.validateMonthYear(month, year);
         const range = this.dateRangeService.getDateRange(month, year);
-        const start = range.startDate.toISOString().split('T')[0];
-        const end = range.endDate.toISOString().split('T')[0];
+        const start = range.startDateString;
+        const end = range.endDateString;
 
-        const results = await this.client.bills.listBill(
-            undefined,
-            undefined,
-            undefined,
-            start,
-            end
+        return fetchAllPages(
+            page => this.client.bills.listBill(undefined, PAGE_SIZE, page, start, end),
+            'fetch bills'
         );
-        if (!results || !results.data) {
-            throw new Error('Failed to fetch bills');
-        }
-        return results.data;
     }
 
     /**

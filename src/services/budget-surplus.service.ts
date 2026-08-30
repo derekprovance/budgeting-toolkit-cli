@@ -37,16 +37,15 @@ export class BudgetSurplusService {
     ): Promise<Result<BudgetSurplusResult, BudgetError>> {
         const operation = 'calculateBudgetSurplus';
 
-        // Validate date
-        try {
-            DateUtils.validateMonthYear(month, year);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn({ month, year, operation, error: err.message }, 'Invalid date parameters');
-
-            return Result.err(
-                BudgetErrorFactory.create(BudgetErrorType.INVALID_DATE, month, year, operation, err)
-            );
+        const dateValidation = DateUtils.validateMonthYearResult(
+            month,
+            year,
+            operation,
+            (m, y, op, err) =>
+                BudgetErrorFactory.create(BudgetErrorType.INVALID_DATE, m, y, op, err)
+        );
+        if (!dateValidation.ok) {
+            return Result.err(dateValidation.error);
         }
 
         logger.debug({ month, year }, 'Calculating budget surplus');
@@ -64,10 +63,14 @@ export class BudgetSurplusService {
                 return sum + (isNaN(amount) ? 0 : amount);
             }, 0);
 
-            // Calculate total spent amount
+            // Total spent. insight/expense/budget reports difference_float as a
+            // negative number per budget, so negating converts it to spend.
+            // Math.abs() per budget would be wrong: a budget whose refunds
+            // exceed its outflows reports a positive difference_float, and
+            // taking its absolute value would count that refund as spending.
             const totalSpent = insights.reduce((sum, insight) => {
-                const spent = insight.difference_float ?? 0;
-                return sum + Math.abs(spent);
+                const difference = insight.difference_float ?? 0;
+                return sum - difference;
             }, 0);
 
             // Calculate surplus (positive) or deficit (negative)

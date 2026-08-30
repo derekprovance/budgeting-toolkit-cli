@@ -5,13 +5,14 @@ import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sd
 import { UnbudgetedExpenseService } from '../../src/services/unbudgeted-expense.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
+import { createMockAccountScopeService } from '../setup/mock-services.js';
 
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
     PRIMARY: 'test-primary-account',
-    CHASE_SAPPHIRE: 'test-chase-sapphire',
-    CHASE_AMAZON: 'test-chase-amazon',
-    CITIBANK_DOUBLECASH: 'test-citibank-doublecash',
+    CREDIT_CARD_A: 'test-credit-card-a',
+    CREDIT_CARD_B: 'test-credit-card-b',
+    CREDIT_CARD_C: 'test-credit-card-c',
     MONEY_MARKET: 'test-money-market',
 } as const;
 
@@ -56,12 +57,15 @@ describe('UnbudgetedExpenseService', () => {
         service = new UnbudgetedExpenseService(
             mockTransactionService,
             mockTransactionClassificationService,
-            [
-                TestAccount.CHASE_AMAZON,
-                TestAccount.CHASE_SAPPHIRE,
-                TestAccount.CITIBANK_DOUBLECASH,
-                TestAccount.PRIMARY,
-            ],
+            createMockAccountScopeService(
+                [],
+                [
+                    TestAccount.CREDIT_CARD_B,
+                    TestAccount.CREDIT_CARD_A,
+                    TestAccount.CREDIT_CARD_C,
+                    TestAccount.PRIMARY,
+                ]
+            ),
             [
                 {
                     source: TestAccount.PRIMARY,
@@ -244,7 +248,7 @@ describe('UnbudgetedExpenseService', () => {
                 createMockTransaction({
                     description: 'Invalid Transfer',
                     source_id: TestAccount.PRIMARY,
-                    destination_id: TestAccount.CHASE_SAPPHIRE,
+                    destination_id: TestAccount.CREDIT_CARD_A,
                 }),
             ];
 
@@ -295,16 +299,16 @@ describe('UnbudgetedExpenseService', () => {
         it('should include expenses from all valid expense accounts', async () => {
             const mockTransactions = [
                 createMockTransaction({
-                    description: 'Chase Amazon Expense',
-                    source_id: TestAccount.CHASE_AMAZON,
+                    description: 'Credit Card B Expense',
+                    source_id: TestAccount.CREDIT_CARD_B,
                 }),
                 createMockTransaction({
-                    description: 'Chase Sapphire Expense',
-                    source_id: TestAccount.CHASE_SAPPHIRE,
+                    description: 'Credit Card A Expense',
+                    source_id: TestAccount.CREDIT_CARD_A,
                 }),
                 createMockTransaction({
                     description: 'Citi Double Cash Expense',
-                    source_id: TestAccount.CITIBANK_DOUBLECASH,
+                    source_id: TestAccount.CREDIT_CARD_C,
                 }),
                 createMockTransaction({
                     description: 'Primary TestAccount Expense',
@@ -329,8 +333,8 @@ describe('UnbudgetedExpenseService', () => {
             if (result.ok) {
                 expect(result.value).toHaveLength(4);
                 expect(result.value.map(t => t.description)).toEqual([
-                    'Chase Amazon Expense',
-                    'Chase Sapphire Expense',
+                    'Credit Card B Expense',
+                    'Credit Card A Expense',
                     'Citi Double Cash Expense',
                     'Primary TestAccount Expense',
                 ]);
@@ -431,7 +435,7 @@ describe('UnbudgetedExpenseService', () => {
                 const mockTransactions = [
                     createMockTransaction({
                         description: 'Invalid Transfer',
-                        source_id: TestAccount.CHASE_SAPPHIRE,
+                        source_id: TestAccount.CREDIT_CARD_A,
                         destination_id: TestAccount.MONEY_MARKET,
                     }),
                 ];
@@ -452,13 +456,63 @@ describe('UnbudgetedExpenseService', () => {
             });
         });
 
+        describe('unreachable expenseTransfers', () => {
+            // A transfer must clear isRegularExpenseTransaction before
+            // shouldCountTransfer is consulted, so its SOURCE has to be a
+            // derived expense source. untrackedAccounts is subtracted from that
+            // list, so configuring both against one account cancels out — the
+            // rule matches nothing and used to say nothing either.
+            const buildService = (transferSource: string) =>
+                new UnbudgetedExpenseService(
+                    mockTransactionService,
+                    mockTransactionClassificationService,
+                    createMockAccountScopeService([], [TestAccount.PRIMARY]),
+                    [{ source: transferSource, destination: TestAccount.PRIMARY }]
+                );
+
+            it('should warn when a configured transfer source is not a tracked expense source', async () => {
+                const service = buildService(TestAccount.MONEY_MARKET);
+                const warn = jest.spyOn(
+                    (service as unknown as { logger: { warn: (...args: unknown[]) => void } })
+                        .logger,
+                    'warn'
+                );
+                // Shared module-level logger: spyOn returns the same mock each
+                // time, so clear history the previous test left behind
+                warn.mockClear();
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+                await service.calculateUnbudgetedExpenses(1, 2024);
+
+                expect(warn).toHaveBeenCalled();
+                expect(String(warn.mock.calls[0][1])).toContain('expenseTransfers');
+            });
+
+            it('should stay quiet when the transfer source is tracked', async () => {
+                const service = buildService(TestAccount.PRIMARY);
+                const warn = jest.spyOn(
+                    (service as unknown as { logger: { warn: (...args: unknown[]) => void } })
+                        .logger,
+                    'warn'
+                );
+                // Shared module-level logger: spyOn returns the same mock each
+                // time, so clear history the previous test left behind
+                warn.mockClear();
+                mockTransactionService.getTransactionsForMonth.mockResolvedValue([]);
+
+                await service.calculateUnbudgetedExpenses(1, 2024);
+
+                expect(warn).not.toHaveBeenCalled();
+            });
+        });
+
         describe('account validation', () => {
             it('should handle transactions from all valid expense accounts', async () => {
                 const validAccounts = [
                     TestAccount.PRIMARY,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.CREDIT_CARD_B,
+                    TestAccount.CREDIT_CARD_A,
+                    TestAccount.CREDIT_CARD_C,
                 ];
 
                 const mockTransactions = validAccounts.map(account =>

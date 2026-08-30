@@ -17,6 +17,9 @@ describe('BudgetReportService', () => {
     let budgetReportService: BudgetReportService;
     let mockBudgetService: jest.Mocked<BudgetService>;
     let mockTransactionClassificationService: jest.Mocked<TransactionClassificationService>;
+    let mockExcludedTransactionService: {
+        isExcludedTransaction: jest.Mock<(d: string, a: string) => boolean>;
+    };
 
     beforeEach(() => {
         mockBudgetService = {
@@ -31,9 +34,16 @@ describe('BudgetReportService', () => {
             isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
         } as unknown as jest.Mocked<TransactionClassificationService>;
 
+        mockExcludedTransactionService = {
+            isExcludedTransaction: jest
+                .fn<(d: string, a: string) => boolean>()
+                .mockReturnValue(false),
+        };
+
         budgetReportService = new BudgetReportService(
             mockBudgetService,
-            mockTransactionClassificationService
+            mockTransactionClassificationService,
+            mockExcludedTransactionService as never
         );
     });
 
@@ -64,11 +74,11 @@ describe('BudgetReportService', () => {
             const mockInsights = [
                 {
                     id: '1',
-                    difference_float: 50.0,
+                    difference_float: -50.0, // Firefly reports spend as negative
                 },
                 {
                     id: '2',
-                    difference_float: 150.0,
+                    difference_float: -150.0,
                 },
             ] as unknown as InsightGroup;
 
@@ -142,6 +152,78 @@ describe('BudgetReportService', () => {
 
             const result2 = await budgetReportService.getBudgetReport(13, 2024);
             expect(result2.ok).toBe(false);
+        });
+    });
+
+    describe('getUntrackedTransactions', () => {
+        const split = (id: string, description: string, amount = '10.00') =>
+            ({
+                transaction_journal_id: id,
+                description,
+                amount,
+                type: 'withdrawal',
+            }) as unknown as TransactionSplit;
+
+        beforeEach(() => {
+            mockTransactionClassificationService.isBill.mockReturnValue(false);
+            mockTransactionClassificationService.isDisposableIncome.mockReturnValue(false);
+        });
+
+        it('should exclude spending the unbudgeted bucket already charges', async () => {
+            // The unbudgeted bucket feeds netImpact, so those transactions are
+            // tracked — listing them as "fell through the cracks" is wrong
+            const charged = split('1', 'Coffee');
+            const orphan = split('2', 'BROKERAGE BUY INVESTMENT', '300.00');
+            mockBudgetService.getTransactionsWithoutBudget.mockResolvedValue([charged, orphan]);
+
+            const result = await budgetReportService.getUntrackedTransactions(8, 2026, [charged]);
+
+            expect(result.map(t => t.transaction_journal_id)).toEqual(['2']);
+        });
+
+        it('should exclude bills and disposable income', async () => {
+            const bill = split('1', 'Rent');
+            const disposable = split('2', 'Dinner');
+            const orphan = split('3', 'Investment');
+            mockBudgetService.getTransactionsWithoutBudget.mockResolvedValue([
+                bill,
+                disposable,
+                orphan,
+            ]);
+            mockTransactionClassificationService.isBill.mockImplementation(
+                (t: TransactionSplit) => t.transaction_journal_id === '1'
+            );
+            mockTransactionClassificationService.isDisposableIncome.mockImplementation(
+                (t: TransactionSplit) => t.transaction_journal_id === '2'
+            );
+
+            const result = await budgetReportService.getUntrackedTransactions(8, 2026, []);
+
+            expect(result.map(t => t.transaction_journal_id)).toEqual(['3']);
+        });
+
+        it('should apply the global exclusion list', async () => {
+            // This endpoint bypasses TransactionService, which is where the
+            // exclusion list is normally applied
+            const excluded = split('1', 'STOCK INVESTMENT');
+            const kept = split('2', 'Something else');
+            mockBudgetService.getTransactionsWithoutBudget.mockResolvedValue([excluded, kept]);
+            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
+                (description: string) => description === 'STOCK INVESTMENT'
+            );
+
+            const result = await budgetReportService.getUntrackedTransactions(8, 2026, []);
+
+            expect(result.map(t => t.transaction_journal_id)).toEqual(['2']);
+        });
+
+        it('should return everything untracked when the unbudgeted bucket is empty', async () => {
+            const orphan = split('1', 'BROKERAGE BUY INVESTMENT', '300.00');
+            mockBudgetService.getTransactionsWithoutBudget.mockResolvedValue([orphan]);
+
+            const result = await budgetReportService.getUntrackedTransactions(8, 2026, []);
+
+            expect(result).toHaveLength(1);
         });
     });
 });

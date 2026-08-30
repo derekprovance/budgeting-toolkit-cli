@@ -30,7 +30,13 @@ class CustomAxiosHttpRequest extends BaseHttpRequest {
     }
 
     public override request<T>(options: ApiRequestOptions): CancelablePromise<T> {
-        return __request(this.config, options, this.axiosInstance);
+        // axios ships distinct ESM/CJS type identities; the CJS-built SDK expects
+        // the CJS AxiosInstance, so bridge via the SDK function's own parameter type
+        return __request(
+            this.config,
+            options,
+            this.axiosInstance as unknown as Parameters<typeof __request>[2]
+        );
     }
 }
 
@@ -59,14 +65,15 @@ export class FireflyClientWithCerts extends FireflyClient {
         config: FireflyClientWithCertsConfig,
         customAxiosFactory: CustomAxiosFactory = createCustomAxiosInstance
     ) {
-        // Create custom axios instance with client certificates if provided
-        const axiosInstance = config.clientCertPath
-            ? customAxiosFactory({
-                  caCertPath: config.caCertPath,
-                  clientCertPath: config.clientCertPath,
-                  clientCertPassword: config.clientCertPassword,
-              })
-            : undefined;
+        // Create custom axios instance when any certificate (client or CA) is provided
+        const axiosInstance =
+            config.clientCertPath || config.caCertPath
+                ? customAxiosFactory({
+                      caCertPath: config.caCertPath,
+                      clientCertPath: config.clientCertPath,
+                      clientCertPassword: config.clientCertPassword,
+                  })
+                : undefined;
 
         super(
             {

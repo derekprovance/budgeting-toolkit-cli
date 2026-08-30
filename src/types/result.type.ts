@@ -34,30 +34,6 @@ export const Result = {
      * Creates a failed Result containing an error
      */
     err: <T = never, E = unknown>(error: E): Result<T, E> => ({ ok: false, error }),
-
-    /**
-     * Returns the value if Ok, otherwise returns the provided default value
-     */
-    unwrapOr: <T, E>(result: Result<T, E>, defaultValue: T): T =>
-        result.ok ? result.value : defaultValue,
-
-    /**
-     * Maps the value if Ok, otherwise returns the error unchanged
-     */
-    map: <T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E> =>
-        result.ok ? Result.ok(fn(result.value)) : result,
-
-    /**
-     * Maps the error if Err, otherwise returns the value unchanged
-     */
-    mapErr: <T, E, F>(result: Result<T, E>, fn: (error: E) => F): Result<T, F> =>
-        result.ok ? result : Result.err(fn(result.error)),
-
-    /**
-     * Chains results together (flatMap)
-     */
-    andThen: <T, U, E>(result: Result<T, E>, fn: (value: T) => Result<U, E>): Result<U, E> =>
-        result.ok ? fn(result.value) : result,
 };
 
 /**

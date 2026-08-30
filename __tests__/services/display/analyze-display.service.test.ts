@@ -73,6 +73,7 @@ describe('AnalyzeDisplayService', () => {
         disposableIncomeTransactions: [],
         disposableIncomeTransfers: [],
         disposableIncome: 0,
+        disposableIncomeTagged: 0,
         billComparison: {
             predictedTotal: 1000,
             actualTotal: 950,
@@ -168,7 +169,7 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('Unbudgeted Expenses:'.padEnd(30));
         });
 
-        it('should align disposable spending when present', () => {
+        it('should align the disposable transfer action when present', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
@@ -178,7 +179,9 @@ describe('AnalyzeDisplayService', () => {
             };
             const result = service.formatAnalysisReport(data, false);
 
-            expect(result).toContain('Disposable Spending:'.padEnd(30));
+            expect(result).toContain('Transfer from disposable pool:'.padEnd(30));
+            // it is an action, not one of the itemized adjustments
+            expect(result).not.toContain('Disposable Spending:');
         });
     });
 
@@ -281,127 +284,128 @@ describe('AnalyzeDisplayService', () => {
         });
     });
 
-    describe('Disposable Income Breakdown', () => {
-        it('should show single-line format when no transfers exist', () => {
+    describe('status icons', () => {
+        it('should render exactly one status icon per expense line', () => {
+            // formatNetImpact already carries an icon; a second appended after
+            // it produced "-$300.00 ⚠ ⚠" on every expense line.
+            const data = {
+                ...createBasicReportData(),
+                unbudgetedExpenses: [createMockTransaction('Spend', 300.0, 'withdrawal')],
+                unbudgetedExpenseTotal: 300.0,
+            };
+            const line = stripAnsi(service.formatAnalysisReport(data, false))
+                .split('\n')
+                .find(l => l.includes('Unbudgeted Expenses') && l.includes('300.00'));
+
+            expect(line).toBeDefined();
+            expect((line!.match(/⚠/g) ?? []).length).toBe(1);
+        });
+
+        it('should not judge disposable spending as an expense at all', () => {
+            // It is charged to the pool rather than the envelope, so it never
+            // reaches netImpact and must not appear among the deductions that
+            // do — the itemized column has to keep summing to the total.
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('Disposable expense', 440.33, 'withdrawal'),
+                    createMockTransaction('Tagged', 250.0, 'withdrawal'),
                 ],
-                disposableIncomeTransfers: [],
-                disposableIncome: 440.33,
+                disposableIncome: 250.0,
             };
-            const result = service.formatAnalysisReport(data, false);
+            const lines = stripAnsi(service.formatAnalysisReport(data, false)).split('\n');
 
-            expect(result).toContain('Disposable Income');
-            expect(result).toContain('$440.33');
-            expect(result).toContain('[1 transaction]');
-            expect(result).not.toContain('Tagged:');
-            expect(result).not.toContain('Transfers:');
+            expect(lines.find(l => l.includes('Disposable Spending:'))).toBeUndefined();
+
+            const action = lines.find(l => l.includes('Transfer from disposable pool:'));
+            expect(action).toBeDefined();
+            expect(action).toContain('250.00');
+            // an action, not a deduction: no warning icon, no minus sign
+            expect(action).not.toContain('⚠');
+            expect(action).not.toContain('-$');
         });
 
-        it('should show breakdown format when transfers exist', () => {
+        it('should render one icon per summary line', () => {
+            const lines = stripAnsi(
+                service.formatAnalysisReport(createBasicReportData(), false)
+            ).split('\n');
+
+            const paycheck = lines.find(l => l.includes('Paycheck:') && l.includes('5000'));
+
+            expect(paycheck).toBeDefined();
+            expect((paycheck!.match(/✓/g) ?? []).length).toBe(1);
+        });
+    });
+
+    describe('Disposable Income', () => {
+        // Pool funding and draws are movement between accounts the owner
+        // already holds, so there is no breakdown to print: the tagged
+        // purchases ARE the expense, on one line.
+        it('should show disposable spending on a single line', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
                     createMockTransaction('Tagged expense 1', 1940.33, 'withdrawal'),
                     createMockTransaction('Tagged expense 2', 1000.0, 'withdrawal'),
                 ],
-                disposableIncomeTransfers: [
-                    createMockTransaction('Transfer out', 2500.0, 'transfer'),
+                disposableIncome: 2940.33,
+            };
+            const result = service.formatAnalysisReport(data, false);
+
+            expect(result).toContain('Disposable Income');
+            expect(result).toContain('$2940.33');
+            expect(result).toContain('[2 transactions]');
+        });
+
+        it('should not print a tagged/transfers/net breakdown', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('Tagged expense', 440.33, 'withdrawal'),
                 ],
                 disposableIncome: 440.33,
             };
             const result = service.formatAnalysisReport(data, false);
 
-            expect(result).toContain('Disposable Income');
-            expect(result).toContain('Tagged:');
-            expect(result).toContain('$2940.33');
-            expect(result).toContain('Transfers:');
-            expect(result).toContain('$2500.00');
-            expect(result).toContain('Net:');
-            expect(result).toContain('$440.33');
+            expect(result).not.toContain('Tagged:');
+            expect(result).not.toContain('Transfers:');
+            expect(result).not.toContain('floored at 0');
         });
 
-        it('should show net as zero when transfers equal tagged', () => {
+        it('should omit the section when there is no tagged spending', () => {
             const data = {
                 ...createBasicReportData(),
-                disposableIncomeTransactions: [
-                    createMockTransaction('Tagged expense', 1000.0, 'withdrawal'),
-                ],
-                disposableIncomeTransfers: [
-                    createMockTransaction('Transfer out', 1000.0, 'transfer'),
-                ],
+                disposableIncomeTransactions: [],
                 disposableIncome: 0,
             };
             const result = service.formatAnalysisReport(data, false);
 
-            expect(result).toContain('Net:');
-            expect(result).toContain('$0.00');
+            expect(result).not.toContain('Disposable Income');
         });
 
-        it('should show net as zero when transfers exceed tagged', () => {
+        it('should show a net-negative month rather than clamping it', () => {
             const data = {
                 ...createBasicReportData(),
-                disposableIncomeTransactions: [
-                    createMockTransaction('Tagged expense', 500.0, 'withdrawal'),
-                ],
-                disposableIncomeTransfers: [
-                    createMockTransaction('Transfer out', 1000.0, 'transfer'),
-                ],
-                disposableIncome: 0,
+                disposableIncomeTransactions: [createMockTransaction('Refund', 250.0, 'deposit')],
+                disposableIncome: -250,
             };
             const result = service.formatAnalysisReport(data, false);
 
-            expect(result).toContain('Tagged:');
-            expect(result).toContain('$500.00');
-            expect(result).toContain('Transfers:');
-            expect(result).toContain('$1000.00');
-            expect(result).toContain('Net:');
-            expect(result).toContain('$0.00');
+            expect(result).toContain('250.00');
         });
 
-        it('should show breakdown with multiple transfers summed', () => {
-            const data = {
-                ...createBasicReportData(),
-                disposableIncomeTransactions: [
-                    createMockTransaction('Tagged expense', 3000.0, 'withdrawal'),
-                ],
-                disposableIncomeTransfers: [
-                    createMockTransaction('Transfer 1', 1000.0, 'transfer'),
-                    createMockTransaction('Transfer 2', 1500.0, 'transfer'),
-                ],
-                disposableIncome: 500.0,
-            };
-            const result = service.formatAnalysisReport(data, false);
-
-            expect(result).toContain('Transfers:');
-            expect(result).toContain('$2500.00');
-        });
-
-        it('should show transaction details in verbose mode with breakdown', () => {
+        it('should list tagged transactions in verbose mode', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
                     createMockTransaction('Tagged expense', 2940.33, 'withdrawal'),
                 ],
-                disposableIncomeTransfers: [
-                    createMockTransaction('Transfer out', 2500.0, 'transfer'),
-                ],
-                disposableIncome: 440.33,
+                disposableIncome: 2940.33,
             };
             const result = service.formatAnalysisReport(data, true);
 
-            // Breakdown shown
-            expect(result).toContain('Tagged:');
-            expect(result).toContain('Transfers:');
-            expect(result).toContain('Net:');
-
-            // Transaction details also shown
             expect(result).toContain('Tagged Transactions:');
             expect(result).toContain('Tagged expense');
-            expect(result).toContain('Transfers (Reducing Balance):');
-            expect(result).toContain('Transfer out');
+            expect(result).not.toContain('Transfers (Reducing Balance):');
         });
     });
 
@@ -678,6 +682,118 @@ describe('AnalyzeDisplayService', () => {
             expect(result).toContain('Total Adjustments:');
             expect(result).toContain('$1000.00');
             expect(result).toContain('FINANCIAL SUMMARY');
+        });
+    });
+
+    describe('disposable transfer action', () => {
+        it('should tell the owner to transfer a positive balance out of the pool', () => {
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [
+                    createMockTransaction('TRAVEL BOOKING', 400.0, 'withdrawal'),
+                    createMockTransaction('Montauk', 589.03, 'withdrawal'),
+                ],
+                disposableIncome: 250.0,
+            };
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('Transfer from disposable pool:');
+            expect(result).toContain('250.00');
+            expect(result).toContain('[2 transactions]');
+            expect(result).toContain('Not included in the net');
+        });
+
+        it('should invert the instruction when refunds outran tagged spending', () => {
+            // disposableIncome is net of refunds and is NOT floored at zero, so
+            // a negative balance is reachable and must never render as a
+            // negative transfer instruction.
+            const data = {
+                ...createBasicReportData(),
+                disposableIncomeTransactions: [createMockTransaction('Refund', 250, 'deposit')],
+                disposableIncome: -250,
+            };
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('Return to disposable pool:');
+            expect(result).toContain('250.00');
+            expect(result).not.toContain('-$250.00');
+            expect(result).not.toContain('Transfer from disposable pool:');
+        });
+
+        it('should stay silent when the balance is zero', () => {
+            const data = { ...createBasicReportData(), disposableIncome: 0 };
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).not.toContain('disposable pool:');
+        });
+    });
+
+    describe('budget rollup warning', () => {
+        it('should warn and name the transaction when one is in both a bill and a budget', () => {
+            const data = createBasicReportData();
+            data.budgetRollupTransactions = [createMockTransaction('LeetCode', 39, 'withdrawal')];
+            data.budgetRollupCorrection = 39;
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('1 budgeted transaction is charged to another section');
+            expect(result).toContain('LeetCode');
+
+            expect(result).toContain('budget');
+            // and it appears in the itemized adjustments so the column still sums
+            expect(result).toContain('Budget Rollup Adj');
+        });
+
+        it('should pluralize for multiple overlapping transactions', () => {
+            const data = createBasicReportData();
+            data.budgetRollupTransactions = [
+                createMockTransaction('LeetCode', 39, 'withdrawal'),
+                createMockTransaction('Gym', 25, 'withdrawal'),
+            ];
+            data.budgetRollupCorrection = 64;
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('2 budgeted transactions are charged to another section');
+        });
+
+        it('should still warn when the correction was clamped to zero', () => {
+            // The adjustment is capped by what each bucket actually subtracted,
+            // so a genuinely double-claimed transaction can carry a $0
+            // adjustment. That is exactly when the user most needs telling.
+            const data = createBasicReportData();
+            data.budgetRollupTransactions = [createMockTransaction('LeetCode', 39, 'withdrawal')];
+            data.budgetRollupCorrection = 0;
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('1 budgeted transaction is charged to another section');
+            expect(result).toContain('LeetCode');
+        });
+
+        it('should state the adjustment actually applied, not the raw overlap', () => {
+            const data = createBasicReportData();
+            data.budgetRollupTransactions = [
+                createMockTransaction('LeetCode', 39, 'withdrawal'),
+                createMockTransaction('Gym', 25, 'withdrawal'),
+            ];
+            data.budgetRollupCorrection = 39; // partially clamped
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).toContain('net adjustment applied: $39.00');
+        });
+
+        it('should stay silent when nothing overlaps', () => {
+            const data = createBasicReportData();
+
+            const result = stripAnsi(service.formatAnalysisReport(data, false));
+
+            expect(result).not.toContain('charged to another section');
+            expect(result).not.toContain('Budget Rollup Adj');
         });
     });
 });

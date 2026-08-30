@@ -5,13 +5,14 @@ import { TransactionSplit, TransactionRead } from '@derekprovance/firefly-iii-sd
 import { AdditionalIncomeService } from '../../src/services/additional-income.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { ITransactionClassificationService } from '../../src/services/core/transaction-classification.service.interface.js';
+import { createMockAccountScopeService } from '../setup/mock-services.js';
 
 // Test account IDs - these are hardcoded for test isolation
 const TestAccount = {
     PRIMARY: 'test-primary-account',
-    CHASE_SAPPHIRE: 'test-chase-sapphire',
-    CHASE_AMAZON: 'test-chase-amazon',
-    CITIBANK_DOUBLECASH: 'test-citibank-doublecash',
+    CREDIT_CARD_A: 'test-credit-card-a',
+    CREDIT_CARD_B: 'test-credit-card-b',
+    CREDIT_CARD_C: 'test-credit-card-c',
     MONEY_MARKET: 'test-money-market',
 } as const;
 
@@ -50,42 +51,57 @@ describe('AdditionalIncomeService', () => {
             hasNoDestination: jest.fn<(destinationId: string | null) => boolean>(),
             isSupplementedByDisposable: jest.fn<(tags: string[] | null | undefined) => boolean>(),
             isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isWithdrawal: jest.fn<(transaction: TransactionSplit) => boolean>(),
             hasACategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
+            isPaycheck: jest
+                .fn<(transaction: TransactionSplit) => boolean>()
+                .mockReturnValue(false),
         } as unknown as jest.Mocked<ITransactionClassificationService>;
 
         service = new AdditionalIncomeService(
             mockTransactionService,
             mockTransactionClassificationService,
-            [
+            createMockAccountScopeService([
                 TestAccount.PRIMARY,
-                TestAccount.CHASE_SAPPHIRE,
-                TestAccount.CHASE_AMAZON,
-                TestAccount.CITIBANK_DOUBLECASH,
-            ],
+                TestAccount.CREDIT_CARD_A,
+                TestAccount.CREDIT_CARD_B,
+                TestAccount.CREDIT_CARD_C,
+            ]),
             ['PAYROLL'],
             true
         );
     });
 
     describe('configuration', () => {
-        it('should throw error for empty valid destination accounts', () => {
-            expect(
-                () =>
-                    new AdditionalIncomeService(
-                        mockTransactionService,
-                        mockTransactionClassificationService,
-                        [],
-                        ['PAYROLL'],
-                        true
-                    )
-            ).toThrow('At least one valid destination account must be specified');
+        it('should return nothing when the resolved scope has no destinations', async () => {
+            // No longer a constructor error: the scope is resolved at analysis
+            // time from Firefly, and AccountScopeService owns the empty case.
+            const emptyScopeService = new AdditionalIncomeService(
+                mockTransactionService,
+                mockTransactionClassificationService,
+                createMockAccountScopeService([]),
+                ['PAYROLL'],
+                true
+            );
+
+            mockTransactionService.getTransactionsForMonth.mockResolvedValue([
+                createMockTransaction({ description: 'Valid Income', amount: '50.00' }),
+            ] as never);
+            mockTransactionClassificationService.isDeposit.mockReturnValue(true);
+
+            const result = await emptyScopeService.calculateAdditionalIncome(1, 2024);
+
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value).toEqual([]);
+            }
         });
 
         it('should accept custom configuration', async () => {
             const customService = new AdditionalIncomeService(
                 mockTransactionService,
                 mockTransactionClassificationService,
-                [TestAccount.PRIMARY],
+                createMockAccountScopeService([TestAccount.PRIMARY]),
                 ['PAYROLL'],
                 false
             );
@@ -167,12 +183,12 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    [
+                    createMockAccountScopeService([
                         TestAccount.PRIMARY,
-                        TestAccount.CHASE_SAPPHIRE,
-                        TestAccount.CHASE_AMAZON,
-                        TestAccount.CITIBANK_DOUBLECASH,
-                    ],
+                        TestAccount.CREDIT_CARD_A,
+                        TestAccount.CREDIT_CARD_B,
+                        TestAccount.CREDIT_CARD_C,
+                    ]),
                     ['PAYROLL'],
                     true
                 );
@@ -207,12 +223,12 @@ describe('AdditionalIncomeService', () => {
                 const serviceWithMinAmount = new AdditionalIncomeService(
                     mockTransactionService,
                     mockTransactionClassificationService,
-                    [
+                    createMockAccountScopeService([
                         TestAccount.PRIMARY,
-                        TestAccount.CHASE_SAPPHIRE,
-                        TestAccount.CHASE_AMAZON,
-                        TestAccount.CITIBANK_DOUBLECASH,
-                    ],
+                        TestAccount.CREDIT_CARD_A,
+                        TestAccount.CREDIT_CARD_B,
+                        TestAccount.CREDIT_CARD_C,
+                    ]),
                     ['PAYROLL'],
                     true
                 );
@@ -430,12 +446,12 @@ describe('AdditionalIncomeService', () => {
                 }
             });
 
-            it('should handle negative amounts', async () => {
+            it('should exclude paycheck-tagged deposits', async () => {
+                // Regression: paychecks are counted by PaycheckSurplusService.
+                // Counting them here too double-counted income in the net.
                 const mockTransactions = [
-                    createMockTransaction({
-                        description: 'Negative Amount',
-                        amount: '-100.00',
-                    }),
+                    createMockTransaction({ description: 'ACME PAYROLL', amount: '1234.56' }),
+                    createMockTransaction({ description: 'Side gig', amount: '100.00' }),
                 ];
 
                 mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
@@ -443,12 +459,16 @@ describe('AdditionalIncomeService', () => {
                 (
                     mockTransactionClassificationService.isDisposableIncome as jest.Mock
                 ).mockReturnValue(false);
+                (mockTransactionClassificationService.isPaycheck as jest.Mock).mockImplementation(
+                    (t: TransactionSplit) => t.description === 'ACME PAYROLL'
+                );
 
                 const result = await service.calculateAdditionalIncome(4, 2024);
 
                 expect(result.ok).toBe(true);
                 if (result.ok) {
-                    expect(result.value).toHaveLength(0);
+                    expect(result.value).toHaveLength(1);
+                    expect(result.value[0].description).toBe('Side gig');
                 }
             });
 
@@ -503,9 +523,9 @@ describe('AdditionalIncomeService', () => {
             it('should handle all valid destination accounts', async () => {
                 const validAccounts = [
                     TestAccount.PRIMARY,
-                    TestAccount.CHASE_SAPPHIRE,
-                    TestAccount.CHASE_AMAZON,
-                    TestAccount.CITIBANK_DOUBLECASH,
+                    TestAccount.CREDIT_CARD_A,
+                    TestAccount.CREDIT_CARD_B,
+                    TestAccount.CREDIT_CARD_C,
                 ];
 
                 const mockTransactions = validAccounts.map(account =>
