@@ -4,90 +4,18 @@
 # Budget and Analysis Configuration
 expectedMonthlyPaycheck: 5000.00
 
-# Income destinations and expense sources are DERIVED from Firefly's account
-# roles, so they stay correct as you add accounts:
+# The cost-of-living envelope (see RULES.md). Every asset account is
+# inside it except the ones listed here: typically savings, a brokerage and a
+# disposable pool. This is the only setting that draws the envelope.
 #
-#   income destinations = active asset accounts, role != ccAsset, minus untracked
-#   expense sources     = active asset accounts,                  minus untracked
+# Deposits into these accounts are not income and withdrawals from them are not
+# spending - both sides move together, so excluding an account cannot
+# manufacture a deficit. Money moving OUT of the envelope INTO one of them
+# (checking -> savings) is unbudgeted spending, so a deficit it causes shows.
 #
-# Credit cards are excluded from income because deposits to them are refunds and
-# statement credits, never income.
-#
-# Leave both empty to derive. Set one explicitly ONLY to override derivation
-# entirely for that side - useful when a Firefly account_role is wrong.
-incomeDestinationAccounts: []
-expenseSourceAccounts: []
-
-# Accounts outside the tracked boundary. Excluded from both derived lists, so
-# money leaving them is not spending and money arriving in them is not income.
-#
-# Both sides move together, and that symmetry matters: excluding an account's
-# income while still charging its spending manufactures a deficit that never
-# happened. Two cases belong here:
-#
-#   Excluded by necessity - a brokerage. Its role is savingAsset, identical to
-#   an ordinary savings account, but its outflows are fund transfers rather than
-#   purchases and Firefly cannot tell those apart.
-#
-#   Excluded by intent - an account holding money deliberately kept outside the
-#   budget, e.g. a savings account that receives earmarked income and funds
-#   investment buys or tax payments. Neither side is the spending you measure.
-#
-# Nothing vanishes: withdrawals from these accounts are listed under 'Untracked
-# Spending' in the report command, a diagnostic outside the net.
-#
-# This does NOT hide money moving into one from a tracked account - a withdrawal
-# from checking to buy an investment still counts as spending, because the
-# source is tracked.
+# Income accounts are derived: the envelope minus credit cards (Firefly role
+# ccAsset). A deposit onto a card is a refund, never income.
 untrackedAccounts: []
-
-# Accounts a Paycheck-tagged deposit must land in to count as the paycheck.
-#
-# Useful when payroll is split across accounts and only one half is the
-# paycheck: a stray tag on the other half is then disregarded instead of
-# inflating paycheck income.
-#
-# Where the rejected half lands is decided by the account boundary, not by this
-# setting. It reaches additional income only if it is a deposit AND its
-# destination is still a derived income destination. If that account is listed
-# in untrackedAccounts, it is counted in no bucket at all - which is the point
-# when the other half is money you keep outside the budget.
-#
-# Leave empty (the default) to let the tag alone decide.
-paycheckDestinationAccounts: []
-
-# Descriptions that must NOT count as additional income. Matched whole-word.
-#
-# Do NOT add 'TRANSFER': additional income already filters on deposit type, so
-# real transfers never reach this list, and the pattern can only discard
-# legitimate deposits that happen to say "transfer" (e.g. STRIPE TRANSFER).
-#
-# Think twice before adding 'PAYROLL' too. If a payroll deposit genuinely is
-# not budget income to you, exclude its DESTINATION via untrackedAccounts
-# instead: a description pattern fixes only the income side, leaving spending
-# funded from that account charged against your budget, while the account
-# boundary excludes both sides at once. Note also that both halves of a split
-# paycheck often share one description, so a pattern cannot separate them.
-#
-# This list is read only by AdditionalIncomeService, so nothing here can affect
-# the paycheck bucket.
-excludedAdditionalIncomePatterns:
-    - 'ATM FEE'
-
-# These are transfers that would be counted towards unbudgeted expenses
-# Only list transfers that represent money genuinely leaving your control.
-# Do NOT list transfers that fund a disposable/cash account: spending out of
-# that account is already charged once via the Disposable Income tag, so
-# listing the funding transfer charges the same dollars twice.
-expenseTransfers:
-    - source: '10' # Remote Investment Account ID
-      destination: '1' # Checking Account ID
-
-# Disposable income is identified by tag alone - there is no account list. The
-# tagged purchase is the expense; funding or drawing from a disposable pool is
-# movement between accounts you already own, so neither is income nor spending.
-
-excludeDisposableIncome: false
 
 # Custom tag names (optional - override if you use different tags in Firefly III)
 # tags:

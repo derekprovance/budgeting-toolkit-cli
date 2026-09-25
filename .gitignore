@@ -22,3 +22,7 @@ backup.sql
 #Mac Specific
 .DS_Store
 .claude
+
+# e2e harness state (keys, tokens, ports) and container-only secrets
+.e2e/
+.env.docker

@@ -40,10 +40,19 @@ CLIENT_CERT_PASSWORD=
 STRICT_TLS=
 
 # Absolute path to a .env file. Highest priority in the .env search order,
-# ahead of ./.env and ~/.budget/.env. This is what `npm run start:dev`,
-# `npm run seed:docker`, and `npm run test:e2e:docker` use.
+# ahead of ./.env and ~/.budget/.env. `npm run start:dev` sets it to .env.dev,
+# and the e2e harness to .e2e/env.
 ENV_FILE=
 ```
+
+`ENV_FILE` and the two variables below are read from the **process
+environment**, not from a `.env` file:
+
+- `BTK_STRICT_CONFIG=1` disables every fallback: `ENV_FILE` and `--config` must
+  both be given and exist, and `./.env`, `~/.budget/.env`, `./config.yaml` and
+  `~/.budget/config.yaml` are never read. The test suites always run strict.
+- `BTK_PAGE_SIZE` sets the page size requested from Firefly list endpoints,
+  1–500 (default 500). An invalid value logs a warning and falls back.
 
 **Notes:**
 
@@ -61,13 +70,9 @@ Use this quick reference to see what each command needs:
 
 - `expectedMonthlyPaycheck` - Expected monthly income
 
-Account scope is derived from Firefly and needs no configuration. See
-`untrackedAccounts` below if you hold a brokerage or similar.
-
 **Recommended:**
 
-- `excludedAdditionalIncomePatterns[]` - Descriptions that must not count as additional income (do **not** use `PAYROLL` — see below)
-- `excludeDisposableIncome` - true/false
+- `untrackedAccounts[]` - Savings, a brokerage, a disposable pool: everything outside the cost-of-living envelope
 - `tags.*` - Custom tag names
 
 ---
@@ -80,7 +85,7 @@ Account scope is derived from Firefly and needs no configuration. See
 
 **Recommended:**
 
-- `firefly.noNameExpenseAccountId` - Verify default '5' matches your setup
+- `untrackedAccounts[]` - Same envelope as `analyze`
 - `tags.*` - Custom tag names if you use different tags
 
 ---
@@ -121,176 +126,47 @@ expectedMonthlyPaycheck: 5000.00
 **Default:** `undefined`
 **Used by:** Analyze command
 
-#### Account scope (derived)
+#### How transactions are classified
 
-Which accounts count as income destinations and expense sources is derived from
-Firefly's own `account_role`, so the lists cannot drift out of date as accounts
-are added:
+`RULES.md` is the authority; this is the short version.
 
-```
-income destinations = active asset accounts, role != ccAsset, minus untracked
-expense sources     = active asset accounts,                  minus untracked
-```
-
-Credit cards are excluded from income because deposits to them are refunds and
-statement credits, never income. Inactive accounts are excluded from both.
+1. **The account decides scope.** The envelope is checking and the credit cards:
+   every asset account not in `untrackedAccounts`. Nothing outside it
+   is counted or shown, whatever it is tagged or budgeted.
+2. **Income lands only in checking.** A `Paycheck`-tagged deposit into a
+   non-card envelope account is the paycheck; any other unmarked deposit there
+   is additional income. Savings deposits, pool interest and card credits are
+   never income.
+3. **Spending is classified by marker:** bill, then `Disposable Income` tag,
+   then budget, else unbudgeted. A transfer out of the envelope (checking →
+   savings) is unbudgeted spending; a card payment is ignored.
+4. **`excludedTransactions` removes a match from the whole tool.**
 
 #### untrackedAccounts
 
-Accounts outside the budget's boundary. Deposits to them are **not income** and
-withdrawals from them are **not spending** — both sides move together.
+Accounts outside the cost-of-living envelope. It is the only setting that
+draws the envelope: every other asset account (closed ones included) is inside it.
 
 ```yaml
 untrackedAccounts:
     - '27' # Brokerage - outflows are fund transfers, not spending
-    - '2' # Savings - outside the cost-of-living envelope by intent
+    - '2' # Savings - receives the savings half of payroll
+    - '39' # Disposable pool - pays for tagged purchases, not the paycheck
 ```
 
 **Type:** `string[]`
 **Default:** `[]`
-**Used by:** Account scope derivation
+**Used by:** `analyze`, `report`
 
-That symmetry is the point. Excluding an account's income while still charging
-its spending manufactures a deficit that never happened, so this is an account
-boundary rather than an income filter. Two distinct cases share the list:
+Deposits into these accounts are not income, and withdrawals from them are not
+spending — both sides move together, so excluding an account can never
+manufacture a deficit. Money moving **out of the envelope into** one of them is
+spending (unbudgeted): a one-off extra transfer to savings that leaves you short
+shows up as the deficit it caused.
 
-- **Excluded by necessity.** A brokerage carries the same `savingAsset` role as
-  an ordinary savings account, but its outflows are fund transfers rather than
-  purchases. Firefly cannot tell them apart; listing it here keeps a large
-  internal rebalance out of your spending total.
-- **Excluded by intent.** An account holding money you have deliberately put
-  beyond the budget — a savings account that receives earmarked income and funds
-  investment buys or tax payments. None of that is the spending you are
-  measuring.
-
-Nothing disappears silently: withdrawals from these accounts are listed under
-**Untracked Spending** in the `report` command, a diagnostic that is explicitly
-not part of the net.
-
-Note this does not hide everything. A withdrawal whose **source** is a tracked
-account still counts as spending, even when the money is headed somewhere
-untracked — that money did leave the tracked world.
-
-#### paycheckDestinationAccounts
-
-Accounts a `Paycheck`-tagged transaction must be **destined for** to count as the
-paycheck.
-
-```yaml
-paycheckDestinationAccounts:
-    - '1' # Checking
-```
-
-**Type:** `string[]`
-**Default:** `[]` (the tag alone decides)
-**Used by:** `analyze`
-
-Use it when payroll is split across accounts and only one half is the paycheck. A
-stray tag on the other half is then disregarded instead of inflating paycheck
-income — real data has carried exactly those stray tags.
-
-The constraint lives inside `isPaycheck()`, so one predicate decides both what
-`PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside
-for; the two can never both claim a transaction.
-
-**Rejection from the paycheck bucket is not a promotion to additional income.** A
-rejected transaction lands there only if it independently passes that service's
-filters: it must be a deposit, its destination must still be a derived income
-destination, and it must not match `excludedAdditionalIncomePatterns`. When the
-other half's account is in `untrackedAccounts`, it is counted in **no bucket at
-all** — which is the point when that money is deliberately outside the budget.
-
-**This setting is also the only thing scoping the paycheck bucket.** Unlike every
-other bucket, `isPaycheck` and `PaycheckSurplusService` never consult the derived
-account scope. With the default empty list, a Paycheck-tagged deposit into an
-untracked account would count as income despite the account being outside the
-boundary. If your payroll is split, set this.
-
-#### incomeDestinationAccounts / expenseSourceAccounts (overrides)
-
-Both default to `[]`, which means "derive". Setting either to a non-empty list
-replaces derivation entirely **for that side**.
-
-```yaml
-expenseSourceAccounts:
-    - '1' # Checking Account
-    - '4' # Credit Card
-```
-
-**Type:** `string[]`
-**Default:** `[]` (derive)
-
-Use these only when a Firefly `account_role` is wrong and you would rather not
-correct it there. Prefer fixing the role — an override is a second source of
-truth that has to be maintained by hand, which is what derivation replaced.
-
-#### expenseTransfers
-
-Transfers that should be counted as unbudgeted expenses.
-
-```yaml
-expenseTransfers:
-    - source: '5' # Remote Investment Account
-      destination: '1' # Checking Account
-```
-
-**Type:** `array of {source: string, destination: string}`
-**Default:** `[]`
-**Used by:** Unbudgeted expense calculations
-
-**Example Use Case:** Tracking investment account withdrawals as expenses.
-
-### Transaction Filtering
-
-#### excludedAdditionalIncomePatterns
-
-Transaction description patterns to exclude from additional income.
-
-```yaml
-excludedAdditionalIncomePatterns:
-    - 'ATM FEE'
-```
-
-**Type:** `string[]`
-**Default:** `[]`
-**Matching:** Case-insensitive **whole-word**, not substring (see below)
-**Used by:** Additional income calculations only
-
-`StringUtils.matchesAnyPattern` splits both the pattern and the description on
-non-alphanumeric characters and requires a contiguous run of whole words. So
-`TRANSFER` does **not** match `Transferwise`, and a pattern fused into a longer
-word (`ACHPAYROLLDEP`) does not match at all — write patterns as they appear as
-words.
-
-Two patterns to avoid:
-
-- **`TRANSFER`** — additional income already filters on deposit type, so real
-  transfers never reach this list. The pattern can only discard legitimate
-  deposits that happen to say "transfer", such as `STRIPE TRANSFER`.
-- **`PAYROLL`** — if a payroll deposit genuinely is not budget income to you,
-  exclude its destination account via `untrackedAccounts` instead. Description
-  matching fixes only the income side, leaving spending funded from that account
-  charged against your budget; the account boundary excludes both sides at once.
-
-This list is consulted only by `AdditionalIncomeService`, so a pattern here can
-never affect the paycheck bucket.
-
-#### excludeDisposableIncome
-
-Whether to exclude transactions tagged as disposable income from budget analysis reports.
-
-```yaml
-excludeDisposableIncome: true
-```
-
-**Type:** `boolean`
-**Default:** `true`
-**Used by:** Additional income calculations
-
-**Use Cases:**
-
-- Set to `true` when you want to exclude personal spending money from budget calculations
-- Set to `false` to include all tagged income in reports
+Income accounts are derived: the envelope minus accounts with Firefly role
+`ccAsset`. A deposit onto a card is a refund, never income. If a card shows up
+as income, fix its role in Firefly.
 
 #### tags
 
@@ -313,16 +189,16 @@ tags:
 
 **Available tags:**
 
-| Tag                | Purpose                            | Used by                       |
-| ------------------ | ---------------------------------- | ----------------------------- |
-| `disposableIncome` | Identifies personal spending money | Additional income filtering   |
-| `paycheck`         | Identifies paycheck transactions   | Paycheck surplus calculations |
+| Tag                | Purpose                                   | Used by               |
+| ------------------ | ----------------------------------------- | --------------------- |
+| `disposableIncome` | Purchases paid for by the disposable pool | `analyze` action line |
+| `paycheck`         | The paycheck deposit into checking        | `analyze` paycheck    |
 
 **Notes:**
 
 - Only customize if you use different tag names in your Firefly III instance
 - Tag matching is exact (case-sensitive)
-- Paycheck tag works with any transaction type (deposits, transfers, etc.)
+- The paycheck tag counts only on a deposit into checking
 - Bills are identified by their Firefly III bill linkage (`bill_id` or `subscription_id`), not by tags
 
 #### excludedTransactions
@@ -494,12 +370,9 @@ If validation fails, you'll see:
 ```yaml
 # config.yaml (minimal)
 expectedMonthlyPaycheck: 5000.00
-
-firefly:
-    noNameExpenseAccountId: '5'
 ```
 
-Account scope is derived, so a minimal config names no accounts at all.
+With no `untrackedAccounts`, every asset account is in the envelope.
 
 ### Advanced Configuration
 
@@ -508,19 +381,9 @@ Account scope is derived, so a minimal config names no accounts at all.
 expectedMonthlyPaycheck: 5500.00
 
 untrackedAccounts:
-    - '27' # Brokerage - outflows are fund transfers, not spending
-
-paycheckDestinationAccounts:
-    - '1' # Only a deposit landing here counts as the paycheck
-
-expenseTransfers:
-    - source: '10'
-      destination: '1'
-
-excludedAdditionalIncomePatterns:
-    - 'ATM FEE'
-
-excludeDisposableIncome: true
+    - '27' # Brokerage
+    - '2' # Savings
+    - '39' # Disposable pool
 
 tags:
     disposableIncome: 'Fun Money'
@@ -534,9 +397,6 @@ excludedTransactions:
     - amount: '1200.00'
       description: 'RENT'
       reason: 'Fixed housing cost'
-
-firefly:
-    noNameExpenseAccountId: '5'
 
 llm:
     model: 'claude-sonnet-5'

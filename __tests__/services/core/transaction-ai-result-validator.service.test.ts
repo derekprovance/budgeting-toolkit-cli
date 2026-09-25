@@ -13,10 +13,10 @@ describe('TransactionAIResultValidator', () => {
     let mockTransactionValidator: jest.Mocked<TransactionValidatorService>;
 
     const mockCategories: CategoryProperties[] = [
-        { id: '1', name: 'Groceries', type: 'expense' },
-        { id: '2', name: 'Healthcare', type: 'expense' },
-        { id: '3', name: 'Bills & Utilities', type: 'expense' },
-        { id: '4', name: "Children's Expenses", type: 'expense' },
+        { name: 'Groceries' },
+        { name: 'Healthcare' },
+        { name: 'Bills & Utilities' },
+        { name: "Children's Expenses" },
     ];
 
     const mockBudgets: BudgetRead[] = [
@@ -216,7 +216,8 @@ describe('TransactionAIResultValidator', () => {
         });
 
         beforeEach(async () => {
-            await validator.initialize();
+            // initialize() is private; the lookup tables are loaded up front here
+            await (validator as unknown as { initialize(): Promise<void> }).initialize();
         });
 
         it('should validate matching category with exact case', async () => {

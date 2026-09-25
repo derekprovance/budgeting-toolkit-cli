@@ -41,47 +41,4 @@ export class StringUtils {
             .replace(/[-_\s]+/g, ' ') // Replace multiple spaces, hyphens, underscores with single space
             .replace(/[^\w\s]/g, ''); // Remove all other special characters
     }
-
-    /**
-     * Checks if a string matches any of the provided patterns using normalized
-     * comparison, matching on whole words.
-     *
-     * A bare substring test makes short patterns dangerously broad: "transfer"
-     * would swallow "Transferwise" and "transferred", quietly dropping real
-     * transactions from a report. Normalization already reduces separators to
-     * spaces, so word boundaries are the right granularity.
-     *
-     * @example
-     * StringUtils.matchesAnyPattern("MY_PAYROLL", ["payroll", "salary"]) // true
-     * StringUtils.matchesAnyPattern("TRANSFERWISE INC", ["transfer"]) // false
-     */
-    /**
-     * Lowercases and splits on any run of non-alphanumeric characters.
-     *
-     * Unlike {@link normalize}, punctuation separates words rather than being
-     * deleted, so "example.com" is two words and cannot accidentally fuse with
-     * its neighbours.
-     */
-    private static splitIntoWords(value: string): string[] {
-        return value
-            .toLowerCase()
-            .split(/[^a-z0-9]+/)
-            .filter(Boolean);
-    }
-
-    static matchesAnyPattern(input: string, patterns: readonly string[]): boolean {
-        const inputWords = this.splitIntoWords(input);
-
-        return patterns.some(pattern => {
-            const patternWords = this.splitIntoWords(pattern);
-            if (patternWords.length === 0) {
-                return false;
-            }
-
-            // A multi-word pattern must appear as a contiguous run of words
-            return inputWords.some((_, start) =>
-                patternWords.every((word, offset) => inputWords[start + offset] === word)
-            );
-        });
-    }
 }

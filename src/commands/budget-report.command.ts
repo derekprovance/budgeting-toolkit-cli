@@ -6,36 +6,65 @@ import ora from 'ora';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
-import { BudgetReportService } from '../services/budget-report.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { EmojiUtils } from '../utils/emoji.utils.js';
 import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
-import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { CashFlowService } from '../services/cash-flow.service.js';
+import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
+import { TopExpenseDto } from '../types/dto/top-expense.dto.js';
+import { BillComparisonDto } from '../types/dto/bill-comparison.dto.js';
+import { BudgetInsight } from '../types/dto/budget-insight.dto.js';
+import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
+
+/**
+ * Everything BudgetReportCommand computed for one month — what the text
+ * report and the JSON document are both built from.
+ */
+export interface BudgetReportResult {
+    budgets: BudgetReportDto[];
+    topExpenses: TopExpenseDto[];
+    billComparison: BillComparisonDto;
+    unbudgeted: CategorizedUnbudgetedDto[];
+    insights: BudgetInsight[];
+    month: number;
+    year: number;
+    isCurrentMonth: boolean;
+    daysInfo?: { daysLeft: number; dataThrough?: Date };
+}
 
 /**
  * Command for displaying budget report with insights and categorized sections
  */
-export class BudgetReportCommand implements Command<void, BudgetDateParams> {
+export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDateParams> {
     private readonly BUDGET_GEN_FAIL = 'Failed to generate budget report';
 
     constructor(
         private readonly budgetAnalyticsService: BudgetAnalyticsService,
         private readonly budgetInsightService: BudgetInsightService,
         private readonly budgetDisplayService: BudgetDisplayService,
-        private readonly budgetReportService: BudgetReportService,
         private readonly billComparisonService: BillComparisonService,
         private readonly transactionService: TransactionService,
-        private readonly unbudgetedExpenseService: UnbudgetedExpenseService
+        private readonly cashFlowService: CashFlowService
     ) {}
 
     /**
      * Executes the budget report command
+     *
+     * In `json` format the spinner is silenced and stdout carries nothing but
+     * the JSON document, so it stays parseable; warnings go to stderr.
+     *
      * @param params The month, year, and flags to display budget report for
+     * @returns The report data the output was built from
      */
-    async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
-        const spinner = ora('Generating budget report...').start();
+    async execute({
+        month,
+        year,
+        verbose,
+        format = 'text',
+    }: BudgetDateParams): Promise<BudgetReportResult> {
+        const json = format === 'json';
+        const spinner = ora({ text: 'Generating budget report...', isSilent: json }).start();
 
         try {
             // Determine if this is the current month
@@ -57,41 +86,25 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
 
             // Fetch all data in parallel
             spinner.text = 'Fetching budget data...';
-            const [budgets, topExpenses, billComparisonResult, unbudgetedResult] =
-                await Promise.all([
-                    this.budgetAnalyticsService.getBudgetReport(month, year, 1),
-                    this.budgetAnalyticsService.getTopExpenses(month, year, 5),
-                    this.billComparisonService.calculateBillComparison(month, year),
-                    this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
-                ]);
+            const [budgets, topExpenses, billComparisonResult, bucketsResult] = await Promise.all([
+                this.budgetAnalyticsService.getBudgetReport(month, year, 1),
+                this.budgetAnalyticsService.getTopExpenses(month, year, 5),
+                this.billComparisonService.calculateBillComparison(month, year),
+                this.cashFlowService.getBuckets(month, year),
+            ]);
 
-            // Not a warning: the untracked list below is derived by subtracting
-            // this one, so an empty stand-in does not degrade the report -- it
-            // inverts it, re-labelling every unbudgeted withdrawal as "untracked"
-            // and rendering the unbudgeted section empty. A plausible-looking
-            // report built on a failed calculation is worse than no report.
-            if (!unbudgetedResult.ok) {
+            if (!bucketsResult.ok) {
                 spinner.fail('Failed to generate budget report');
                 console.error(
-                    chalk.red('Error calculating unbudgeted expenses:'),
-                    chalk.red.bold(unbudgetedResult.error.userMessage)
+                    chalk.red('Error sorting transactions:'),
+                    chalk.red.bold(bucketsResult.error.userMessage)
                 );
-                throw new Error(unbudgetedResult.error.message);
+                throw new Error(bucketsResult.error.message);
             }
 
             // The bucket that feeds the cash-flow net, same definition analyze uses
-            const unbudgetedExpenses = unbudgetedResult.value;
-
-            // Spending no bucket accounts for. Depends on the list above, so it
-            // cannot join the parallel fetch.
-            const untrackedTransactions = await this.budgetReportService.getUntrackedTransactions(
-                month,
-                year,
-                unbudgetedExpenses
-            );
-
-            const categorize = (transactions: TransactionSplit[]): CategorizedUnbudgetedDto[] =>
-                transactions.map(transaction => ({
+            const categorizedUnbudgeted: CategorizedUnbudgetedDto[] =
+                bucketsResult.value.unbudgeted.map(transaction => ({
                     transaction,
                     categoryEmoji: EmojiUtils.getCategoryEmoji(
                         transaction.category_name || undefined
@@ -99,11 +112,12 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                     categoryName: transaction.category_name || undefined,
                 }));
 
-            const categorizedUnbudgeted = categorize(unbudgetedExpenses);
-            const categorizedUntracked = categorize(untrackedTransactions);
-
             if (!billComparisonResult.ok) {
                 spinner.warn('Warning: Bill comparison data unavailable');
+                if (json) {
+                    // The spinner is silent in JSON mode; keep the warning visible
+                    console.error('Warning: Bill comparison data unavailable');
+                }
                 logger.warn(
                     { error: billComparisonResult.error.message },
                     'Failed to fetch bill comparison'
@@ -122,12 +136,11 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
             spinner.succeed('Budget report generated');
 
             // Format and display the report
-            const reportData = {
+            const reportData: BudgetReportResult = {
                 budgets: budgets,
                 topExpenses,
                 billComparison,
                 unbudgeted: categorizedUnbudgeted,
-                untracked: categorizedUntracked,
                 insights,
                 month,
                 year,
@@ -135,13 +148,23 @@ export class BudgetReportCommand implements Command<void, BudgetDateParams> {
                 daysInfo,
             };
 
-            const formattedReport = this.budgetDisplayService.formatReport(
-                reportData,
-                verbose || false
-            );
-            console.log(formattedReport);
+            if (json) {
+                console.log(JSON.stringify(serializeBudgetReport(reportData), null, 2));
+            } else {
+                const formattedReport = this.budgetDisplayService.formatReport(
+                    reportData,
+                    verbose || false
+                );
+                console.log(formattedReport);
+            }
+
+            return reportData;
         } catch (error) {
-            spinner.fail(this.BUDGET_GEN_FAIL);
+            // A Result error already failed the spinner; only an unexpected
+            // throw leaves it spinning (AnalyzeCommand does the same)
+            if (spinner.isSpinning) {
+                spinner.fail(this.BUDGET_GEN_FAIL);
+            }
             const err = error instanceof Error ? error : new Error(String(error));
             logger.error({ error: err.message }, 'Failed to generate budget report');
             throw err;

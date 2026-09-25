@@ -1,28 +1,25 @@
-import { jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { CategorizeMode, EditTransactionAttribute } from '../../src/types/enums.js';
 
-// Create mock functions first
-const mockExpand = jest.fn();
-const mockCheckbox = jest.fn();
-const mockSelect = jest.fn();
-const mockSearch = jest.fn();
-const mockInput = jest.fn();
-const mockConfirm = jest.fn();
+// The subset of an @inquirer/prompts config these tests read back
+type PromptConfig = {
+    message: string;
+    choices?: unknown[];
+    validate?: (value: string) => boolean | string;
+    [key: string]: unknown;
+};
+type PromptFn<R> = (config: PromptConfig) => Promise<R>;
 
-// Mock chalk to return the input string (disable styling for tests)
-jest.unstable_mockModule('chalk', () => ({
-    default: {
-        red: (str: string) => str,
-        green: (str: string) => str,
-        redBright: (str: string) => str,
-        cyan: (str: string) => str,
-        yellow: (str: string) => str,
-        gray: (str: string) => str,
-        bold: (str: string) => str,
-        dim: (str: string) => str,
-    },
-}));
+// Create mock functions first
+const mockExpand = jest.fn<PromptFn<CategorizeMode>>();
+const mockCheckbox = jest.fn<PromptFn<EditTransactionAttribute[]>>();
+const mockSelect = jest.fn<PromptFn<string>>();
+const mockSearch = jest.fn<PromptFn<string>>();
+const mockInput = jest.fn<PromptFn<string>>();
+const mockConfirm = jest.fn<PromptFn<boolean>>();
+
+// chalk is not mocked: FORCE_COLOR=0 (__tests__/setup/env.ts) keeps output plain.
 
 // Mock @inquirer/prompts
 jest.unstable_mockModule('@inquirer/prompts', () => ({
@@ -38,7 +35,7 @@ jest.unstable_mockModule('@inquirer/prompts', () => ({
 const { UserInputService } = await import('../../src/services/user-input.service.js');
 
 describe('UserInputService', () => {
-    let service: UserInputService;
+    let service: InstanceType<typeof UserInputService>;
 
     const mockBaseUrl = 'http://firefly.example.com';
 
@@ -87,7 +84,7 @@ describe('UserInputService', () => {
         });
 
         it('should always show both fields even when values match current', async () => {
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -105,7 +102,7 @@ describe('UserInputService', () => {
 
         it('should prompt for category change only', async () => {
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Category);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Category);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -141,7 +138,7 @@ describe('UserInputService', () => {
 
         it('should prompt for budget change only', async () => {
             const newBudget = 'New Budget';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Budget);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Budget);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -178,7 +175,7 @@ describe('UserInputService', () => {
         it('should prompt for both category and budget changes', async () => {
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -227,7 +224,7 @@ describe('UserInputService', () => {
 
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             const result = await service.askToUpdateTransaction(
                 mockTransactionWithoutValues as TransactionSplit,
@@ -255,7 +252,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
             };
 
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             const result = await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
@@ -273,7 +270,7 @@ describe('UserInputService', () => {
 
         it('should return Skip when user selects abort option', async () => {
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -294,7 +291,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
             };
 
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(
                 mockTransactionNoBudget as TransactionSplit,
@@ -340,7 +337,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
                 category_name: 'Food',
             };
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             await service.askToUpdateTransaction(withdrawal as TransactionSplit, '1', {
                 category: 'Dining',
@@ -361,7 +358,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
                 category_name: 'Income',
             };
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             await service.askToUpdateTransaction(deposit as TransactionSplit, '2', {
                 category: 'Salary',
@@ -382,7 +379,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
                 category_name: 'Transfer',
             };
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             await service.askToUpdateTransaction(transfer as TransactionSplit, '3', {
                 category: 'Transfer',
@@ -401,7 +398,7 @@ describe('UserInputService', () => {
                 amount: '10.00',
                 category_name: 'Misc',
             };
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             await service.askToUpdateTransaction(transaction as TransactionSplit, '4', {
                 category: 'Other',
@@ -428,7 +425,7 @@ describe('UserInputService', () => {
         it('should include hyperlink in description when transaction ID is provided', async () => {
             const transactionId = '123';
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -448,7 +445,7 @@ describe('UserInputService', () => {
 
         it('should not include hyperlink when transaction ID is undefined', async () => {
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(mockTransaction as TransactionSplit, undefined, {
                 category: newCategory,
@@ -480,7 +477,7 @@ describe('UserInputService', () => {
             };
             const transactionId = '456';
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
@@ -524,7 +521,7 @@ describe('UserInputService', () => {
 
         it('should handle empty transaction ID as no hyperlink', async () => {
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(mockTransaction as TransactionSplit, '', {
                 category: newCategory,
@@ -555,7 +552,7 @@ describe('UserInputService', () => {
             };
             const transactionId = '999';
             const newCategory = 'New Category';
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(
                 specialDescTransaction as TransactionSplit,
@@ -585,7 +582,7 @@ describe('UserInputService', () => {
         };
 
         it('should show Budget: N/A for deposits instead of None', async () => {
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
 
             await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
                 category: 'Salary',
@@ -599,7 +596,7 @@ describe('UserInputService', () => {
         });
 
         it('should not show "Update only the budget" option for deposits', async () => {
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
                 category: 'Salary',
@@ -643,7 +640,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
             };
 
-            (mockExpand as jest.Mock).mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
 
             await service.askToUpdateTransaction(mockBill as TransactionSplit, '5', {
                 category: 'Food',
@@ -735,7 +732,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('')).toBe('Amount is required');
                 expect(validate('   ')).toBe('Amount is required');
             });
@@ -745,7 +742,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('abc')).toBe(
                     'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
                 );
@@ -759,7 +756,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('50.123')).toBe(
                     'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
                 );
@@ -770,7 +767,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('-50.00')).toBe(
                     'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
                 );
@@ -781,7 +778,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('0')).toBe('Amount must be greater than zero');
                 expect(validate('0.00')).toBe('Amount must be greater than zero');
             });
@@ -791,7 +788,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('0.001')).toBe(
                     'Please enter a valid amount with at most 2 decimal places (e.g., 10.50)'
                 );
@@ -802,7 +799,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('100')).toBe('Amount must be less than the original amount ($100)');
                 expect(validate('100.01')).toBe(
                     'Amount must be less than the original amount ($100)'
@@ -814,7 +811,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 // 99.99 leaves exactly 0.01 which is the minimum, so it should be valid
                 expect(validate('99.99')).toBe(true);
                 // 99.991 would leave 0.009 which is < 0.01, but regex rejects it first
@@ -828,7 +825,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(10.1, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 // 10.10 - 3.37 = 6.73, should be valid
                 expect(validate('3.37')).toBe(true);
             });
@@ -838,7 +835,7 @@ describe('UserInputService', () => {
 
                 await service.getSplitAmount(100, '$');
 
-                const validate = mockInput.mock.calls[0][0].validate;
+                const validate = mockInput.mock.calls[0][0].validate!;
                 expect(validate('50')).toBe(true);
                 expect(validate('50.5')).toBe(true);
                 expect(validate('50.50')).toBe(true);

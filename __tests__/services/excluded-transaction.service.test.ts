@@ -31,11 +31,11 @@ describe('ExcludedTransactionService', () => {
     beforeEach(() => {
         // Create mock logger
         mockLogger = {
-            debug: jest.fn<(obj: unknown, msg: string) => void>(),
-            info: jest.fn<(obj: unknown, msg: string) => void>(),
-            warn: jest.fn<(obj: unknown, msg: string) => void>(),
-            error: jest.fn<(obj: unknown, msg: string) => void>(),
-            trace: jest.fn<(obj: unknown, msg: string) => void>(),
+            debug: jest.fn<(obj: unknown, msg?: string) => void>(),
+            info: jest.fn<(obj: unknown, msg?: string) => void>(),
+            warn: jest.fn<(obj: unknown, msg?: string) => void>(),
+            error: jest.fn<(obj: unknown, msg?: string) => void>(),
+            trace: jest.fn<(obj: unknown, msg?: string) => void>(),
         };
 
         service = new ExcludedTransactionService(mockExcludedTransactions, mockLogger);

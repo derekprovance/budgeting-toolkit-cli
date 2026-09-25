@@ -118,6 +118,8 @@ export class DisplayFormatterUtils {
      * @returns Formatted string with sign, color, and icon
      */
     static formatNetImpact(amount: number, symbol: string, positiveIsGood: boolean = true): string {
+        // Signs and icons are decided on the displayed cents, so float noise
+        // like -5e-15 never renders as "-$0.00 ⚠"
         const icon = DisplayFormatterUtils.getStatusIcon(amount, positiveIsGood);
         return `${DisplayFormatterUtils.formatSignedAmount(amount, symbol, positiveIsGood)} ${icon}`;
     }
@@ -136,6 +138,7 @@ export class DisplayFormatterUtils {
         symbol: string,
         positiveIsGood: boolean = true
     ): string {
+        amount = CurrencyUtils.toCents(amount);
         const absFormatted = CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
 
         if (amount === 0) {
@@ -156,6 +159,7 @@ export class DisplayFormatterUtils {
      * @returns Colored status icon
      */
     static getStatusIcon(amount: number, positiveIsGood: boolean): string {
+        amount = CurrencyUtils.toCents(amount);
         if (amount === 0) return '○';
         if (positiveIsGood) {
             return amount > 0 ? chalk.green('✓') : chalk.red('⚠');

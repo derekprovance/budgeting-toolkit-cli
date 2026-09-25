@@ -3,18 +3,6 @@ import { TransactionClassificationService } from '../../../src/services/core/tra
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 
-// Mock the logger to prevent console output during tests
-jest.mock('../../../src/logger', () => ({
-    logger: {
-        debug: jest.fn<(obj: unknown, msg: string) => void>(),
-        warn: jest.fn<(obj: unknown, msg: string) => void>(),
-        error: jest.fn<(obj: unknown, msg: string) => void>(),
-        trace: jest.fn<(obj: unknown, msg: string) => void>(),
-    },
-}));
-
-jest.mock('../../../src/services/core/transaction-classification.service');
-
 describe('TransactionValidatorService', () => {
     let service: TransactionValidatorService;
     let mockPropertyService: jest.Mocked<TransactionClassificationService>;

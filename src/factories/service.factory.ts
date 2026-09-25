@@ -2,13 +2,11 @@ import { FireflyClientWithCerts } from '../api/firefly-client-with-certs.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { BudgetService } from '../services/core/budget.service.js';
 import { CategoryService } from '../services/core/category.service.js';
-import { AdditionalIncomeService } from '../services/additional-income.service.js';
-import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
 import { BudgetReportService } from '../services/budget-report.service.js';
 import { ExcludedTransactionService } from '../services/excluded-transaction.service.js';
 import { TransactionClassificationService } from '../services/core/transaction-classification.service.js';
 import { AccountScopeService } from '../services/core/account-scope.service.js';
-import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
+import { CashFlowService } from '../services/cash-flow.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
 import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
@@ -23,16 +21,28 @@ import { SplitTransactionDisplayService } from '../services/display/split-transa
 import { BillService } from '../services/core/bill.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionSplitService } from '../services/transaction-split.service.js';
-import { DisposableIncomeService } from '../services/disposable-income.service.js';
-import { BudgetSurplusService } from '../services/budget-surplus.service.js';
 import { DateRangeService } from '../services/core/date-range.service.js';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
+import { AppConfig } from '../config/config.types.js';
+
+/** Every service the CLI wires, as returned by {@link ServiceFactory.createServices}. */
+export type AppServices = ReturnType<typeof ServiceFactory.createServices>;
 
 export class ServiceFactory {
-    static createServices(apiClient: FireflyClientWithCerts) {
-        const config = ConfigManager.getInstance().getConfig();
+    /**
+     * Wires every service from one configuration.
+     *
+     * @param apiClient Firefly III client every API-backed service shares
+     * @param config Application configuration. Defaults to the ConfigManager
+     *   singleton; tests and the in-process harness pass their own so that no
+     *   config file or `.env` is ever read.
+     */
+    static createServices(
+        apiClient: FireflyClientWithCerts,
+        config: AppConfig = ConfigManager.getInstance().getConfig()
+    ) {
         const dateRangeService = new DateRangeService();
         const budgetService = new BudgetService(apiClient, dateRangeService);
         const categoryService = new CategoryService(apiClient);
@@ -41,11 +51,10 @@ export class ServiceFactory {
             config.transactions.excludedTransactions
         );
 
-        const accountScopeService = new AccountScopeService(apiClient, {
-            incomeDestinationAccounts: config.accounts.incomeDestinationAccounts,
-            expenseSourceAccounts: config.accounts.expenseSourceAccounts,
-            untrackedAccounts: config.accounts.untrackedAccounts,
-        });
+        const accountScopeService = new AccountScopeService(
+            apiClient,
+            config.accounts.untrackedAccounts
+        );
 
         const transactionService = new TransactionService(
             excludedTransactionService,
@@ -55,58 +64,26 @@ export class ServiceFactory {
 
         const transactionClassificationService = new TransactionClassificationService(
             config.transactions.tags.disposableIncome,
-            config.transactions.tags.paycheck,
-            config.accounts.paycheckDestinationAccounts
+            config.transactions.tags.paycheck
+        );
+        const cashFlowService = new CashFlowService(
+            transactionService,
+            transactionClassificationService,
+            accountScopeService
         );
 
         const transactionValidatorService = new TransactionValidatorService(
             transactionClassificationService
         );
-        const additionalIncomeService = new AdditionalIncomeService(
-            transactionService,
-            transactionClassificationService,
-            accountScopeService,
-            config.transactions.excludedAdditionalIncomePatterns,
-            config.transactions.excludeDisposableIncome
-        );
-        const unbudgetedExpenseService = new UnbudgetedExpenseService(
-            transactionService,
-            transactionClassificationService,
-            accountScopeService,
-            config.accounts.expenseTransfers
-        );
-        const budgetReport = new BudgetReportService(
-            budgetService,
-            transactionClassificationService,
-            excludedTransactionService
-        );
-        const paycheckSurplusService = new PaycheckSurplusService(
-            transactionService,
-            transactionClassificationService,
-            config.transactions.expectedMonthlyPaycheck
-        );
+        const budgetReport = new BudgetReportService(budgetService, cashFlowService);
         const analyzeDisplayService = new AnalyzeDisplayService(transactionClassificationService);
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
         );
         const billService = new BillService(apiClient, dateRangeService);
-        const billComparisonService = new BillComparisonService(
-            billService,
-            transactionService,
-            transactionClassificationService
-        );
+        const billComparisonService = new BillComparisonService(billService, cashFlowService);
         const transactionSplitService = new TransactionSplitService(apiClient);
-        const disposableIncomeService = new DisposableIncomeService(
-            transactionService,
-            transactionClassificationService
-        );
-        const budgetSurplusService = new BudgetSurplusService(budgetService);
-        const budgetAnalyticsService = new BudgetAnalyticsService(
-            budgetReport,
-            budgetService,
-            transactionService,
-            transactionClassificationService
-        );
+        const budgetAnalyticsService = new BudgetAnalyticsService(budgetReport, cashFlowService);
         const budgetInsightService = new BudgetInsightService();
         const budgetDisplayService = new BudgetDisplayService(config.api.firefly.url);
 
@@ -115,20 +92,16 @@ export class ServiceFactory {
             budgetService,
             categoryService,
             userInputService,
-            additionalIncomeService,
-            unbudgetedExpenseService,
+            cashFlowService,
             budgetReport,
             transactionClassificationService,
             excludedTransactionService,
-            paycheckSurplusService,
             transactionValidatorService,
             analyzeDisplayService,
             splitTransactionDisplayService,
             billService,
             billComparisonService,
             transactionSplitService,
-            disposableIncomeService,
-            budgetSurplusService,
             budgetAnalyticsService,
             budgetInsightService,
             budgetDisplayService,
@@ -136,13 +109,14 @@ export class ServiceFactory {
     }
 
     static async createAITransactionUpdateOrchestrator(
-        services: ReturnType<typeof ServiceFactory.createServices>,
+        services: AppServices,
         force: boolean = false,
-        dryRun: boolean = false
+        dryRun: boolean = false,
+        config: AppConfig = ConfigManager.getInstance().getConfig()
     ): Promise<AITransactionUpdateOrchestrator> {
         const claudeClient = LLMConfig.createClient();
 
-        const llmConfig = ConfigManager.getInstance().getConfig().llm;
+        const llmConfig = config.llm;
         const llmAssignmentService = new LLMAssignmentService(claudeClient, {
             batchSize: llmConfig.batchSize,
             maxConcurrent: llmConfig.maxConcurrent,

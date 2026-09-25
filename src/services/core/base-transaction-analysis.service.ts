@@ -232,7 +232,7 @@ export abstract class BaseTransactionAnalysisService<TResult> {
 
     /**
      * Operation name for logging and error messages.
-     * E.g., "calculateAdditionalIncome", "calculatePaycheckSurplus"
+     * E.g., "getBuckets"
      */
     protected abstract getOperationName(): string;
 }

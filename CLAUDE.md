@@ -4,144 +4,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Tool Is For
 
-This tool measures **one isolated envelope: cost of living.** The user pays
-themselves a fixed amount into checking, and the question is whether cost of
-living fit inside it. `Net Cash Flow` in the analyze report is that answer.
-Everything else in the report exists to explain it.
+This tool measures **one isolated envelope: cost of living.** `Net Cash Flow` in
+the analyze report answers whether it fit inside what the user pays themselves
+into checking. It is deliberately not a household cash-flow statement.
 
-**It is deliberately not a household cash-flow statement.** Total income is
-larger than the envelope; the remainder is saved outside this tool's purview and
-must never appear in the report. If a change makes Net Cash Flow drift toward
-"all money in minus all money out," that change is wrong.
+**`RULES.md` is the single source of truth for what the tool counts and why.
+Read it before touching anything that decides which transactions count as
+income or spending.** It wins over the code, this file and agent memory. Do not
+restate its rules here or re-derive them from the code; that is how the tool
+drifted before. Changing a rule needs the user's explicit approval and a dated
+entry in its Changelog.
 
-Read this section before touching anything that decides which transactions count
-as income or spending. The model below is the setup this tool assumes, and it
-has been re-derived incorrectly from the code before.
+Every rule id (`R-SCOPE-1`, …) must be named by at least one test
+(`[R-XFER-1] ignores a card payment`). `__tests__/meta/rules-coverage.test.ts`
+fails otherwise, and also fails on a test naming a rule that no longer exists.
 
-### The account boundary
+### Where each rule lives in code
 
-The envelope is defined by accounts, not by transaction descriptions. An account
-is either inside it or outside it, and both directions move together — an
-account outside the envelope contributes neither income nor spending. Keeping
-that symmetric is the whole design: excluding an account's income while still
-charging its spending manufactures a deficit that never happened.
+| Rules                                  | Code                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| R-SCOPE-1, R-INCOME-1 (which accounts) | `AccountScopeService.getScope` (`src/services/core/account-scope.service.ts`)                           |
+| Every bucket decision                  | `TransactionClassificationService.classify` (`src/services/core/transaction-classification.service.ts`) |
+| Sorting a month into buckets           | `CashFlowService.getBuckets` (`src/services/cash-flow.service.ts`)                                      |
+| R-PURPOSE-1, R-DISP-1 (the net)        | `AnalyzeReportDto.create` (`src/types/dto/analyze-report.dto.ts`)                                       |
+| R-BILL-1 (predicted vs actual)         | `BillComparisonService` (`src/services/bill-comparison.service.ts`)                                     |
+| R-BUDGET-1 (per-budget rows)           | `BudgetReportService` (`src/services/budget-report.service.ts`)                                         |
+| R-EXCL-1                               | `TransactionService.getFromCacheOrFetch` (`src/services/core/transaction.service.ts`)                   |
 
-Inside the envelope:
+Everything downstream totals the buckets `CashFlowService` returns — `analyze`,
+`report`, bill actuals, budget rows, top expenses — so no two figures can
+disagree about what a transaction is. Add a new figure the same way; never add a
+second filter chain over raw transactions.
 
-- **Credit cards** are where nearly all spending happens. A card purchase is the
-  expense.
-- **Checking** receives the paycheck and pays the cards. A card payment is a
-  transfer between two tracked accounts, so it is **not** an expense — counting
-  it would charge the same purchase twice. The goal is for checking to net to
-  roughly zero each cycle.
-- **The disposable pool** sources one real bill; see "Disposable income" below.
-
-Outside the envelope, via `untrackedAccounts`. Two distinct cases share that
-list:
-
-- **Savings is outside by intent.** It receives the savings half of payroll and
-  sources the spending funded by it — investment buys, tax payments. None of
-  that is cost of living, so neither side is counted.
-- **A brokerage is outside by necessity.** Firefly's `account_role` cannot
-  distinguish it from an ordinary savings account — both are `savingAsset` —
-  while its outflows are large fund transfers rather than purchases. Only config
-  can make that call.
-
-Nothing is silently dropped. Withdrawals from untracked accounts surface under
-**Untracked Spending** in the `report` command: visible as a diagnostic,
-deliberately outside the net.
-
-Income destinations and expense sources are **derived** from account roles by
-`AccountScopeService`, not hand-maintained. Leave the override lists empty; set
-them only when a Firefly role is wrong.
-
-### Payroll is split, and only the checking half is income
-
-One deposit lands in checking and carries the `Paycheck` tag — that is the user
-paying themselves, and it funds the envelope. A second deposit lands in savings.
-**It is not income to this tool.** It never enters the envelope, it is saved, and
-counting it would inflate Net Cash Flow substantially and hide the only number
-that matters.
-
-Both halves carry an identical payroll description, and every deposit arrives
-from Firefly's catch-all `(no name)` revenue account, so neither description nor
-payer can tell them apart. **Destination is the only working discriminator**,
-which is exactly what the account boundary keys on: savings is in
-`untrackedAccounts`, so `AdditionalIncomeService.hasValidDestinationAccount`
-rejects the savings half.
-
-`paycheckDestinationAccounts` constrains the `Paycheck` tag by destination as
-well, so a stray tag on the savings half cannot inflate paycheck income. Real
-data has carried exactly those stray tags, so this is load-bearing rather than
-precautionary.
-
-**It is also the only thing protecting the paycheck bucket.** Unlike every other
-bucket, `isPaycheck` and `PaycheckSurplusService` never consult
-`AccountScopeService` — the paycheck bucket does not know the account boundary
-exists. Empty `paycheckDestinationAccounts` (the documented default) and a
-Paycheck-tagged deposit into an untracked account would count as envelope income
-despite the account being outside the envelope. Keep it set to the checking
-account.
-
-**The savings half is therefore counted in no bucket at all — not paycheck, not
-additional income. That is intended, not a leak.** Earlier revisions of this
-file promised that a paycheck-rejected transaction always "falls through to
-additional income rather than vanishing"; that guarantee no longer holds and
-should not be restored. Money outside the envelope belongs in no bucket.
-
-**Pulling money back in is not income either.** Savings→checking top-ups are
-typed as transfers, so `AdditionalIncomeService` rejects them on type, and
-`UnbudgetedExpenseService` rejects them because their _source_ is no longer an
-expense source. They are counted nowhere. This is correct: treating a top-up as
-income would mask the very overspend it was covering. The deficit stays visible;
-the report simply does not explain that savings covered it.
-
-(Note the transfer rule is not simply "listed in `expenseTransfers`". A transfer
-must pass `isRegularExpenseTransaction` **and** `shouldCountTransfer`, and the
-latter returns true for any transfer with no `destination_id` — so a
-destination-less transfer out of a tracked account counts without being listed.)
-
-### Disposable income
-
-There is a separate "guilt-free" pool account — a money-market account,
-deliberately outside the budget. The `Disposable Income` tag marks purchases
-made **on cards** that are charged to that pool; at the end of a cycle the user
-reads the tagged total and moves that much out of the pool into checking to
-cover it.
-
-**The tagged purchase is charged to the pool, not the envelope.** It is funded
-from the pool rather than from the paycheck, so — exactly like savings-sourced
-spending — it must not reduce `Net Cash Flow`. `netImpact` has no
-`- disposableIncome` term, and reintroducing one would re-answer the wrong
-question.
-
-Instead the report **states the amount as an action**, below the net:
-
-```
-  → Transfer from disposable pool:   $250.00  [2 transactions]
-    Not included in the net — covers tagged card purchases.
-```
-
-That line is the entire point of the tag. `disposableIncome` is net of refunds
-and is **not** floored at zero, so a month whose refunds exceed its tagged
-spending reports a negative balance; the display inverts the instruction rather
-than printing a negative transfer.
-
-Funding the pool and drawing from it are movements between accounts the user
-already holds — neither is income nor spending, and neither is modelled. Do not
-reintroduce a deduction for the draws.
-
-One deliberate exception: a bill may be paid straight from the pool account, for
-instance when a provider discounts debit payment. The pool is therefore a normal
-expense source, and that withdrawal is counted like any other — it is a real
-bill, not a tagged card purchase.
-
-### Averaged bills
-
-Bills are paid at a levelled average rather than the exact amount due, so
-checking runs slightly over or short each month by design. Do not read that
-drift as an error, and do not "fix" a bill whose actual differs from its
-`amount_avg`.
+The owner's real accounts and data facts (payroll halves, account ids) are in
+agent memory, not here.
 
 ## Module System
 
@@ -166,15 +62,39 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 
 - `npm run compile` - Compile TypeScript to ESM JavaScript in `/dist`
 - `npm start -- [command] [options]` - Run in development mode with tsx (use this for testing/development)
+- `npm run start:dev -- [command] [options]` - Same, with `ENV_FILE=.env.dev` (the local Docker Firefly; see `DOCKER.md`)
 - `btk [command] [options]` - Run the installed CLI (requires `npm run dev:install`; `npm run compile` alone only writes `dist/`)
 
 **Important:** For integration testing during development, always use `npm start` instead of `btk` to avoid compilation delays and ensure latest code changes are tested.
 
+`analyze` and `report` accept `--json`: stdout then carries only a versioned
+JSON document (`schemaVersion: 2`, types in `src/types/dto/report-json.types.ts`)
+and the spinner is silenced. A breaking change to that shape must bump
+`schemaVersion`. Structured logs always go to **stderr** (`src/logger.ts`), so
+they can never corrupt stdout.
+
+**Environment switches:**
+
+- `BTK_PAGE_SIZE` - Page size requested from Firefly list endpoints, 1–500
+  (default 500). An invalid value warns and falls back. Read once at module
+  load, so it must be in the process environment; a value in a `.env` file is
+  not seen. The harness sets 10 so a small ledger spans several pages.
+- `BTK_STRICT_CONFIG=1` - Disables every implicit config fallback (`./.env`,
+  `~/.budget/.env`, `./config.yaml`, `~/.budget/config.yaml`). `ENV_FILE` and
+  `--config` become mandatory and a missing file is an error. Unit tests and
+  e2e always run strict, so they can never reach the real Firefly.
+
 ### Testing
 
-- `npm test` - Run all tests with ESM configuration
-- `npm run test:coverage` - Run tests with coverage report
-- `npm run test:watch` - Run tests in watch mode
+- `npm test` - Unit tests plus the Docker-free in-process scenario tests
+- `npm run test:coverage` - Same, with coverage
+- `npm run test:watch` - Watch mode
+- `npm run typecheck:tests` - Typecheck `src/`, `__tests__/`, `test-harness/`, `e2e/` and `scripts/` (`tsconfig.test.json`); Jest itself does not typecheck
+- `npm run test:e2e` - Full e2e lifecycle against a real, ephemeral Firefly in Docker: up → seed → Jest (`e2e/jest.config.mjs`) → down
+- `npm run test:e2e:reuse` - Same, but leaves the stack running and skips seeding when the seed marker matches
+- `npm run e2e:up` / `e2e:seed` / `e2e:down` - The individual lifecycle steps
+
+See "Testing" below and `DOCKER.md` for the e2e stack.
 
 ### Code Quality
 
@@ -182,7 +102,7 @@ This project uses **ECMAScript Modules (ESM)** - the modern JavaScript module st
 
 ### Docker Development
 
-- See `DOCKER.md` for Docker environment setup and `npm run start:dev` usage
+- See `DOCKER.md` for the local Firefly stack (`docker-compose.yml`) and the e2e stack (`docker-compose.e2e.yml`)
 
 ## Configuration System
 
@@ -195,6 +115,10 @@ Configuration is loaded with clear precedence (high to low):
 1. **YAML Configuration** (`config.yaml`) - Highest priority
 2. **Environment Variables** (`.env`) - Overrides defaults
 3. **Code Defaults** (`src/config/config.defaults.ts`) - Lowest priority
+
+File lookup: `--config`, then `./config.yaml`, then `~/.budget/config.yaml`; and
+`ENV_FILE`, then `./.env`, then `~/.budget/.env`. `BTK_STRICT_CONFIG=1` allows
+only the explicit ones.
 
 ### Configuration Manager
 
@@ -209,28 +133,14 @@ The `ConfigManager` singleton (`src/config/config-manager.ts`) provides centrali
 
 **Account Configuration:**
 
-Income destinations and expense sources are **derived** from Firefly's account
-roles by `AccountScopeService` (`src/services/core/account-scope.service.ts`):
-
-```
-income destinations = active asset accounts, role != ccAsset, minus untracked
-expense sources     = active asset accounts,                  minus untracked
-```
-
-Credit cards are excluded from income because deposits to them are refunds and statement credits, never income. Inactive accounts are excluded from both — a closed account keeps its history but must not widen the scope.
-
-- `untrackedAccounts` - Array of account IDs outside the cost-of-living envelope. Deposits to them are not income **and** withdrawals from them are not spending — both sides move together, which is what keeps the net honest. Two cases share the list: **savings**, excluded by intent (it receives the savings half of payroll and funds investment buys and tax payments, none of it cost of living), and **a brokerage**, excluded by necessity (it carries the same `savingAsset` role as an ordinary savings account, but its outflows are fund transfers rather than purchases, and Firefly cannot tell those apart). Withdrawals from these accounts remain visible under **Untracked Spending** in the `report` command. Note this does not hide everything: a withdrawal whose _source_ is tracked still counts, even when the money is headed somewhere untracked
-- `incomeDestinationAccounts` - **Override.** Empty (the default) derives the list. Non-empty replaces derivation entirely for that side. Set it only when a Firefly `account_role` is wrong and you would rather not fix it there
-- `expenseSourceAccounts` - **Override.** Same semantics as above
-- `expenseTransfers` - Array of transfer configurations (source/destination pairs) that count as unbudgeted expenses. Note that a transfer funding a disposable pool does **not** belong here: the tagged purchase is already the expense (see "Disposable income" above)
-- `paycheckDestinationAccounts` - Array of account IDs a paycheck-tagged transaction must be destined for to count as a paycheck. Empty (the default) means the tag alone decides. Use it when payroll is split across accounts and only one half is the paycheck: a stray tag on the other half is then disregarded rather than inflating paycheck income. Where a rejected transaction lands depends on the account boundary, not on this setting: it reaches additional income only if its destination is still a derived income destination **and** it is a deposit **and** it does not match `excludedAdditionalIncomePatterns`. When the other half's account is in `untrackedAccounts` — as this setup has it — it is counted in no bucket at all, which is the intent
+- `untrackedAccounts` - Array of account IDs outside the cost-of-living envelope: savings, a brokerage, the disposable pool. It is the **only** setting that draws the envelope (RULES.md, R-SCOPE-1): every other asset account (closed ones included) is inside it, and income accounts are derived as the envelope minus credit cards (`account_role: ccAsset`)
 
 **Transaction Configuration:**
 
-- `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations
-- `excludedAdditionalIncomePatterns` - Transaction descriptions to exclude. Matched **whole-word** by `StringUtils.matchesAnyPattern`, splitting on punctuation, so `transfer` will not swallow `Transferwise`. A pattern fused into a longer word (`ACHPAYROLLDEP`) therefore will not match — write patterns as they appear as words. Consulted **only** by `AdditionalIncomeService`, so a pattern here can never affect the paycheck bucket. Do not add `TRANSFER`: additional income already filters on deposit type, so the pattern can only discard legitimate deposits. Do not add `PAYROLL` either — prefer the account boundary. Description matching fixes only the income side and would leave savings-sourced spending charged against the checking paycheck; `untrackedAccounts` excludes the deposit symmetrically and covers savings interest and savings spending at the same time
-- `excludeDisposableIncome` - Whether to exclude disposable income transactions
-- `excludedTransactions` - Array of transactions to globally exclude; each entry requires `description`, with optional `amount` and `reason`. `description` is matched **whole-string** after trim and lower-case (not a substring), and `amount` narrows a rule to one amount, compared numerically on absolute value after currency cleaning. **Amount-only rules are rejected by `ConfigValidator` at startup**: exclusion is applied at fetch time (`TransactionService.getFromCacheOrFetch`), so a match removes the transaction from every bucket in every command, and a rule with no description would drop every transaction of that amount on any account in either direction. A malformed `amount` is rejected for the same reason — it would otherwise sit in the config matching nothing. Both the validator and the matcher parse amounts with `TransactionCalculationUtils.parseAmountSafe`, so they cannot disagree
+- `expectedMonthlyPaycheck` - Expected monthly paycheck amount for surplus calculations; required by `analyze`
+- `excludedTransactions` - Array of transactions removed from the whole tool (RULES.md, R-EXCL-1); each entry requires `description`, with optional `amount` and `reason`. `description` is matched **whole-string** after trim and lower-case (not a substring), and `amount` narrows a rule to one amount, compared numerically on absolute value after currency cleaning. **Amount-only rules are rejected by `ConfigValidator` at startup**: a rule with no description would drop every transaction of that amount on any account in either direction. A malformed `amount` is rejected for the same reason — it would otherwise sit in the config matching nothing. Both the validator and the matcher parse amounts with `TransactionCalculationUtils.parseAmountSafe`, so they cannot disagree
+
+Any other top-level key is reported as an unknown setting and ignored. Old configuration is not migrated: a breaking change simply changes the keys.
 
 **Transaction Tags Configuration:**
 
@@ -261,21 +171,22 @@ Credit cards are excluded from income because deposits to them are refunds and s
 - `CLIENT_CERT_PATH` - Client certificate path for mTLS
 - `CLIENT_CERT_PASSWORD` - Certificate password
 
+`ENV_FILE`, `BTK_PAGE_SIZE` and `BTK_STRICT_CONFIG` are read from the process
+environment, not from a `.env` file (see "Development Commands").
+
 ## Architecture Overview
 
 ### Command Pattern Architecture
 
-The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
+The CLI uses a command pattern with four main commands defined in `src/cli.ts`. `analyze` and `report` are built by `src/factories/command.factory.ts` and return their report DTO:
 
 1. **analyze** (alias: `an`) - Comprehensive cash flow and budget analysis including:
-    - Actual paycheck and additional income (deposits not from payroll)
+    - Actual paycheck and additional income
     - Bills paid and budgeted spending vs. allocation
     - Unbudgeted expenses and disposable income
     - True cash flow net impact calculation
 
-2. **report** (alias: `st`) - Shows current budget report for a given month. Its two spending sections are deliberately different:
-    - **Unbudgeted Expenses** - the bucket that feeds `netImpact`, from `UnbudgetedExpenseService`. Same definition `analyze` uses, so the two commands always agree
-    - **Untracked Spending** - withdrawals charged to _no_ bucket at all (not budget, bill, disposable, or unbudgeted). In practice this is spending from an account the derived scope excludes — an `untrackedAccounts` entry, or an inactive account. It is a diagnostic, not part of the net, and it is where spending funded from outside the envelope stays visible instead of disappearing. Note it is sourced from `getTransactionsWithoutBudget`, so an untracked withdrawal that carries a budget will not appear here — see the `budgetSpent` caveat below
+2. **report** (alias: `st`) - Shows the budget report for a given month: per-budget rows, bills, top expenses and the **Unbudgeted Expenses** bucket. Every figure comes from the same buckets `analyze` uses, so the two commands always agree. Activity in outside accounts is not shown
 
 3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
     - By default, processes uncategorized transactions and transactions with category but no budget
@@ -289,50 +200,28 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`:
 
 ### Service Layer Architecture
 
-Services are organized by role and all wired in `ServiceFactory.createServices()` (`src/factories/service.factory.ts`):
+Services are organized by role and all wired in `ServiceFactory.createServices(apiClient, config)` (`src/factories/service.factory.ts`); `config` defaults to the `ConfigManager` singleton, and tests pass their own:
 
 - **Core Services** (`src/services/core/`): Firefly III API wrappers (transactions, budgets, categories) and transaction utilities (classification, validation).
-- **Business Logic Services** (`src/services/`): Analyzers and utilities (additional income, unbudgeted expenses, paycheck surplus, transaction splitting, excluded transaction filtering, AI orchestration).
+- **Business Logic Services** (`src/services/`): `CashFlowService` (the month's buckets), bill comparison, budget report and analytics, transaction splitting, excluded transaction filtering, AI orchestration.
 - **AI Services** (`src/services/ai/`): Claude integration with structured prompts and transaction mapping.
-- **Display Services** (`src/services/display/`): CLI output formatting for reports, analysis, and status messages.
+- **Display Services** (`src/services/display/`): CLI output formatting for reports, analysis, and status messages, plus the `--json` serializers.
 
-**Pattern:** Business logic analysis services extend `BaseTransactionAnalysisService`, which provides a template method: validate date range → fetch transactions → call `analyzeTransactions()` → return results. Examples: `AdditionalIncomeService`, `UnbudgetedExpenseService`, `PaycheckSurplusService`, `DisposableIncomeService`.
+**Pattern:** `CashFlowService` extends `BaseTransactionAnalysisService`, which provides a template method: validate date range → fetch transactions → call `analyzeTransactions()` → return a `Result`.
 
 **Configuration:** All services receive configuration via constructor injection (never load themselves). Configuration comes from `ConfigManager` singleton, with priority: YAML > environment variables > defaults.
 
 ### Transaction Classification System
 
-The `TransactionClassificationService` provides the core logic for classifying transactions:
-
-- **Deposits**: `type === "deposit"`
-- **Transfers**: `type === "transfer"`
-- **Bills**: Transactions linked to a bill (bill_id or subscription_id is set)
-- **Disposable Income**: Transactions tagged with configured disposable income tag (default: "Disposable Income")
-- **Paychecks**: Transactions tagged with the configured paycheck tag (default: "Paycheck") **and**, when `paycheckDestinationAccounts` is configured, destined for one of those accounts. Supports all transaction types (deposits, transfers, etc).
-
-The account constraint lives in `isPaycheck` rather than in its callers on purpose: one predicate decides both what `PaycheckSurplusService` counts and what `AdditionalIncomeService` steps aside for, so the two cannot both claim a transaction.
-
-**Rejection from the paycheck bucket is not a promotion to additional income.** A rejected transaction lands there only if it independently passes that service's filters — its destination must be a derived income destination, it must be a deposit, and it must not match `excludedAdditionalIncomePatterns`. Two consequences are deliberate and must not be "fixed": a rejected **transfer** is counted in neither bucket (a transfer between accounts you already hold is not income), and a deposit into an **untracked** account — the savings half of payroll — is counted in neither bucket either, because it is outside the envelope. See "The account boundary".
+`TransactionClassificationService.classify(transaction, scope)` returns the one bucket a transaction is charged to — `paycheck`, `additionalIncome`, `bill`, `disposable`, `budget`, `unbudgeted` — or `null` when it is counted nowhere. It implements RULES.md; the rule ids are in its comments. The single-purpose predicates (`isBill`, `hasBudget`, `isPaycheck`, …) remain for `categorize` and `split`.
 
 **Amount sign convention (verified against Firefly III 6.6.6):** `GET /v1/transactions` returns `amount` **unsigned** — withdrawals, deposits, and transfers are all positive, and direction comes from `type`. Never identify spending with `amount < 0`; use `isWithdrawal()`.
 
-Because direction lives in `type`, never total a mixed set of transactions with `calculateTransactionTotal(..., useAbsolute)` — a refund would inflate the very bucket it should reduce. Use `TransactionCalculationUtils.calculateNetSpend()` (withdrawals and transfers add, deposits subtract) or `calculateNetIncome()` (its mirror, for paycheck totals).
+Because direction lives in `type`, total a bucket with `TransactionCalculationUtils.calculateNetSpend()` (withdrawals and transfers add, deposits subtract) or `calculateNetIncome()` (its mirror). An absolute sum would let a refund inflate the very bucket it should reduce.
 
-Separately, `GET /v1/insight/expense/budget` returns `difference_float` **negative** per budget. Convert it by negating, never with `Math.abs` per budget: a budget whose refunds exceed its outflows reports a _positive_ value, and taking its absolute value would count that refund as spending.
+**Firefly facts that shape the rules** (evidence in `test-harness/VERIFICATION.md`): a budget is silently dropped on a deposit or transfer (V8), and so is a bill link on a transfer (V20). A transfer therefore carries no marker but tags, and a refund can never carry a budget.
 
-**Bucket precedence for the analyze report.** Each transaction must be charged at most once, so the expense buckets are disjoint by construction, in the order **bill > disposable > unbudgeted** (`UnbudgetedExpenseService` excludes bills and disposable; `DisposableIncomeService` excludes bills). On the income side, **paycheck > additional income** (`AdditionalIncomeService` excludes paycheck-tagged transactions).
-
-Note the disposable bucket is disjoint but does **not** feed the net — it is charged to the pool and reported as an action instead. Its precedence still matters: it is what keeps a tagged purchase out of `unbudgetedExpenses`, which does feed the net.
-
-Bill-linked transactions are counted by `BillComparisonService` even when the bill is deactivated or missing from the bill list entirely — every other bucket rejects a bill-linked transaction, so without that they would be charged nowhere.
-
-The one overlap that cannot be filtered is `budgetSpent`: it comes from Firefly's server-side rollup (`insight/expense/budget`), which returns one number per budget with no per-transaction handle. A bill or disposable transaction that also carries a budget is therefore inside it. Those transactions are reported by `BillComparisonDto.budgetedTransactions` / `DisposableIncomeAnalysis.budgetedTransactions`, added back once in `AnalyzeReportDto` (`budgetRollupCorrection`), and surfaced as a warning so the data can be corrected in Firefly.
-
-**The correction is bounded, and the two halves are bounded differently.** A **bill** carrying a budget is subtracted twice — once as a bill, once inside `budgetSpent` — so its credit back is capped at what the bill bucket actually subtracted; crediting more would invent income. A **disposable** transaction carrying a budget is a different defect: it is charged to the pool, so `netImpact` subtracts it nowhere and only `budgetSpent` still contains it. It is credited back **in full**, with no per-bucket cap — capping it at the disposable balance (as an earlier revision did) under-credits whenever refunds shrink that balance, because the balance is net of refunds and is not floored at zero. Both halves are bounded together by `budgetSpent` itself: the premise of the whole correction is that this spending sits inside that rollup, so it cannot credit back more than the rollup contains.
-
-The same rollup is also blind to `excludedTransactions`, which is filtered client-side. `AnalyzeCommand` subtracts excluded budgeted spending from `budgetSpent` so both sides describe the same set of transactions.
-
-**It is blind to account scope too, and that is not corrected today.** `BudgetService.getBudgetExpenseInsights` calls `insightExpenseBudget(start, end)` with no account filter, so the endpoint totals each budget across every account. A withdrawal from an `untrackedAccounts` entry that carries a `budget_id` therefore lands in `budgetSpent` and is charged to the envelope, despite its account being outside it. No savings withdrawal carries a budget today, and `categorize` is the likely way one would acquire one. Symptom: spending inside the net that appears in no bucket you can find, and not in Untracked Spending either. Workaround: clear the budget in Firefly. **Real fix, if this ever bites:** the SDK signature is `insightExpenseBudget(start, end, xTraceId?, budgetsArray?, accountsArray?)` — passing the derived expense sources as `accountsArray` would scope the rollup like every other bucket. Doing so would also shift `budgetSurplus` and the `budgetRollupCorrection` inputs, so it needs its own verification pass.
+Bill-linked transactions are counted by `BillComparisonService` even when the bill is deactivated or missing from the bill list entirely — no other bucket takes a bill-linked transaction, so without that they would be charged nowhere.
 
 ### Transaction Splitting System
 
@@ -387,36 +276,69 @@ To add a new configuration key:
 ### Service Creation
 
 - `src/factories/service.factory.ts` - Central service factory; all new services must be instantiated and returned here for consistent dependency injection
+- `src/factories/command.factory.ts` - Builds `analyze` and `report` from the service bundle, shared by `cli.ts` and the in-process scenario tests
 
 ### Error Handling
 
 - Structured logging via Pino logger (`src/logger.ts`)
 - Services throw descriptive errors with context
-- Commands catch and log errors before exiting
+- Commands catch and log errors before exiting; `cli.ts` also prints a one-line `Error …` to stderr, since the structured log is silent by default
 
 ### Logging Best Practices
 
 - **User-facing output**: Use `console.log/error` for CLI output (reports, summaries, results)
     - This goes to stdout/stderr and can be piped/redirected
     - Clean, formatted output without JSON structure
+    - In `--json` mode stdout must carry nothing but the JSON document
 - **Diagnostic logging**: Use `logger.debug/info/warn/error` for operational diagnostics
-    - Structured JSON logs controlled by `LOG_LEVEL` environment variable
+    - Structured JSON logs written to **stderr**, controlled by `LOG_LEVEL`
     - Includes context objects for troubleshooting
     - Examples: API errors, validation failures, processing statistics
 
 ### Pagination
 
-Firefly III paginates **every** list endpoint and defaults to 50 items per page. Reading `response.data` alone therefore silently truncates any busy month. All list calls must go through `fetchAllPages()` (`src/utils/pagination.utils.ts`), which follows `meta.pagination.total_pages`.
+Firefly III paginates **every** list endpoint and defaults to 50 items per page. Reading `response.data` alone therefore silently truncates any busy month. All list calls must go through `fetchAllPages()` (`src/utils/pagination.utils.ts`), which requests `PAGE_SIZE` items per page (500, or `BTK_PAGE_SIZE`) and follows `meta.pagination.total_pages`. Firefly 6.6.6 does not cap `limit` (V14), but the loop never assumes the requested size was honored.
 
 The one exception is `budgets.listBudgetLimit`, which the SDK exposes with no `page` parameter; `BudgetService.getBudgetLimits` logs a warning when the response reports more than one page.
 
 ### Transaction Filtering
 
-Transaction analysis services follow a consistent pattern: fetch transactions for the month, apply business logic filters via `.filter()` chains, and return results.
+There is one filter: `classify`. Code that needs a set of transactions takes it from `CashFlowService.getBuckets` rather than filtering the raw month itself.
 
-### Testing
+## Testing
 
-- Comprehensive test coverage in `__tests__/` directories
-- Test both success and error scenarios
-- Services are tested independently with mocked dependencies
-- Test files: `import { jest } from '@jest/globals'` for mocking (ESM requirement)
+### Three layers, one scenario
+
+1. **Unit tests** (`__tests__/**`, part of `npm test`) - services tested independently with injected mocks. Name the RULES.md rule a test pins in its title: `[R-XFER-1] …`.
+2. **In-process scenario tests** (`__tests__/scenario/`, part of `npm test`, no Docker) - a real `FireflyClientWithCerts` talks to an in-memory fake Firefly (`test-harness/fake-firefly/server.ts`), so the SDK, axios and `fetchAllPages` all run for real. `seedScenario` seeds the fake, then the real commands run through `ServiceFactory` + `command.factory` in both JSON and text formats.
+3. **E2E** (`e2e/`, `npm run test:e2e`) - the CLI is spawned against a pinned, auto-bootstrapped Firefly 6.6.6 in Docker (see `DOCKER.md`).
+
+Layers 2 and 3 run the **same** shared suites (`test-harness/suites/*.suite.ts`) against the **same** scenario.
+
+### The scenario is the single source of truth
+
+`test-harness/scenario/` defines it: `ledger.ts` (accounts, bills, budgets, tags and transactions by month, referenced by key rather than id), `config.ts` (the config built from the seeded id map), and `expected.ts` (the expected results). Fixed months, `TZ=UTC`.
+
+- **Expected values are hand-derived literals from RULES.md**, each with a derivation comment citing the rule ids. They must never be computed by, or import from, `src/`: a value derived by the code under test cannot catch that code's bugs. ESLint enforces this with `no-restricted-imports` on `test-harness/scenario/**` and `test-harness/fake-firefly/**`.
+- **`test-harness/scenario/firefly-contract.ts` is the only place observed Firefly behavior is recorded** (bill pay dates, pagination, inclusive end dates, account and currency readback). The fake server is built from it, and the `firefly-contract` suite runs the same literals against real Firefly in e2e. If the two disagree, correct the literal, citing the evidence in `test-harness/VERIFICATION.md`.
+- Changing `ledger.ts` or `config.ts` changes `scenarioHash()`, which invalidates a reused e2e database.
+
+### Known defects
+
+Where the code disagrees with RULES.md, the test asserts the **rule** and runs as `test.failing`, driven by the `KNOWN_DEFECTS` list in `expected.ts` (each entry: KD id, field, expected value, today's value, and the rule it contradicts). A fix makes the assertion pass, which fails the `test.failing` and forces the entry's removal, so the list cannot silently go stale. The list is empty today. Never "fix" a failing assertion by changing the expected literal to what the code produces.
+
+### Unit-test rules
+
+- **`jest.mock` is inert under native ESM.** It is not hoisted and does not intercept ES module linking, so it silently does nothing. The canary `__tests__/meta/esm-mocking.test.ts` proves it and fails if that ever changes. Inject dependencies through constructors, or use `jest.unstable_mockModule(...)` followed by a dynamic `await import(...)` (as `__tests__/cli.test.ts` does).
+- Build transactions with the typed builders in `__tests__/shared/test-data.ts` — `withdrawal()`, `deposit()`, `transfer()` — which set a fixed date, an **unsigned** amount and an explicit `type`, matching Firefly's sign convention. Reuse `createMockAccountScopeService`, `createMockCashFlowService`, `buckets()` and `mockDate` rather than hand-rolling them.
+- `__tests__/setup/env.ts` runs before every test file: `FORCE_COLOR=0`, `LOG_LEVEL=silent`, `BTK_STRICT_CONFIG=1`, and a temp `HOME`, so no test can read the real `config.yaml` or `~/.budget` credentials.
+- Import `jest` from `@jest/globals`. Jest does not typecheck; run `npm run typecheck:tests`.
+- Test both success and error scenarios.
+
+### E2E safety guard
+
+The e2e suite must never touch the real Firefly or Anthropic.
+
+- `assertLocalFirefly` (`test-harness/safety.ts`) refuses any URL not on `127.0.0.1`/`localhost`; `scripts/e2e/up.sh` insists on a loopback binding, and the seeder and e2e global setup also check that the token belongs to `e2e@btk.invalid`.
+- The CLI is spawned with an environment built **from scratch** (`buildChildEnv`): `PATH`, a temp `HOME`, `ENV_FILE=.e2e/env`, `BTK_STRICT_CONFIG=1`, `BTK_PAGE_SIZE=10`, `LOG_LEVEL=silent`, `TZ=UTC`, in a fresh temp `cwd`. Nothing is inherited from `FIREFLY_*` or `ANTHROPIC_*`, and passing `ANTHROPIC_*` is rejected outright.
+- Strict config means a missing `.e2e/` artifact fails loudly instead of falling back to `~/.budget/.env`.

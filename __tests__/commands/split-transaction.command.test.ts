@@ -5,30 +5,8 @@ import { SplitTransactionDisplayService } from '../../src/services/display/split
 import { UserInputService } from '../../src/services/user-input.service.js';
 import { TransactionRead } from '@derekprovance/firefly-iii-sdk';
 
-// Mock ora spinner
-jest.mock('ora', () => {
-    const spinnerInstance = {
-        start: jest.fn().mockReturnThis(),
-        succeed: jest.fn().mockReturnThis(),
-        fail: jest.fn().mockReturnThis(),
-        stop: jest.fn().mockReturnThis(),
-    };
-    return jest.fn(() => spinnerInstance);
-});
-
-// Mock chalk to return the input string (disable styling for tests)
-jest.mock('chalk', () => ({
-    default: {
-        red: (str: string) => str,
-        yellow: (str: string) => str,
-        green: (str: string) => str,
-    },
-}));
-
-// Mock services
-jest.mock('../../src/services/transaction-split.service');
-jest.mock('../../src/services/display/split-transaction-display.service');
-jest.mock('../../src/services/user-input.service');
+// Collaborators are injected as manual mocks; chalk and ora are real
+// (FORCE_COLOR=0 in __tests__/setup/env.ts keeps output plain).
 
 describe('SplitTransactionCommand', () => {
     let command: SplitTransactionCommand;
@@ -40,6 +18,7 @@ describe('SplitTransactionCommand', () => {
     const createMockTransactionRead = (overrides?: Partial<TransactionRead>): TransactionRead => ({
         type: 'transactions',
         id: '123',
+        links: {},
         attributes: {
             transactions: [
                 {
@@ -101,7 +80,7 @@ describe('SplitTransactionCommand', () => {
         command = new SplitTransactionCommand(splitService, displayService, userInputService);
 
         // Spy on console
-        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     });
 
     afterEach(() => {

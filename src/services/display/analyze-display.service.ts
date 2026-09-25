@@ -1,10 +1,10 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { ITransactionClassificationService } from '../core/transaction-classification.service.interface.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { BillDetailDto, isBillUpcoming } from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
-import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 
 /**
  * Service for formatting and displaying comprehensive budget analysis information
@@ -129,8 +129,6 @@ export class AnalyzeDisplayService {
             });
         }
 
-        lines.push(...this.formatBudgetRollupWarning(data));
-
         // Disposable income subsection
         //
         // Listed here for visibility, but deliberately NOT styled as a
@@ -147,7 +145,7 @@ export class AnalyzeDisplayService {
             // direction instead. Deliberately not a negative amount: this
             // section states an action, and formatDisposableAction inverts the
             // instruction rather than printing a negative transfer.
-            const isReimbursement = data.disposableIncome >= 0;
+            const isReimbursement = this.disposableBalance(data) >= 0;
             lines.push('');
             lines.push(
                 `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
@@ -195,58 +193,6 @@ export class AnalyzeDisplayService {
     }
 
     /**
-     * Warns when the budget rollup contains spending charged elsewhere.
-     *
-     * Firefly's budget total is a server-side rollup, so a bill or disposable
-     * transaction that also carries a budget cannot be filtered out of it. A
-     * bill is then subtracted twice; a disposable transaction is subtracted
-     * once when it should not be subtracted at all, being charged to the pool
-     * rather than the envelope. Either way the net is corrected arithmetically;
-     * this names the transactions so the data can be cleaned up in Firefly.
-     */
-    private formatBudgetRollupWarning(data: AnalyzeReportDto): string[] {
-        const transactions = data.budgetRollupTransactions ?? [];
-        // Gate on the transactions, never on the adjustment. The bill half of
-        // the correction is capped by what that bucket actually subtracted, so
-        // a genuinely double-claimed transaction can carry a $0 adjustment —
-        // and that is precisely the case most worth telling the user to fix.
-        if (transactions.length === 0) {
-            return [];
-        }
-
-        const count = transactions.length;
-        const noun = count === 1 ? 'transaction is' : 'transactions are';
-        const adjustment = this.formatCurrency(
-            data.budgetRollupCorrection ?? 0,
-            data.currencySymbol
-        );
-        const lines = [
-            '',
-            chalk.yellow(`  ⚠ ${count} budgeted ${noun} charged to another section`),
-            chalk.dim(`    net adjustment applied: ${adjustment}`),
-        ];
-
-        transactions.forEach(transaction => {
-            const amount = this.formatCurrency(
-                TransactionCalculationUtils.parseAmountSafe(transaction.amount),
-                data.currencySymbol
-            );
-            // The overlap is always with the budget total; say which other
-            // section also claims it so it can be corrected in Firefly
-            const other = this.transactionClassificationService.isBill(transaction)
-                ? 'bill'
-                : 'disposable income';
-            lines.push(
-                chalk.dim(
-                    `    ${transaction.description ?? 'Unknown'} ${amount} — ${other} + budget`
-                )
-            );
-        });
-
-        return lines;
-    }
-
-    /**
      * Formats the financial summary section
      */
     private formatSummarySection(data: AnalyzeReportDto): string {
@@ -266,12 +212,6 @@ export class AnalyzeDisplayService {
         // charged to the pool rather than the envelope, so netImpact does not
         // subtract it — listing it here would stop the column summing to the
         // total. It is stated below the net as an action instead.
-
-        if (data.budgetRollupCorrection && data.budgetRollupCorrection > 0) {
-            lines.push(
-                `    ${this.getStatusIcon(data.budgetRollupCorrection, true)} ${'Budget Rollup Adj:'.padEnd(30)} ${this.formatSignedAmount(data.budgetRollupCorrection, data.currencySymbol, true)}`
-            );
-        }
 
         lines.push(`    ${chalk.dim('────────────────────────────────────')}`);
 
@@ -297,16 +237,17 @@ export class AnalyzeDisplayService {
      * all three signs are handled rather than assuming a positive amount.
      */
     private formatDisposableAction(data: AnalyzeReportDto): string[] {
-        if (data.disposableIncome === 0) {
+        const balance = this.disposableBalance(data);
+        if (balance === 0) {
             return [];
         }
 
         const count = data.disposableIncomeTransactions.length;
         const countText =
             count > 0 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`) : '';
-        const amount = this.formatCurrency(Math.abs(data.disposableIncome), data.currencySymbol);
+        const amount = this.formatCurrency(Math.abs(balance), data.currencySymbol);
 
-        if (data.disposableIncome > 0) {
+        if (balance > 0) {
             return [
                 '',
                 `  ${chalk.cyan('→')} ${chalk.bold('Transfer from disposable pool:'.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
@@ -320,6 +261,14 @@ export class AnalyzeDisplayService {
             `  ${chalk.cyan('←')} ${chalk.bold('Return to disposable pool:'.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
             chalk.dim('    Not included in the net — tagged refunds exceeded tagged spending.'),
         ];
+    }
+
+    /**
+     * The disposable balance in cents, as the JSON report rounds it, so float
+     * noise from refunds that cancel spending never prints a $0.00 transfer
+     */
+    private disposableBalance(data: AnalyzeReportDto): number {
+        return CurrencyUtils.toCents(data.disposableIncome);
     }
 
     /**

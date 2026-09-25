@@ -1,18 +1,12 @@
+import stripAnsi from 'strip-ansi';
 import { BudgetDisplayService } from '../../../src/services/display/budget-display.service.js';
 import { BudgetReportDto } from '../../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
-import { jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import { withdrawal } from '../../shared/test-data.js';
 
-// Mock chalk to return the input string (disable styling for tests)
-jest.mock('chalk', () => ({
-    default: {
-        red: (str: string) => str,
-        green: (str: string) => str,
-        gray: (str: string) => str,
-        cyan: (str: string) => str,
-        bold: (str: string) => str,
-    },
-}));
+// Output is plain text: FORCE_COLOR=0 (see __tests__/setup/env.ts) disables
+// chalk. OSC 8 hyperlinks are emitted regardless of color support.
 
 describe('BudgetDisplayService', () => {
     let service: BudgetDisplayService;
@@ -29,6 +23,7 @@ describe('BudgetDisplayService', () => {
                 actual,
                 predicted,
                 frequency: 'monthly' as const,
+                upcomingAmount: 0,
             });
 
             const billComparison: BillComparisonDto = {
@@ -52,7 +47,6 @@ describe('BudgetDisplayService', () => {
                 topExpenses: [],
                 billComparison,
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -79,6 +73,7 @@ describe('BudgetDisplayService', () => {
                 actual,
                 predicted,
                 frequency: 'monthly' as const,
+                upcomingAmount: 0,
             });
 
             const billComparison: BillComparisonDto = {
@@ -102,7 +97,6 @@ describe('BudgetDisplayService', () => {
                 topExpenses: [],
                 billComparison,
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -130,6 +124,7 @@ describe('BudgetDisplayService', () => {
                 actual,
                 predicted,
                 frequency: 'monthly' as const,
+                upcomingAmount: 0,
             });
 
             const billComparison: BillComparisonDto = {
@@ -150,7 +145,6 @@ describe('BudgetDisplayService', () => {
                 topExpenses: [],
                 billComparison,
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -206,7 +200,6 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -257,7 +250,6 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -303,7 +295,6 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -336,7 +327,6 @@ describe('BudgetDisplayService', () => {
                     currencyCode: 'USD',
                 },
                 unbudgeted: [],
-                untracked: [],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -356,13 +346,12 @@ describe('BudgetDisplayService', () => {
             const serviceWithUrl = new BudgetDisplayService(baseUrl);
 
             const longDesc = 'A'.repeat(80);
-            const mockTransaction = {
+            const mockTransaction = withdrawal('55.99', {
                 transaction_journal_id: 'txn-123',
                 description: longDesc,
-                amount: '-55.99',
                 date: '2025-04-12',
                 currency_symbol: '$',
-            };
+            });
 
             const reportData = {
                 budgets: [],
@@ -375,7 +364,6 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -409,13 +397,12 @@ describe('BudgetDisplayService', () => {
             const serviceWithUrl = new BudgetDisplayService(baseUrl);
 
             const transactionId = 'txn-456';
-            const mockTransaction = {
+            const mockTransaction = withdrawal('25.00', {
                 transaction_journal_id: transactionId,
                 description: 'Simple Transaction',
-                amount: '-25.00',
                 date: '2025-04-12',
                 currency_symbol: '$',
-            };
+            });
 
             const reportData = {
                 budgets: [],
@@ -428,7 +415,6 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -451,13 +437,12 @@ describe('BudgetDisplayService', () => {
         it('should not add hyperlinks when baseUrl is empty', () => {
             const serviceNoUrl = new BudgetDisplayService();
 
-            const mockTransaction = {
+            const mockTransaction = withdrawal('10.00', {
                 transaction_journal_id: 'txn-789',
                 description: 'Test Transaction',
-                amount: '-10.00',
                 date: '2025-04-12',
                 currency_symbol: '$',
-            };
+            });
 
             const reportData = {
                 budgets: [],
@@ -470,7 +455,6 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -493,13 +477,12 @@ describe('BudgetDisplayService', () => {
             const baseUrl = 'http://firefly.local';
             const serviceWithUrl = new BudgetDisplayService(baseUrl);
 
-            const mockTransaction = {
+            const mockTransaction = withdrawal('15.00', {
                 transaction_journal_id: undefined,
                 description: 'No ID Transaction',
-                amount: '-15.00',
                 date: '2025-04-12',
                 currency_symbol: '$',
-            };
+            });
 
             const reportData = {
                 budgets: [],
@@ -512,7 +495,6 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                untracked: [],
                 unbudgeted: [
                     {
                         transaction: mockTransaction,
@@ -532,11 +514,12 @@ describe('BudgetDisplayService', () => {
         });
     });
 
-    describe('formatReport - unbudgeted vs untracked sections', () => {
-        const item = (description: string, amount: string) => ({
+    describe('formatReport - unbudgeted section', () => {
+        const item = (description: string, amount: string, type = 'withdrawal') => ({
             transaction: {
                 description,
                 amount,
+                type,
                 transaction_journal_id: '1',
                 date: '2026-08-11',
             },
@@ -555,48 +538,68 @@ describe('BudgetDisplayService', () => {
                 currencyCode: 'USD',
             },
             unbudgeted: [],
-            untracked: [],
             insights: [],
             month: 8,
             year: 2026,
             isCurrentMonth: false,
         });
 
-        it('should render both sections under distinct headers', () => {
-            const data = {
-                ...baseData(),
-                unbudgeted: [item('Coffee', '4.50')],
-                untracked: [item('BROKERAGE BUY INVESTMENT', '300.00')],
-            };
-
-            const result = service.formatReport(data as never, false);
-
-            expect(result).toContain('UNBUDGETED EXPENSES');
-            expect(result).toContain('UNTRACKED SPENDING');
-            expect(result).toContain('Charged to no bucket');
-            expect(result).toContain('Coffee');
-            expect(result).toContain('BROKERAGE BUY INVESTMENT');
-        });
-
-        it('should omit the untracked section when nothing is untracked', () => {
+        it('should render the unbudgeted bucket under its header', () => {
             const data = { ...baseData(), unbudgeted: [item('Coffee', '4.50')] };
 
             const result = service.formatReport(data as never, false);
 
             expect(result).toContain('UNBUDGETED EXPENSES');
-            expect(result).not.toContain('UNTRACKED SPENDING');
+            expect(result).toContain('Coffee');
         });
 
         it('should omit the unbudgeted section when the bucket is empty', () => {
+            const result = service.formatReport(baseData() as never, false);
+
+            expect(result).not.toContain('UNBUDGETED EXPENSES');
+        });
+
+        it('[R-REFUND-1] should sign a refund so the rows visibly add up', () => {
             const data = {
                 ...baseData(),
-                untracked: [item('BROKERAGE BUY INVESTMENT', '300.00')],
+                unbudgeted: [item('Hardware', '100.00'), item('Grocer Refund', '25.00', 'deposit')],
             };
+
+            const result = stripAnsi(service.formatReport(data as never, false));
+
+            expect(result).toContain('-$25.00');
+            expect(result).toContain('Total: $75.00');
+        });
+
+        it('should say "no limit" rather than count spending as money left', () => {
+            const data = {
+                ...baseData(),
+                budgets: [
+                    {
+                        budgetId: '1',
+                        name: 'NoLimit',
+                        amount: 0,
+                        spent: 50,
+                        remaining: -50,
+                        percentageUsed: 0,
+                        status: 'under',
+                    },
+                ],
+            };
+
+            const result = stripAnsi(service.formatReport(data as never, false));
+
+            expect(result).toContain('no limit');
+            expect(result).not.toContain('$50.00 left');
+        });
+
+        it('should never render an Untracked Spending section', () => {
+            // RULES.md: activity in outside accounts is not shown
+            const data = { ...baseData(), unbudgeted: [item('Coffee', '4.50')] };
 
             const result = service.formatReport(data as never, false);
 
-            expect(result).not.toContain('UNBUDGETED EXPENSES');
-            expect(result).toContain('UNTRACKED SPENDING');
+            expect(result).not.toContain('UNTRACKED SPENDING');
         });
     });
 });

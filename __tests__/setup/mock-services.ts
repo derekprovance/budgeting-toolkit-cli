@@ -17,7 +17,12 @@ import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.servi
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { ILogger } from '../../src/types/interface/logger.interface.js';
 import { TransactionSplitService } from '../../src/services/transaction-split.service.js';
-import { AccountScopeService } from '../../src/services/core/account-scope.service.js';
+import {
+    AccountScope,
+    AccountScopeService,
+} from '../../src/services/core/account-scope.service.js';
+import { CashFlowService, MonthBuckets } from '../../src/services/cash-flow.service.js';
+import { Result } from '../../src/types/result.type.js';
 import { SplitTransactionDisplayService } from '../../src/services/display/split-transaction-display.service.js';
 import { jest } from '@jest/globals';
 
@@ -66,9 +71,7 @@ export const createMockCategoryService = (): jest.Mocked<CategoryService> => {
 export const createMockBudgetService = (): jest.Mocked<BudgetService> => {
     return {
         getBudgets: jest.fn(),
-        getBudgetByName: jest.fn(),
-        getBudgetById: jest.fn(),
-        getBudgetLimitsForMonth: jest.fn(),
+        getBudgetLimits: jest.fn(),
     } as unknown as jest.Mocked<BudgetService>;
 };
 
@@ -216,17 +219,48 @@ export const resetAllServiceMocks = (...services: Array<Record<string, unknown>>
 };
 
 /**
- * Account scope mock. Defaults mirror a typical derived scope so existing tests
- * keep the account IDs they already use; pass explicit lists to vary it.
+ * Account scope mock. `income` defaults to the envelope's first account, the
+ * way checking is the one non-card envelope account in real data.
  */
 export const createMockAccountScopeService = (
-    incomeDestinations: string[] = [],
-    expenseSources: string[] = []
+    envelope: string[] = [],
+    income: string[] = envelope.slice(0, 1)
 ): jest.Mocked<AccountScopeService> => {
+    const scope: AccountScope = { envelope: new Set(envelope), income: new Set(income) };
     return {
-        getIncomeDestinations: jest
-            .fn<() => Promise<string[]>>()
-            .mockResolvedValue(incomeDestinations),
-        getExpenseSources: jest.fn<() => Promise<string[]>>().mockResolvedValue(expenseSources),
+        getScope: jest.fn<() => Promise<AccountScope>>().mockResolvedValue(scope),
     } as unknown as jest.Mocked<AccountScopeService>;
+};
+
+/** Buckets with every bucket present, overridden where given */
+export const buckets = (overrides: Partial<MonthBuckets> = {}): MonthBuckets => ({
+    paycheck: [],
+    additionalIncome: [],
+    bill: [],
+    disposable: [],
+    budget: [],
+    unbudgeted: [],
+    ...overrides,
+});
+
+/**
+ * CashFlowService mock resolving to the given buckets for every month, or to
+ * per-month buckets keyed `month-year`.
+ */
+export const createMockCashFlowService = (
+    byMonth: MonthBuckets | Record<string, MonthBuckets> = buckets()
+): jest.Mocked<CashFlowService> => {
+    const isPerMonth = !('budget' in byMonth);
+    return {
+        getBuckets: jest.fn((month: number, year: number) =>
+            Promise.resolve(
+                Result.ok(
+                    isPerMonth
+                        ? ((byMonth as Record<string, MonthBuckets>)[`${month}-${year}`] ??
+                              buckets())
+                        : (byMonth as MonthBuckets)
+                )
+            )
+        ),
+    } as unknown as jest.Mocked<CashFlowService>;
 };

@@ -13,7 +13,7 @@ describe('DateRangeService', () => {
     });
 
     describe('getDateRange', () => {
-        it('should return correct date range for January', () => {
+        it('[R-TIME-1] should bound a month by its first and last day', () => {
             const result = service.getDateRange(1, 2024);
 
             expect(result.startDate.getMonth()).toBe(0); // January = 0

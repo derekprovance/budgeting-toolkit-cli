@@ -4,9 +4,6 @@ import { CategorizeDisplayService } from '../../src/services/display/categorize-
 import { jest } from '@jest/globals';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 
-jest.mock('../../src/services/ai-transaction-update-orchestrator.service');
-jest.mock('../../src/services/display/categorize-display.service');
-
 describe('CategorizeCommand', () => {
     let command: CategorizeCommand;
     let mockAIOrchestrator: jest.Mocked<AITransactionUpdateOrchestrator>;
@@ -109,7 +106,7 @@ describe('CategorizeCommand', () => {
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
 
             // Mock console.log to verify output
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+            const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
             await command.execute(params);
 
@@ -142,7 +139,7 @@ describe('CategorizeCommand', () => {
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
 
             // Mock console.log to verify output
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+            const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
             await command.execute(params);
 
@@ -193,7 +190,7 @@ describe('CategorizeCommand', () => {
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
 
             // Mock console.log to verify output
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+            const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
             await command.execute(params);
 

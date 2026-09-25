@@ -1,55 +1,64 @@
-import { jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { BudgetAnalyticsService } from '../../src/services/budget-analytics.service.js';
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
-import { BudgetService } from '../../src/services/core/budget.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
+import { CashFlowService } from '../../src/services/cash-flow.service.js';
+import { BudgetError } from '../../src/types/error/budget.error.js';
+import { withdrawal } from '../shared/test-data.js';
+import { createMockAccountScopeService, createMockLogger } from '../setup/mock-services.js';
 
-// Mock the services
-jest.mock('../../src/services/budget-report.service.js');
-jest.mock('../../src/services/core/transaction.service.js');
-jest.mock('../../src/services/core/budget.service.js');
+/** Envelope accounts: the builders' default source, and a card */
+const CHECKING = 'source1';
+const CARD = 'card';
+
+type BudgetReportDto = BudgetLimitDto;
+type GetReport = BudgetReportService['getBudgetReport'];
+type GetTransactions = TransactionService['getTransactionsForMonth'];
 
 describe('BudgetAnalyticsService', () => {
     let service: BudgetAnalyticsService;
     let budgetReportService: jest.Mocked<BudgetReportService>;
     let transactionService: jest.Mocked<TransactionService>;
-    let budgetService: jest.Mocked<BudgetService>;
 
     const mockBudget: BudgetLimitDto = {
         budgetId: 'budget-1',
-        budgetName: 'Groceries',
+        name: 'Groceries',
         amount: 500,
         spent: 200,
-        currencyCode: 'USD',
-        currencySymbol: '$',
     };
 
     // Firefly returns amounts unsigned; direction comes from `type`
-    const mockTransaction: Partial<TransactionSplit> = {
+    const mockTransaction: TransactionSplit = withdrawal('50.00', {
         transaction_journal_id: 'trans-1',
         description: 'Walmart',
-        amount: '50.00',
-        type: 'withdrawal',
         budget_id: 'budget-1',
         currency_symbol: '$',
         date: '2024-01-15',
-    };
+    });
 
     beforeEach(() => {
         jest.clearAllMocks();
 
-        budgetReportService = new BudgetReportService() as jest.Mocked<BudgetReportService>;
-        transactionService = new TransactionService() as jest.Mocked<TransactionService>;
-        budgetService = new BudgetService() as jest.Mocked<BudgetService>;
-
+        // Each test installs the methods it needs; nothing else is reachable.
+        budgetReportService = {
+            getBudgetReport: jest.fn<GetReport>(),
+        } as unknown as jest.Mocked<BudgetReportService>;
+        transactionService = {
+            getTransactionsForMonth: jest.fn<GetTransactions>(),
+        } as unknown as jest.Mocked<TransactionService>;
+        // A real CashFlowService over the mocked month, so statistics and top
+        // expenses see exactly the buckets the classifier produces
         service = new BudgetAnalyticsService(
             budgetReportService,
-            budgetService,
-            transactionService,
-            new TransactionClassificationService('Disposable Income', 'Paycheck')
+            new CashFlowService(
+                transactionService,
+                new TransactionClassificationService('Disposable Income', 'Paycheck'),
+                createMockAccountScopeService([CHECKING, CARD]),
+                createMockLogger()
+            )
         );
     });
 
@@ -58,12 +67,12 @@ describe('BudgetAnalyticsService', () => {
             const mockBudgets: BudgetReportDto[] = [mockBudget];
 
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: mockBudgets });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -76,12 +85,12 @@ describe('BudgetAnalyticsService', () => {
             const mockBudgets: BudgetReportDto[] = [mockBudget];
 
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: mockBudgets });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             await service.getBudgetReport(3, 2024, 2);
 
@@ -93,9 +102,9 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should throw error when budget report service fails', async () => {
-            budgetReportService.getBudgetReport = jest.fn().mockResolvedValue({
+            budgetReportService.getBudgetReport = jest.fn<GetReport>().mockResolvedValue({
                 ok: false,
-                error: { message: 'API error', userMessage: 'Failed' },
+                error: { message: 'API error', userMessage: 'Failed' } as unknown as BudgetError,
             });
 
             await expect(service.getBudgetReport(1, 2024, 0)).rejects.toThrow('API error');
@@ -108,12 +117,12 @@ describe('BudgetAnalyticsService', () => {
             };
 
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [budgetWithData] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -131,12 +140,12 @@ describe('BudgetAnalyticsService', () => {
             };
 
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [noLimit] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -156,12 +165,12 @@ describe('BudgetAnalyticsService', () => {
             };
 
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [refunded] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -178,12 +187,12 @@ describe('BudgetAnalyticsService', () => {
             };
 
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [overBudget] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -192,31 +201,29 @@ describe('BudgetAnalyticsService', () => {
 
         it('should calculate remaining budget amount', async () => {
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [mockBudget] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue([mockTransaction] as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue([mockTransaction]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
-            // amount (500) + spent (-200) = 300
+            // amount (500) - spent (200) = 300
             expect(result[0].remaining).toBe(300);
         });
     });
 
     describe('top merchant selection', () => {
         const txn = (description: string, amount: string) =>
-            ({
+            withdrawal(amount, {
                 transaction_journal_id: `t-${description}`,
                 description,
-                amount,
-                type: 'withdrawal',
                 budget_id: 'budget-1',
                 currency_symbol: '$',
                 date: '2024-01-15',
-            }) as Partial<TransactionSplit>;
+            });
 
         it('should break a visit-count tie on amount spent', async () => {
             // Every merchant visited once is the common case for a category.
@@ -224,16 +231,16 @@ describe('BudgetAnalyticsService', () => {
             // enumerated first -- a $5 corner-shop run standing in for a
             // category dominated by a $678 charge.
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [mockBudget] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
+                .fn<GetTransactions>()
                 .mockResolvedValue([
                     txn('VENMO PAYMENT', '5.00'),
                     txn('AMAZON MKTPL', '400.00'),
                     txn('CORNER STORE', '3.25'),
-                ] as never);
+                ]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -242,16 +249,16 @@ describe('BudgetAnalyticsService', () => {
 
         it('should still prefer more visits over a larger single charge', async () => {
             budgetReportService.getBudgetReport = jest
-                .fn()
+                .fn<GetReport>()
                 .mockResolvedValue({ ok: true, value: [mockBudget] });
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
+                .fn<GetTransactions>()
                 .mockResolvedValue([
                     txn('BIG ONE OFF', '900.00'),
                     { ...txn('GROCERY MART', '20.00'), transaction_journal_id: 'ks-1' },
                     { ...txn('GROCERY MART', '25.00'), transaction_journal_id: 'ks-2' },
-                ] as never);
+                ]);
 
             const result = await service.getBudgetReport(1, 2024, 0);
 
@@ -262,7 +269,7 @@ describe('BudgetAnalyticsService', () => {
 
     describe('getTopExpenses', () => {
         it('should return top expenses sorted by amount descending', async () => {
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 { ...mockTransaction, amount: '50.00', description: 'Walmart' },
                 { ...mockTransaction, amount: '25.00', description: 'Gas Station' },
                 { ...mockTransaction, amount: '100.00', description: 'Restaurant' },
@@ -270,8 +277,8 @@ describe('BudgetAnalyticsService', () => {
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 3);
 
@@ -282,29 +289,31 @@ describe('BudgetAnalyticsService', () => {
             expect(result[2].amount).toBe(25);
         });
 
-        it('should filter out deposits and transfers, keeping withdrawals', async () => {
+        it('should keep envelope spending and drop income, refunds and card payments', async () => {
             // Regression: amounts are all positive, so the old `amount < 0`
             // filter matched nothing and this section never rendered
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 { ...mockTransaction, amount: '50.00', description: 'Expense' },
                 {
                     ...mockTransaction,
                     amount: '100.00',
                     type: 'deposit',
+                    destination_id: CHECKING,
                     description: 'Income',
                 },
                 {
                     ...mockTransaction,
                     amount: '75.00',
                     type: 'transfer',
-                    description: 'Moved money',
+                    destination_id: CARD,
+                    description: 'Card payment',
                 },
                 { ...mockTransaction, amount: '25.00', description: 'Another Expense' },
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 10);
 
@@ -313,8 +322,54 @@ describe('BudgetAnalyticsService', () => {
             expect(result.every(e => e.amount > 0)).toBe(true);
         });
 
+        it('[R-DISP-1] should leave out purchases the disposable pool pays for', async () => {
+            const transactions: TransactionSplit[] = [
+                {
+                    ...mockTransaction,
+                    amount: '900.00',
+                    tags: ['Disposable Income'],
+                    description: 'Concert',
+                },
+                { ...mockTransaction, amount: '50.00', description: 'Groceries' },
+            ];
+
+            transactionService.getTransactionsForMonth = jest
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
+
+            const result = await service.getTopExpenses(1, 2024, 10);
+
+            expect(result.map(e => e.description)).toEqual(['Groceries']);
+        });
+
+        it('[R-XFER-3] [R-SCOPE-2] should include money leaving the envelope and nothing from outside it', async () => {
+            const transactions: TransactionSplit[] = [
+                {
+                    ...mockTransaction,
+                    amount: '200.00',
+                    type: 'transfer',
+                    destination_id: 'savings',
+                    description: 'Extra to savings',
+                },
+                {
+                    ...mockTransaction,
+                    amount: '1000.00',
+                    source_id: 'brokerage',
+                    description: 'Fund purchase',
+                },
+            ];
+
+            transactionService.getTransactionsForMonth = jest
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
+
+            const result = await service.getTopExpenses(1, 2024, 10);
+
+            expect(result.map(e => e.description)).toEqual(['Extra to savings']);
+        });
+
         it('should return empty array when no expenses exist', async () => {
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 { ...mockTransaction, amount: '100.00', type: 'deposit', description: 'Income' },
                 {
                     ...mockTransaction,
@@ -325,8 +380,8 @@ describe('BudgetAnalyticsService', () => {
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 5);
 
@@ -334,7 +389,7 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should respect the limit parameter', async () => {
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 { ...mockTransaction, amount: '10.00', description: 'Exp1' },
                 { ...mockTransaction, amount: '20.00', description: 'Exp2' },
                 { ...mockTransaction, amount: '30.00', description: 'Exp3' },
@@ -343,8 +398,8 @@ describe('BudgetAnalyticsService', () => {
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 2);
 
@@ -354,18 +409,15 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should use default limit of 5 when not provided', async () => {
-            const transactions: Partial<TransactionSplit>[] = Array.from(
-                { length: 10 },
-                (_, i) => ({
-                    ...mockTransaction,
-                    amount: `-${(i + 1) * 10}.00`,
-                    description: `Expense ${i + 1}`,
-                })
-            );
+            const transactions: TransactionSplit[] = Array.from({ length: 10 }, (_, i) => ({
+                ...mockTransaction,
+                amount: `${(i + 1) * 10}.00`,
+                description: `Expense ${i + 1}`,
+            }));
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024);
 
@@ -373,13 +425,13 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should include budget name for each expense', async () => {
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 { ...mockTransaction, amount: '50.00', budget_name: 'Groceries' },
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 1);
 
@@ -387,13 +439,13 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should label a transaction with no budget explicitly', async () => {
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 { ...mockTransaction, amount: '50.00', budget_name: null },
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 1);
 
@@ -405,14 +457,14 @@ describe('BudgetAnalyticsService', () => {
 
         it('should throw error when transaction service fails', async () => {
             transactionService.getTransactionsForMonth = jest
-                .fn()
+                .fn<GetTransactions>()
                 .mockRejectedValue(new Error('Fetch failed'));
 
             await expect(service.getTopExpenses(1, 2024, 5)).rejects.toThrow('Fetch failed');
         });
 
         it('should include date and transaction ID in results', async () => {
-            const transactions: Partial<TransactionSplit>[] = [
+            const transactions: TransactionSplit[] = [
                 {
                     ...mockTransaction,
                     amount: '50.00',
@@ -422,8 +474,8 @@ describe('BudgetAnalyticsService', () => {
             ];
 
             transactionService.getTransactionsForMonth = jest
-                .fn()
-                .mockResolvedValue(transactions as any);
+                .fn<GetTransactions>()
+                .mockResolvedValue(transactions);
 
             const result = await service.getTopExpenses(1, 2024, 1);
 

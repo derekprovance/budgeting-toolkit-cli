@@ -127,6 +127,11 @@ export class ConfigValidator {
      * transaction of that amount on every account, in either direction.
      */
     private validateExcludedTransactions(config: AppConfig, errors: string[]): void {
+        if (!Array.isArray(config.transactions.excludedTransactions)) {
+            errors.push('transactions.excludedTransactions must be a list');
+            return;
+        }
+
         config.transactions.excludedTransactions.forEach((entry, index) => {
             const field = `transactions.excludedTransactions[${index}]`;
 

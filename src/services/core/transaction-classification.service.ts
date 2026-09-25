@@ -1,16 +1,62 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ITransactionClassificationService } from './transaction-classification.service.interface.js';
+import {
+    Bucket,
+    ITransactionClassificationService,
+} from './transaction-classification.service.interface.js';
+import { AccountScope } from './account-scope.service.js';
 
+/**
+ * Decides which bucket a transaction belongs to. RULES.md is the authority for
+ * every rule here; the rule ids in the comments point at it.
+ */
 export class TransactionClassificationService implements ITransactionClassificationService {
     constructor(
         private readonly disposableIncomeTag: string,
-        private readonly paycheckTag: string,
-        /**
-         * Accounts a paycheck-tagged transaction must be destined for. Empty
-         * means the tag alone decides.
-         */
-        private readonly paycheckDestinationAccounts: string[] = []
+        private readonly paycheckTag: string
     ) {}
+
+    /**
+     * The one bucket a transaction is charged to, or null when it is counted
+     * nowhere. Every command totals the same buckets, so this is the only
+     * place a transaction's treatment is decided.
+     */
+    classify(transaction: TransactionSplit, scope: AccountScope): Bucket | null {
+        const fromEnvelope = isIn(scope.envelope, transaction.source_id);
+        const toEnvelope = isIn(scope.envelope, transaction.destination_id);
+
+        switch (transaction.type) {
+            case 'withdrawal':
+                // R-SCOPE-2: a marker never pulls an outside withdrawal in
+                return fromEnvelope ? this.bucketByMarker(transaction) : null;
+
+            case 'transfer':
+                // R-XFER-1/2: inside or inbound is ignored. R-XFER-3: outbound
+                // is unbudgeted; Firefly keeps no bill or budget on a transfer.
+                return fromEnvelope && !toEnvelope ? 'unbudgeted' : null;
+
+            case 'deposit': {
+                if (!toEnvelope) {
+                    return null; // R-INCOME-2
+                }
+
+                const intoIncomeAccount = isIn(scope.income, transaction.destination_id);
+                if (intoIncomeAccount && this.isPaycheck(transaction)) {
+                    return 'paycheck'; // R-INCOME-1
+                }
+
+                // R-REFUND-1: a marked deposit, or any deposit onto a card,
+                // reduces a spending bucket rather than counting as income
+                if (this.isMarked(transaction) || !intoIncomeAccount) {
+                    return this.bucketByMarker(transaction);
+                }
+
+                return 'additionalIncome'; // R-INCOME-1
+            }
+
+            default:
+                return null;
+        }
+    }
 
     isTransfer(transaction: TransactionSplit): boolean {
         return transaction.type === 'transfer';
@@ -21,15 +67,7 @@ export class TransactionClassificationService implements ITransactionClassificat
     }
 
     isDisposableIncome(transaction: TransactionSplit): boolean {
-        if (!transaction.tags) {
-            return false;
-        }
-
-        return transaction.tags.includes(this.disposableIncomeTag);
-    }
-
-    isSupplementedByDisposable(tags: string[] | null | undefined): boolean {
-        return tags?.includes(this.disposableIncomeTag) ?? false;
+        return transaction.tags?.includes(this.disposableIncomeTag) ?? false;
     }
 
     isDeposit(transaction: TransactionSplit): boolean {
@@ -45,51 +83,31 @@ export class TransactionClassificationService implements ITransactionClassificat
     }
 
     hasBudget(transaction: TransactionSplit): boolean {
-        return !(transaction.budget_id === undefined || transaction.budget_id === null);
+        return !!transaction.budget_id;
     }
 
     /**
-     * A paycheck is tagged with the configured paycheck tag AND, when
-     * `paycheckDestinationAccounts` is configured, lands in one of those
-     * accounts.
-     *
-     * The account check exists because a payroll deposit is often split across
-     * accounts, and a stray tag on the half that is not the paycheck would
-     * charge that money to the paycheck bucket. Constraining it here rather
-     * than in the callers keeps one predicate deciding both what
-     * PaycheckSurplusService counts and what AdditionalIncomeService steps
-     * aside for, so the two cannot both claim a transaction.
-     *
-     * Rejection here is NOT a promotion to additional income. A rejected
-     * transaction reaches that bucket only if it independently passes
-     * AdditionalIncomeService's own filters. Three cases where it will not, and
-     * the money is charged to no income bucket at all:
-     *
-     * - its destination is an untracked account. This is the current setup: the
-     *   savings half of payroll lands outside the tracked boundary, so it is
-     *   deliberately counted nowhere. Money outside the boundary belongs in no
-     *   bucket — do not "fix" this by widening the scope.
-     * - it is a transfer. AdditionalIncomeService requires a deposit. Also the
-     *   right outcome — a transfer between accounts the owner already holds is
-     *   not income — but a paycheck-tagged transfer is silently uncounted.
-     * - its description matches `excludedAdditionalIncomePatterns`. Prefer the
-     *   account boundary over a description pattern; see CLAUDE.md.
-     *
-     * Left empty the tag alone decides, which is the behaviour for anyone who
-     * has not configured the accounts.
+     * Carries the paycheck tag. Where it landed is {@link classify}'s concern:
+     * the stray tag on the savings half of payroll is rejected there because
+     * savings is outside the envelope.
      */
     isPaycheck(transaction: TransactionSplit): boolean {
-        if (!transaction.tags?.includes(this.paycheckTag)) {
-            return false;
-        }
-
-        if (this.paycheckDestinationAccounts.length === 0) {
-            return true;
-        }
-
-        return (
-            !!transaction.destination_id &&
-            this.paycheckDestinationAccounts.includes(transaction.destination_id)
-        );
+        return transaction.tags?.includes(this.paycheckTag) ?? false;
     }
+
+    /** R-BUCKET-1: bill, then disposable, then budget; the first match wins */
+    private bucketByMarker(transaction: TransactionSplit): Bucket {
+        if (this.isBill(transaction)) return 'bill';
+        if (this.isDisposableIncome(transaction)) return 'disposable';
+        if (this.hasBudget(transaction)) return 'budget';
+        return 'unbudgeted';
+    }
+
+    private isMarked(transaction: TransactionSplit): boolean {
+        return this.bucketByMarker(transaction) !== 'unbudgeted';
+    }
+}
+
+function isIn(accounts: ReadonlySet<string>, id: string | null | undefined): boolean {
+    return !!id && accounts.has(id);
 }

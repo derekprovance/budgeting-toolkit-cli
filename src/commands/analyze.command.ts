@@ -1,17 +1,13 @@
 import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/common.types.js';
-import { AdditionalIncomeService } from '../services/additional-income.service.js';
-import { UnbudgetedExpenseService } from '../services/unbudgeted-expense.service.js';
 import { AnalyzeDisplayService } from '../services/display/analyze-display.service.js';
-import { PaycheckSurplusService } from '../services/paycheck-surplus.service.js';
-import { DisposableIncomeService } from '../services/disposable-income.service.js';
-import { BudgetSurplusService } from '../services/budget-surplus.service.js';
+import { CashFlowService } from '../services/cash-flow.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
+import { IBudgetService } from '../services/core/budget.service.interface.js';
+import { allocationsByBudget } from '../services/core/budget.service.js';
 import { AnalyzeReportDto } from '../types/dto/analyze-report.dto.js';
-import { ITransactionService } from '../services/core/transaction.service.interface.js';
-import { ITransactionClassificationService } from '../services/core/transaction-classification.service.interface.js';
-import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { Result } from '../types/result.type.js';
+import { serializeAnalyzeReport } from '../services/display/analyze-json.serializer.js';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 
@@ -19,73 +15,46 @@ import ora, { type Ora } from 'ora';
  * Command for analyzing budget variance
  */
 
-export class AnalyzeCommand implements Command<void, BudgetDateParams> {
+export class AnalyzeCommand implements Command<AnalyzeReportDto, BudgetDateParams> {
     private readonly BUDGET_FAIL_MSG = 'Failed to generate variance analysis';
 
     constructor(
-        private readonly additionalIncomeService: AdditionalIncomeService,
-        private readonly unbudgetedExpenseService: UnbudgetedExpenseService,
-        private readonly paycheckSurplusService: PaycheckSurplusService,
-        private readonly disposableIncomeService: DisposableIncomeService,
-        private readonly budgetSurplusService: BudgetSurplusService,
+        private readonly cashFlowService: CashFlowService,
         private readonly billComparisonService: BillComparisonService,
+        private readonly budgetService: IBudgetService,
         private readonly analyzeDisplayService: AnalyzeDisplayService,
-        private readonly transactionService: ITransactionService,
-        private readonly transactionClassificationService: ITransactionClassificationService
+        private readonly expectedMonthlyPaycheck: number
     ) {}
 
     /**
      * Executes the analyze command
+     *
+     * In `json` format the spinner is silenced and stdout carries nothing but
+     * the JSON document, so it stays parseable; error messages still go to
+     * stderr.
+     *
      * @param params The month and year to perform the analysis
+     * @returns The report DTO the output was built from
      */
-    async execute({ month, year, verbose }: BudgetDateParams): Promise<void> {
-        const spinner = ora(`Analyzing ${month}-${year}...`).start();
+    async execute({
+        month,
+        year,
+        verbose,
+        format = 'text',
+    }: BudgetDateParams): Promise<AnalyzeReportDto> {
+        const json = format === 'json';
+        const spinner = ora({ text: `Analyzing ${month}-${year}...`, isSilent: json }).start();
 
         try {
-            // Fetch all analysis data in parallel
-            const [
-                additionalIncomeResult,
-                unbudgetedExpenseResult,
-                paycheckSurplusResult,
-                disposableIncomeResult,
-                budgetSurplusResult,
-                billComparisonResult,
-                excludedTransactions,
-            ] = await Promise.all([
-                this.additionalIncomeService.calculateAdditionalIncome(month, year),
-                this.unbudgetedExpenseService.calculateUnbudgetedExpenses(month, year),
-                this.paycheckSurplusService.calculatePaycheckSurplus(month, year),
-                this.disposableIncomeService.calculateDisposableIncome(month, year),
-                this.budgetSurplusService.calculateBudgetSurplus(month, year),
+            // BillComparisonService reads the same buckets; TransactionService
+            // and AccountScopeService share one in-flight fetch between them
+            const [bucketsResult, billComparisonResult, budgetLimits] = await Promise.all([
+                this.cashFlowService.getBuckets(month, year),
                 this.billComparisonService.calculateBillComparison(month, year),
-                this.transactionService.getExcludedTransactionsForMonth(month, year),
+                this.budgetService.getBudgetLimits(month, year),
             ]);
 
-            const additionalIncome = this.unwrap(
-                additionalIncomeResult,
-                'Error fetching additional income',
-                spinner
-            );
-            const unbudgetedExpenses = this.unwrap(
-                unbudgetedExpenseResult,
-                'Error fetching unbudgeted expenses',
-                spinner
-            );
-            const paycheck = this.unwrap(
-                paycheckSurplusResult,
-                'Error calculating paycheck surplus',
-                spinner
-            );
-            const disposableIncome = this.unwrap(
-                disposableIncomeResult,
-                'Error calculating disposable income',
-                spinner
-            );
-            const budgetResult = this.unwrap(
-                budgetSurplusResult,
-                'Error calculating budget surplus',
-                spinner
-            );
+            const buckets = this.unwrap(bucketsResult, 'Error sorting transactions', spinner);
             const billComparison = this.unwrap(
                 billComparisonResult,
                 'Error calculating bill comparison',
@@ -94,42 +63,28 @@ export class AnalyzeCommand implements Command<void, BudgetDateParams> {
 
             spinner.succeed('Analysis generated');
 
-            // Extract budget values from result
-            const budgetAllocated = budgetResult.totalAllocated;
-
-            // budgetSpent comes from Firefly's server-side rollup, which knows
-            // nothing about the local exclusion list. An excluded transaction
-            // carrying a budget is therefore still inside it, even though every
-            // locally-computed bucket dropped it. Take it back out so the two
-            // sides describe the same set of transactions.
-            const excludedBudgetSpend = TransactionCalculationUtils.calculateNetSpend(
-                excludedTransactions.filter(t => this.transactionClassificationService.hasBudget(t))
-            );
-            const budgetSpent = Math.max(0, budgetResult.totalSpent - excludedBudgetSpend);
-            const budgetSurplus = budgetAllocated - budgetSpent;
-
-            // Build comprehensive report DTO
-            const reportData = AnalyzeReportDto.create(
-                additionalIncome,
-                unbudgetedExpenses,
-                budgetAllocated,
-                budgetSpent,
-                budgetSurplus,
+            const reportData = AnalyzeReportDto.create({
+                buckets,
                 billComparison,
-                paycheck.expected,
-                paycheck.actual,
-                paycheck.surplus,
-                disposableIncome.transactions,
-                disposableIncome.balance,
+                budgetAllocated: [...allocationsByBudget(budgetLimits).values()].reduce(
+                    (sum, amount) => sum + amount,
+                    0
+                ),
+                expectedMonthlyPaycheck: this.expectedMonthlyPaycheck,
                 month,
                 year,
-                disposableIncome.budgetedTransactions
-            );
+            });
 
-            // Display the comprehensive report
-            console.log(
-                this.analyzeDisplayService.formatAnalysisReport(reportData, verbose || false)
-            );
+            if (json) {
+                console.log(JSON.stringify(serializeAnalyzeReport(reportData), null, 2));
+            } else {
+                // Display the comprehensive report
+                console.log(
+                    this.analyzeDisplayService.formatAnalysisReport(reportData, verbose || false)
+                );
+            }
+
+            return reportData;
         } catch (error) {
             // unwrap() already failed the spinner for a Result error; only an
             // unexpected throw leaves it still spinning.

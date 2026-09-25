@@ -1,27 +1,9 @@
-jest.mock('../../src/logger', () => ({
-    logger: {
-        debug: (...args: unknown[]) => console.log('[logger.debug]', ...args),
-        info: (...args: unknown[]) => console.log('[logger.info]', ...args),
-        warn: (...args: unknown[]) => console.log('[logger.warn]', ...args),
-        error: (...args: unknown[]) => console.log('[logger.error]', ...args),
-        trace: (...args: unknown[]) => console.log('[logger.trace]', ...args),
-    },
-}));
-
-jest.mock('../../src/services/core/transaction.service');
-jest.mock('../../src/services/core/category.service');
-jest.mock('../../src/services/core/budget.service');
-jest.mock('../../src/services/ai/llm-transaction-processing.service');
-jest.mock('../../src/services/core/transaction-classification.service');
-jest.mock('../../src/services/core/transaction-validator.service');
-jest.mock('../../src/services/core/transaction-ai-result-validator.service');
-jest.mock('../../src/services/interactive-transaction-updater.service');
-
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { CategoryService } from '../../src/services/core/category.service.js';
 import { BudgetService } from '../../src/services/core/budget.service.js';
 import { LLMTransactionProcessingService } from '../../src/services/ai/llm-transaction-processing.service.js';
+import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
@@ -95,7 +77,7 @@ describe('AITransactionUpdateOrchestrator', () => {
         mockTransactionService = {
             tagExists: jest.fn<(tag: string) => Promise<boolean>>(),
             getTransactionsByTag: jest
-                .fn()
+                .fn<(tag: string) => Promise<TransactionSplit[]>>()
                 .mockResolvedValue(mockTransactions as TransactionSplit[]),
             updateTransaction:
                 jest.fn<
@@ -108,29 +90,34 @@ describe('AITransactionUpdateOrchestrator', () => {
         } as unknown as jest.Mocked<TransactionService>;
 
         mockInteractiveTransactionUpdater = {
-            updateTransaction: jest.fn().mockImplementation(async (transaction, aiResults) => {
-                // Return Result with discriminated union pattern
-                const journalId = transaction.transaction_journal_id;
-                if (!journalId) {
-                    return {
-                        ok: false,
-                        error: {
-                            field: 'journalId',
-                            message: 'Missing journal ID',
-                            userMessage: 'Transaction missing journal ID',
-                            transactionId: 'unknown',
-                            transactionDescription: transaction.description || 'No description',
-                        },
+            updateTransaction: jest.fn(
+                async (
+                    transaction: TransactionSplit,
+                    aiResults: Record<string, { category?: string; budget?: string }>
+                ) => {
+                    // Return Result with discriminated union pattern
+                    const journalId = transaction.transaction_journal_id;
+                    if (!journalId) {
+                        return {
+                            ok: false,
+                            error: {
+                                field: 'journalId',
+                                message: 'Missing journal ID',
+                                userMessage: 'Transaction missing journal ID',
+                                transactionId: 'unknown',
+                                transactionDescription: transaction.description || 'No description',
+                            },
+                        };
+                    }
+                    const aiResult = aiResults[journalId];
+                    const result = {
+                        ...transaction,
+                        category_name: aiResult?.category || transaction.category_name,
+                        budget_name: aiResult?.budget || transaction.budget_name,
                     };
+                    return { ok: true, value: result };
                 }
-                const aiResult = aiResults[journalId];
-                const result = {
-                    ...transaction,
-                    category_name: aiResult?.category || transaction.category_name,
-                    budget_name: aiResult?.budget || transaction.budget_name,
-                };
-                return { ok: true, value: result };
-            }),
+            ),
         } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
 
         mockCategoryService = {
@@ -308,8 +295,12 @@ describe('AITransactionUpdateOrchestrator', () => {
             const result = await service.updateTransactionsByTag('test', CategorizeMode.Category);
 
             expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
-            // In category-only mode with force=false, budgets are fetched to support budget-only candidates
-            expect(mockBudgetService.getBudgets).toHaveBeenCalled();
+            expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
+            expect(mockLLMService.processTransactions).toHaveBeenCalledWith(
+                expect.any(Array),
+                expect.any(Array),
+                undefined
+            );
             expect(mockInteractiveTransactionUpdater.updateTransaction).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.any(Object)
@@ -442,7 +433,6 @@ describe('AITransactionUpdateOrchestrator', () => {
         it('should handle successful updates', async () => {
             const tag = 'test-tag';
             const updateMode = CategorizeMode.Both;
-            const dryRun = false;
 
             const mockTransaction = createMockTransaction({
                 transaction_journal_id: '1',
@@ -485,7 +475,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 value: mockTransaction as any,
             });
 
-            const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
+            const result = await service.updateTransactionsByTag(tag, updateMode);
 
             expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
@@ -555,7 +545,18 @@ describe('AITransactionUpdateOrchestrator', () => {
                 value: mockTransaction as any,
             });
 
-            const result = await service.updateTransactionsByTag(tag, updateMode, dryRun);
+            // dryRun is a constructor option, not a per-call argument
+            const dryRunService = new AITransactionUpdateOrchestrator(
+                mockTransactionService,
+                mockInteractiveTransactionUpdater,
+                mockCategoryService,
+                mockBudgetService,
+                mockLLMService,
+                mockValidator,
+                false,
+                dryRun
+            );
+            const result = await dryRunService.updateTransactionsByTag(tag, updateMode);
 
             expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
             expect(mockTransactionService.tagExists).toHaveBeenCalledWith(tag);
@@ -755,7 +756,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 });
 
             // Spy on console.error to verify error display
-            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
@@ -876,7 +877,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 });
 
             // Spy on console.error to verify error display
-            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
@@ -981,10 +982,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockLLMService.processTransactions).toHaveBeenCalledTimes(2);
         });
 
-        it('should fetch budgets in category-only mode when budget-only transactions exist', async () => {
-            const tag = 'test-tag';
-            const updateMode = CategorizeMode.Category;
-
+        it('should leave budget-only candidates alone in category-only mode', async () => {
             const transactionWithCategory = createMockTransaction({
                 transaction_journal_id: '1',
                 description: 'Has category, no budget',
@@ -1003,20 +1001,82 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockCategoryService.getCategories.mockResolvedValue([]);
             mockBudgetService.getBudgets.mockResolvedValue([]);
 
-            mockLLMService.processTransactions.mockResolvedValue({
-                '1': { budget: 'New Budget' },
-            });
+            const result = await service.updateTransactionsByTag(
+                'test-tag',
+                CategorizeMode.Category
+            );
 
-            mockInteractiveTransactionUpdater.updateTransaction.mockResolvedValue({
-                ok: true,
-                value: transactionWithCategory as any,
-            });
-
-            const result = await service.updateTransactionsByTag(tag, updateMode);
-
+            // --mode category must never write a budget
             expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
-            // Should have fetched budgets even in category-only mode
-            expect(mockBudgetService.getBudgets).toHaveBeenCalled();
+            expect(result.transactionsUpdated).toBe(0);
+            expect(mockBudgetService.getBudgets).not.toHaveBeenCalled();
+            expect(mockLLMService.processTransactions).not.toHaveBeenCalled();
+            expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
+        });
+
+        it('should never ask for categories in budget-only mode', async () => {
+            const [withCategory, withoutCategory] = [
+                createMockTransaction({
+                    transaction_journal_id: '1',
+                    category_id: '1',
+                    category_name: 'Groceries',
+                    budget_id: undefined,
+                }),
+                createMockTransaction({ transaction_journal_id: '2', budget_id: undefined }),
+            ];
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockTransactionService.getTransactionsByTag.mockResolvedValue([
+                withCategory,
+                withoutCategory,
+            ]);
+            mockValidator.shouldProcessTransaction.mockReturnValue(true);
+            mockValidator.isBudgetOnlyCandidate.mockImplementation(
+                t => t.transaction_journal_id === '1'
+            );
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
+            mockLLMService.processTransactions.mockImplementation(async txns =>
+                Object.fromEntries(txns.map(t => [t.transaction_journal_id!, { budget: 'B' }]))
+            );
+
+            await service.updateTransactionsByTag('test-tag', CategorizeMode.Budget);
+
+            expect(mockCategoryService.getCategories).not.toHaveBeenCalled();
+            expect(mockLLMService.processTransactions).toHaveBeenCalledTimes(2);
+            for (const [, categories] of mockLLMService.processTransactions.mock.calls) {
+                expect(categories).toBeUndefined();
+            }
+        });
+
+        it('should fail the run when the AI layer hits a critical error', async () => {
+            const assignmentService = {
+                assignCategories: jest
+                    .fn<LLMAssignmentService['assignCategories']>()
+                    .mockRejectedValue(new Error('invalid x-api-key')),
+                assignBudgets: jest.fn<LLMAssignmentService['assignBudgets']>(),
+            } as unknown as LLMAssignmentService;
+            const orchestrator = new AITransactionUpdateOrchestrator(
+                mockTransactionService,
+                mockInteractiveTransactionUpdater,
+                mockCategoryService,
+                mockBudgetService,
+                new LLMTransactionProcessingService(assignmentService),
+                mockValidator
+            );
+
+            mockTransactionService.tagExists.mockResolvedValue(true);
+            mockValidator.isBudgetOnlyCandidate.mockReturnValue(false);
+            mockCategoryService.getCategories.mockResolvedValue(
+                mockCategories as CategoryProperties[]
+            );
+            mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
+
+            const result = await orchestrator.updateTransactionsByTag('test', CategorizeMode.Both);
+
+            // Swallowed, this became HAS_RESULTS with "Updated 0 Transaction(s)!"
+            expect(result.status).toBe(CategorizeStatus.PROCESSING_FAILED);
+            expect(result.error).toBe('invalid x-api-key');
+            expect(mockInteractiveTransactionUpdater.updateTransaction).not.toHaveBeenCalled();
         });
     });
 });

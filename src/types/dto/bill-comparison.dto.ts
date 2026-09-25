@@ -1,4 +1,4 @@
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { today } from '../../utils/bill-schedule.utils.js';
 
 /**
  * Data Transfer Object for individual bill details.
@@ -52,15 +52,7 @@ export class BillComparisonDto {
         public variance: number,
         public bills: BillDetailDto[],
         public currencyCode: string,
-        public currencySymbol: string,
-        /**
-         * The bill transactions counted in {@link actualTotal} that ALSO carry
-         * a budget, and are therefore inside Firefly's server-side budget total
-         * as well. The analyze report uses these to avoid subtracting the same
-         * spending twice. Optional so fixtures that don't exercise the overlap
-         * can omit it.
-         */
-        public budgetedTransactions?: TransactionSplit[]
+        public currencySymbol: string
     ) {}
 
     /**
@@ -71,8 +63,7 @@ export class BillComparisonDto {
         actualTotal: number,
         bills: BillDetailDto[],
         currencyCode: string,
-        currencySymbol: string,
-        budgetedTransactions?: TransactionSplit[]
+        currencySymbol: string
     ): BillComparisonDto {
         const variance = actualTotal - predictedTotal;
         return new BillComparisonDto(
@@ -81,8 +72,7 @@ export class BillComparisonDto {
             variance,
             bills,
             currencyCode,
-            currencySymbol,
-            budgetedTransactions
+            currencySymbol
         );
     }
 }
@@ -98,7 +88,8 @@ export class BillComparisonDto {
  * as plain objects.
  */
 export function isBillUpcoming(bill: BillDetailDto, now: Date = new Date()): boolean {
-    return !!bill.dueDate && bill.dueDate.getTime() > now.getTime();
+    // By calendar day, so a bill due today is still ahead of us
+    return !!bill.dueDate && today(bill.dueDate) >= today(now);
 }
 
 /**

@@ -1,14 +1,52 @@
 import { jest } from '@jest/globals';
-import { createCli } from '../src/cli.js';
+import { DEFAULT_CONFIG } from '../src/config/config.defaults.js';
+import type { AppConfig } from '../src/config/config.types.js';
+import type { BudgetDateParams } from '../src/types/common.types.js';
 
-// Mock external modules
-jest.mock('../src/config/config-manager.js');
-jest.mock('../src/factories/service.factory.js');
-jest.mock('../src/api/firefly-client-with-certs.js');
-jest.mock('../src/commands/analyze.command.js');
-jest.mock('../src/commands/budget-report.command.js');
-jest.mock('../src/commands/categorize.command.js');
-jest.mock('../src/commands/split-transaction.command.js');
+/*
+ * Native ESM: `jest.mock` is inert here (see __tests__/meta/esm-mocking.test.ts),
+ * so the modules createCli wires at construction are replaced with
+ * `unstable_mockModule` and cli.ts is imported dynamically afterwards. Without
+ * this, createCli would construct the real ConfigManager and read the
+ * developer's ./config.yaml and ~/.budget credentials.
+ */
+const testConfig: AppConfig = structuredClone(DEFAULT_CONFIG);
+testConfig.transactions.expectedMonthlyPaycheck = 2000;
+
+const mockGetInstance = jest.fn(() => ({ getConfig: () => testConfig }));
+const mockGetResolvedPaths = jest.fn(() => ({ configPath: null, envPath: null }));
+
+jest.unstable_mockModule('../src/config/config-manager.js', () => ({
+    ConfigManager: {
+        getInstance: mockGetInstance,
+        getResolvedPaths: mockGetResolvedPaths,
+    },
+}));
+
+const mockCreateServices = jest.fn<(client: unknown, config?: AppConfig) => object>(() => ({}));
+
+jest.unstable_mockModule('../src/factories/service.factory.js', () => ({
+    ServiceFactory: {
+        createServices: mockCreateServices,
+        createAITransactionUpdateOrchestrator: jest.fn(),
+    },
+}));
+
+const mockAnalyzeExecute = jest.fn<(params: BudgetDateParams) => Promise<undefined>>(
+    async () => undefined
+);
+const mockReportExecute = jest.fn<(params: BudgetDateParams) => Promise<undefined>>(
+    async () => undefined
+);
+const mockCreateAnalyzeCommand = jest.fn(() => ({ execute: mockAnalyzeExecute }));
+const mockCreateBudgetReportCommand = jest.fn(() => ({ execute: mockReportExecute }));
+
+jest.unstable_mockModule('../src/factories/command.factory.js', () => ({
+    createAnalyzeCommand: mockCreateAnalyzeCommand,
+    createBudgetReportCommand: mockCreateBudgetReportCommand,
+}));
+
+const { createCli } = await import('../src/cli.js');
 
 describe('CLI', () => {
     let consoleLogSpy: jest.Spied<typeof console.log>;
@@ -19,8 +57,8 @@ describe('CLI', () => {
         jest.clearAllMocks();
 
         // Setup spies
-        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
         processExitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
             throw new Error('process.exit called');
         });
@@ -181,11 +219,81 @@ describe('CLI', () => {
     });
 
     describe('config error handling', () => {
-        it('should exit gracefully on config load errors', () => {
-            // The CLI is created with mocked ConfigManager that returns valid config by default
-            // This test verifies the basic flow completes without throwing
-            const cli = createCli();
+        it('should build services from the injected config', () => {
+            const cli = createCli('/explicit/config.yaml');
+
             expect(cli).toBeDefined();
+            expect(mockGetInstance).toHaveBeenCalledWith('/explicit/config.yaml');
+            expect(mockCreateServices).toHaveBeenCalledWith(expect.anything(), testConfig);
+        });
+
+        it('should exit 1 when configuration cannot be loaded', () => {
+            mockGetInstance.mockImplementationOnce(() => {
+                throw new Error('BTK_STRICT_CONFIG is set: pass the config file explicitly');
+            });
+
+            expect(() => createCli()).toThrow('process.exit called');
+            expect(processExitSpy).toHaveBeenCalledWith(1);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                'Failed to initialize API client:',
+                expect.stringContaining('BTK_STRICT_CONFIG')
+            );
+        });
+    });
+
+    describe('--json', () => {
+        const argv = (...args: string[]) => ['node', 'btk', ...args];
+
+        it.each(['analyze', 'report'])('should be offered by %s', name => {
+            const cli = createCli();
+            const cmd = cli.commands.find(c => c.name() === name);
+
+            expect(cmd?.options.find(opt => opt.long === '--json')).toBeDefined();
+        });
+
+        it('should run analyze in json format when passed', async () => {
+            const cli = createCli();
+            await cli.parseAsync(argv('analyze', '-m', '1', '-y', '2025', '--json'));
+
+            expect(mockCreateAnalyzeCommand).toHaveBeenCalledTimes(1);
+            expect(mockAnalyzeExecute).toHaveBeenCalledWith({
+                month: 1,
+                year: 2025,
+                verbose: false,
+                format: 'json',
+            });
+        });
+
+        it('should run analyze in text format by default', async () => {
+            const cli = createCli();
+            await cli.parseAsync(argv('analyze', '-m', '1', '-y', '2025'));
+
+            expect(mockAnalyzeExecute).toHaveBeenCalledWith(
+                expect.objectContaining({ format: 'text' })
+            );
+        });
+
+        it('should run report in json format when passed', async () => {
+            const cli = createCli();
+            await cli.parseAsync(argv('report', '-m', '2', '-y', '2025', '--json'));
+
+            expect(mockCreateBudgetReportCommand).toHaveBeenCalledTimes(1);
+            expect(mockReportExecute).toHaveBeenCalledWith({
+                month: 2,
+                year: 2025,
+                verbose: false,
+                format: 'json',
+            });
+        });
+
+        it('should still exit 1 when a json-mode command fails', async () => {
+            mockAnalyzeExecute.mockRejectedValueOnce(new Error('boom'));
+            const cli = createCli();
+
+            await expect(
+                cli.parseAsync(argv('analyze', '-m', '1', '-y', '2025', '--json'))
+            ).rejects.toThrow('process.exit called');
+            expect(processExitSpy).toHaveBeenCalledWith(1);
         });
     });
 

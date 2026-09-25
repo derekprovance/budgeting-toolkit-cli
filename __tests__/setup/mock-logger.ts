@@ -1,33 +1,25 @@
 /**
- * Centralized logger mock for all tests
+ * Injectable mock logger.
  *
- * Usage:
- * 1. Import at the top of your test file (before other imports):
- *    import '../setup/mock-logger';
- *
- * 2. Or use the setupMockLogger function for more control:
- *    import { setupMockLogger, mockLogger } from '../setup/mock-logger.js';
- *
- *    beforeEach(() => {
- *      setupMockLogger();
- *    });
+ * This is a plain object, not a module mock: under native ESM `jest.mock` is
+ * inert (see __tests__/meta/esm-mocking.test.ts), so the real `src/logger.js`
+ * is always what a service imports by default. Pass `mockLogger` through the
+ * service's constructor (services that log accept an `ILogger`) to
+ * assert on log calls. The real logger is kept quiet by LOG_LEVEL=silent in
+ * __tests__/setup/env.ts.
  */
 
 import { jest } from '@jest/globals';
 
-// Create the mock logger instance
-export const mockLogger = {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    trace: jest.fn(),
-};
+type LogFn = (obj: unknown, msg?: string) => void;
 
-// Mock the logger module
-jest.mock('../../src/logger', () => ({
-    logger: mockLogger,
-}));
+export const mockLogger = {
+    debug: jest.fn<LogFn>(),
+    info: jest.fn<LogFn>(),
+    warn: jest.fn<LogFn>(),
+    error: jest.fn<LogFn>(),
+    trace: jest.fn<LogFn>(),
+};
 
 /**
  * Reset all logger mocks (useful in beforeEach)

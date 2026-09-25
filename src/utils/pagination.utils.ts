@@ -18,6 +18,42 @@ export interface PaginatedResponse<T> {
     };
 }
 
+/** The page size requested when `BTK_PAGE_SIZE` is unset or invalid. */
+export const DEFAULT_PAGE_SIZE = 500;
+
+/** Largest page size `BTK_PAGE_SIZE` may request. */
+export const MAX_PAGE_SIZE = 500;
+
+/**
+ * Resolves the page size from a raw `BTK_PAGE_SIZE` value.
+ *
+ * A test seam: the harness sets a small page size so that a modest seeded
+ * ledger still spans several pages and pagination is exercised for real.
+ * Accepts a whole number from 1 to {@link MAX_PAGE_SIZE}. Anything else falls
+ * back to {@link DEFAULT_PAGE_SIZE} with a warning rather than failing, since
+ * a wrong page size changes round-trips, never results.
+ *
+ * @param raw The raw environment value (undefined or empty means unset)
+ * @param logger Optional logger override
+ */
+export function resolvePageSize(raw: string | undefined, logger: ILogger = defaultLogger): number {
+    if (raw === undefined || raw.trim() === '') {
+        return DEFAULT_PAGE_SIZE;
+    }
+
+    const trimmed = raw.trim();
+    const parsed = Number(trimmed);
+    if (!/^\d+$/.test(trimmed) || parsed < 1 || parsed > MAX_PAGE_SIZE) {
+        logger.warn(
+            { BTK_PAGE_SIZE: raw, fallback: DEFAULT_PAGE_SIZE },
+            `Ignoring invalid BTK_PAGE_SIZE - expected an integer from 1 to ${MAX_PAGE_SIZE}`
+        );
+        return DEFAULT_PAGE_SIZE;
+    }
+
+    return parsed;
+}
+
 /**
  * Items requested per page.
  *
@@ -26,8 +62,15 @@ export interface PaginatedResponse<T> {
  * server would have given costs extra round-trips for nothing, so this asks for
  * a generous page. The loop below follows `total_pages` regardless, so an
  * instance that serves a smaller page is still drained completely.
+ *
+ * Overridable through `BTK_PAGE_SIZE` (see {@link resolvePageSize}). Resolved
+ * once, at module load: every call site passes this constant as `limit`, and a
+ * page size that stays fixed for the life of the process means every page of
+ * one listing is requested with the same `limit`. The variable must therefore
+ * be in the process environment at startup — a value in a `.env` file loaded
+ * later by ConfigManager is not seen.
  */
-export const PAGE_SIZE = 500;
+export const PAGE_SIZE = resolvePageSize(process.env.BTK_PAGE_SIZE);
 
 /**
  * Guard against an endpoint that ignores the `page` parameter and would

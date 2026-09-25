@@ -9,17 +9,10 @@ import { ILogger } from '../types/interface/logger.interface.js';
  *   deposits, and transfers are all positive. Direction comes from `type`,
  *   never from the sign. Never filter spending with `amount < 0`; use
  *   `TransactionClassificationService.isWithdrawal()`.
- * - `GET /v1/insight/expense/budget` returns `difference_float` **negative**.
- *   Convert it by NEGATING, never with `Math.abs` per budget: a budget whose
- *   refunds exceed its outflows reports a positive `difference_float`, and
- *   taking its absolute value counts that refund as spending. Both consumers
- *   negate once at the source — `BudgetSurplusService` for the analyze path and
- *   `BudgetReportService` for the report path — so `BudgetLimitDto.spent` is
- *   positive-for-spending everywhere downstream.
  *
- * Because direction lives in `type`, never total a MIXED set with
- * `calculateTransactionTotal(..., useAbsolute)` — a refund would inflate the
- * very bucket it should reduce. Use `calculateNetSpend` / `calculateNetIncome`.
+ * Because direction lives in `type`, total a set with `calculateNetSpend` or
+ * `calculateNetIncome`; an absolute sum would let a refund inflate the very
+ * bucket it should reduce.
  */
 export class TransactionCalculationUtils {
     /**
@@ -30,35 +23,11 @@ export class TransactionCalculationUtils {
     }
 
     /**
-     * Calculates the total of transaction amounts
-     * @param transactions Array of transaction splits
-     * @param useAbsolute Whether to use absolute values (default: false)
-     * @param logger Optional logger for warnings
-     * @returns Sum of transaction amounts
-     */
-    static calculateTransactionTotal(
-        transactions: TransactionSplit[],
-        useAbsolute: boolean = false,
-        logger?: ILogger
-    ): number {
-        return transactions.reduce((sum, transaction) => {
-            const amount = parseFloat(transaction.amount);
-            if (isNaN(amount)) {
-                logger?.warn({ transaction }, 'Invalid transaction amount found');
-                return sum;
-            }
-            return sum + (useAbsolute ? Math.abs(amount) : amount);
-        }, 0);
-    }
-
-    /**
      * Sums a set of transactions as *spending*, honouring direction.
      *
      * Firefly reports `amount` unsigned, so direction has to come from `type`:
      * withdrawals and transfers add to the total, and deposits (refunds,
-     * chargebacks, returned payments) subtract from it. Summing with
-     * `useAbsolute` instead makes a refund inflate the very bucket it should
-     * reduce.
+     * chargebacks, returned payments) subtract from it.
      *
      * @returns Net spend; negative when refunds exceed outflows
      */
@@ -70,9 +39,8 @@ export class TransactionCalculationUtils {
      * Sums a set of transactions as *income*, honouring direction.
      *
      * The mirror of {@link calculateNetSpend}: deposits and transfers add,
-     * withdrawals subtract. Used for paycheck totals, where a transaction
-     * tagged as a paycheck but recorded as a withdrawal (a clawback or a
-     * correction) must reduce income rather than inflate it.
+     * withdrawals subtract. The income buckets hold only deposits today; the
+     * signs keep a total honest if that ever changes.
      */
     static calculateNetIncome(transactions: TransactionSplit[], logger?: ILogger): number {
         return TransactionCalculationUtils.sumBySignedType(transactions, 'income', logger);

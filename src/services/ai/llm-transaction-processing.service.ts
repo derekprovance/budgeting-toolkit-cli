@@ -107,76 +107,52 @@ export class LLMTransactionProcessingService implements ITransactionProcessor {
         transactions: TransactionSplit[],
         categories: string[]
     ): Promise<string[]> {
-        try {
-            logger.debug(
-                {
-                    transactionCount: transactions.length,
-                    categoryCount: categories.length,
-                },
-                'Processing categories'
-            );
+        logger.debug(
+            {
+                transactionCount: transactions.length,
+                categoryCount: categories.length,
+            },
+            'Processing categories'
+        );
 
-            const results = await this.llmAssignmentService.assignCategories(
-                transactions,
-                categories
-            );
+        // Errors propagate: LLMAssignmentService already degrades recoverable
+        // chunk failures, so anything reaching here is critical and aborts the run.
+        const results = await this.llmAssignmentService.assignCategories(transactions, categories);
 
-            logger.debug(
-                {
-                    totalProcessed: results.filter(r => !isNoMatch('category', r)).length,
-                    totalTransactions: transactions.length,
-                },
-                'Category processing complete'
-            );
+        logger.debug(
+            {
+                totalProcessed: results.filter(r => !isNoMatch('category', r)).length,
+                totalTransactions: transactions.length,
+            },
+            'Category processing complete'
+        );
 
-            return results;
-        } catch (error) {
-            logger.error(
-                {
-                    error: error instanceof Error ? error.message : String(error),
-                    transactionCount: transactions.length,
-                    categoryCount: categories.length,
-                },
-                'Unable to assign categories'
-            );
-            return new Array(transactions.length).fill('');
-        }
+        return results;
     }
 
     private async processBudgets(
         transactions: TransactionSplit[],
         budgets: string[]
     ): Promise<string[]> {
-        try {
-            logger.debug(
-                {
-                    transactionCount: transactions.length,
-                    budgetCount: budgets.length,
-                },
-                'Processing budgets'
-            );
+        logger.debug(
+            {
+                transactionCount: transactions.length,
+                budgetCount: budgets.length,
+            },
+            'Processing budgets'
+        );
 
-            const results = await this.llmAssignmentService.assignBudgets(transactions, budgets);
+        // Errors propagate for the same reason as in processCategories
+        const results = await this.llmAssignmentService.assignBudgets(transactions, budgets);
 
-            logger.debug(
-                {
-                    totalProcessed: results.filter(r => !isNoMatch('budget', r)).length,
-                    totalTransactions: transactions.length,
-                },
-                'Budget processing complete'
-            );
+        logger.debug(
+            {
+                totalProcessed: results.filter(r => !isNoMatch('budget', r)).length,
+                totalTransactions: transactions.length,
+            },
+            'Budget processing complete'
+        );
 
-            return results;
-        } catch (error) {
-            logger.error(
-                {
-                    error: error instanceof Error ? error.message : String(error),
-                    transactionCount: transactions.length,
-                    budgetCount: budgets.length,
-                },
-                'Unable to assign budgets'
-            );
-            return new Array(transactions.length).fill('');
-        }
+        return results;
     }
 }

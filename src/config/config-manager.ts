@@ -6,19 +6,12 @@ import dotenv from 'dotenv';
 import { AppConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
-import { ValidTransfer } from '../types/common.types.js';
 
 /**
  * YAML configuration file structure (maps to AppConfig)
  */
 interface YamlConfig {
-    incomeDestinationAccounts?: string[];
-    expenseSourceAccounts?: string[];
-    expenseTransfers?: ValidTransfer[];
     untrackedAccounts?: string[];
-    paycheckDestinationAccounts?: string[];
-    excludedAdditionalIncomePatterns?: string[];
-    excludeDisposableIncome?: boolean;
     expectedMonthlyPaycheck?: number;
     excludedTransactions?: ExcludedTransaction[];
 
@@ -164,8 +157,23 @@ export class ConfigManager {
     }
 
     /**
+     * Whether `BTK_STRICT_CONFIG` is on.
+     *
+     * Strict mode exists so that tests and the e2e harness can never fall back
+     * to the developer's real `./.env`, `~/.budget/.env`, `./config.yaml` or
+     * `~/.budget/config.yaml` — which point at a live Firefly instance. Every
+     * file must be named explicitly (`ENV_FILE` and `--config`), and a missing
+     * one is an error rather than a silent fallback.
+     */
+    static isStrictMode(): boolean {
+        const value = process.env.BTK_STRICT_CONFIG?.trim().toLowerCase();
+        return value === '1' || value === 'true';
+    }
+
+    /**
      * Resolves the config file path by searching multiple locations in priority order:
-     * 1. CLI flag --config path (if provided)
+     * 1. CLI flag --config path (if provided) — the only source in strict mode
+     *    (BTK_STRICT_CONFIG), which throws instead of falling back
      * 2. Current working directory: ./config.yaml
      * 3. User home directory: ~/.budget/config.yaml
      * 4. null (use defaults if no config file found)
@@ -185,6 +193,13 @@ export class ConfigManager {
             }
 
             throw new Error(`Config file not found: ${resolved}`);
+        }
+
+        if (ConfigManager.isStrictMode()) {
+            throw new Error(
+                'BTK_STRICT_CONFIG is set: pass the config file explicitly with --config <path>. ' +
+                    'The ./config.yaml and ~/.budget/config.yaml fallbacks are disabled.'
+            );
         }
 
         // Priority 2: Current working directory
@@ -212,10 +227,34 @@ export class ConfigManager {
      * 2. Current working directory: ./.env
      * 3. User home directory: ~/.budget/.env
      *
+     * In strict mode (BTK_STRICT_CONFIG) only ENV_FILE is consulted, and it
+     * must be set and exist.
+     *
      * Uses dotenv.config which silently ignores missing files (quiet: true)
      * Tracks which .env file was loaded in this.loadedEnvPath
      */
     private loadEnvironmentFile(): void {
+        // Strict mode: ENV_FILE is the only source, and it must exist
+        if (ConfigManager.isStrictMode()) {
+            const envFile = process.env.ENV_FILE;
+            if (!envFile) {
+                throw new Error(
+                    'BTK_STRICT_CONFIG is set: ENV_FILE must name the .env file to load. ' +
+                        'The ./.env and ~/.budget/.env fallbacks are disabled.'
+                );
+            }
+            const resolved = path.isAbsolute(envFile)
+                ? envFile
+                : path.resolve(process.cwd(), envFile);
+            if (!fs.existsSync(resolved)) {
+                throw new Error(`BTK_STRICT_CONFIG is set: ENV_FILE not found: ${resolved}`);
+            }
+            dotenv.config({ path: resolved, quiet: true });
+            this.loadedEnvPath = resolved;
+            ConfigManager.resolvedEnvPath = resolved;
+            return;
+        }
+
         // Priority 1: ENV_FILE environment variable
         if (process.env.ENV_FILE) {
             dotenv.config({
@@ -323,17 +362,10 @@ export class ConfigManager {
     }
 
     /**
-     * Every key this loader understands. Anything else in the YAML is either a
-     * typo or a setting that has been renamed or removed.
+     * Every key this loader understands. Anything else in the YAML is ignored.
      */
     private static readonly KNOWN_YAML_KEYS: ReadonlySet<string> = new Set([
-        'incomeDestinationAccounts',
-        'expenseSourceAccounts',
-        'expenseTransfers',
         'untrackedAccounts',
-        'paycheckDestinationAccounts',
-        'excludedAdditionalIncomePatterns',
-        'excludeDisposableIncome',
         'expectedMonthlyPaycheck',
         'excludedTransactions',
         'tags',
@@ -341,61 +373,14 @@ export class ConfigManager {
     ]);
 
     /**
-     * Settings that once existed, mapped to what replaced them.
-     *
-     * A removed key is worse than a misspelled one: the config still looks
-     * deliberate, but the boundary it used to draw is gone. `untrackedAccounts`
-     * defaults to empty, so a config still carrying `disposableIncomeAccounts`
-     * would silently start counting the savings half of payroll as envelope
-     * income — thousands of dollars of phantom Net Cash Flow, with nothing
-     * printed to say why.
-     */
-    private static readonly RENAMED_YAML_KEYS: Readonly<Record<string, string>> = {
-        disposableIncomeAccounts: 'untrackedAccounts',
-    };
-
-    /**
-     * Settings that were removed outright, mapped to why.
-     *
-     * Distinct from a rename: there is nowhere to move the value to, so the
-     * warning has to explain that the behaviour never existed rather than point
-     * somewhere else.
-     */
-    private static readonly REMOVED_YAML_KEYS: Readonly<Record<string, string>> = {
-        firefly: "the only key it held, 'noNameExpenseAccountId', was never read by any code path",
-    };
-
-    /**
-     * Warns about YAML keys this loader does not read.
-     *
-     * Deliberately a warning rather than an error: an unknown key is often a
-     * config written for a newer or older build, and refusing to start would be
-     * a harsher failure than the problem warrants. It must never be silent
-     * though — a key that is ignored without comment reads as applied.
+     * Warns about YAML keys this loader does not read, so a typo is never
+     * silently taken as applied.
      */
     private warnOnUnknownYamlKeys(yamlConfig: YamlConfig): void {
         for (const key of Object.keys(yamlConfig)) {
-            if (ConfigManager.KNOWN_YAML_KEYS.has(key)) {
-                continue;
+            if (!ConfigManager.KNOWN_YAML_KEYS.has(key)) {
+                console.warn(`⚠️  config.yaml: unknown setting '${key}' is being ignored.`);
             }
-
-            const replacement = ConfigManager.RENAMED_YAML_KEYS[key];
-            if (replacement) {
-                console.warn(
-                    `⚠️  config.yaml: '${key}' is no longer used — it was replaced by ` +
-                        `'${replacement}'. Its value is being ignored; move it to ` +
-                        `'${replacement}' to restore the behaviour.`
-                );
-                continue;
-            }
-
-            const removedBecause = ConfigManager.REMOVED_YAML_KEYS[key];
-            console.warn(
-                removedBecause
-                    ? `⚠️  config.yaml: '${key}' has been removed — ${removedBecause}. ` +
-                          `It is safe to delete from your config.`
-                    : `⚠️  config.yaml: unknown setting '${key}' is being ignored.`
-            );
         }
     }
 
@@ -412,35 +397,28 @@ export class ConfigManager {
         this.warnOnUnknownYamlKeys(yamlConfig);
 
         // Accounts Configuration
-        if (yamlConfig.incomeDestinationAccounts) {
-            config.accounts.incomeDestinationAccounts = yamlConfig.incomeDestinationAccounts;
-        }
-        if (yamlConfig.expenseSourceAccounts) {
-            config.accounts.expenseSourceAccounts = yamlConfig.expenseSourceAccounts;
-        }
-        if (yamlConfig.expenseTransfers) {
-            config.accounts.expenseTransfers = yamlConfig.expenseTransfers;
-        }
         if (yamlConfig.untrackedAccounts) {
-            config.accounts.untrackedAccounts = yamlConfig.untrackedAccounts;
-        }
-        if (yamlConfig.paycheckDestinationAccounts) {
-            config.accounts.paycheckDestinationAccounts = yamlConfig.paycheckDestinationAccounts;
+            // Firefly ids are strings; an unquoted `- 27` parses as a number and
+            // would silently match nothing, putting savings back in the envelope
+            config.accounts.untrackedAccounts = ([] as unknown[])
+                .concat(yamlConfig.untrackedAccounts)
+                .map(String);
         }
 
         // Transaction Configuration
-        if (yamlConfig.excludedAdditionalIncomePatterns) {
-            config.transactions.excludedAdditionalIncomePatterns =
-                yamlConfig.excludedAdditionalIncomePatterns;
-        }
-        if (yamlConfig.excludeDisposableIncome != null) {
-            config.transactions.excludeDisposableIncome = yamlConfig.excludeDisposableIncome;
-        }
         if (yamlConfig.expectedMonthlyPaycheck != null) {
             config.transactions.expectedMonthlyPaycheck = yamlConfig.expectedMonthlyPaycheck;
         }
         if (yamlConfig.excludedTransactions) {
-            config.transactions.excludedTransactions = yamlConfig.excludedTransactions;
+            // An unquoted `amount: 75.00` parses as a number
+            // Left as-is when not a list, so ConfigValidator reports it by name
+            config.transactions.excludedTransactions = Array.isArray(
+                yamlConfig.excludedTransactions
+            )
+                ? yamlConfig.excludedTransactions.map(rule =>
+                      rule.amount == null ? rule : { ...rule, amount: String(rule.amount) }
+                  )
+                : yamlConfig.excludedTransactions;
         }
 
         // Tags Configuration

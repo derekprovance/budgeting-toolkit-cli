@@ -7,7 +7,7 @@ AI-powered command-line interface for Firefly III Personal Finance Manager with 
 - AI-powered transaction categorization and budgeting
 - Budget analysis with surplus/deficit tracking
 - Interactive transaction splitting
-- Docker development environment with Firefly III, and PostgreSQL
+- Docker development environment with Firefly III and PostgreSQL
 
 ## Quick Start
 
@@ -106,11 +106,15 @@ See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) fo
 | `analyze` | `an` | Budget surplus/deficit analysis | `btk analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
 | `split <id>` | `sp` | Interactive transaction splitting | `btk split 123` | - |
 
+What `analyze` and `report` count as income and spending — the cost-of-living
+envelope, transfers, refunds — is defined in [RULES.md](RULES.md).
+
 ### Common Options
 
 Per-command options:
 - `-m, --month <1-12>` - Target month (default: current) — `report`, `analyze`
 - `-y, --year <year>` - Target year (default: current) — `report`, `analyze`
+- `--json` - Print only a machine-readable JSON document to stdout — `report`, `analyze`. Logs always go to stderr
 - `-h, --help` - Display help
 
 Program-level options — these go **before** the subcommand (`btk --verbose report`):
@@ -188,9 +192,13 @@ LOG_LEVEL=trace npm start -- categorize Import-2025-06-23
 ## Development
 
 ```bash
-# Run tests
+# Unit tests + Docker-free in-process scenario tests
 npm test
 npm run test:coverage
+npm run typecheck:tests
+
+# End-to-end against an ephemeral, auto-bootstrapped Firefly III in Docker
+npm run test:e2e
 
 # Lint and format
 npm run linter
@@ -200,16 +208,17 @@ See [CLAUDE.md](CLAUDE.md) for architecture, patterns, and development guideline
 
 ## Docker
 
-Full Docker development environment with Firefly III, and PostgreSQL included.
+A local Firefly III + PostgreSQL stack (pinned images, bound to 127.0.0.1), plus a separate throwaway stack that `npm run test:e2e` manages on its own.
 
 See [DOCKER.md](DOCKER.md) for complete setup instructions.
 
 Quick start:
 ```bash
-cp .env.example .env.dev
-# Edit .env.dev with your settings
-docker compose up
-# Access Firefly at http://localhost:8080
+cp .env.docker.example .env.docker   # container settings only
+# Fill in POSTGRES_PASSWORD and a 32-char FIREFLY_APP_KEY
+docker compose --env-file .env.docker up -d --wait
+# Open http://localhost:8080, register, create a token, put it in .env.dev
+npm run start:dev -- report -m 1
 ```
 
 ## License

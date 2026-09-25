@@ -98,7 +98,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             }
 
             let budgets: BudgetRead[] | undefined;
-            if (updateMode !== CategorizeMode.Category || !this.force) {
+            if (updateMode !== CategorizeMode.Category) {
                 budgets = await this.budgetService.getBudgets();
             }
 
@@ -215,10 +215,13 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         });
 
         // Group B: has category, no budget — budget assignment only
-        const budgetOnlyTransactions = this.force
+        const budgetOnlyCandidates = this.force
             ? []
             : identifiableTransactions.filter(t => this.validator.isBudgetOnlyCandidate(t));
-        const budgetOnlySet = new Set(budgetOnlyTransactions);
+        const budgetOnlySet = new Set(budgetOnlyCandidates);
+        // Category mode leaves Group B alone: its category is kept without
+        // --force, and assigning a budget is outside the mode
+        const budgetOnlyTransactions = budgetNames ? budgetOnlyCandidates : [];
 
         // Group A: all others — full assignment per updateMode
         const normalTransactions = identifiableTransactions.filter(t => !budgetOnlySet.has(t));
@@ -236,7 +239,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         }
 
         // Process Group B (budget only, category preserved)
-        if (budgetOnlyTransactions.length > 0 && budgetNames) {
+        if (budgetOnlyTransactions.length > 0) {
             const groupBResults = await this.llmService.processTransactions(
                 budgetOnlyTransactions,
                 undefined, // don't reassign category
@@ -245,15 +248,16 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             Object.assign(aiResults, groupBResults);
         }
 
-        if (Object.keys(aiResults).length !== identifiableTransactions.length) {
+        const expectedCount = normalTransactions.length + budgetOnlyTransactions.length;
+        if (Object.keys(aiResults).length !== expectedCount) {
             const error = new Error(
                 `LLM categorization result count (${
                     Object.keys(aiResults).length
-                }) doesn't match transaction count (${identifiableTransactions.length})`
+                }) doesn't match transaction count (${expectedCount})`
             );
             logger.error(
                 {
-                    expectedCount: identifiableTransactions.length,
+                    expectedCount,
                     actualCount: Object.keys(aiResults).length,
                 },
                 'AI result count mismatch'

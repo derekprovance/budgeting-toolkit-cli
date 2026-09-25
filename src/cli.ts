@@ -3,11 +3,10 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
 import { ConfigManager } from './config/config-manager.js';
-import { AnalyzeCommand } from './commands/analyze.command.js';
-import { BudgetReportCommand } from './commands/budget-report.command.js';
 import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
-import { ServiceFactory } from './factories/service.factory.js';
+import { AppServices, ServiceFactory } from './factories/service.factory.js';
+import { createAnalyzeCommand, createBudgetReportCommand } from './factories/command.factory.js';
 import {
     BudgetDateOptions,
     CategorizeOptions,
@@ -64,6 +63,18 @@ const withDateOptions = (command: Command): Command =>
                 .default(getCurrentYear(), 'current year')
         );
 
+/** Options shared by the report commands (`analyze`, `report`) */
+type ReportCommandOptions = BudgetDateOptions & { json?: boolean };
+
+/**
+ * Adds the `--json` flag to a report command
+ */
+const withJsonOption = (command: Command): Command =>
+    command.option(
+        '--json',
+        'print only a machine-readable JSON document to stdout (spinner and text report suppressed)'
+    );
+
 /**
  * Exits with usage guidance when a required positional argument is blank.
  * (Commander already rejects a missing argument; this catches whitespace.)
@@ -71,14 +82,17 @@ const withDateOptions = (command: Command): Command =>
 const requireArg = (value: string, name: string, usage: string, example: string): void => {
     if (!value || value.trim() === '') {
         console.error(`❌ Error: ${name} is required and cannot be empty`);
-        console.log(`\nUsage: ${usage}`);
-        console.log(`Example: ${example}`);
+        console.error(`\nUsage: ${usage}`);
+        console.error(`Example: ${example}`);
         process.exit(1);
     }
 };
 
 const handleError = (error: unknown, operation: string): never => {
     logger.error({ err: error }, `Error ${operation}:`);
+    // The structured log is silenced at LOG_LEVEL=silent; the user still needs
+    // to see why the command failed.
+    console.error(`Error ${operation}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
 };
 
@@ -94,7 +108,7 @@ export const createCli = (configPath?: string): Command => {
 
     // Try to initialize API client and services for other commands
     let apiClient: FireflyClientWithCerts;
-    let services: ReturnType<typeof ServiceFactory.createServices>;
+    let services: AppServices;
 
     try {
         const configManager = ConfigManager.getInstance(configPath);
@@ -113,7 +127,7 @@ export const createCli = (configPath?: string): Command => {
             clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
         });
 
-        services = ServiceFactory.createServices(apiClient);
+        services = ServiceFactory.createServices(apiClient, config);
     } catch (error) {
         const isValidationError =
             error instanceof Error && error.message.includes('Configuration validation failed');
@@ -125,11 +139,11 @@ export const createCli = (configPath?: string): Command => {
 
         if (isValidationError) {
             // Show detailed validation error with file paths
-            console.log('\n[!] Configuration validation failed\n');
+            console.error('\n[!] Configuration validation failed\n');
 
-            console.log('Loaded files:');
-            console.log(`  config.yaml: ${loadedConfigPath ? loadedConfigPath : '(none found)'}`);
-            console.log(`  .env:        ${loadedEnvPath ? loadedEnvPath : '(none found)'}`);
+            console.error('Loaded files:');
+            console.error(`  config.yaml: ${loadedConfigPath ? loadedConfigPath : '(none found)'}`);
+            console.error(`  .env:        ${loadedEnvPath ? loadedEnvPath : '(none found)'}`);
 
             // ConfigManager formats the message as a bulleted list, one entry
             // per validation error. Print all of them — a bare "validation
@@ -142,8 +156,8 @@ export const createCli = (configPath?: string): Command => {
                 .map((line: string) => line.slice(2));
 
             if (problems.length > 0) {
-                console.log('\nProblems found:');
-                problems.forEach((problem: string) => console.log(`  - ${problem}`));
+                console.error('\nProblems found:');
+                problems.forEach((problem: string) => console.error(`  - ${problem}`));
             }
 
             // Missing credentials come from .env rather than config.yaml, so
@@ -154,11 +168,11 @@ export const createCli = (configPath?: string): Command => {
                 .map((match: RegExpMatchArray) => match[1]);
 
             if (missingVars.length > 0) {
-                console.log(
+                console.error(
                     `\nSet the missing environment variables in ${loadedEnvPath || '.env'}:`
                 );
                 missingVars.forEach((varName: string) => {
-                    console.log(`  - ${varName}`);
+                    console.error(`  - ${varName}`);
                 });
             }
 
@@ -168,26 +182,28 @@ export const createCli = (configPath?: string): Command => {
                 (loadedEnvPath && loadedEnvPath.startsWith(process.cwd()));
 
             if (usingCwdFiles) {
-                console.log('\nNote: Files in the current directory take priority over ~/.budget/');
-                console.log('      You can:');
-                console.log('      - Move/delete local config files to use ~/.budget/ instead');
-                console.log('      - Or update values in the current directory files');
-                console.log(
+                console.error(
+                    '\nNote: Files in the current directory take priority over ~/.budget/'
+                );
+                console.error('      You can:');
+                console.error('      - Move/delete local config files to use ~/.budget/ instead');
+                console.error('      - Or update values in the current directory files');
+                console.error(
                     '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
                 );
             } else {
-                console.log(
+                console.error(
                     '\nCopy config.yaml.example and .env.example to ~/.budget/ to get started.'
                 );
             }
 
-            console.log('\nSee example file: .env.example\n');
+            console.error('\nSee example file: .env.example\n');
         } else {
             console.error(
                 'Failed to initialize API client:',
                 error instanceof Error ? error.message : String(error)
             );
-            console.log(
+            console.error(
                 '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
             );
         }
@@ -195,11 +211,13 @@ export const createCli = (configPath?: string): Command => {
         process.exit(1);
     }
 
-    withDateOptions(
-        program
-            .command('analyze')
-            .alias('an')
-            .description('Budget analysis with surplus/deficit variance')
+    withJsonOption(
+        withDateOptions(
+            program
+                .command('analyze')
+                .alias('an')
+                .description('Budget analysis with surplus/deficit variance')
+        )
     )
         .addHelpText(
             'after',
@@ -208,40 +226,34 @@ Examples:
   $ budgeting-toolkit analyze                   # current month
   $ budgeting-toolkit analyze -m 6              # June, current year
   $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
-  $ budgeting-toolkit an -m 3                   # March (using alias)`
+  $ budgeting-toolkit an -m 3                   # March (using alias)
+  $ budgeting-toolkit analyze -m 6 --json       # machine-readable output`
         )
-        .action(async (opts: BudgetDateOptions) => {
+        .action(async (opts: ReportCommandOptions) => {
             try {
                 const configManager = ConfigManager.getInstance(configPath);
                 const config = configManager.getConfig();
                 CommandConfigValidator.validateAnalyzeCommand(config);
 
-                const command = new AnalyzeCommand(
-                    services.additionalIncomeService,
-                    services.unbudgetedExpenseService,
-                    services.paycheckSurplusService,
-                    services.disposableIncomeService,
-                    services.budgetSurplusService,
-                    services.billComparisonService,
-                    services.analyzeDisplayService,
-                    services.transactionService,
-                    services.transactionClassificationService
-                );
+                const command = createAnalyzeCommand(services, config);
                 await command.execute({
                     month: opts.month!,
                     year: opts.year!,
                     verbose: program?.opts().verbose || false,
+                    format: opts.json ? 'json' : 'text',
                 });
             } catch (error) {
                 handleError(error, 'analyzing budget');
             }
         });
 
-    withDateOptions(
-        program
-            .command('report')
-            .alias('st')
-            .description('Display current budget report and spending analysis')
+    withJsonOption(
+        withDateOptions(
+            program
+                .command('report')
+                .alias('st')
+                .description('Display current budget report and spending analysis')
+        )
     )
         .addHelpText(
             'after',
@@ -249,23 +261,17 @@ Examples:
 Examples:
   $ budgeting-toolkit report                      # current month report
   $ budgeting-toolkit report -m 8                 # August report
-  $ budgeting-toolkit st                          # current month (using alias)`
+  $ budgeting-toolkit st                          # current month (using alias)
+  $ budgeting-toolkit report -m 8 --json          # machine-readable output`
         )
-        .action(async (opts: BudgetDateOptions) => {
+        .action(async (opts: ReportCommandOptions) => {
             try {
-                const command = new BudgetReportCommand(
-                    services.budgetAnalyticsService,
-                    services.budgetInsightService,
-                    services.budgetDisplayService,
-                    services.budgetReport,
-                    services.billComparisonService,
-                    services.transactionService,
-                    services.unbudgetedExpenseService
-                );
+                const command = createBudgetReportCommand(services);
                 await command.execute({
                     month: opts.month!,
                     year: opts.year!,
                     verbose: program?.opts().verbose || false,
+                    format: opts.json ? 'json' : 'text',
                 });
             } catch (error) {
                 handleError(error, 'getting budget report');

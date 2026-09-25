@@ -1,5 +1,8 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
+/** Fixed date for builder-made transactions, inside the 2025-01 test month. */
+export const TEST_DATE = '2025-01-15';
+
 export const createMockTransaction = (
     overrides: Partial<TransactionSplit> = {}
 ): TransactionSplit => ({
@@ -23,7 +26,6 @@ export const createMockTransaction = (
     bill_id: null,
     internal_reference: null,
     external_url: null,
-    bunq_payment_id: null,
     sepa_ct_id: null,
     sepa_ct_op: null,
     sepa_db: null,
@@ -75,3 +77,51 @@ export const mockBudgets = {
     shopping: 'Shopping',
     other: 'Other',
 };
+
+/**
+ * Typed transaction builders.
+ *
+ * They encode Firefly's actual wire format (verified against 6.6.6): `amount`
+ * is always UNSIGNED, and direction lives only in `type`. Pass the amount as a
+ * non-negative number or string; a signed value is a test bug and throws, so a
+ * fixture can never smuggle direction through the sign.
+ *
+ * Every builder uses the fixed date TEST_DATE unless overridden.
+ */
+type BuilderOverrides = Partial<Omit<TransactionSplit, 'type' | 'amount'>>;
+
+const unsignedAmount = (amount: number | string): string => {
+    // Garbage strings pass through untouched, so tests can still feed the
+    // parser malformed input; only a sign is refused.
+    const value = typeof amount === 'number' ? amount : parseFloat(amount);
+    if (value < 0 || (typeof amount === 'string' && amount.trim().startsWith('-'))) {
+        throw new Error(
+            `Test builder amount must be unsigned (Firefly direction lives in "type"); got ${amount}`
+        );
+    }
+    return typeof amount === 'number' ? amount.toFixed(2) : amount;
+};
+
+const build = (
+    type: 'withdrawal' | 'deposit' | 'transfer',
+    amount: number | string,
+    overrides: BuilderOverrides
+): TransactionSplit =>
+    createMockTransaction({
+        date: TEST_DATE,
+        ...overrides,
+        type,
+        amount: unsignedAmount(amount),
+    });
+
+/** Money leaving a tracked asset account for an expense account. */
+export const withdrawal = (amount: number | string, overrides: BuilderOverrides = {}) =>
+    build('withdrawal', amount, overrides);
+
+/** Money arriving in an asset account from a revenue account. */
+export const deposit = (amount: number | string, overrides: BuilderOverrides = {}) =>
+    build('deposit', amount, overrides);
+
+/** Money moving between two asset accounts. */
+export const transfer = (amount: number | string, overrides: BuilderOverrides = {}) =>
+    build('transfer', amount, overrides);

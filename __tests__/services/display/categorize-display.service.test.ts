@@ -1,49 +1,5 @@
-// Mock chalk with chained methods
-const createChalkMock = () => {
-    interface ChalkChain {
-        (text: string): string;
-        bold: ChalkChain;
-        cyan: ChalkChain;
-        yellow: ChalkChain;
-        blue: ChalkChain;
-        blueBright: ChalkChain;
-        gray: ChalkChain;
-        green: ChalkChain;
-        red: ChalkChain;
-        redBright: ChalkChain;
-        white: ChalkChain;
-    }
-
-    const chainedFn = ((text: string) => text) as unknown as ChalkChain;
-    const methods = [
-        'bold',
-        'cyan',
-        'yellow',
-        'blue',
-        'blueBright',
-        'gray',
-        'green',
-        'red',
-        'redBright',
-        'white',
-    ] as const;
-
-    methods.forEach(method => {
-        chainedFn[method] = ((text?: string) => {
-            if (text === undefined) {
-                return chainedFn;
-            }
-            return text;
-        }) as unknown as ChalkChain;
-    });
-
-    return chainedFn;
-};
-
-jest.mock('chalk', () => createChalkMock());
-
+// chalk is not mocked: FORCE_COLOR=0 (__tests__/setup/env.ts) keeps output plain.
 import { CategorizeDisplayService } from '../../../src/services/display/categorize-display.service.js';
-import { jest } from '@jest/globals';
 import { CategorizeMode } from '../../../src/types/enums.js';
 
 describe('CategorizeDisplayService', () => {

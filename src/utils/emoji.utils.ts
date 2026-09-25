@@ -15,7 +15,8 @@ export class EmojiUtils {
         if (isOverBudget) {
             return '🔴';
         }
-        if (percentage > BUSINESS_CONSTANTS.BUDGET.ON_TRACK_THRESHOLD) {
+        // Same boundary as BudgetAnalyticsService.determineStatus
+        if (percentage >= BUSINESS_CONSTANTS.BUDGET.ON_TRACK_THRESHOLD) {
             return '🟡';
         }
         return '🟢';
@@ -63,95 +64,42 @@ export class EmojiUtils {
      * @returns Emoji representing the category, or default 📊
      */
     static getCategoryEmoji(categoryName: string | undefined): string {
-        if (!categoryName) {
-            return '📊';
-        }
-
-        const normalizedName = categoryName.toLowerCase().trim();
-
-        // Investment/Retirement categories
-        if (
-            normalizedName.includes('investment') ||
-            normalizedName.includes('retirement') ||
-            normalizedName.includes('vanguard') ||
-            normalizedName.includes('401') ||
-            normalizedName.includes('ira') ||
-            normalizedName.includes('savings')
-        ) {
-            return '💰';
-        }
-
-        // Housing/Rent/Mortgage categories
-        if (
-            normalizedName.includes('rent') ||
-            normalizedName.includes('mortgage') ||
-            normalizedName.includes('housing') ||
-            normalizedName.includes('home') ||
-            normalizedName.includes('property')
-        ) {
-            return '🏠';
-        }
-
-        // Phone/Mobile/Internet/Telecom categories
-        if (
-            normalizedName.includes('phone') ||
-            normalizedName.includes('mobile') ||
-            normalizedName.includes('internet') ||
-            normalizedName.includes('telecom') ||
-            normalizedName.includes('wifi')
-        ) {
-            return '📱';
-        }
-
-        // Groceries/Food/Dining categories
-        if (
-            normalizedName.includes('groceries') ||
-            normalizedName.includes('food') ||
-            normalizedName.includes('dining') ||
-            normalizedName.includes('restaurant') ||
-            normalizedName.includes('grocery') ||
-            normalizedName.includes('supermarket')
-        ) {
-            return '🍔';
-        }
-
-        // Transport/Car/Vehicle/Gas categories
-        if (
-            normalizedName.includes('transport') ||
-            normalizedName.includes('car') ||
-            normalizedName.includes('vehicle') ||
-            normalizedName.includes('gas') ||
-            normalizedName.includes('fuel') ||
-            normalizedName.includes('parking') ||
-            normalizedName.includes('insurance') ||
-            normalizedName.includes('auto')
-        ) {
-            return '🚗';
-        }
-
-        // Entertainment/Movies/Gaming categories
-        if (
-            normalizedName.includes('entertainment') ||
-            normalizedName.includes('movies') ||
-            normalizedName.includes('gaming') ||
-            normalizedName.includes('going out')
-        ) {
-            return '🎮';
-        }
-
-        // Health/Medical/Fitness categories
-        if (
-            normalizedName.includes('health') ||
-            normalizedName.includes('medical') ||
-            normalizedName.includes('fitness') ||
-            normalizedName.includes('gym') ||
-            normalizedName.includes('doctor') ||
-            normalizedName.includes('pharmacy')
-        ) {
-            return '🏥';
-        }
-
-        // Default category indicator
-        return '📊';
+        // Whole words only: a substring test sent "Healthcare" to 🚗 via "car"
+        // and "Parent" to 🏠 via "rent"
+        const words = ` ${(categoryName ?? '')
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .join(' ')} `;
+        const match = CATEGORY_EMOJIS.find(([, keywords]) =>
+            keywords.some(keyword => words.includes(` ${keyword} `))
+        );
+        return match ? match[0] : '📊';
     }
 }
+
+/** First match wins; multi-word keywords match as a phrase */
+const CATEGORY_EMOJIS: [string, string[]][] = [
+    [
+        '💰',
+        ['investment', 'investments', 'retirement', 'vanguard', '401k', '401', 'ira', 'savings'],
+    ],
+    ['🏠', ['rent', 'mortgage', 'housing', 'home', 'property']],
+    ['📱', ['phone', 'mobile', 'internet', 'telecom', 'wifi']],
+    ['🍔', ['groceries', 'grocery', 'food', 'dining', 'restaurant', 'restaurants', 'supermarket']],
+    [
+        '🚗',
+        [
+            'transport',
+            'transportation',
+            'car',
+            'vehicle',
+            'gas',
+            'fuel',
+            'parking',
+            'insurance',
+            'auto',
+        ],
+    ],
+    ['🎮', ['entertainment', 'movies', 'gaming', 'going out']],
+    ['🏥', ['health', 'healthcare', 'medical', 'fitness', 'gym', 'doctor', 'pharmacy']],
+];

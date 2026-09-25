@@ -161,7 +161,7 @@ describe('isCertificateError', () => {
         });
 
         it('stops traversing after MAX_DEPTH (5 levels)', () => {
-            let current = Object.assign(new Error('certificate error'), {
+            let current: Error = Object.assign(new Error('certificate error'), {
                 code: 'CERT_HAS_EXPIRED',
             });
             const levels: Error[] = [current];

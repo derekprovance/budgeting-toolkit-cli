@@ -1,4 +1,3 @@
-import '../../__tests__/setup/mock-logger';
 import {
     ClaudeClient,
     ChatMessage,
@@ -39,14 +38,14 @@ const textResponse = (text: string): Anthropic.Message =>
 describe('ClaudeClient', () => {
     let client: ClaudeClient;
     let mockAnthropicClient: jest.Mocked<Anthropic>;
-    let mockMessagesCreate: jest.Mock<() => Promise<Anthropic.Message>>;
+    let mockMessagesCreate: jest.Mock<(params: unknown) => Promise<Anthropic.Message>>;
 
     const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
 
     beforeEach(() => {
         jest.clearAllMocks();
 
-        mockMessagesCreate = jest.fn<() => Promise<Anthropic.Message>>();
+        mockMessagesCreate = jest.fn<(params: unknown) => Promise<Anthropic.Message>>();
         mockAnthropicClient = {
             messages: {
                 create: mockMessagesCreate,

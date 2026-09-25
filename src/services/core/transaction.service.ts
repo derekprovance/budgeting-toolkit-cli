@@ -28,8 +28,6 @@ export class TransactionService implements ITransactionService {
     private readonly cache: TransactionCache;
     private readonly splitTransactionIdx: TransactionSplitIndex;
     private readonly logger: ILogger;
-    /** Splits removed by the exclusion list, per cache key */
-    private readonly excludedByKey: Map<string, TransactionSplit[]>;
 
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
@@ -41,7 +39,6 @@ export class TransactionService implements ITransactionService {
         this.cache = cacheImplementation;
         this.splitTransactionIdx = new Map();
         this.logger = logger;
-        this.excludedByKey = new Map();
     }
 
     /**
@@ -58,20 +55,6 @@ export class TransactionService implements ITransactionService {
         } catch (error) {
             throw this.handleError('fetch transactions for month', month, error);
         }
-    }
-
-    /**
-     * Retrieves the transactions for a month that the exclusion list removed.
-     * Shares the same fetch as getTransactionsForMonth.
-     */
-    async getExcludedTransactionsForMonth(
-        month: number,
-        year: number
-    ): Promise<TransactionSplit[]> {
-        const cacheKey = `month-${month}-year-${year}`;
-        // Awaiting the normal fetch guarantees the excluded set is populated
-        await this.getTransactionsForMonth(month, year);
-        return this.excludedByKey.get(cacheKey) ?? [];
     }
 
     /**
@@ -127,7 +110,7 @@ export class TransactionService implements ITransactionService {
         transaction: TransactionSplit,
         category?: string,
         budgetId?: string
-    ): Promise<TransactionRead | undefined> {
+    ): Promise<TransactionRead> {
         if (!transaction?.transaction_journal_id) {
             throw new TransactionError(
                 `Invalid transaction: missing transaction_journal_id for ${transaction.description}`
@@ -150,57 +133,46 @@ export class TransactionService implements ITransactionService {
             `Updating transaction: ${transaction.description}`
         );
 
-        try {
-            const transactionRead = this.getTransactionReadBySplit(transaction);
-            if (!transactionRead?.id) {
-                this.logger.error(
-                    {
-                        transactionId: transaction.transaction_journal_id,
-                        description: transaction.description,
-                    },
-                    'Unable to find Transaction ID for Split'
-                );
-                return undefined;
-            }
-
-            const updatePayload: TransactionUpdate = {
-                apply_rules: true,
-                fire_webhooks: true,
-                transactions: [
-                    {
-                        transaction_journal_id: transaction.transaction_journal_id,
-                        ...(category && { category_name: category }),
-                        ...(budgetId && { budget_id: budgetId }),
-                    },
-                ],
-            };
-
-            const updatedTransaction = await this.client.transactions.updateTransaction(
-                transactionRead.id,
-                updatePayload
+        const transactionRead = this.getTransactionReadBySplit(transaction);
+        if (!transactionRead?.id) {
+            throw new TransactionError(
+                `Unable to find transaction ID for split ${transaction.transaction_journal_id} (${transaction.description})`
             );
-            this.logger.debug(
-                {
-                    transactionId: transaction.transaction_journal_id,
-                    updatedFields: Object.keys(updatePayload.transactions?.[0] ?? {}),
-                },
-                `Transaction updated successfully`
-            );
-
-            return updatedTransaction.data;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
-            this.logger.error(
-                {
-                    error: errorMessage,
-                    transactionId: transaction.transaction_journal_id,
-                    description: transaction.description,
-                },
-                'Transaction update failed'
-            );
-            return undefined;
         }
+
+        const journalId = transaction.transaction_journal_id;
+        const change = {
+            ...(category && { category_name: category }),
+            ...(budgetId && { budget_id: budgetId }),
+        };
+        // Firefly deletes every split of the group that the PUT does not list,
+        // so the payload names all of them, in the order Firefly returned
+        // them. Only the target split carries the change. A multi-split PUT is
+        // rejected without the group title, so it is sent back unchanged.
+        const groupTitle = transactionRead.attributes.group_title;
+        const updatePayload: TransactionUpdate = {
+            apply_rules: true,
+            fire_webhooks: true,
+            ...(groupTitle && { group_title: groupTitle }),
+            transactions: transactionRead.attributes.transactions.map(split =>
+                split.transaction_journal_id === journalId
+                    ? { transaction_journal_id: journalId, ...change }
+                    : { transaction_journal_id: split.transaction_journal_id }
+            ),
+        };
+
+        // A failed write propagates, so the caller reports it as a failure
+        // rather than counting it as a skipped transaction.
+        const updatedTransaction = await this.client.transactions.updateTransaction(
+            transactionRead.id,
+            updatePayload
+        );
+        this.logger.debug(
+            { transactionId: journalId, updatedFields: Object.keys(change) },
+            `Transaction updated successfully`
+        );
+
+        return updatedTransaction.data;
     }
 
     getTransactionReadBySplit(splitTransaction: TransactionSplit): TransactionRead | undefined {
@@ -223,36 +195,21 @@ export class TransactionService implements ITransactionService {
             return inflight;
         }
 
+        // RULES.md, R-EXCL-1: the one place exclusions are applied. Everything
+        // downstream reads from here, so an excluded transaction is gone from
+        // every bucket in every command.
         const promise = (async () => {
             const data = await fetchFn();
-
-            const transactions: TransactionSplit[] = [];
-            const excluded: TransactionSplit[] = [];
-
-            for (const trx of TransactionCalculationUtils.flattenTransactions(data)) {
-                if (
-                    this.excludedTransactionService.isExcludedTransaction(
-                        trx.description,
-                        trx.amount
-                    )
-                ) {
-                    excluded.push(trx);
-                } else {
-                    transactions.push(trx);
-                }
-            }
-
-            this.excludedByKey.set(key, excluded);
             this.storeTransactionSplitInIndex(data);
-
-            return transactions;
+            return TransactionCalculationUtils.flattenTransactions(data).filter(
+                trx => !this.isExcluded(trx)
+            );
         })();
 
         this.cache.set(key, promise);
         // Don't cache failures — let the next caller retry
         promise.catch(() => {
             this.cache.delete(key);
-            this.excludedByKey.delete(key);
         });
 
         return promise;
@@ -262,11 +219,7 @@ export class TransactionService implements ITransactionService {
         transactions.forEach(tx => {
             const splitTransactions = tx.attributes.transactions;
             splitTransactions.forEach(txSp => {
-                const isExcluded = this.excludedTransactionService.isExcludedTransaction(
-                    txSp.description,
-                    txSp.amount
-                );
-                if (!isExcluded) {
+                if (!this.isExcluded(txSp)) {
                     const indexKey = this.generateSplitTransactionKey(txSp);
 
                     if (this.splitTransactionIdx.has(indexKey)) {
@@ -283,6 +236,13 @@ export class TransactionService implements ITransactionService {
                 }
             });
         });
+    }
+
+    private isExcluded(transaction: TransactionSplit): boolean {
+        return this.excludedTransactionService.isExcludedTransaction(
+            transaction.description,
+            transaction.amount
+        );
     }
 
     private async fetchTransactionsByTag(tag: string): Promise<TransactionRead[]> {

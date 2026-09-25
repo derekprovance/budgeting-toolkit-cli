@@ -21,8 +21,8 @@ const mockLogger = (): ILogger =>
     }) as unknown as ILogger;
 
 describe('AccountScopeService', () => {
-    // Mirrors the real shape: checking, savings, three cards, a brokerage, and
-    // a closed account.
+    // Mirrors the real shape: checking, savings, three cards, a brokerage, the
+    // disposable pool, and a closed account.
     const ACCOUNTS = [
         account('1', 'defaultAsset'),
         account('2', 'savingAsset'),
@@ -48,60 +48,54 @@ describe('AccountScopeService', () => {
         client = { accounts: { listAccount } } as unknown as FireflyClientWithCerts;
     });
 
-    const build = (overrides: Partial<Parameters<typeof AccountScopeService>[1]> = {}) =>
-        new AccountScopeService(
-            client,
-            {
-                incomeDestinationAccounts: [],
-                expenseSourceAccounts: [],
-                untrackedAccounts: [],
-                ...overrides,
-            },
-            mockLogger()
-        );
+    // The real config: savings, the brokerage and the pool are outside
+    const UNTRACKED = ['2', '27', '39'];
+
+    const build = (untracked: string[] = UNTRACKED) =>
+        new AccountScopeService(client, untracked, mockLogger());
+
+    const scopeOf = async (untracked?: string[]) => {
+        const scope = await build(untracked).getScope();
+        return { envelope: [...scope.envelope], income: [...scope.income] };
+    };
 
     describe('derivation', () => {
-        it('should exclude credit cards from income destinations', async () => {
-            // Deposits to a card are refunds and statement credits, never income.
-            const scope = build();
-
-            expect(await scope.getIncomeDestinations()).toEqual(['1', '2', '27', '39']);
+        it('[R-SCOPE-1] should put checking and the cards in the envelope', async () => {
+            expect((await scopeOf()).envelope).toEqual(['1', '8', '11', '14', '13']);
         });
 
-        it('should treat every asset account as an expense source', async () => {
-            const scope = build();
-
-            expect(await scope.getExpenseSources()).toEqual([
-                '1',
-                '2',
-                '8',
-                '11',
-                '14',
-                '27',
-                '39',
-            ]);
+        it('[R-INCOME-1] should derive income accounts as the envelope minus the cards', async () => {
+            // Deposits to a card are refunds and statement credits, never income
+            expect((await scopeOf()).income).toEqual(['1', '13']);
         });
 
-        it('should exclude untracked accounts from both sides', async () => {
-            // The judgement Firefly cannot make: a brokerage carries the same
-            // savingAsset role as an ordinary savings account, but its outflows
-            // are fund transfers rather than purchases.
-            const scope = build({ untrackedAccounts: ['27'] });
+        it('[R-SCOPE-1] should leave untracked accounts out of both sets', async () => {
+            const { envelope, income } = await scopeOf();
 
-            expect(await scope.getIncomeDestinations()).not.toContain('27');
-            expect(await scope.getExpenseSources()).not.toContain('27');
+            for (const id of UNTRACKED) {
+                expect(envelope).not.toContain(id);
+                expect(income).not.toContain(id);
+            }
         });
 
-        it('should exclude inactive accounts', async () => {
-            // A closed account keeps its history but must not widen the scope.
-            const scope = build();
+        it('[R-SCOPE-1] should keep a closed account in, so closing it rewrites no history', async () => {
+            const { envelope } = await scopeOf();
 
-            expect(await scope.getExpenseSources()).not.toContain('13');
-            expect(await scope.getIncomeDestinations()).not.toContain('13');
+            expect(envelope).toContain('13');
+        });
+
+        it('should warn about an untracked id that matches no account', async () => {
+            const logger = mockLogger();
+            await new AccountScopeService(client, ['2', '999'], logger).getScope();
+
+            expect(logger.warn).toHaveBeenCalledWith(
+                { unknown: ['999'] },
+                expect.stringContaining('match no asset account')
+            );
         });
 
         it('should request only asset accounts', async () => {
-            await build().getExpenseSources();
+            await build().getScope();
 
             expect(listAccount).toHaveBeenCalledWith(
                 undefined,
@@ -115,44 +109,13 @@ describe('AccountScopeService', () => {
         });
     });
 
-    describe('overrides', () => {
-        it('should let an explicit income list replace derivation', async () => {
-            const scope = build({ incomeDestinationAccounts: ['99'] });
-
-            expect(await scope.getIncomeDestinations()).toEqual(['99']);
-            // the other side still derives
-            expect(await scope.getExpenseSources()).toContain('14');
-        });
-
-        it('should let an explicit expense list replace derivation', async () => {
-            const scope = build({ expenseSourceAccounts: ['99'] });
-
-            expect(await scope.getExpenseSources()).toEqual(['99']);
-        });
-
-        it('should skip the API call entirely when both sides are overridden', async () => {
-            const scope = build({
-                incomeDestinationAccounts: ['1'],
-                expenseSourceAccounts: ['14'],
-            });
-
-            expect(await scope.getIncomeDestinations()).toEqual(['1']);
-            expect(await scope.getExpenseSources()).toEqual(['14']);
-            expect(listAccount).not.toHaveBeenCalled();
-        });
-    });
-
     describe('caching', () => {
         it('should fetch once even for concurrent callers', async () => {
-            // The analyze command runs its services in parallel; they must
-            // share one fetch rather than stampede.
+            // Every command sorts several months' buckets in parallel; they
+            // must share one fetch rather than stampede
             const scope = build();
 
-            await Promise.all([
-                scope.getIncomeDestinations(),
-                scope.getExpenseSources(),
-                scope.getIncomeDestinations(),
-            ]);
+            await Promise.all([scope.getScope(), scope.getScope(), scope.getScope()]);
 
             expect(listAccount).toHaveBeenCalledTimes(1);
         });
@@ -165,42 +128,32 @@ describe('AccountScopeService', () => {
 
             const scope = build();
 
-            await expect(scope.getExpenseSources()).rejects.toThrow();
-            await expect(scope.getExpenseSources()).resolves.toContain('1');
+            await expect(scope.getScope()).rejects.toThrow();
+            await expect(scope.getScope()).resolves.toBeDefined();
         });
     });
 
     describe('empty derivation', () => {
-        it('should fail loudly rather than report zero spending', async () => {
-            // Silently deriving nothing would make analyze report no expenses
-            // at all, which is far worse than an error.
+        it('should fail loudly when there are no accounts at all', async () => {
+            // Silently deriving nothing would report no income or spending at
+            // all, which is far worse than an error
             listAccount.mockResolvedValue({
                 data: [],
                 meta: { pagination: { total_pages: 1 } },
             } as never);
 
-            await expect(build().getExpenseSources()).rejects.toThrow(
-                /No expense source or income destination accounts/
-            );
+            await expect(build().getScope()).rejects.toThrow(/No income account/);
         });
 
-        it('should fail when only the income side derives to nothing', async () => {
-            // Every asset account a credit card: they can source spending but
-            // never receive income, so additional income would silently report
-            // $0 forever. The constructor validation this derivation replaced
-            // used to catch exactly this.
+        it('should fail when every envelope account is a credit card', async () => {
+            // Cards can hold spending but never receive income, so the paycheck
+            // and additional income would silently report $0 forever
             listAccount.mockResolvedValue({
                 data: [account('8', 'ccAsset'), account('11', 'ccAsset')],
                 meta: { pagination: { total_pages: 1 } },
             } as never);
 
-            await expect(build().getExpenseSources()).rejects.toThrow(
-                /No income destination accounts/
-            );
-        });
-
-        it('should not fire when both sides derive to something', async () => {
-            await expect(build().getExpenseSources()).resolves.toContain('1');
+            await expect(build().getScope()).rejects.toThrow(/No income account/);
         });
     });
 });

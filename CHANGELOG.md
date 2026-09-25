@@ -2,6 +2,69 @@
 
 All notable changes to this project are documented here.
 
+## 10.0.0
+
+Rebuilds classification around **`RULES.md`**, a single source of truth for
+what the tool counts, settled with the owner concept by concept. Every
+transaction is now classified once, and every figure in `analyze` and `report`
+is a total over the same buckets, so the two commands cannot disagree.
+
+### Breaking
+
+- **The account decides scope first.** A budget, bill link or tag no longer
+  pulls a transaction from an outside account into the net (R-SCOPE-2).
+  **Migration:** list every account outside the envelope in
+  `untrackedAccounts` — savings, any brokerage, and the disposable pool.
+  Unquoted numeric ids are read as strings.
+- **Closed accounts stay in the envelope** (R-SCOPE-1), so closing a card no
+  longer rewrites the months it was used.
+- **Bills are expected from their own schedule** (R-BILL-1). Firefly's
+  `pay_dates` drops occurrences already paid, so a weekly bill half paid was
+  expected at half its amount, and a late payment for last month hid this
+  month's bill. `pay_dates` now drives only the not-yet-due amount.
+- **Transfers out of the envelope are unbudgeted spending** (R-XFER-3), for
+  example checking → savings. Transfers inside the envelope (card payments) and
+  into it (top-ups) are still ignored.
+- **Income lands only in a non-card envelope account (checking)** (R-INCOME-1).
+  Pool and savings interest are never income. Unmarked card credits now reduce
+  unbudgeted spending (R-REFUND-1).
+- **Budget spent is computed locally** from the budget bucket (R-BUDGET-1). The
+  Firefly insight rollup and its correction (`Budget Rollup Adj`, the
+  overlap warning) are gone; a bill or disposable purchase that also carries a
+  budget is simply charged once, to the bill or the pool.
+- **Untracked Spending removed** from `report`. Top expenses now list envelope
+  spending only.
+- **Six config keys removed:** `incomeDestinationAccounts`,
+  `expenseSourceAccounts`, `paycheckDestinationAccounts`, `expenseTransfers`,
+  `excludedAdditionalIncomePatterns`, `excludeDisposableIncome`.
+  `untrackedAccounts` is now the only account setting. Old keys get no special
+  handling; they are reported as unknown settings. The rename warnings for
+  `disposableIncomeAccounts` and `firefly` from 9.0.0 are gone too.
+- **`--json` is `schemaVersion: 2`**: `budgetRollup` (analyze) and
+  `untrackedSpending` (report) are removed.
+
+### Fixed
+
+- `categorize` no longer deletes the other splits of a multi-split
+  transaction; `--mode category` no longer writes budgets; an auth or
+  bad-request error from the AI aborts the run, and a failed Firefly write is
+  reported as failed instead of vanishing.
+- `split` divides a foreign amount in proportion instead of leaving all of it
+  on the first part.
+- `report`: a budget with no limit reads "no limit" instead of counting its
+  spending as money left; refunds keep their minus sign; an inactive budget
+  with spending or a limit gets a row, and allocations sum every limit, so
+  `report` and `analyze` totals agree.
+- Float noise no longer renders as `-$0.00 ⚠`; category emoji match whole
+  words ("Healthcare" is no longer a car).
+
+### Added
+
+- `RULES.md`, and a meta test that fails if any rule is not named by a test or a
+  test names a rule that no longer exists.
+- V20 in `test-harness/VERIFICATION.md`: Firefly 6.6.6 drops a bill link on a
+  transfer, as it drops a budget.
+
 ## 9.0.0
 
 Redefines what counts as income and spending around an **account boundary**

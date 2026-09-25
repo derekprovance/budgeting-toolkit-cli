@@ -22,11 +22,6 @@ export class CommandConfigValidator {
             );
         }
 
-        // incomeDestinationAccounts and expenseSourceAccounts are no longer
-        // required: left empty they are derived from Firefly's account roles.
-        // They are validated at the point of derivation instead, where an empty
-        // result actually means something is wrong.
-
         if (errors.length > 0) {
             console.error(chalk.red.bold('\n❌ Configuration Error: analyze command\n'));
             errors.forEach(error => console.error(chalk.red(error) + '\n'));

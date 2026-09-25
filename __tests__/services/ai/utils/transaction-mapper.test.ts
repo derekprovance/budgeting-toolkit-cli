@@ -147,17 +147,20 @@ describe('transaction-mapper', () => {
             expect(result.amount).toBe('9999999.99');
         });
 
-        it('should handle negative amount (refund)', () => {
+        it('should pass a refund through as an unsigned deposit', () => {
+            // Firefly never signs amounts: a refund is a deposit, and the
+            // direction reaches the model through `type`.
             const transaction = createMockTransaction({
                 description: 'Refund',
-                amount: '-50.00',
+                amount: '50.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
+                type: 'deposit',
             });
 
             const result = mapTransactionForLLM(transaction);
 
-            expect(result.amount).toBe('-50.00');
+            expect(result.amount).toBe('50.00');
+            expect(result.type).toBe('deposit');
         });
 
         it('should handle special characters in description', () => {

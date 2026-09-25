@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import { AppConfig, ExcludedTransaction } from '../../src/config/config.types.js';
 
 // Mock fs module BEFORE importing ConfigValidator
-const mockExistsSync = jest.fn<() => boolean>();
+const mockExistsSync = jest.fn<(path: unknown) => boolean>();
 const mockAccessSync = jest.fn<() => void>();
 const mockReadFileSync = jest.fn<() => string>();
 jest.unstable_mockModule('fs', () => ({
@@ -25,8 +25,12 @@ jest.unstable_mockModule('fs', () => ({
 // Import ConfigValidator after mock is set up
 const { ConfigValidator } = await import('../../src/config/config.validator.js');
 
+/** The validator reports its individual messages under `details.errors`. */
+const validationErrors = (error: { details?: Record<string, unknown> }): string[] =>
+    (error.details?.errors as string[] | undefined) ?? [];
+
 describe('ConfigValidator', () => {
-    let validator: ConfigValidator;
+    let validator: InstanceType<typeof ConfigValidator>;
     let validConfig: AppConfig;
 
     beforeEach(() => {
@@ -50,16 +54,10 @@ describe('ConfigValidator', () => {
                 },
             },
             accounts: {
-                incomeDestinationAccounts: ['1'],
-                expenseSourceAccounts: ['3'],
-                expenseTransfers: [],
                 untrackedAccounts: [],
-                paycheckDestinationAccounts: [],
             },
             transactions: {
                 expectedMonthlyPaycheck: 5000,
-                excludedAdditionalIncomePatterns: [],
-                excludeDisposableIncome: false,
                 excludedTransactions: [],
                 tags: {
                     disposableIncome: 'Disposable Income',
@@ -100,7 +98,7 @@ describe('ConfigValidator', () => {
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toContain('FIREFLY_API_URL is required');
+                expect(validationErrors(result.error)).toContain('FIREFLY_API_URL is required');
             }
         });
 
@@ -111,7 +109,7 @@ describe('ConfigValidator', () => {
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toContain(
+                expect(validationErrors(result.error)).toContain(
                     'FIREFLY_API_URL must be a valid URL'
                 );
             }
@@ -124,7 +122,7 @@ describe('ConfigValidator', () => {
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toContain('FIREFLY_API_TOKEN is required');
+                expect(validationErrors(result.error)).toContain('FIREFLY_API_TOKEN is required');
             }
         });
 
@@ -178,7 +176,7 @@ describe('ConfigValidator', () => {
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toContain(
+                expect(validationErrors(result.error)).toContain(
                     'logging.level must be one of: trace, debug, info, warn, error, silent'
                 );
             }
@@ -239,7 +237,7 @@ qZXQ
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors[0]).toContain(
+                expect(validationErrors(result.error)[0]).toContain(
                     'Client certificate not found: /path/to/missing/cert.pem'
                 );
             }
@@ -251,7 +249,7 @@ qZXQ
                 caCertPath: '/path/to/missing/ca.pem',
             };
 
-            mockExistsSync.mockImplementation((path: any) => {
+            mockExistsSync.mockImplementation((path: unknown) => {
                 return path === '/path/to/cert.pem';
             });
             mockAccessSync.mockReturnValue(undefined);
@@ -281,7 +279,7 @@ qZXQ
             expect(result.ok).toBe(false);
             if (!result.ok) {
                 // The error message now includes a multi-line string with suggestions
-                const errorMessage = result.error.details.errors.find(e =>
+                const errorMessage = validationErrors(result.error).find(e =>
                     e.includes('CA certificate not found: /path/to/missing/ca.pem')
                 );
                 expect(errorMessage).toBeDefined();
@@ -469,10 +467,10 @@ qZXQ
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.details.errors).toHaveLength(3);
-                expect(result.error.details.errors).toContain('FIREFLY_API_URL is required');
-                expect(result.error.details.errors).toContain('FIREFLY_API_TOKEN is required');
-                expect(result.error.details.errors).toContain(
+                expect(validationErrors(result.error)).toHaveLength(3);
+                expect(validationErrors(result.error)).toContain('FIREFLY_API_URL is required');
+                expect(validationErrors(result.error)).toContain('FIREFLY_API_TOKEN is required');
+                expect(validationErrors(result.error)).toContain(
                     'logging.level must be one of: trace, debug, info, warn, error, silent'
                 );
             }

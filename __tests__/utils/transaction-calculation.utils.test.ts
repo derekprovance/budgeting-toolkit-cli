@@ -45,28 +45,12 @@ describe('TransactionCalculationUtils', () => {
         });
     });
 
-    describe('calculateTransactionTotal', () => {
-        it('should sum signed amounts by default', () => {
-            const total = TransactionCalculationUtils.calculateTransactionTotal([
-                txn('100.50'),
-                txn('-40.25'),
-            ]);
-            expect(total).toBeCloseTo(60.25);
-        });
-
-        it('should sum absolute values when requested', () => {
-            const total = TransactionCalculationUtils.calculateTransactionTotal(
-                [txn('100.50'), txn('-40.25')],
-                true
-            );
-            expect(total).toBeCloseTo(140.75);
-        });
-
+    describe('calculateNetSpend with bad data', () => {
         it('should skip unparseable amounts and warn instead of poisoning the total', () => {
             const logger = { warn: jest.fn() } as unknown as ILogger;
-            const total = TransactionCalculationUtils.calculateTransactionTotal(
-                [txn('100'), txn('not-a-number'), txn('50')],
-                true,
+            const spend = (amount: string) => ({ ...txn(amount), type: 'withdrawal' as const });
+            const total = TransactionCalculationUtils.calculateNetSpend(
+                [spend('100'), spend('not-a-number'), spend('50')],
                 logger
             );
             expect(total).toBe(150);

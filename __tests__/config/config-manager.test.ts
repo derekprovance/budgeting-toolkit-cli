@@ -1,10 +1,11 @@
 import { jest } from '@jest/globals';
+import * as os from 'os';
 
 // Create mock functions
-const mockExistsSync = jest.fn<() => boolean>();
-const mockReadFileSync = jest.fn<() => string>();
+const mockExistsSync = jest.fn<(filePath: string) => boolean>();
+const mockReadFileSync = jest.fn<(filePath: string) => string>();
 const mockAccessSync = jest.fn<() => void>();
-const mockYamlLoad = jest.fn<() => any>();
+const mockYamlLoad = jest.fn<(content: string) => any>();
 const mockConfigSync = jest.fn<() => void>();
 
 // Mock fs module
@@ -63,7 +64,7 @@ describe('ConfigManager', () => {
         ConfigManager.resetInstance();
 
         // Mock process.cwd
-        process.cwd = jest.fn().mockReturnValue('/test/path');
+        process.cwd = jest.fn(() => '/test/path');
 
         // Clear environment variables
         process.env = { ...originalEnv };
@@ -74,6 +75,11 @@ describe('ConfigManager', () => {
         delete process.env.CLIENT_CERT_CA_PATH;
         delete process.env.CLIENT_CERT_PASSWORD;
         delete process.env.LOG_LEVEL;
+        // The Jest setup file turns strict mode on globally; these tests
+        // exercise the fallback chain, so start from non-strict and opt in
+        // per test. afterAll restores the original environment.
+        delete process.env.BTK_STRICT_CONFIG;
+        delete process.env.ENV_FILE;
 
         // Reset mocks
         mockExistsSync.mockReset();
@@ -276,7 +282,7 @@ qZXQ
 
         it('should load configuration from YAML file when it exists', () => {
             const yamlConfig = {
-                incomeDestinationAccounts: ['account-1', 'account-2'],
+                untrackedAccounts: ['account-1', 'account-2'],
                 expectedMonthlyPaycheck: 5000,
             };
 
@@ -287,7 +293,7 @@ qZXQ
             const configManager = ConfigManager.getInstance();
             const config = configManager.getConfig();
 
-            expect(config.accounts.incomeDestinationAccounts).toEqual(['account-1', 'account-2']);
+            expect(config.accounts.untrackedAccounts).toEqual(['account-1', 'account-2']);
             expect(config.transactions.expectedMonthlyPaycheck).toBe(5000);
         });
 
@@ -323,7 +329,6 @@ qZXQ
             // `model:` with no value parses to null — must not clobber the default
             const yamlConfig = {
                 expectedMonthlyPaycheck: null,
-                excludeDisposableIncome: null,
                 tags: { disposableIncome: null },
                 llm: { model: null, maxTokens: null },
             };
@@ -338,12 +343,36 @@ qZXQ
             expect(config.llm.maxTokens).toBeGreaterThan(0);
             // Default is undefined — a null YAML scalar must not turn it into null
             expect(config.transactions.expectedMonthlyPaycheck).toBeUndefined();
-            expect(typeof config.transactions.excludeDisposableIncome).toBe('boolean');
             expect(config.transactions.tags.disposableIncome).toBe('Disposable Income');
         });
 
-        it('should preserve legitimate falsy YAML values like false', () => {
-            const yamlConfig = { excludeDisposableIncome: false };
+        it('[R-SCOPE-1] should read unquoted account ids as the strings Firefly uses', () => {
+            // `- 27` parses as a number and would silently match no account
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({ untrackedAccounts: [27, '2'] });
+
+            const config = ConfigManager.getInstance().getConfig();
+
+            expect(config.accounts.untrackedAccounts).toEqual(['27', '2']);
+        });
+
+        it('should read an unquoted exclusion amount as a string', () => {
+            mockExistsSync.mockReturnValue(true);
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({
+                excludedTransactions: [{ description: 'Deposit', amount: 75 }],
+            });
+
+            const config = ConfigManager.getInstance().getConfig();
+
+            expect(config.transactions.excludedTransactions).toEqual([
+                { description: 'Deposit', amount: '75' },
+            ]);
+        });
+
+        it('should preserve a legitimate falsy YAML value like 0', () => {
+            const yamlConfig = { expectedMonthlyPaycheck: 0 };
 
             mockExistsSync.mockReturnValue(true);
             mockReadFileSync.mockReturnValue('yaml content');
@@ -351,11 +380,11 @@ qZXQ
 
             const config = ConfigManager.getInstance().getConfig();
 
-            expect(config.transactions.excludeDisposableIncome).toBe(false);
+            expect(config.transactions.expectedMonthlyPaycheck).toBe(0);
         });
     });
 
-    describe('Unknown and renamed YAML keys', () => {
+    describe('Unknown YAML keys', () => {
         let consoleWarnSpy: jest.Spied<typeof console.warn>;
 
         beforeEach(() => {
@@ -370,22 +399,6 @@ qZXQ
             consoleWarnSpy.mockRestore();
         });
 
-        it('should name the replacement for a renamed setting', () => {
-            // A config still carrying disposableIncomeAccounts would silently
-            // stop excluding savings, counting the savings half of payroll as
-            // envelope income. Being ignored quietly is the dangerous part.
-            mockYamlLoad.mockReturnValue({
-                disposableIncomeAccounts: ['39'],
-                expectedMonthlyPaycheck: 5000,
-            });
-
-            ConfigManager.getInstance();
-
-            const warnings = consoleWarnSpy.mock.calls.map(call => String(call[0])).join('\n');
-            expect(warnings).toContain('disposableIncomeAccounts');
-            expect(warnings).toContain('untrackedAccounts');
-        });
-
         it('should warn about an unrecognised setting', () => {
             mockYamlLoad.mockReturnValue({ untrackedAccounts: ['2'], notARealSetting: true });
 
@@ -398,7 +411,6 @@ qZXQ
         it('should stay quiet when every key is known', () => {
             mockYamlLoad.mockReturnValue({
                 untrackedAccounts: ['2'],
-                paycheckDestinationAccounts: ['1'],
                 expectedMonthlyPaycheck: 5000,
                 tags: { paycheck: 'Paycheck' },
                 llm: { model: 'claude-sonnet-5' },
@@ -508,19 +520,19 @@ qZXQ
         it('should return correct default config directory', () => {
             const configDir = ConfigManager.getDefaultConfigDir();
             expect(configDir).toMatch(/\.budget$/);
-            expect(configDir).toContain(process.env.HOME || process.env.USERPROFILE);
+            expect(configDir).toContain(os.homedir());
         });
 
         it('should return correct default config path', () => {
             const configPath = ConfigManager.getDefaultConfigPath();
             expect(configPath).toMatch(/\.budget[/\\]config\.yaml$/);
-            expect(configPath).toContain(process.env.HOME || process.env.USERPROFILE);
+            expect(configPath).toContain(os.homedir());
         });
 
         it('should return correct default env path', () => {
             const envPath = ConfigManager.getDefaultEnvPath();
             expect(envPath).toMatch(/\.budget[/\\]\.env$/);
-            expect(envPath).toContain(process.env.HOME || process.env.USERPROFILE);
+            expect(envPath).toContain(os.homedir());
         });
 
         it('should resolve config path from CLI --config flag with highest priority', () => {
@@ -557,7 +569,7 @@ qZXQ
 
         it('should fallback to home directory config as third priority', () => {
             // Mock: CLI and current dir don't exist, home dir exists
-            const homeDir = process.env.HOME || process.env.USERPROFILE;
+            const homeDir = os.homedir();
             const homePath = `${homeDir}/.budget/config.yaml`;
 
             mockExistsSync.mockImplementation((filePath: string) => {
@@ -612,7 +624,7 @@ qZXQ
         });
 
         it('should prefer home directory over defaults when no CLI path provided', () => {
-            const homeDir = process.env.HOME || process.env.USERPROFILE;
+            const homeDir = os.homedir();
             const homePath = `${homeDir}/.budget/config.yaml`;
 
             mockExistsSync.mockImplementation((filePath: string) => {
@@ -627,6 +639,102 @@ qZXQ
 
             const configManager = ConfigManager.getInstance();
             expect(configManager).toBeDefined();
+        });
+    });
+    describe('Strict mode (BTK_STRICT_CONFIG)', () => {
+        const customPath = '/explicit/config.yaml';
+        const envFile = '/explicit/.env';
+
+        beforeEach(() => {
+            process.env.BTK_STRICT_CONFIG = '1';
+            process.env.FIREFLY_API_URL = 'http://localhost:8080';
+            process.env.FIREFLY_API_TOKEN = 'test-token';
+            mockReadFileSync.mockReturnValue('yaml content');
+            mockYamlLoad.mockReturnValue({});
+        });
+
+        const existing =
+            (...paths: string[]) =>
+            (filePath: string) =>
+                paths.includes(filePath);
+
+        it('is off unless BTK_STRICT_CONFIG is 1 or true', () => {
+            delete process.env.BTK_STRICT_CONFIG;
+            expect(ConfigManager.isStrictMode()).toBe(false);
+            process.env.BTK_STRICT_CONFIG = '0';
+            expect(ConfigManager.isStrictMode()).toBe(false);
+            process.env.BTK_STRICT_CONFIG = 'true';
+            expect(ConfigManager.isStrictMode()).toBe(true);
+            process.env.BTK_STRICT_CONFIG = '1';
+            expect(ConfigManager.isStrictMode()).toBe(true);
+        });
+
+        it('loads only the explicit --config path and ENV_FILE', () => {
+            process.env.ENV_FILE = envFile;
+            mockExistsSync.mockImplementation(existing(customPath, envFile));
+
+            const manager = ConfigManager.getInstance(customPath);
+
+            expect(manager.getLoadedConfigPath()).toBe(customPath);
+            expect(manager.getLoadedEnvPath()).toBe(envFile);
+            expect(mockConfigSync).toHaveBeenCalledTimes(1);
+            expect(mockConfigSync).toHaveBeenCalledWith({ path: envFile, quiet: true });
+        });
+
+        it('resolves a relative ENV_FILE against the working directory', () => {
+            process.env.ENV_FILE = 'rel/.env';
+            mockExistsSync.mockImplementation(existing(customPath, '/test/path/rel/.env'));
+
+            const manager = ConfigManager.getInstance(customPath);
+
+            expect(manager.getLoadedEnvPath()).toBe('/test/path/rel/.env');
+        });
+
+        it('throws when no --config path is given, even if ./config.yaml and ~/.budget/config.yaml exist', () => {
+            process.env.ENV_FILE = envFile;
+            mockExistsSync.mockReturnValue(true);
+
+            expect(() => ConfigManager.getInstance()).toThrow(
+                /BTK_STRICT_CONFIG is set: pass the config file explicitly with --config/
+            );
+            expect(mockReadFileSync).not.toHaveBeenCalled();
+        });
+
+        it('still throws when the explicit --config path is missing', () => {
+            process.env.ENV_FILE = envFile;
+            mockExistsSync.mockImplementation(existing(envFile));
+
+            expect(() => ConfigManager.getInstance(customPath)).toThrow(
+                `Config file not found: ${customPath}`
+            );
+        });
+
+        it('throws when ENV_FILE is unset, even if ./.env and ~/.budget/.env exist', () => {
+            mockExistsSync.mockReturnValue(true);
+
+            expect(() => ConfigManager.getInstance(customPath)).toThrow(
+                /BTK_STRICT_CONFIG is set: ENV_FILE must name the \.env file/
+            );
+            expect(mockConfigSync).not.toHaveBeenCalled();
+        });
+
+        it('throws when ENV_FILE does not exist', () => {
+            process.env.ENV_FILE = envFile;
+            mockExistsSync.mockImplementation(existing(customPath));
+
+            expect(() => ConfigManager.getInstance(customPath)).toThrow(
+                `BTK_STRICT_CONFIG is set: ENV_FILE not found: ${envFile}`
+            );
+            expect(mockConfigSync).not.toHaveBeenCalled();
+        });
+
+        it('does not warn about a missing config.yaml (it never falls back to defaults)', () => {
+            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+            mockExistsSync.mockReturnValue(false);
+
+            expect(() => ConfigManager.getInstance()).toThrow(/BTK_STRICT_CONFIG/);
+            expect(warnSpy).not.toHaveBeenCalled();
+            warnSpy.mockRestore();
         });
     });
 });

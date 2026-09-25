@@ -58,20 +58,22 @@ describe('LLMTransactionProcessingService', () => {
         expect(result).toEqual({});
     });
 
-    it('handles category service errors gracefully', async () => {
-        mockAssignmentService.assignCategories.mockRejectedValue(
-            new Error('Category service error')
-        );
+    // LLMAssignmentService degrades recoverable chunk failures itself, so an
+    // error reaching this layer is critical and must abort the run.
+    it('propagates category assignment errors instead of swallowing them', async () => {
+        mockAssignmentService.assignCategories.mockRejectedValue(new Error('invalid x-api-key'));
         mockAssignmentService.assignBudgets.mockResolvedValue(['Groceries']);
-        const result = await service.processTransactions(tx, categories, budgets);
-        expect(result['1']).toEqual({ budget: 'Groceries' });
+        await expect(service.processTransactions(tx, categories, budgets)).rejects.toThrow(
+            'invalid x-api-key'
+        );
     });
 
-    it('handles budget service errors gracefully', async () => {
+    it('propagates budget assignment errors instead of swallowing them', async () => {
         mockAssignmentService.assignCategories.mockResolvedValue(['Coffee & Tea']);
-        mockAssignmentService.assignBudgets.mockRejectedValue(new Error('Budget service error'));
-        const result = await service.processTransactions(tx, categories, budgets);
-        expect(result['1']).toEqual({ category: 'Coffee & Tea' });
+        mockAssignmentService.assignBudgets.mockRejectedValue(new Error('invalid x-api-key'));
+        await expect(service.processTransactions(tx, categories, budgets)).rejects.toThrow(
+            'invalid x-api-key'
+        );
     });
 
     it('filters out "(no category)" placeholder values', async () => {

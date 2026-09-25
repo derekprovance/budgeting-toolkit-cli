@@ -3,18 +3,17 @@ import { logger } from '../logger.js';
 import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
 import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
 import { DateUtils } from '../utils/date.utils.js';
+import { Day, dueDatesInMonth, toDay, today } from '../utils/bill-schedule.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { BillService } from './core/bill.service.js';
-import { ITransactionService } from './core/transaction.service.interface.js';
-import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
+import { CashFlowService } from './cash-flow.service.js';
 import { Result } from '../types/result.type.js';
 import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
 
 export class BillComparisonService implements IBillComparisonService {
     constructor(
         private readonly billService: BillService,
-        private readonly transactionService: ITransactionService,
-        private readonly transactionClassificationService: ITransactionClassificationService
+        private readonly cashFlowService: CashFlowService
     ) {}
 
     /**
@@ -48,13 +47,14 @@ export class BillComparisonService implements IBillComparisonService {
             // rejects a bill-linked transaction.
             const bills = await this.billService.getBillsForMonth(month, year);
 
-            // Get actual transactions for the specific month
-            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
-
-            // Filter to transactions linked to bills
-            const billTransactions = transactions.filter(t =>
-                this.transactionClassificationService.isBill(t)
-            );
+            // The bill bucket: bill-linked envelope withdrawals and their
+            // refunds (RULES.md, R-BILL-1). A bill paid from outside the
+            // envelope is not here: it shows as expected but not paid.
+            const buckets = await this.cashFlowService.getBuckets(month, year);
+            if (!buckets.ok) {
+                throw buckets.error;
+            }
+            const billTransactions = buckets.value.bill;
 
             // Bail out only when there is genuinely nothing to report. Returning
             // early on `bills.length === 0` alone would skip the orphan path
@@ -67,8 +67,12 @@ export class BillComparisonService implements IBillComparisonService {
             }
 
             // Calculate bill details with predicted amounts based on pay_dates
-            const { predictedTotal, actualTotal, billDetails, budgetedTransactions } =
-                this.calculateBillDetails(bills, billTransactions, month, year);
+            const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
+                bills,
+                billTransactions,
+                month,
+                year
+            );
 
             // Get currency info from first bill or use default
             const currencyCode =
@@ -85,8 +89,7 @@ export class BillComparisonService implements IBillComparisonService {
                 actualTotal,
                 billDetails,
                 currencyCode,
-                currencySymbol,
-                budgetedTransactions
+                currencySymbol
             );
 
             logger.debug(
@@ -128,28 +131,19 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * The pay dates a bill falls due on within the requested month, in order.
+     * The unpaid due dates Firefly reports for this month, in order.
      *
-     * Returned as a list rather than a yes/no because a bill can fall due more
-     * than once in a month — a weekly or fortnightly bill routinely does — and
-     * predicting a single payment for it understates the month. `Zest of Life`
-     * is fortnightly at $130 and falls due twice in August: $260, not $130.
+     * `pay_dates` is payment-aware: it lists only the occurrences after the
+     * latest payment in the window, and falls back to the next one outside it
+     * (V11). So it says what is still owed, not what fell due; the month's
+     * schedule comes from {@link dueDatesInMonth} instead.
      */
-    private payDatesInMonth(bill: BillRead, month: number, year: number): Date[] {
-        const payDates = bill.attributes.pay_dates;
-        if (!Array.isArray(payDates) || payDates.length === 0) {
-            return [];
-        }
-
-        return payDates
-            .map(dateStr => new Date(dateStr))
-            .filter(
-                date =>
-                    !isNaN(date.getTime()) &&
-                    date.getUTCMonth() + 1 === month &&
-                    date.getUTCFullYear() === year
-            )
-            .sort((a, b) => a.getTime() - b.getTime());
+    private unpaidDatesInMonth(bill: BillRead, month: number, year: number): Day[] {
+        const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+        return (bill.attributes.pay_dates ?? [])
+            .map(toDay)
+            .filter((day): day is Day => day !== null && day.startsWith(prefix))
+            .sort();
     }
 
     /**
@@ -187,9 +181,8 @@ export class BillComparisonService implements IBillComparisonService {
     }
 
     /**
-     * Calculate bill details with predicted amounts based on pay_dates.
-     * If a bill has a pay_date in the requested period, predicted = bill amount.
-     * If a bill has no pay_date in the requested period, predicted = 0.
+     * Expected versus paid per bill (R-BILL-1). Expected is the bill's amount
+     * for every date it falls due this month; paid is the bill bucket.
      */
     private calculateBillDetails(
         bills: BillRead[],
@@ -200,142 +193,63 @@ export class BillComparisonService implements IBillComparisonService {
         predictedTotal: number;
         actualTotal: number;
         billDetails: BillDetailDto[];
-        budgetedTransactions: TransactionSplit[];
     } {
-        const now = new Date();
+        const todayDay = today();
         let predictedTotal = 0;
         let actualTotal = 0;
         const billDetails: BillDetailDto[] = [];
-        // Bill transactions that also carry a budget. Collected only for bills
-        // actually summed into actualTotal, so the analyze report's correction
-        // matches what was counted rather than what merely exists.
-        const budgetedTransactions: TransactionSplit[] = [];
 
-        logger.debug(
-            `Calculating bill details from ${transactions.length} bill-linked transactions for ${bills.length} bills`
-        );
-
-        // Create a map of bill ID to transactions
         const billTransactionMap = new Map<string, TransactionSplit[]>();
         for (const transaction of transactions) {
-            // Use bill_id or subscription_id
-            const billId = transaction.bill_id ?? transaction.subscription_id;
+            // Same test as isBill, so every transaction in the bill bucket has a key
+            const billId = transaction.bill_id || transaction.subscription_id;
             if (billId) {
                 billTransactionMap.getOrInsert(billId, []).push(transaction);
-
-                logger.debug({
-                    transactionDesc: transaction.description,
-                    transactionAmount: transaction.amount,
-                    linkedBillId: billId,
-                    transactionDate: transaction.date,
-                });
             }
         }
 
-        // Build details for each bill
         for (const bill of bills) {
             const billId = bill.id;
             const billTransactions = billTransactionMap.get(billId) ?? [];
-            const frequency = bill.attributes.repeat_freq ?? 'monthly';
+            billTransactionMap.delete(billId);
+
+            // A deactivated bill predicts nothing; it is listed only so spending
+            // still linked to it is counted
             const isActive = bill.attributes.active ?? false;
-            const payDates = isActive ? this.payDatesInMonth(bill, month, year) : [];
+            const dueDates = isActive ? dueDatesInMonth(bill, month, year) : [];
 
             // A bill that neither falls due nor sees any activity this month is
-            // not worth a row: it would render as "$0.00 (expected $0.00)",
-            // which is eight of August's twenty rows and tells the reader
-            // nothing. Covers deactivated bills and yearly bills alike.
-            if (payDates.length === 0 && billTransactions.length === 0) {
-                billTransactionMap.delete(billId);
+            // not worth a row: it would render as "$0.00 (expected $0.00)"
+            if (dueDates.length === 0 && billTransactions.length === 0) {
                 continue;
             }
 
-            // Net spend for this bill: a refund or returned payment linked to
-            // the bill reduces what was actually paid, it does not add to it
+            const amount = this.getBillAmount(bill);
+            // Net spend: a refund linked to the bill reduces what it cost
             const actualAmount = TransactionCalculationUtils.calculateNetSpend(
                 billTransactions,
                 logger
             );
+            const predictedAmount = amount * dueDates.length;
+            const upcoming = isActive
+                ? this.unpaidDatesInMonth(bill, month, year).filter(day => day >= todayDay)
+                : [];
+            const outstanding = amount * upcoming.length;
 
             actualTotal += actualAmount;
-
-            budgetedTransactions.push(
-                ...billTransactions.filter(t => this.transactionClassificationService.hasBudget(t))
-            );
-
-            // Predicted amount determination with defensive logic:
-            // 1. If bill is marked as due (has pay_dates) → use full bill amount
-            // 2. If bill is NOT marked as due BUT has actual transactions → use full bill amount (Firefly III bug workaround)
-            // 3. If bill is NOT marked as due AND has no transactions → use 0
-            // (represents what's actually owed this month, not the monthly budget equivalent)
-            // A deactivated bill predicts nothing - it is only here so its
-            // actual spending is not dropped on the floor
-            const isDue = payDates.length > 0;
-            const hasActualTransactions = isActive && billTransactions.length > 0;
-            // Dates still ahead of us. A bill can be partly behind and partly
-            // ahead when it falls due several times in one month.
-            const upcomingDates = payDates.filter(date => date.getTime() > now.getTime());
-
-            // Defensive logic: If bill has transactions but pay_dates is empty,
-            // assume Firefly III bug and treat as due
-            let predictedAmount: number;
-            let usedFallbackLogic = false;
-
-            if (isDue) {
-                // Normal case: one payment expected per due date this month
-                predictedAmount = this.getBillAmount(bill) * payDates.length;
-            } else if (!isDue && hasActualTransactions) {
-                // Defensive case: pay_dates is empty but transactions exist
-                // This handles Firefly III bug where pay_dates may not be populated
-                predictedAmount = this.getBillAmount(bill);
-                usedFallbackLogic = true;
-
-                logger.debug(
-                    {
-                        billName: bill.attributes.name,
-                        billId,
-                        actualAmount,
-                        predictedAmount,
-                        transactionCount: billTransactions.length,
-                        payDates: bill.attributes.pay_dates,
-                        month,
-                        year,
-                    },
-                    'Bill has transactions but no pay_dates - using fallback logic to set expected amount'
-                );
-            } else {
-                // Normal case: bill is not due and has no transactions
-                predictedAmount = 0;
-            }
-
             predictedTotal += predictedAmount;
 
-            // What is still ahead of us, capped by what is actually unpaid.
-            //
-            // Both halves matter. Without the cap, a bill paid early still
-            // reports its next date as outstanding, because Firefly's pay_dates
-            // is payment-unaware and cannot say which occurrence was settled.
-            // Without the per-occurrence bound, a bill due twice and paid once
-            // would report the whole remainder rather than the one payment left.
-            const outstanding = Math.max(
-                0,
-                Math.min(
-                    predictedAmount - actualAmount,
-                    this.getBillAmount(bill) * upcomingDates.length
-                )
+            logger.debug(
+                {
+                    billId,
+                    billName: bill.attributes.name,
+                    dueDates,
+                    upcoming,
+                    predictedAmount,
+                    actualAmount,
+                },
+                'Compared bill'
             );
-
-            logger.debug({
-                billName: bill.attributes.name,
-                billId,
-                isDue,
-                payDates: bill.attributes.pay_dates,
-                frequency: bill.attributes.repeat_freq ?? 'monthly',
-                fullAmount: this.getBillAmount(bill),
-                predictedAmount,
-                transactionCount: billTransactions.length,
-                actualAmount,
-                usedFallbackLogic,
-            });
 
             billDetails.push(
                 new BillDetailDto(
@@ -343,13 +257,11 @@ export class BillComparisonService implements IBillComparisonService {
                     bill.attributes.name ?? 'Unknown Bill',
                     predictedAmount,
                     actualAmount,
-                    frequency,
-                    upcomingDates.length > 0 && outstanding > 0 ? upcomingDates[0] : undefined,
+                    bill.attributes.repeat_freq ?? 'monthly',
+                    upcoming.length > 0 ? new Date(`${upcoming[0]}T00:00:00`) : undefined,
                     outstanding
                 )
             );
-
-            billTransactionMap.delete(billId);
         }
 
         // Anything still in the map links to a bill this month's bill list does
@@ -362,11 +274,6 @@ export class BillComparisonService implements IBillComparisonService {
             );
 
             actualTotal += orphanAmount;
-            budgetedTransactions.push(
-                ...orphanTransactions.filter(t =>
-                    this.transactionClassificationService.hasBudget(t)
-                )
-            );
 
             logger.warn(
                 {
@@ -386,6 +293,6 @@ export class BillComparisonService implements IBillComparisonService {
 
         logger.debug({ predictedTotal, actualTotal, billDetailsCount: billDetails.length });
 
-        return { predictedTotal, actualTotal, billDetails, budgetedTransactions };
+        return { predictedTotal, actualTotal, billDetails };
     }
 }

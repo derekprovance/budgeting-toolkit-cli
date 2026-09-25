@@ -29,16 +29,10 @@ export const DEFAULT_CONFIG: AppConfig = {
         },
     },
     accounts: {
-        incomeDestinationAccounts: [],
-        expenseSourceAccounts: [],
-        expenseTransfers: [],
         untrackedAccounts: [],
-        paycheckDestinationAccounts: [],
     },
     transactions: {
         expectedMonthlyPaycheck: undefined,
-        excludedAdditionalIncomePatterns: [],
-        excludeDisposableIncome: true,
         excludedTransactions: [],
         tags: {
             disposableIncome: 'Disposable Income',

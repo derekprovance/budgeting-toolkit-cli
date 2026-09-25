@@ -1,5 +1,4 @@
 import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
-import '../../setup/mock-logger.js'; // Must be first to mock logger module
 import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
 import { TransactionService } from '../../../src/services/core/transaction.service.js';
@@ -16,6 +15,10 @@ import {
     createMockExcludedTransactionService,
     createMockFireflyClient,
 } from '../../setup/mock-services.js';
+import { withdrawal } from '../../shared/test-data.js';
+
+// Partial Firefly responses: only the fields the service reads.
+type TagSingleResponse = Awaited<ReturnType<FireflyClientWithCerts['tags']['getTag']>>;
 
 describe('TransactionService', () => {
     let service: TransactionService;
@@ -66,7 +69,7 @@ describe('TransactionService', () => {
                 },
             ] as TransactionRead[];
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: mockTransactions,
             } as TransactionArray);
 
@@ -96,9 +99,7 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockRejectedValueOnce(
-                new Error('API Error')
-            );
+            mockApiClient.tags.listTransactionByTag.mockRejectedValueOnce(new Error('API Error'));
 
             await expect(service.getTransactionsByTag('test-tag')).rejects.toThrow(
                 'Failed to fetch transactions by tag test-tag'
@@ -123,7 +124,7 @@ describe('TransactionService', () => {
             } as TransactionRead;
 
             // First, populate the transaction index by fetching transactions
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -133,7 +134,7 @@ describe('TransactionService', () => {
             await service.getTransactionsByTag('test-tag');
 
             // Mock the updateTransaction response
-            (mockApiClient.transactions.updateTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.updateTransaction.mockResolvedValueOnce({
                 data: mockTransactionRead,
             });
 
@@ -178,23 +179,11 @@ describe('TransactionService', () => {
             ).rejects.toThrow('Unsupported transaction type invalid');
         });
 
-        it('should handle error when transaction read is not found', async () => {
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
-                data: [],
-                meta: {},
-                links: {},
-            } as TransactionArray);
-
-            const result = await service.updateTransaction(mockTransaction, 'New Category');
-
-            expect(mockLogger.error).toHaveBeenCalledWith(
-                {
-                    transactionId: '1',
-                    description: 'Test Transaction',
-                },
-                'Unable to find Transaction ID for Split'
-            );
-            expect(result).toBeUndefined();
+        it('should throw when transaction read is not found', async () => {
+            await expect(
+                service.updateTransaction(mockTransaction, 'New Category')
+            ).rejects.toThrow('Unable to find transaction ID for split 1');
+            expect(mockApiClient.transactions.updateTransaction).not.toHaveBeenCalled();
         });
 
         it('should throw TransactionError when API update fails', async () => {
@@ -205,7 +194,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -213,14 +202,46 @@ describe('TransactionService', () => {
 
             await service.getTransactionsByTag('test-tag');
 
-            (mockApiClient.transactions.updateTransaction as jest.Mock).mockRejectedValueOnce(
+            mockApiClient.transactions.updateTransaction.mockRejectedValueOnce(
                 new Error('API Error')
             );
 
-            const result = await service.updateTransaction(mockTransaction, 'New Category');
+            // A swallowed failure would be counted as a skip, never as a failure
+            await expect(
+                service.updateTransaction(mockTransaction, 'New Category')
+            ).rejects.toThrow('API Error');
+        });
 
-            expect(result).toBeUndefined();
-            expect(mockLogger.error).toHaveBeenCalled();
+        it('should list every split of a multi-split group so Firefly keeps them', async () => {
+            const first = withdrawal(60, { transaction_journal_id: '10', description: 'Part A' });
+            const target = withdrawal(40, { transaction_journal_id: '11', description: 'Part B' });
+            const third = withdrawal(5, { transaction_journal_id: '12', description: 'Part C' });
+            const group = {
+                id: '7',
+                attributes: { group_title: 'Costco', transactions: [first, target, third] },
+            } as TransactionRead;
+
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
+                data: [group],
+            } as TransactionArray);
+            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            await service.getTransactionsByTag('test-tag');
+
+            mockApiClient.transactions.updateTransaction.mockResolvedValueOnce({ data: group });
+
+            await service.updateTransaction(target, 'Groceries', '3');
+
+            // Firefly 6.6.6 rejects a multi-split PUT without its group title
+            expect(mockApiClient.transactions.updateTransaction).toHaveBeenCalledWith('7', {
+                apply_rules: true,
+                fire_webhooks: true,
+                group_title: 'Costco',
+                transactions: [
+                    { transaction_journal_id: '10' },
+                    { transaction_journal_id: '11', category_name: 'Groceries', budget_id: '3' },
+                    { transaction_journal_id: '12' },
+                ],
+            });
         });
     });
 
@@ -242,7 +263,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -283,7 +304,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -311,7 +332,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -347,7 +368,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -378,7 +399,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -409,7 +430,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -422,7 +443,7 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockRejectedValueOnce(
+            mockApiClient.transactions.listTransaction.mockRejectedValueOnce(
                 new Error('API Error')
             );
 
@@ -432,7 +453,7 @@ describe('TransactionService', () => {
         });
 
         it('should handle error with proper context', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockRejectedValueOnce(
+            mockApiClient.transactions.listTransaction.mockRejectedValueOnce(
                 new Error('Network Error')
             );
 
@@ -455,7 +476,7 @@ describe('TransactionService', () => {
                 },
             } as unknown as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransaction],
             } as TransactionArray);
 
@@ -470,7 +491,7 @@ describe('TransactionService', () => {
                 attributes: { created_at: '2024-01-15T10:30:00Z', transactions: [] },
             } as unknown as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransaction],
             } as TransactionArray);
 
@@ -486,9 +507,9 @@ describe('TransactionService', () => {
                     created_at: null,
                     transactions: [],
                 },
-            } as TransactionRead;
+            } as unknown as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransaction],
             } as TransactionArray);
 
@@ -498,9 +519,9 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when API returns empty data array', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [],
-            } as TransactionArray);
+            } as unknown as TransactionArray);
 
             await expect(service.getMostRecentTransactionDate()).rejects.toThrow(
                 'Failed to fetch transactions'
@@ -508,8 +529,8 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when response is undefined', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce(
-                undefined
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                undefined as unknown as TransactionArray
             );
 
             await expect(service.getMostRecentTransactionDate()).rejects.toThrow(
@@ -518,9 +539,9 @@ describe('TransactionService', () => {
         });
 
         it('should throw error when response data is undefined', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: undefined,
-            } as TransactionArray);
+            } as unknown as TransactionArray);
 
             await expect(service.getMostRecentTransactionDate()).rejects.toThrow(
                 'Failed to fetch transactions'
@@ -528,7 +549,7 @@ describe('TransactionService', () => {
         });
 
         it('should handle API errors gracefully', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockRejectedValueOnce(
+            mockApiClient.transactions.listTransaction.mockRejectedValueOnce(
                 new Error('Network Error')
             );
 
@@ -538,9 +559,9 @@ describe('TransactionService', () => {
 
     describe('tagExists', () => {
         it('should return true when tag exists', async () => {
-            (mockApiClient.tags.getTag as jest.Mock).mockResolvedValueOnce({
-                data: { id: '1', attributes: { name: 'test-tag' } },
-            });
+            mockApiClient.tags.getTag.mockResolvedValueOnce({
+                data: { id: '1', attributes: { tag: 'test-tag' } },
+            } as unknown as TagSingleResponse);
 
             const result = await service.tagExists('test-tag');
 
@@ -548,9 +569,7 @@ describe('TransactionService', () => {
         });
 
         it('should return false when tag does not exist (API throws)', async () => {
-            (mockApiClient.tags.getTag as jest.Mock).mockRejectedValueOnce(
-                new Error('Tag not found')
-            );
+            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('Tag not found'));
 
             const result = await service.tagExists('nonexistent-tag');
 
@@ -558,9 +577,7 @@ describe('TransactionService', () => {
         });
 
         it('should return false for empty tag string', async () => {
-            (mockApiClient.tags.getTag as jest.Mock).mockRejectedValueOnce(
-                new Error('Invalid tag')
-            );
+            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('Invalid tag'));
 
             const result = await service.tagExists('');
 
@@ -569,7 +586,7 @@ describe('TransactionService', () => {
         });
 
         it('should handle API errors gracefully', async () => {
-            (mockApiClient.tags.getTag as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('API Error'));
 
             const result = await service.tagExists('test-tag');
 
@@ -577,9 +594,9 @@ describe('TransactionService', () => {
         });
 
         it('should return false when API returns undefined data', async () => {
-            (mockApiClient.tags.getTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.getTag.mockResolvedValueOnce({
                 data: undefined,
-            });
+            } as unknown as TagSingleResponse);
 
             const result = await service.tagExists('test-tag');
 
@@ -603,7 +620,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -658,7 +675,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -697,7 +714,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -728,7 +745,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -757,7 +774,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -786,7 +803,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -830,7 +847,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -862,7 +879,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -889,7 +906,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -917,7 +934,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -948,7 +965,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -978,7 +995,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+            mockApiClient.transactions.listTransaction.mockResolvedValue({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -997,7 +1014,7 @@ describe('TransactionService', () => {
         });
 
         it('should not cache failed fetches', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock)
+            mockApiClient.transactions.listTransaction
                 .mockRejectedValueOnce(new Error('network down'))
                 .mockResolvedValueOnce({ data: [] } as unknown as TransactionArray);
 
@@ -1023,7 +1040,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.transactions.listTransaction as jest.Mock)
+            mockApiClient.transactions.listTransaction
                 .mockResolvedValueOnce({
                     data: [mockTransactionRead],
                 } as TransactionArray)
@@ -1057,11 +1074,11 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -1095,7 +1112,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -1130,7 +1147,7 @@ describe('TransactionService', () => {
                 },
             } as TransactionRead;
 
-            (mockApiClient.tags.listTransactionByTag as jest.Mock).mockResolvedValueOnce({
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
                 data: [mockTransactionRead],
             } as TransactionArray);
 
@@ -1175,7 +1192,7 @@ describe('TransactionService', () => {
         it('should fetch every page, not just the first', async () => {
             // Firefly defaults to 50 items per page; reading only response.data
             // silently truncates any busy month
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockImplementation((async (
+            mockApiClient.transactions.listTransaction.mockImplementation((async (
                 _trace: unknown,
                 _limit: number,
                 page: number
@@ -1192,7 +1209,7 @@ describe('TransactionService', () => {
         });
 
         it('should request a page size instead of relying on the API default', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+            mockApiClient.transactions.listTransaction.mockResolvedValue({
                 data: [],
                 meta: { pagination: { current_page: 1, total_pages: 1 } },
             } as never);
@@ -1208,11 +1225,11 @@ describe('TransactionService', () => {
             );
         });
 
-        it('should expose the transactions the exclusion list removed', async () => {
+        it('[R-EXCL-1] should drop an excluded transaction once, at fetch', async () => {
             const kept = split('1', '10.00');
             const dropped = split('2', '99.00', 'budget-7');
 
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
+            mockApiClient.transactions.listTransaction.mockResolvedValue({
                 data: [group([kept, dropped])],
                 meta: { pagination: { current_page: 1, total_pages: 1 } },
             } as never);
@@ -1221,22 +1238,8 @@ describe('TransactionService', () => {
             );
 
             const included = await service.getTransactionsForMonth(1, 2024);
-            const excluded = await service.getExcludedTransactionsForMonth(1, 2024);
 
             expect(included.map(t => t.transaction_journal_id)).toEqual(['1']);
-            expect(excluded.map(t => t.transaction_journal_id)).toEqual(['2']);
-            // shares the cached fetch rather than hitting the API again
-            expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
-        });
-
-        it('should report no exclusions when nothing was filtered', async () => {
-            (mockApiClient.transactions.listTransaction as jest.Mock).mockResolvedValue({
-                data: [group([split('1', '10.00')])],
-                meta: { pagination: { current_page: 1, total_pages: 1 } },
-            } as never);
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            await expect(service.getExcludedTransactionsForMonth(1, 2024)).resolves.toEqual([]);
         });
     });
 });

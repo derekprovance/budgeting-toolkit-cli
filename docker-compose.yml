@@ -1,113 +1,103 @@
+# Local development Firefly III. Not used by the e2e suite (see
+# docker-compose.e2e.yml).
+#
+#   cp .env.docker.example .env.docker    # then fill in real values
+#   docker compose --env-file .env.docker up -d --wait
+#   docker compose --env-file .env.docker --profile importer up -d   # + data importer
+#
+# .env.docker holds container-only values (POSTGRES_*, FIREFLY_APP_KEY). CLI
+# secrets (FIREFLY_API_TOKEN, ANTHROPIC_API_KEY) stay in .env / .env.dev and
+# never reach a container. `--env-file` is required: ${VAR:?} is resolved at
+# interpolation time, and `env_file:` alone does not feed interpolation.
 services:
     db:
-        image: postgres:18-alpine
-        container_name: firefly-db
+        image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
         restart: unless-stopped
-        environment:
-            - POSTGRES_USER=${POSTGRES_USER:-firefly}
-            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-firefly_secret}
-            - POSTGRES_DB=${POSTGRES_DB:-firefly}
-        volumes:
-            - firefly-db-data:/var/lib/postgresql/data
-            - ./docker/db-init:/docker-entrypoint-initdb.d
-        ports:
-            - '5432:5432'
-        healthcheck:
-            test: ['CMD-SHELL', 'pg_isready -U firefly']
-            interval: 10s
-            timeout: 5s
-            retries: 5
-
-    # Firefly III Application
-    firefly:
-        image: fireflyiii/core:latest
         env_file:
-            - .env.dev
-        container_name: firefly-app
+            - path: .env.docker
+              required: true
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env.docker}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.docker}
+            POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.docker}
+        volumes:
+            # pg18 images keep PGDATA at /var/lib/postgresql/18/docker and
+            # declare the volume at /var/lib/postgresql (not .../data).
+            - firefly-db-data:/var/lib/postgresql
+        # No published port: reach it with `docker compose exec db psql`.
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+            interval: 5s
+            timeout: 5s
+            retries: 30
+
+    firefly:
+        image: fireflyiii/core:version-6.6.6@sha256:ae69fdd95cdef9038cd7a460a5aec731f14813973e4f096511d5a4ea9ff0e972
         restart: unless-stopped
         depends_on:
             db:
                 condition: service_healthy
         environment:
             # Database settings
-            - DB_CONNECTION=pgsql
-            - DB_HOST=db
-            - DB_PORT=5432
-            - DB_DATABASE=firefly
-            - DB_USERNAME=firefly
-            - DB_PASSWORD=firefly_secret
+            DB_CONNECTION: pgsql
+            DB_HOST: db
+            DB_PORT: '5432'
+            DB_DATABASE: ${POSTGRES_DB:?set POSTGRES_DB in .env.docker}
+            DB_USERNAME: ${POSTGRES_USER:?set POSTGRES_USER in .env.docker}
+            DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.docker}
 
             # Application settings
-            - APP_KEY=${FIREFLY_APP_KEY:-SomeRandomStringOf32CharsExactly}
-            - APP_URL=http://localhost:8080
-            - APP_ENV=local
-            - APP_DEBUG=true
-            - LOG_CHANNEL=stack
-            - LOG_LEVEL=debug
+            APP_KEY: ${FIREFLY_APP_KEY:?set FIREFLY_APP_KEY (exactly 32 chars) in .env.docker}
+            APP_URL: http://localhost:8080
+            APP_ENV: local
+            APP_DEBUG: 'true'
+            LOG_CHANNEL: stack
+            LOG_LEVEL: debug
+            TZ: UTC
 
             # Security
-            - TRUSTED_PROXIES=**
+            TRUSTED_PROXIES: '**'
 
-            # Email settings (optional, for testing)
-            - MAIL_MAILER=log
-            - MAIL_HOST=null
-            - MAIL_PORT=2525
-            - MAIL_FROM=changeme@example.com
-            - MAIL_USERNAME=null
-            - MAIL_PASSWORD=null
-            - MAIL_ENCRYPTION=null
+            # Email: log only
+            MAIL_MAILER: log
+            MAIL_FROM: changeme@example.com
 
             # Authentication
-            - LOGIN_PROVIDER=eloquent
-            - AUTHENTICATION_GUARD=web
-
-            # Feature flags
-            - DISABLE_FRAME_HEADER=false
-            - DKR_BUILD_LOCALE=true
-            - DKR_CHECK_SQLITE=false
-            - DKR_RUN_MIGRATION=true
-            - DKR_RUN_UPGRADE=true
-            - DKR_RUN_VERIFY=true
-            - DKR_RUN_REPORT=true
-            - DKR_RUN_PASSPORT_INSTALL=true
-
+            LOGIN_PROVIDER: eloquent
+            AUTHENTICATION_GUARD: web
         volumes:
             - firefly-upload:/var/www/html/storage/upload
         ports:
-            - '8080:8080'
+            - '127.0.0.1:8080:8080'
         healthcheck:
-            test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
-            interval: 30s
-            timeout: 10s
-            retries: 5
-            start_period: 60s
+            test: ['CMD', 'curl', '-fsS', 'http://localhost:8080/health']
+            interval: 5s
+            timeout: 5s
+            retries: 30
+            start_period: 10s
 
-    # Data Importer (optional, useful for bulk imports)
+    # Data Importer (optional). Start with `--profile importer`. Configure the
+    # Firefly URL (http://firefly:8080) and a token in its UI; no CLI secrets
+    # are passed in.
     importer:
-        image: fireflyiii/data-importer:latest
-        env_file:
-            - .env.dev
-        container_name: firefly-importer
+        image: fireflyiii/data-importer:version-2.3.5@sha256:2627644321afdcb52b49b258126bfe98312c2f93a709cc3a07c90327854e6aa2
+        profiles: [importer]
         restart: unless-stopped
         depends_on:
             firefly:
                 condition: service_healthy
         environment:
-            - FIREFLY_III_URL=http://firefly:8080
-            - TRUSTED_PROXIES=**
-            - EXPECT_SECURE_URL=false
-            - APP_ENV=local
-            - APP_DEBUG=true
-            - LOG_LEVEL=debug
+            FIREFLY_III_URL: http://firefly:8080
+            VANITY_URL: http://localhost:8080
+            TRUSTED_PROXIES: '**'
+            EXPECT_SECURE_URL: 'false'
+            APP_ENV: local
+            APP_DEBUG: 'true'
+            LOG_LEVEL: debug
+            TZ: UTC
         ports:
-            - '8081:8080'
+            - '127.0.0.1:8081:8080'
 
 volumes:
     firefly-db-data:
-        driver: local
     firefly-upload:
-        driver: local
-
-networks:
-    default:
-        name: firefly-network

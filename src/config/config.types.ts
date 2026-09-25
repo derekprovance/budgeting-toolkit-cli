@@ -1,5 +1,3 @@
-import { ValidTransfer } from '../types/common.types.js';
-
 /**
  * Complete application configuration structure.
  * All configuration values are defined here for type safety and documentation.
@@ -49,36 +47,16 @@ export interface ClaudeApiConfig {
 }
 
 /**
- * Account Configuration for transaction filtering
+ * Account Configuration. See RULES.md, R-SCOPE-1.
  */
 export interface AccountsConfig {
     /**
-     * Explicit income destinations. Empty (the default) derives them from
-     * Firefly's account roles; non-empty overrides derivation entirely.
-     */
-    incomeDestinationAccounts: string[];
-    /**
-     * Explicit expense sources. Empty (the default) derives them from Firefly's
-     * account roles; non-empty overrides derivation entirely.
-     */
-    expenseSourceAccounts: string[];
-    expenseTransfers: ValidTransfer[];
-    /**
-     * Accounts outside the tracked boundary: excluded from both derived lists,
-     * so money leaving them is not spending and money arriving in them is not
-     * income. A brokerage is the usual case.
-     *
-     * This does NOT hide money moving into one from a tracked account — a
-     * withdrawal from checking to buy an investment still counts as spending,
-     * because the source is tracked. Only activity whose tracked side is the
-     * untracked account itself disappears.
+     * Accounts outside the cost-of-living envelope: savings, a brokerage, the
+     * disposable pool. Every other asset account (closed ones included) is inside it. This is
+     * the only setting that draws the envelope; income accounts (the envelope
+     * minus credit cards) are derived from it.
      */
     untrackedAccounts: string[];
-    /**
-     * Accounts a paycheck-tagged deposit must land in to count as a paycheck.
-     * Empty means no constraint — the tag alone decides.
-     */
-    paycheckDestinationAccounts: string[];
 }
 
 /**
@@ -86,8 +64,6 @@ export interface AccountsConfig {
  */
 export interface TransactionsConfig {
     expectedMonthlyPaycheck?: number;
-    excludedAdditionalIncomePatterns: string[];
-    excludeDisposableIncome: boolean;
     excludedTransactions: ExcludedTransaction[];
     tags: TagsConfig;
 }

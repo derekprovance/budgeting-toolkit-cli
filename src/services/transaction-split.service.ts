@@ -217,6 +217,8 @@ export class TransactionSplitService {
         firstData: SplitData,
         secondData: SplitData
     ): TransactionUpdate {
+        const foreign = this.splitForeignAmount(originalSplit, firstAmount);
+
         // First split: Update original transaction (preserves journal ID)
         const firstSplitUpdate: TransactionSplitUpdate = {
             transaction_journal_id: originalSplit.transaction_journal_id,
@@ -228,6 +230,7 @@ export class TransactionSplitService {
             ...(originalSplit.category_name && { category_name: originalSplit.category_name }),
             // Preserve budget from original
             ...(originalSplit.budget_id && { budget_id: originalSplit.budget_id }),
+            ...(foreign && { ...foreign.currency, foreign_amount: foreign.amounts[0] }),
         };
 
         // Second split: Create new transaction (no journal ID)
@@ -246,6 +249,7 @@ export class TransactionSplitService {
             // Copy currency information
             ...(originalSplit.currency_id && { currency_id: originalSplit.currency_id }),
             ...(originalSplit.currency_code && { currency_code: originalSplit.currency_code }),
+            ...(foreign && { ...foreign.currency, foreign_amount: foreign.amounts[1] }),
         };
 
         return {
@@ -253,6 +257,50 @@ export class TransactionSplitService {
             fire_webhooks: true,
             group_title: originalSplit.description,
             transactions: [firstSplitUpdate, secondSplitUpdate],
+        };
+    }
+
+    /**
+     * Divides the foreign amount in the same proportion as the amount, in the
+     * foreign currency's own smallest unit (JPY has none below 1), with the
+     * remainder on the second part so the two sum exactly. Without it Firefly
+     * keeps the full foreign amount on the first split.
+     * @returns undefined when the original carries no foreign amount
+     */
+    private splitForeignAmount(
+        originalSplit: TransactionSplit,
+        firstAmount: string
+    ):
+        | {
+              amounts: [string, string];
+              currency: Pick<
+                  TransactionSplitUpdate,
+                  'foreign_currency_id' | 'foreign_currency_code'
+              >;
+          }
+        | undefined {
+        const decimals = originalSplit.foreign_currency_decimal_places ?? 2;
+        const unit = 10 ** decimals;
+        const foreignUnits = Math.round(parseFloat(originalSplit.foreign_amount ?? '') * unit);
+        const total = parseFloat(originalSplit.amount);
+        if (!(foreignUnits > 0) || !(total > 0)) {
+            return undefined;
+        }
+
+        const firstUnits = Math.round((foreignUnits * parseFloat(firstAmount)) / total);
+        return {
+            amounts: [
+                (firstUnits / unit).toFixed(decimals),
+                ((foreignUnits - firstUnits) / unit).toFixed(decimals),
+            ],
+            currency: {
+                ...(originalSplit.foreign_currency_id && {
+                    foreign_currency_id: originalSplit.foreign_currency_id,
+                }),
+                ...(originalSplit.foreign_currency_code && {
+                    foreign_currency_code: originalSplit.foreign_currency_code,
+                }),
+            },
         };
     }
 }

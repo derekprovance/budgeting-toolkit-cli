@@ -22,7 +22,6 @@ interface ReportData {
     topExpenses: TopExpenseDto[];
     billComparison: BillComparisonDto;
     unbudgeted: CategorizedUnbudgetedDto[];
-    untracked: CategorizedUnbudgetedDto[];
     insights: BudgetInsight[];
     month: number;
     year: number;
@@ -98,23 +97,7 @@ export class BudgetDisplayService {
         // unbudgeted bucket, the same definition the analyze command uses
         if (data.unbudgeted.length > 0) {
             sections.push(
-                this.formatUnbudgetedSection(
-                    data.unbudgeted,
-                    data.billComparison.currencySymbol,
-                    'UNBUDGETED EXPENSES'
-                )
-            );
-        }
-
-        // Spending no bucket accounts for at all
-        if (data.untracked.length > 0) {
-            sections.push(
-                this.formatUnbudgetedSection(
-                    data.untracked,
-                    data.billComparison.currencySymbol,
-                    'UNTRACKED SPENDING',
-                    'Charged to no bucket - not counted in the cash-flow net'
-                )
+                this.formatUnbudgetedSection(data.unbudgeted, data.billComparison.currencySymbol)
             );
         }
 
@@ -227,7 +210,10 @@ export class BudgetDisplayService {
             sectionTitle: 'ON TRACK',
             statusColor: chalk.green,
             statusEmoji: '🟢',
-            formatRemaining: (budget: BudgetReportDto, formatted: string) => `${formatted} left`,
+            // A budget with no limit has nothing left or over; its "remaining"
+            // is just its spending negated
+            formatRemaining: (budget: BudgetReportDto, formatted: string) =>
+                budget.amount > 0 ? `${formatted} left` : 'no limit',
             getRemainingAmount: (budget: BudgetReportDto) => budget.remaining,
         });
     }
@@ -498,28 +484,21 @@ export class BudgetDisplayService {
      */
     private formatUnbudgetedSection(
         unbudgeted: CategorizedUnbudgetedDto[],
-        currencySymbol: string,
-        header: string,
-        subtitle?: string
+        currencySymbol: string
     ): string {
         const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader(header));
+        lines.push(DisplayFormatterUtils.createSectionHeader('UNBUDGETED EXPENSES'));
         lines.push('');
-        if (subtitle) {
-            lines.push(chalk.dim(`  ${subtitle}`));
-            lines.push('');
-        }
 
         let total = 0;
 
         unbudgeted.forEach(item => {
-            // Signed: Firefly restricts transactions-without-budget to
-            // withdrawals server-side, but nothing local enforces that, so a
-            // refund must reduce the total rather than inflate it.
+            // Signed: a card refund in the bucket reduces the total (R-REFUND-1)
             const amount = TransactionCalculationUtils.calculateNetSpend([item.transaction]);
             total += amount;
 
-            const amountFormatted = CurrencyUtils.formatWithSymbol(
+            // A refund keeps its minus sign so the rows visibly add up
+            const amountFormatted = CurrencyUtils.formatSigned(
                 amount,
                 item.transaction.currency_symbol || currencySymbol
             );
@@ -544,7 +523,7 @@ export class BudgetDisplayService {
         });
 
         lines.push('');
-        lines.push(chalk.bold(`Total: ${CurrencyUtils.formatWithSymbol(total, currencySymbol)}`));
+        lines.push(chalk.bold(`Total: ${CurrencyUtils.formatSigned(total, currencySymbol)}`));
         lines.push('');
         return lines.join('\n');
     }
@@ -592,9 +571,13 @@ export class BudgetDisplayService {
      * Creates a progress bar
      */
     private createProgressBar(percentage: number): string {
-        const filled = Math.min(
-            Math.round((percentage / 100) * BudgetDisplayService.PROGRESS_BAR_WIDTH),
-            BudgetDisplayService.PROGRESS_BAR_WIDTH
+        // Clamped both ways: refunds can push a budget below 0%
+        const filled = Math.max(
+            0,
+            Math.min(
+                Math.round((percentage / 100) * BudgetDisplayService.PROGRESS_BAR_WIDTH),
+                BudgetDisplayService.PROGRESS_BAR_WIDTH
+            )
         );
         const empty = BudgetDisplayService.PROGRESS_BAR_WIDTH - filled;
 

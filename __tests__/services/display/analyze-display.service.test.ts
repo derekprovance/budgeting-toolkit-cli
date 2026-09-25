@@ -1,91 +1,69 @@
-import { jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { AnalyzeDisplayService } from '../../../src/services/display/analyze-display.service.js';
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
-import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
 import { AnalyzeReportDto } from '../../../src/types/dto/analyze-report.dto.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import stripAnsi from 'strip-ansi';
+import { deposit, transfer, withdrawal } from '../../shared/test-data.js';
 
-// Mock chalk to return the input string (disable styling for tests)
-jest.mock('chalk', () => ({
-    default: {
-        redBright: (str: string) => str,
-        cyan: (str: string) => str,
-        yellow: (str: string) => str,
-        gray: (str: string) => str,
-        dim: (str: string) => str,
-        bold: (str: string) => str,
-        green: (str: string) => str,
-        red: (str: string) => str,
-        cyanBright: (str: string) => str,
-        blueBright: (str: string) => str,
-        white: (str: string) => str,
-    },
-}));
-
-jest.mock('../../../src/services/core/transaction-classification.service');
-jest.mock('../../../src/services/excluded-transaction.service');
+// Output is plain text: FORCE_COLOR=0 (see __tests__/setup/env.ts) disables
+// chalk, and stripAnsi removes any remaining escapes such as hyperlinks.
 
 describe('AnalyzeDisplayService', () => {
     let service: AnalyzeDisplayService;
-    let transactionClassificationService: jest.Mocked<TransactionClassificationService>;
-    let excludedTransactionService: jest.Mocked<ExcludedTransactionService>;
 
     beforeEach(() => {
-        excludedTransactionService =
-            new ExcludedTransactionService() as jest.Mocked<ExcludedTransactionService>;
-        transactionClassificationService = new TransactionClassificationService(
-            excludedTransactionService
-        ) as jest.Mocked<TransactionClassificationService>;
-
-        service = new AnalyzeDisplayService(transactionClassificationService);
+        service = new AnalyzeDisplayService(
+            new TransactionClassificationService('Disposable Income', 'Paycheck')
+        );
     });
 
+    const builders = { deposit, withdrawal, transfer };
     const createMockTransaction = (
         description: string,
         amount: number,
         type: 'deposit' | 'withdrawal' | 'transfer' = 'deposit'
-    ): TransactionSplit => ({
-        description,
-        amount: amount.toString(),
-        type,
-        date: '2025-11-15T00:00:00Z',
-        source_name: 'Test Source',
-        destination_name: 'Test Destination',
-        currency_code: 'USD',
-    });
+    ): TransactionSplit =>
+        builders[type](amount.toString(), {
+            description,
+            date: '2025-11-15T00:00:00Z',
+            source_name: 'Test Source',
+            destination_name: 'Test Destination',
+            currency_code: 'USD',
+        });
 
-    const createBasicReportData = (): AnalyzeReportDto => ({
-        month: 11,
-        year: 2025,
-        currencySymbol: '$',
-        currencyCode: 'USD',
-        additionalIncome: [],
-        additionalIncomeTotal: 0,
-        unbudgetedExpenses: [],
-        unbudgetedExpenseTotal: 0,
-        paycheckSurplus: 0,
-        expectedMonthlyPaycheck: 5000,
-        actualPaycheck: 5000,
-        budgetAllocated: 2000,
-        budgetSpent: 1500,
-        budgetSurplus: 500,
-        disposableIncomeTransactions: [],
-        disposableIncomeTransfers: [],
-        disposableIncome: 0,
-        disposableIncomeTagged: 0,
-        billComparison: {
-            predictedTotal: 1000,
-            actualTotal: 950,
-            variance: -50,
-            bills: [],
-            currencyCode: 'USD',
+    const createBasicReportData = (): AnalyzeReportDto =>
+        ({
+            month: 11,
+            year: 2025,
             currencySymbol: '$',
-        },
-        // netImpact = actualPaycheck + additionalIncomeTotal - billComparison.actualTotal - budgetSpent - unbudgetedExpenseTotal - disposableIncome
-        // = 5000 + 0 - 950 - 1500 - 0 - 0 = 2550
-        netImpact: 2550,
-    });
+            currencyCode: 'USD',
+            additionalIncome: [],
+            additionalIncomeTotal: 0,
+            unbudgetedExpenses: [],
+            unbudgetedExpenseTotal: 0,
+            paycheckSurplus: 0,
+            expectedMonthlyPaycheck: 5000,
+            actualPaycheck: 5000,
+            budgetAllocated: 2000,
+            budgetSpent: 1500,
+            budgetSurplus: 500,
+            disposableIncomeTransactions: [],
+            disposableIncome: 0,
+            billComparison: {
+                predictedTotal: 1000,
+                actualTotal: 950,
+                variance: -50,
+                bills: [],
+                currencyCode: 'USD',
+                currencySymbol: '$',
+            },
+            // netImpact = actualPaycheck + additionalIncomeTotal - billComparison.actualTotal
+            //             - budgetSpent - unbudgetedExpenseTotal
+            // = 5000 + 0 - 950 - 1500 - 0 = 2550
+            // disposableIncome is charged to the pool, not the envelope: no term here.
+            netImpact: 2550,
+        }) satisfies AnalyzeReportDto;
 
     describe('formatAnalysisReport', () => {
         it('should format complete report with all sections', () => {
@@ -526,6 +504,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 100,
                             actual: 150,
                             frequency: 'monthly',
+                            upcomingAmount: 0,
                         },
                         {
                             id: '2',
@@ -533,6 +512,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 50,
                             actual: 60,
                             frequency: 'monthly',
+                            upcomingAmount: 0,
                         },
                     ],
                 },
@@ -569,6 +549,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 1000,
                             actual: 1000,
                             frequency: 'monthly',
+                            upcomingAmount: 0,
                         },
                         {
                             id: '2',
@@ -576,6 +557,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 50,
                             actual: 0,
                             frequency: 'yearly',
+                            upcomingAmount: 0,
                         },
                         {
                             id: '3',
@@ -583,6 +565,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 150,
                             actual: 140,
                             frequency: 'quarterly',
+                            upcomingAmount: 0,
                         },
                     ],
                 },
@@ -610,6 +593,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 1000,
                             actual: 1000,
                             frequency: 'monthly',
+                            upcomingAmount: 0,
                         },
                     ],
                 },
@@ -633,6 +617,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 25,
                             actual: 25,
                             frequency: 'weekly',
+                            upcomingAmount: 0,
                         },
                         {
                             id: '2',
@@ -640,6 +625,7 @@ describe('AnalyzeDisplayService', () => {
                             predicted: 100,
                             actual: 100,
                             frequency: 'half-year',
+                            upcomingAmount: 0,
                         },
                     ],
                 },
@@ -728,72 +714,6 @@ describe('AnalyzeDisplayService', () => {
             const result = stripAnsi(service.formatAnalysisReport(data, false));
 
             expect(result).not.toContain('disposable pool:');
-        });
-    });
-
-    describe('budget rollup warning', () => {
-        it('should warn and name the transaction when one is in both a bill and a budget', () => {
-            const data = createBasicReportData();
-            data.budgetRollupTransactions = [createMockTransaction('LeetCode', 39, 'withdrawal')];
-            data.budgetRollupCorrection = 39;
-
-            const result = stripAnsi(service.formatAnalysisReport(data, false));
-
-            expect(result).toContain('1 budgeted transaction is charged to another section');
-            expect(result).toContain('LeetCode');
-
-            expect(result).toContain('budget');
-            // and it appears in the itemized adjustments so the column still sums
-            expect(result).toContain('Budget Rollup Adj');
-        });
-
-        it('should pluralize for multiple overlapping transactions', () => {
-            const data = createBasicReportData();
-            data.budgetRollupTransactions = [
-                createMockTransaction('LeetCode', 39, 'withdrawal'),
-                createMockTransaction('Gym', 25, 'withdrawal'),
-            ];
-            data.budgetRollupCorrection = 64;
-
-            const result = stripAnsi(service.formatAnalysisReport(data, false));
-
-            expect(result).toContain('2 budgeted transactions are charged to another section');
-        });
-
-        it('should still warn when the correction was clamped to zero', () => {
-            // The adjustment is capped by what each bucket actually subtracted,
-            // so a genuinely double-claimed transaction can carry a $0
-            // adjustment. That is exactly when the user most needs telling.
-            const data = createBasicReportData();
-            data.budgetRollupTransactions = [createMockTransaction('LeetCode', 39, 'withdrawal')];
-            data.budgetRollupCorrection = 0;
-
-            const result = stripAnsi(service.formatAnalysisReport(data, false));
-
-            expect(result).toContain('1 budgeted transaction is charged to another section');
-            expect(result).toContain('LeetCode');
-        });
-
-        it('should state the adjustment actually applied, not the raw overlap', () => {
-            const data = createBasicReportData();
-            data.budgetRollupTransactions = [
-                createMockTransaction('LeetCode', 39, 'withdrawal'),
-                createMockTransaction('Gym', 25, 'withdrawal'),
-            ];
-            data.budgetRollupCorrection = 39; // partially clamped
-
-            const result = stripAnsi(service.formatAnalysisReport(data, false));
-
-            expect(result).toContain('net adjustment applied: $39.00');
-        });
-
-        it('should stay silent when nothing overlaps', () => {
-            const data = createBasicReportData();
-
-            const result = stripAnsi(service.formatAnalysisReport(data, false));
-
-            expect(result).not.toContain('charged to another section');
-            expect(result).not.toContain('Budget Rollup Adj');
         });
     });
 });

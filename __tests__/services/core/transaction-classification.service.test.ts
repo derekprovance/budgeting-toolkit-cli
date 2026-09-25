@@ -1,5 +1,8 @@
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
+import { Bucket } from '../../../src/services/core/transaction-classification.service.interface.js';
+import { AccountScope } from '../../../src/services/core/account-scope.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { deposit, transfer, withdrawal } from '../../shared/test-data.js';
 
 const DISPOSABLE_INCOME_TAG = 'Disposable Income';
 const PAYCHECK_TAG = 'Paycheck';
@@ -77,30 +80,6 @@ describe('TransactionClassificationService', () => {
         });
     });
 
-    describe('isSupplementedByDisposable', () => {
-        it('should return true when tags include Disposable Income', () => {
-            const tags = [DISPOSABLE_INCOME_TAG, 'other'];
-            expect(service.isSupplementedByDisposable(tags)).toBe(true);
-        });
-
-        it('should return false when tags do not include Disposable Income', () => {
-            const tags = ['other'];
-            expect(service.isSupplementedByDisposable(tags)).toBe(false);
-        });
-
-        it('should return false when tags is null', () => {
-            expect(service.isSupplementedByDisposable(null)).toBe(false);
-        });
-
-        it('should return false when tags is undefined', () => {
-            expect(service.isSupplementedByDisposable(undefined)).toBe(false);
-        });
-
-        it('should return false when tags is empty array', () => {
-            expect(service.isSupplementedByDisposable([])).toBe(false);
-        });
-    });
-
     describe('isDeposit', () => {
         it('should return true for deposit transactions', () => {
             const transaction = { type: 'deposit' } as TransactionSplit;
@@ -145,6 +124,11 @@ describe('TransactionClassificationService', () => {
             const transaction = { budget_id: null } as TransactionSplit;
             expect(service.hasBudget(transaction)).toBe(false);
         });
+
+        it('should return false when budget_id is empty', () => {
+            const transaction = { budget_id: '' } as TransactionSplit;
+            expect(service.hasBudget(transaction)).toBe(false);
+        });
     });
 
     describe('isPaycheck', () => {
@@ -176,58 +160,8 @@ describe('TransactionClassificationService', () => {
         });
 
         it('should return false when tags is empty array', () => {
-            const transaction = { tags: [] } as TransactionSplit;
+            const transaction = { tags: [] as string[] } as TransactionSplit;
             expect(service.isPaycheck(transaction)).toBe(false);
-        });
-
-        describe('paycheckDestinationAccounts', () => {
-            const withAccounts = (accounts: string[]) =>
-                new TransactionClassificationService(DISPOSABLE_INCOME_TAG, PAYCHECK_TAG, accounts);
-
-            it('should accept a tagged transaction landing in a configured account', () => {
-                const transaction = {
-                    tags: [PAYCHECK_TAG],
-                    destination_id: '1',
-                } as TransactionSplit;
-
-                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(true);
-            });
-
-            it('should reject a tagged transaction landing elsewhere', () => {
-                // Payroll split across accounts: a stray tag on the savings
-                // half must not be charged to the paycheck bucket.
-                const transaction = {
-                    tags: [PAYCHECK_TAG],
-                    destination_id: '2',
-                } as TransactionSplit;
-
-                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(false);
-            });
-
-            it('should reject a tagged transaction with no destination', () => {
-                const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
-
-                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(false);
-            });
-
-            it('should let the tag alone decide when no accounts are configured', () => {
-                const transaction = {
-                    tags: [PAYCHECK_TAG],
-                    destination_id: '99',
-                } as TransactionSplit;
-
-                expect(withAccounts([]).isPaycheck(transaction)).toBe(true);
-                expect(service.isPaycheck(transaction)).toBe(true);
-            });
-
-            it('should still require the tag even for a configured account', () => {
-                const transaction = {
-                    tags: ['Other'],
-                    destination_id: '1',
-                } as TransactionSplit;
-
-                expect(withAccounts(['1']).isPaycheck(transaction)).toBe(false);
-            });
         });
 
         it('should support custom paycheck tag name', () => {
@@ -251,19 +185,162 @@ describe('TransactionClassificationService', () => {
             const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
             expect(customService.isPaycheck(transaction)).toBe(false);
         });
+    });
 
-        it('should work for both deposit and transfer type transactions', () => {
-            const depositTransaction = {
-                type: 'deposit',
-                tags: [PAYCHECK_TAG],
-            } as TransactionSplit;
-            expect(service.isPaycheck(depositTransaction)).toBe(true);
+    describe('classify', () => {
+        // Checking and a card are the envelope; savings and the pool are outside
+        const CHK = '1';
+        const CC = '2';
+        const SAV = '3';
+        const POOL = '4';
+        const scope: AccountScope = {
+            envelope: new Set([CHK, CC]),
+            income: new Set([CHK]),
+        };
+        const PAYCHECK = [PAYCHECK_TAG];
+        const DISPOSABLE = [DISPOSABLE_INCOME_TAG];
 
-            const transferTransaction = {
-                type: 'transfer',
-                tags: [PAYCHECK_TAG],
-            } as TransactionSplit;
-            expect(service.isPaycheck(transferTransaction)).toBe(true);
+        const cases: [string, TransactionSplit, Bucket | null][] = [
+            // Withdrawals: the account decides scope, markers pick the bucket
+            [
+                '[R-BUCKET-1] unmarked card purchase',
+                withdrawal(10, { source_id: CC }),
+                'unbudgeted',
+            ],
+            [
+                '[R-BUCKET-1] unmarked checking debit',
+                withdrawal(10, { source_id: CHK }),
+                'unbudgeted',
+            ],
+            [
+                '[R-BUCKET-1] budgeted card purchase',
+                withdrawal(10, { source_id: CC, budget_id: '9' }),
+                'budget',
+            ],
+            [
+                '[R-BUCKET-1] disposable beats budget',
+                withdrawal(10, { source_id: CC, budget_id: '9', tags: DISPOSABLE }),
+                'disposable',
+            ],
+            [
+                '[R-BUCKET-1] bill beats budget and tag',
+                withdrawal(10, { source_id: CC, bill_id: '7', budget_id: '9', tags: DISPOSABLE }),
+                'bill',
+            ],
+            [
+                '[R-BUCKET-1] subscription link is a bill',
+                withdrawal(10, { source_id: CHK, subscription_id: '7' }),
+                'bill',
+            ],
+            [
+                '[R-SCOPE-2] budgeted savings withdrawal',
+                withdrawal(10, { source_id: SAV, budget_id: '9' }),
+                null,
+            ],
+            [
+                '[R-SCOPE-2] bill paid from the pool',
+                withdrawal(10, { source_id: POOL, bill_id: '7' }),
+                null,
+            ],
+            [
+                '[R-SCOPE-2] disposable-tagged savings withdrawal',
+                withdrawal(10, { source_id: SAV, tags: DISPOSABLE }),
+                null,
+            ],
+            ['[R-SCOPE-2] withdrawal with no source', withdrawal(10, { source_id: null }), null],
+
+            // Transfers
+            ['[R-XFER-1] card payment', transfer(10, { source_id: CHK, destination_id: CC }), null],
+            [
+                '[R-XFER-2] savings top-up',
+                transfer(10, { source_id: SAV, destination_id: CHK }),
+                null,
+            ],
+            [
+                '[R-XFER-2] pool reimbursement',
+                transfer(10, { source_id: POOL, destination_id: CHK }),
+                null,
+            ],
+            [
+                '[R-XFER-3] extra to savings',
+                transfer(10, { source_id: CHK, destination_id: SAV }),
+                'unbudgeted',
+            ],
+            [
+                '[R-XFER-3] pool top-up, whatever it is tagged',
+                transfer(10, { source_id: CHK, destination_id: POOL, tags: DISPOSABLE }),
+                'unbudgeted',
+            ],
+            [
+                '[R-XFER-3] transfer with no destination',
+                transfer(10, { source_id: CHK, destination_id: null }),
+                'unbudgeted',
+            ],
+            [
+                '[R-SCOPE-2] savings to pool',
+                transfer(10, { source_id: SAV, destination_id: POOL }),
+                null,
+            ],
+
+            // Income
+            [
+                '[R-INCOME-1] paycheck into checking',
+                deposit(10, { destination_id: CHK, tags: PAYCHECK }),
+                'paycheck',
+            ],
+            [
+                '[R-INCOME-1] freelance pay into checking',
+                deposit(10, { destination_id: CHK }),
+                'additionalIncome',
+            ],
+            [
+                '[R-INCOME-2] stray paycheck tag on the savings half',
+                deposit(10, { destination_id: SAV, tags: PAYCHECK }),
+                null,
+            ],
+            ['[R-INCOME-2] pool interest', deposit(10, { destination_id: POOL }), null],
+            [
+                '[R-INCOME-2] paycheck tag on a card deposit',
+                deposit(10, { destination_id: CC, tags: PAYCHECK }),
+                'unbudgeted',
+            ],
+
+            // Refunds
+            [
+                '[R-REFUND-1] unmarked card refund',
+                deposit(10, { destination_id: CC }),
+                'unbudgeted',
+            ],
+            [
+                '[R-REFUND-1] disposable refund on the card',
+                deposit(10, { destination_id: CC, tags: DISPOSABLE }),
+                'disposable',
+            ],
+            [
+                '[R-REFUND-1] disposable refund into checking',
+                deposit(10, { destination_id: CHK, tags: DISPOSABLE }),
+                'disposable',
+            ],
+            [
+                '[R-REFUND-1] bill refund into checking',
+                deposit(10, { destination_id: CHK, bill_id: '7' }),
+                'bill',
+            ],
+            [
+                '[R-REFUND-1] paycheck tag wins over a marker',
+                deposit(10, { destination_id: CHK, tags: [...PAYCHECK, ...DISPOSABLE] }),
+                'paycheck',
+            ],
+        ];
+
+        it.each(cases)('%s', (_name, transaction, expected) => {
+            expect(service.classify(transaction, scope)).toBe(expected);
+        });
+
+        it('should count an unknown transaction type nowhere', () => {
+            const opening = withdrawal(10, { source_id: CHK });
+            opening.type = 'opening balance' as TransactionSplit['type'];
+            expect(service.classify(opening, scope)).toBeNull();
         });
     });
 });

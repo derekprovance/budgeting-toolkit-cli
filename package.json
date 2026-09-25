@@ -1,6 +1,6 @@
 {
     "name": "budgeting-toolkit-cli",
-    "version": "9.0.0",
+    "version": "10.0.0",
     "type": "module",
     "main": "./dist/index.js",
     "exports": {
@@ -13,10 +13,12 @@
         "test": "NODE_OPTIONS=--experimental-vm-modules jest",
         "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
         "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-        "test:e2e": "bash scripts/e2e-test.sh",
-        "test:e2e:docker": "ENV_FILE=.env.dev bash scripts/e2e-test.sh",
-        "seed:docker": "ENV_FILE=.env.dev node --import tsx/esm scripts/seed-test-data.ts",
-        "db:dump": "docker compose exec db pg_dump -U firefly --clean --if-exists --no-owner --no-acl firefly > docker/db-init/01-seed.sql",
+        "typecheck:tests": "tsc -p tsconfig.test.json",
+        "test:e2e": "bash scripts/e2e/run.sh",
+        "test:e2e:reuse": "E2E_REUSE=1 bash scripts/e2e/run.sh",
+        "e2e:up": "bash scripts/e2e/up.sh",
+        "e2e:seed": "tsx scripts/e2e/seed.ts",
+        "e2e:down": "docker compose -f docker-compose.e2e.yml down -v --remove-orphans",
         "linter": "eslint . && prettier . --write",
         "prepack": "npm run compile",
         "dev:install": "npm pack && npm install -g *.tgz && rm -f *.tgz"

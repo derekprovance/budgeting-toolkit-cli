@@ -7,13 +7,11 @@ import {
     MerchantInsight,
 } from '../types/dto/budget-limit.dto.js';
 import { BudgetReportService } from './budget-report.service.js';
-import { IBudgetService } from './core/budget.service.interface.js';
-import { TransactionService } from './core/transaction.service.js';
+import { CashFlowService, MonthBuckets } from './cash-flow.service.js';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
-import { ITransactionClassificationService } from './core/transaction-classification.service.interface.js';
 
 /**
  * Service for aggregating and analyzing budget data with historical context
@@ -22,9 +20,7 @@ import { ITransactionClassificationService } from './core/transaction-classifica
 export class BudgetAnalyticsService {
     constructor(
         private readonly budgetReportService: BudgetReportService,
-        private readonly budgetService: IBudgetService,
-        private readonly transactionService: TransactionService,
-        private readonly transactionClassificationService: ITransactionClassificationService
+        private readonly cashFlowService: CashFlowService
     ) {}
 
     /**
@@ -61,21 +57,24 @@ export class BudgetAnalyticsService {
                     this.budgetReportService.getBudgetReport(prevMonth, prevYear)
                 )
             );
-            const historicalData: BudgetLimitDto[][] = historicalResults.map(result =>
-                result.ok ? result.value : []
-            );
+            const historicalData: BudgetLimitDto[][] = historicalResults.map((result, i) => {
+                if (result.ok) {
+                    return result.value;
+                }
+                // Shown as no history rather than failing the report, but never silently
+                logger.warn(
+                    { ...historicalMonths[i], error: result.error.message },
+                    'Budget history unavailable for a previous month - its figures show as 0'
+                );
+                return [];
+            });
 
-            // Get all transactions for statistics
-            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
+            // Statistics describe the same budget bucket the rows total
+            const budgetTransactions = (await this.getBuckets(month, year)).budget;
 
             // Enhance each budget with statistics and historical data
             const enhanced = currentBudgets.map(budget => {
-                const stats = this.calculateBudgetStatistics(
-                    budget.budgetId,
-                    month,
-                    year,
-                    transactions
-                );
+                const stats = this.calculateBudgetStatistics(budget.budgetId, budgetTransactions);
 
                 const historical = this.calculateHistoricalComparison(
                     budget.budgetId,
@@ -126,12 +125,12 @@ export class BudgetAnalyticsService {
         logger.debug({ month, year, limit }, 'Fetching top expenses');
 
         try {
-            const transactions = await this.transactionService.getTransactionsForMonth(month, year);
-
-            // Firefly returns all amounts positive — spending is identified by
-            // type, not by sign
-            const expenses = transactions.filter(t =>
-                this.transactionClassificationService.isWithdrawal(t)
+            // What the envelope paid for (RULES.md): the buckets in the net,
+            // less refunds. Disposable purchases are the pool's (R-DISP-1), and
+            // outside accounts never appear.
+            const buckets = await this.getBuckets(month, year);
+            const expenses = [...buckets.bill, ...buckets.budget, ...buckets.unbudgeted].filter(
+                t => t.type !== 'deposit'
             );
 
             // Sort by amount descending
@@ -163,23 +162,26 @@ export class BudgetAnalyticsService {
         }
     }
 
+    private async getBuckets(month: number, year: number): Promise<MonthBuckets> {
+        const result = await this.cashFlowService.getBuckets(month, year);
+        if (!result.ok) {
+            throw new Error(result.error.message);
+        }
+        return result.value;
+    }
+
     /**
      * Calculates transaction statistics for a budget
      * @param budgetId Budget ID
-     * @param month Month (1-12)
-     * @param year Year
-     * @param allTransactions All transactions for the month (for efficiency)
+     * @param bucket The month's budget bucket
      * @returns Transaction statistics
      */
     private calculateBudgetStatistics(
         budgetId: string,
-        month: number,
-        year: number,
-        allTransactions: TransactionSplit[]
+        bucket: TransactionSplit[]
     ): TransactionStats {
         try {
-            // Filter transactions for this budget
-            const budgetTransactions = allTransactions.filter(t => t.budget_id === budgetId);
+            const budgetTransactions = bucket.filter(t => t.budget_id === budgetId);
 
             if (budgetTransactions.length === 0) {
                 return {
@@ -190,9 +192,7 @@ export class BudgetAnalyticsService {
 
             // Calculate count and average
             const count = budgetTransactions.length;
-            // Signed: budgetTransactions is filtered by budget_id alone, so a
-            // budgeted refund is in the set. useAbsolute would let that refund
-            // inflate the average instead of reducing it.
+            // Signed, so a refund in the bucket reduces the average
             const totalAmount = TransactionCalculationUtils.calculateNetSpend(
                 budgetTransactions,
                 logger

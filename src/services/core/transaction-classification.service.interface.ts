@@ -1,10 +1,30 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { AccountScope } from './account-scope.service.js';
+
+/** Where a transaction is charged. See RULES.md. */
+export type Bucket =
+    'paycheck' | 'additionalIncome' | 'bill' | 'disposable' | 'budget' | 'unbudgeted';
+
+export const BUCKETS: readonly Bucket[] = [
+    'paycheck',
+    'additionalIncome',
+    'bill',
+    'disposable',
+    'budget',
+    'unbudgeted',
+];
 
 /**
  * Interface for TransactionClassificationService
  * Enables dependency injection and testing without mocking ESM modules
  */
 export interface ITransactionClassificationService {
+    /**
+     * The one bucket a transaction is charged to, or null when it is counted
+     * nowhere
+     */
+    classify(transaction: TransactionSplit, scope: AccountScope): Bucket | null;
+
     /**
      * Checks if transaction is a transfer
      */
@@ -19,11 +39,6 @@ export interface ITransactionClassificationService {
      * Checks if transaction is tagged as disposable income
      */
     isDisposableIncome(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction is supplemented by disposable income
-     */
-    isSupplementedByDisposable(tags: string[] | null | undefined): boolean;
 
     /**
      * Checks if transaction is a deposit

@@ -1,391 +1,240 @@
-# Docker Development Environment
+# Docker
 
-Docker setup for testing the Budgeting Toolkit CLI with Firefly III locally.
+There are two Firefly III stacks, and they share nothing:
 
-## Overview
+| Stack | Compose file             | Purpose                                            | Data                        |
+| ----- | ------------------------ | -------------------------------------------------- | --------------------------- |
+| Dev   | `docker-compose.yml`     | A local Firefly to click around in and run the CLI | Named volume, persists      |
+| E2E   | `docker-compose.e2e.yml` | Driven by `npm run test:e2e`; never used by hand   | tmpfs, gone on every `down` |
 
-Services included:
+Both run the same pinned images (verified in `test-harness/VERIFICATION.md`):
 
-- **Firefly III** - Personal finance manager (port 8080)
-- **PostgreSQL** - Database backend (port 5432)
-- **Data Importer** - CSV import tool (port 8081)
+- `fireflyiii/core:version-6.6.6@sha256:ae69fdd9…`
+- `postgres:18.6-alpine@sha256:77f58511…`
+- `fireflyiii/data-importer:version-2.3.5@sha256:26276443…` (dev only, optional)
 
-## Quick Start
+Bump a version by changing tag **and** digest together, then rerun the e2e
+suite: the harness's recorded Firefly behavior (`firefly-contract.ts`) is only
+verified against the pinned version.
 
-### 1. Configure Environment
+Everything binds to **127.0.0.1** only. Postgres publishes no port at all.
 
-```bash
-# Copy template
-cp .env.example .env.dev
+## Dev stack
 
-# Edit .env.dev and set:
-# - FIREFLY_API_TOKEN (generate after setup)
-# - ANTHROPIC_API_KEY (if using AI features)
-```
-
-The `.env.dev` file is gitignored and safe for local secrets.
-
-### 2. Start Services
+### 1. Container settings: `.env.docker`
 
 ```bash
-# Start all services
-docker compose up -d
-
-# Check status
-docker compose ps
+cp .env.docker.example .env.docker
+# Fill in POSTGRES_PASSWORD (openssl rand -hex 24)
+# and FIREFLY_APP_KEY, exactly 32 chars (openssl rand -hex 16)
 ```
 
-### 3. Setup Firefly III
+`.env.docker` is gitignored and holds **only** container settings:
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `FIREFLY_APP_KEY`. Every
+value is required; compose refuses to start with a clear `${VAR:?}` message if
+one is missing. There is no default password and no fallback APP_KEY.
 
-Wait 1-2 minutes for initialization, then:
+CLI secrets (`FIREFLY_API_TOKEN`, `ANTHROPIC_API_KEY`) never go in this file and
+never reach a container.
 
-1. Open http://localhost:8080
-2. Register new account (first user becomes admin)
-3. Complete setup wizard
-
-**Default test credentials (Docker environment only):**
-
-- Email: `test@test.com`
-- Password: `thisisatestpassword`
-
-### 4. Generate API Token
-
-1. In Firefly: **Options** → **Profile** → **OAuth**
-2. Under **Personal Access Tokens**, click **Create New Token**
-3. Name: `Budgeting Toolkit CLI`
-4. Copy token and add to `.env.dev`:
+### 2. Start
 
 ```bash
-FIREFLY_API_TOKEN=<your_token_here>
+docker compose --env-file .env.docker up -d --wait
 ```
 
-### 5. Verify Connection
+`--env-file` is required: the `${VAR:?}` checks are resolved at interpolation
+time, and the `env_file:` entry alone does not feed interpolation. `--wait`
+returns once Postgres (`pg_isready`) and Firefly (`/health`) are healthy, which
+takes seconds on a warm machine. The first boot runs Firefly's migrations and
+takes longer.
+
+Firefly is at http://localhost:8080.
+
+To also start the Data Importer (http://localhost:8081):
 
 ```bash
-# Test CLI connection
-npm run start:dev -- report -m 1
+docker compose --env-file .env.docker --profile importer up -d --wait
 ```
 
-## E2E Testing
+Configure the importer's Firefly URL (`http://firefly:8080`) and a token in its
+own UI; no CLI secret is passed to it.
 
-### Seed Test Data
+### 3. First user and API token
 
-Before running E2E tests, seed the Docker environment with realistic end-of-month test data:
+The dev stack has no automated bootstrap. `scripts/e2e/up.sh` is hard-wired to
+the `btk-e2e` project and its `e2e@btk.invalid` user, so it cannot be pointed at
+the dev stack. Create both by hand once per volume:
+
+1. Open http://localhost:8080 and register (the first user becomes the owner).
+2. **Options → Profile → OAuth → Personal Access Tokens → Create New Token.**
+3. Put the CLI settings in `.env.dev` (gitignored):
 
 ```bash
-npm run seed:docker
+FIREFLY_API_URL=http://localhost:8080   # no /api suffix, no trailing slash
+FIREFLY_API_TOKEN=<token>
+ANTHROPIC_API_KEY=<key>                  # only for categorize
 ```
 
-This creates accounts, budgets, bills, and a full month of transactions that simulate a real end-of-month finalization:
-
-| Data                | Detail                                                                       |
-| ------------------- | ---------------------------------------------------------------------------- |
-| Asset account       | Test Checking                                                                |
-| Revenue accounts    | Test Employer, Test Side Income                                              |
-| Expense accounts    | Test Groceries Store, Test Dining, Test Netflix, Test Gas Station, Test Misc |
-| Budgets             | Groceries ($500), Dining ($200), Entertainment ($100)                        |
-| Bills               | Rent ($1,500/mo), Netflix ($15.99/mo)                                        |
-| Paycheck deposit    | $4,000 on the 1st (tagged `Paycheck`)                                        |
-| Bill payments       | Rent + Netflix paid                                                          |
-| Budgeted expenses   | Groceries $355 · Dining $130                                                 |
-| Unbudgeted expenses | Gas $55 · misc $30                                                           |
-| Additional income   | Freelance $350 mid-month                                                     |
-| Uncategorized       | 1 transaction tagged `e2e-test` (for categorize dry-run)                     |
-
-The script also writes `scripts/e2e-config.yaml` with the real account IDs from the newly created accounts.
-
-> **Re-run after `docker compose down -v`**: The seed script must be run again any time the Docker volumes are wiped, since account IDs change with each fresh database.
-
-### Run E2E Tests
+### 4. Run the CLI against it
 
 ```bash
-npm run test:e2e:docker
+npm run start:dev -- report -m 1       # ENV_FILE=.env.dev
+npm run start:dev -- analyze -m 1 --json
 ```
 
-This runs three CLI commands against the live Firefly III instance:
-
-1. `analyze` — validates full cash flow analysis (paycheck, bills, budget, unbudgeted, additional income)
-2. `report` — validates budget report rendering with spending visualizations
-3. `categorize --dry-run` — validates AI categorization pipeline against the `e2e-test` tagged transaction without mutating data
-
-To run E2E tests against your local `.env`:
-
-```bash
-npm run test:e2e
-```
-
-### Full E2E Workflow (first time)
-
-```bash
-docker compose up -d            # Start services
-# Complete Firefly setup at http://localhost:8080
-# Generate API token → add to .env.dev
-npm run seed:docker             # Create test data + write e2e-config.yaml
-npm run test:e2e:docker         # Run E2E tests
-```
-
-### 6. Import Custom Test Data
-
-For custom data beyond the seed script, use the Data Importer at http://localhost:8081:
-
-1. Configure connection:
-    - Firefly URL: `http://firefly:8080`
-    - Token: Your API token
-2. Upload CSV files
-3. Map columns and import
-
-## Development Workflows
-
-### npm run Scripts (Recommended)
-
-Best for active development with TypeScript:
-
-```bash
-# Run without compilation
-npm run start:dev -- report -m 1
-npm run start:dev -- analyze -m 1
-npm run start:dev -- categorize Import-2024
-```
-
-### Production Mode
-
-Compile and run:
-
-```bash
-npm run compile
-btk report -m 1
-```
-
-### Environment Separation
-
-- **Production**: `npm start` or `btk` (uses `.env`)
-- **Docker**: `npm run start:dev` (uses `.env.dev`)
-
-## Docker Commands
-
-### Service Management
-
-```bash
-# Start/stop
-docker compose up -d
-docker compose stop
-docker compose restart firefly
-
-# Remove containers (keeps data)
-docker compose down
-
-# Remove everything including data
-docker compose down -v
-
-# View logs
-docker compose logs -f firefly
-docker compose logs -f db
-```
-
-### Database Access
-
-#### Via psql CLI
-
-```bash
-docker compose exec db psql -U firefly -d firefly
-
-# Example queries
-\dt                          # List tables
-SELECT * FROM users;         # View users
-SELECT * FROM transactions;  # View transactions
-```
-
-### Backup and Restore
-
-```bash
-# Backup
-docker compose exec db pg_dump -U firefly firefly > backup.sql
-
-# Restore
-docker compose exec -T db psql -U firefly firefly < backup.sql
-```
-
-## Configuration
-
-### Environment Variables (.env.dev)
-
-**Required:**
-
-- `FIREFLY_APP_KEY` - Exactly 32 characters for encryption
-- `FIREFLY_API_URL` - Set to `http://localhost:8080`
-- `FIREFLY_API_TOKEN` - Generate from Firefly UI
-
-**Optional:**
-
-- `ANTHROPIC_API_KEY` - For AI categorization
-- `LOG_LEVEL` - Set to `debug` for verbose logging
-- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` - Database credentials
-
-**Not Required:**
-
-- `CLIENT_CERT_*` - Skip for local Docker (no mTLS needed)
-
-### Ports
-
-Configurable in `.env.dev`:
-
-- Firefly III: `8080`
-- Data Importer: `8081`
-- PostgreSQL: `5432`
-
-## Troubleshooting
-
-### Firefly Won't Start
-
-```bash
-# Check logs
-docker compose logs firefly
-
-# Common issues:
-# - APP_KEY must be 32 characters exactly
-# - Database not ready - wait longer
-# - Port 8080 in use
-```
-
-### Database Connection Errors
-
-```bash
-# Check DB health
-docker compose ps db
-docker compose logs db
-
-# Test connection
-docker compose exec db psql -U firefly -d firefly -c "SELECT 1;"
-```
-
-### API Returns 401 Unauthorized
-
-1. Verify token in `.env.dev`
-2. Regenerate token in Firefly UI
-3. Check URL format: `http://localhost:8080` (no /api/v1 suffix or trailing slash)
-
-### Permission Errors
-
-```bash
-# Fix storage permissions
-docker compose exec firefly chown -R www-data:www-data /var/www/html/storage
-```
-
-### Reset Everything
-
-```bash
-# Nuclear option - removes all data
-docker compose down -v
-docker volume prune -f
-docker compose up -d
-```
-
-## Advanced Configuration
-
-### Switch to MySQL
-
-Edit `docker-compose.yml`:
-
-```yaml
-db:
-    image: mysql:8
-    environment:
-        MYSQL_ROOT_PASSWORD: root_secret
-        MYSQL_DATABASE: firefly
-        MYSQL_USER: firefly
-        MYSQL_PASSWORD: firefly_secret
-
-firefly:
-    environment:
-        DB_CONNECTION: mysql
-        DB_PORT: 3306
-```
-
-Then restart:
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-### Update config.yaml
-
-Match configuration to your test data:
-
-Account scope is **derived** from Firefly's account roles, so a test config
-names no accounts at all — leave the override lists empty and add only what your
-seeded data actually needs:
+The envelope is derived from Firefly's accounts, so a dev `config.yaml` names
+only what is outside it (see RULES.md):
 
 ```yaml
 expectedMonthlyPaycheck: 3500
 
-# Accounts outside the cost-of-living envelope. Deposits to them are not income
-# AND withdrawals from them are not spending — both sides move together.
+# Savings, any brokerage, the disposable pool
 untrackedAccounts:
-    - '2' # Savings
-
-# Accounts a Paycheck-tagged deposit must land in to count as the paycheck
-paycheckDestinationAccounts:
-    - '1' # Main Checking
+    - '2'
 ```
 
-Do **not** add `PAYROLL` to `excludedAdditionalIncomePatterns` — use
-`untrackedAccounts` instead. A description pattern fixes only the income side and
-leaves spending from that account charged against your budget; the account
-boundary excludes both sides at once. See CONFIG.md.
+See CONFIG.md.
 
-`incomeDestinationAccounts` / `expenseSourceAccounts` still exist but are
-**overrides that disable derivation entirely**. Set them only when a Firefly
-`account_role` is wrong and you would rather not fix it there.
+There is no seed script for the dev stack. Enter data by hand or through the
+Data Importer. The e2e scenario is not meant to be loaded into it.
 
-## Typical Development Session
+### Service management
 
 ```bash
-# 1. First time setup
-cp .env.example .env.dev
-# Edit .env.dev
-
-# 2. Start environment
-docker compose up -d
-
-# 3. Setup Firefly (first time)
-# - Open http://localhost:8080
-# - Register admin account (test@test.com / thisisatestpassword for Docker)
-# - Generate API token (Options → Profile → OAuth → Personal Access Tokens)
-# - Add token to .env.dev
-
-# 4. Seed test data (first time, or after docker compose down -v)
-npm run seed:docker
-
-# 5. Run E2E tests
-npm run test:e2e:docker
-
-# 6. Make changes and test
-npm test
-npm run start:dev -- analyze -m 1
-
-# 7. Stop when done
-docker compose stop
+docker compose --env-file .env.docker ps
+docker compose --env-file .env.docker logs -f firefly
+docker compose --env-file .env.docker restart firefly
+docker compose --env-file .env.docker stop           # keep containers and data
+docker compose --env-file .env.docker down           # remove containers, keep data
+docker compose --env-file .env.docker down -v        # remove data too
 ```
 
-## Additional Resources
-
-- [Firefly III Documentation](https://docs.firefly-iii.org/)
-- [Firefly III API Docs](https://api-docs.firefly-iii.org/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-
-## Clean Up
+### Database access
 
 ```bash
-# Stop containers, keep data
-docker compose stop
+docker compose --env-file .env.docker exec db psql -U firefly -d firefly
 
-# Remove containers, keep data
-docker compose down
-
-# Remove everything including data
-docker compose down -v
-
-# Remove images too
-docker compose down --rmi all -v
+# Backup / restore
+docker compose --env-file .env.docker exec db pg_dump -U firefly firefly > backup.sql
+docker compose --env-file .env.docker exec -T db psql -U firefly firefly < backup.sql
 ```
+
+`*.sql` and `*.dump` are gitignored. The pg18 image keeps its data under
+`/var/lib/postgresql/18/docker`, so the volume is mounted at
+`/var/lib/postgresql`, not `…/data`.
+
+## E2E stack
+
+`npm run test:e2e` owns this stack end to end. You need Docker, `curl` and
+`openssl`; nothing else, and no manual token steps.
+
+```bash
+npm run test:e2e          # up → seed → jest → down
+npm run test:e2e:reuse    # same, but leave the stack up and reuse its data
+```
+
+Extra arguments go to Jest (`npm run test:e2e -- -t split`).
+
+### Lifecycle
+
+`scripts/e2e/run.sh` runs these steps and installs a `trap` that runs
+`npm run e2e:down` on exit, success or failure, unless `E2E_REUSE=1`.
+
+1. **`npm run e2e:up`** (`scripts/e2e/up.sh`)
+    - Generates `.e2e/app-key` (32 chars), mounted into Firefly as a compose
+      secret via `APP_KEY_FILE`.
+    - `docker compose -f docker-compose.e2e.yml up -d --wait` (project
+      `btk-e2e`). Postgres runs on **tmpfs**, so every fresh `up` starts from an
+      empty database. Firefly runs with `TZ=UTC` and `restart: "no"`.
+    - Resolves Firefly's **ephemeral** host port and refuses to continue unless
+      it is bound to `127.0.0.1`.
+    - Bootstraps inside the container: runs `system:create-first-user` for
+      `e2e@btk.invalid`, creates a Passport personal access client if none
+      exists, and mints a token. It refuses if the database already holds a
+      different user.
+    - Writes `.e2e/env` (`FIREFLY_API_URL`, `FIREFLY_API_TOKEN`, mode 600) and
+      `.e2e/state.json` (port, URL), then smoke-tests `/api/v1/about/user`.
+    - Idempotent: rerun against a running stack, it reuses the user and the
+      token in `.e2e/env` if that token still authenticates.
+2. **`npm run e2e:seed`** (`scripts/e2e/seed.ts` → `test-harness/seed/seed-scenario.ts`)
+   loads the scenario from `test-harness/scenario/ledger.ts`: sets USD as the
+   primary currency (a fresh install is EUR), creates accounts, budgets and
+   limits, bills and transactions, deactivates what the scenario deactivates,
+   reads everything back to prove it persisted, and writes `.e2e/id-map.json`
+   and `.e2e/config.yaml`. It creates the marker tag `btk-e2e-seed-<hash>` last.
+3. **Jest** with `e2e/jest.config.mjs`, in band (60s timeout, one worker). The
+   CLI is spawned as `tsx src/index.ts --config .e2e/config.yaml`.
+4. **`npm run e2e:down`** removes the containers, volumes and data. Afterwards
+   `docker compose -p btk-e2e ps -a` is empty.
+
+### `.e2e/` artifacts
+
+All gitignored, directory mode 700:
+
+| File          | Written by | Contents                                |
+| ------------- | ---------- | --------------------------------------- |
+| `app-key`     | `e2e:up`   | Firefly APP_KEY                         |
+| `env`         | `e2e:up`   | CLI URL and token, mode 600             |
+| `state.json`  | `e2e:up`   | Ephemeral port and URL                  |
+| `id-map.json` | `e2e:seed` | Scenario key → Firefly id               |
+| `config.yaml` | `e2e:seed` | Scenario config with real ids filled in |
+
+### Reuse mode and the seed marker
+
+With `E2E_REUSE=1` the stack stays up after the run, which makes iterating on
+e2e tests fast. The seeder then decides from the marker tag:
+
+- Marker `btk-e2e-seed-<hash>` present and the hash matches the current
+  scenario (`scenarioHash()` over `ledger.ts` + `config.ts`): skip seeding.
+- Data present but no marker, or a marker with a different hash: **abort**.
+  The data cannot be trusted to match the expected values. Run
+  `npm run e2e:down` and start again.
+
+The `split` test creates and deletes its own April transaction, so it leaves
+the seeded months untouched.
+
+### Safety guard
+
+The e2e suite must never reach the real Firefly or Anthropic:
+
+- `.e2e/env` is loaded explicitly; the seeder and global setup call
+  `assertLocalFirefly` (`test-harness/safety.ts`), which rejects any URL not on
+  `127.0.0.1`/`localhost`, and check the token belongs to `e2e@btk.invalid`.
+- The CLI runs with an environment built from scratch (`PATH`, temp `HOME`,
+  `ENV_FILE=.e2e/env`, `BTK_STRICT_CONFIG=1`, `BTK_PAGE_SIZE=10`,
+  `LOG_LEVEL=silent`, `TZ=UTC`) in a temp `cwd`. No `FIREFLY_*` or `ANTHROPIC_*`
+  variable is inherited, and `ANTHROPIC_*` is rejected outright.
+- `BTK_STRICT_CONFIG=1` disables the `./.env`, `~/.budget/.env`,
+  `./config.yaml` and `~/.budget/config.yaml` fallbacks, so a missing artifact
+  is an error rather than a silent switch to your real credentials.
+
+## Troubleshooting
+
+**`required variable … is missing a value`** — the dev stack was started
+without `--env-file .env.docker`, or a value in it is empty.
+
+**Firefly unhealthy / `--wait` times out** — `docker compose … logs firefly`.
+Usual causes: APP_KEY not exactly 32 characters, or port 8080 already in use on
+127.0.0.1 (dev stack only; the e2e stack picks a free port).
+
+**401 from the CLI (dev)** — check the token in `.env.dev` and that
+`FIREFLY_API_URL` is `http://localhost:8080` with no `/api` suffix or trailing
+slash. A token dies with its volume, so recreate it after `down -v`.
+
+**`e2e:up` says the bootstrap failed** — rerun the bootstrap step (`exec -T firefly php`) from `up.sh` without `2>/dev/null` to see Firefly's error.
+`refusing: database already has users` means a stale stack: `npm run e2e:down`.
+
+**Seeder aborts on the marker** — the running e2e database was seeded from a
+different scenario, or by hand. `npm run e2e:down`, then rerun.
+
+**E2E stack left running** — only `test:e2e:reuse` or a killed `run.sh` does
+this. `npm run e2e:down` removes it and its data.
+
+**Storage permission errors (dev)** —
+`docker compose --env-file .env.docker exec firefly chown -R www-data:www-data /var/www/html/storage`.
+
+## Resources
+
+- [Firefly III documentation](https://docs.firefly-iii.org/)
+- [Firefly III API](https://api-docs.firefly-iii.org/)

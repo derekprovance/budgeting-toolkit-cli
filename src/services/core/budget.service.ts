@@ -1,14 +1,8 @@
-import {
-    BudgetLimitRead,
-    BudgetRead,
-    InsightGroup,
-    TransactionSplit,
-} from '@derekprovance/firefly-iii-sdk';
+import { BudgetLimitRead, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { DateUtils } from '../../utils/date.utils.js';
 import { IBudgetService } from './budget.service.interface.js';
-import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 import { logger } from '../../logger.js';
 
@@ -18,34 +12,9 @@ export class BudgetService implements IBudgetService {
         private readonly dateRangeService: IDateRangeService
     ) {}
 
-    async getBudgets(): Promise<BudgetRead[]> {
+    async getBudgets(includeInactive = false): Promise<BudgetRead[]> {
         const budgets = await this.fetchBudgets();
-        return budgets.filter(budget => budget.attributes.active);
-    }
-
-    async getBudgetExpenseInsights(month: number, year: number): Promise<InsightGroup> {
-        DateUtils.validateMonthYear(month, year);
-        const range = this.dateRangeService.getDateRange(month, year);
-
-        let results: InsightGroup | undefined;
-        try {
-            results = await this.client.insight.insightExpenseBudget(
-                range.startDateString,
-                range.endDateString
-            );
-        } catch (error) {
-            throw new Error(
-                `Failed to get budget expense insights for month ${month}: ${error instanceof Error ? error.message : String(error)}`,
-                { cause: error }
-            );
-        }
-
-        if (!results) {
-            throw new Error(
-                `Failed to get budget expense insights for month ${month}: API returned empty response`
-            );
-        }
-        return results;
+        return includeInactive ? budgets : budgets.filter(budget => budget.attributes.active);
     }
 
     async getBudgetLimits(month: number, year: number): Promise<BudgetLimitRead[]> {
@@ -91,27 +60,25 @@ export class BudgetService implements IBudgetService {
         return results.data;
     }
 
-    async getTransactionsWithoutBudget(month: number, year: number): Promise<TransactionSplit[]> {
-        DateUtils.validateMonthYear(month, year);
-        const range = this.dateRangeService.getDateRange(month, year);
-        const data = await fetchAllPages(
-            page =>
-                this.client.budgets.listTransactionWithoutBudget(
-                    undefined, // xTraceId
-                    PAGE_SIZE,
-                    page,
-                    range.startDateString,
-                    range.endDateString
-                ),
-            `fetch transactions without budget for month: ${month}`
-        );
-        return TransactionCalculationUtils.flattenTransactions(data);
-    }
-
     private async fetchBudgets(): Promise<BudgetRead[]> {
         return fetchAllPages(
             page => this.client.budgets.listBudget(undefined, PAGE_SIZE, page),
             'fetch budgets'
         );
     }
+}
+
+/**
+ * Each budget's allocation for the period: the sum of its limits. A budget can
+ * carry several limits in one month; an unparseable amount allocates nothing.
+ * `analyze` and `report` both total allocations through here.
+ */
+export function allocationsByBudget(limits: BudgetLimitRead[]): Map<string, number> {
+    const allocations = new Map<string, number>();
+    for (const limit of limits) {
+        const amount = Number(limit.attributes.amount);
+        const budgetId = String(limit.attributes.budget_id);
+        allocations.set(budgetId, (allocations.get(budgetId) ?? 0) + (isNaN(amount) ? 0 : amount));
+    }
+    return allocations;
 }

@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import Anthropic from '@anthropic-ai/sdk';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import {
@@ -12,6 +12,8 @@ import {
     ClaudeResponseError,
 } from '../../../src/api/claude.client.js';
 import { createMockTransaction } from '../../shared/test-data.js';
+
+type ChatFn = ClaudeClient['chat'];
 
 describe('LLMAssignmentService', () => {
     let service: LLMAssignmentService;
@@ -42,7 +44,7 @@ describe('LLMAssignmentService', () => {
 
         // Create mock dependencies
         mockDeps = {
-            mapTransactionForLLM: jest.fn().mockImplementation(tx => ({
+            mapTransactionForLLM: jest.fn((tx: TransactionSplit) => ({
                 description: tx.description,
                 amount: tx.amount,
                 date: tx.date,
@@ -142,7 +144,7 @@ describe('LLMAssignmentService', () => {
 
         describe('successful assignment', () => {
             beforeEach(() => {
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: ['Groceries', 'Healthcare', 'Groceries'],
                     })
@@ -173,13 +175,15 @@ describe('LLMAssignmentService', () => {
 
                 expect(mockDeps.mapTransactionForLLM).toHaveBeenCalledTimes(3);
                 // Array.map passes (item, index, array) to the callback
-                expect(mockDeps.mapTransactionForLLM).toHaveBeenCalledWith(
+                // (the declared signature takes only the transaction, so the
+                // extra arguments are checked on the raw call record)
+                expect(mockDeps.mapTransactionForLLM.mock.calls[0]).toEqual([
                     expect.objectContaining({
                         description: 'Walmart Supercenter',
                     }),
                     0,
-                    mockTransactions
-                );
+                    mockTransactions,
+                ]);
             });
 
             it('should call Claude client with correct parameters', async () => {
@@ -220,7 +224,7 @@ describe('LLMAssignmentService', () => {
                 const mockResponse = JSON.stringify({
                     categories: ['Groceries', 'Healthcare', 'Groceries'],
                 });
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(mockResponse);
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(mockResponse);
 
                 await service.assign('category', mockTransactions, validCategories);
 
@@ -233,7 +237,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should work with budget assignment type', async () => {
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         budgets: ['Food', 'Medical', 'Food'],
                     })
@@ -291,7 +295,7 @@ describe('LLMAssignmentService', () => {
 
         describe('error handling', () => {
             it('should return default categories on Claude API error', async () => {
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('API Error'));
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(new Error('API Error'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
@@ -303,7 +307,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should return default budgets on Claude API error', async () => {
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('API Error'));
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(new Error('API Error'));
 
                 const result = await service.assign('budget', mockTransactions, validBudgets);
 
@@ -315,7 +319,7 @@ describe('LLMAssignmentService', () => {
                 // so degrading them to the sentinel would sentinel-fill the
                 // rest of the run and still report success.
                 mockClaudeClient.chat = jest
-                    .fn()
+                    .fn<ChatFn>()
                     .mockRejectedValue(new CircuitOpenError('Circuit is open'));
 
                 await expect(
@@ -327,7 +331,7 @@ describe('LLMAssignmentService', () => {
                 // Truncation means the response outgrew llm.maxTokens — a
                 // configuration problem every later chunk will hit too.
                 mockClaudeClient.chat = jest
-                    .fn()
+                    .fn<ChatFn>()
                     .mockRejectedValue(new ClaudeResponseError('truncated', 'Response truncated'));
 
                 await expect(
@@ -337,7 +341,7 @@ describe('LLMAssignmentService', () => {
 
             it('should still degrade a chunk on a recoverable response error', async () => {
                 mockClaudeClient.chat = jest
-                    .fn()
+                    .fn<ChatFn>()
                     .mockRejectedValue(new ClaudeResponseError('empty', 'No content'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);
@@ -346,7 +350,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should report how many transactions went unassigned after degrading', async () => {
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('API Error'));
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(new Error('API Error'));
 
                 await service.assign('category', mockTransactions, validCategories);
 
@@ -362,7 +366,7 @@ describe('LLMAssignmentService', () => {
 
             it('should not report degradation when every chunk succeeds', async () => {
                 mockClaudeClient.chat = jest
-                    .fn()
+                    .fn<ChatFn>()
                     .mockResolvedValue(JSON.stringify({ categories: ['Groceries'] }));
                 (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
                     'Groceries',
@@ -379,7 +383,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should handle parsing errors gracefully', async () => {
-                mockClaudeClient.chat = jest.fn().mockResolvedValue('Invalid JSON');
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue('Invalid JSON');
                 (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(() => {
                     throw new Error('Parse error');
                 });
@@ -390,7 +394,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should handle non-Error objects thrown', async () => {
-                mockClaudeClient.chat = jest.fn().mockRejectedValue('String error');
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue('String error');
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
@@ -398,7 +402,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should handle response count mismatch by returning defaults', async () => {
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: ['Groceries', 'Healthcare'], // Only 2 instead of 3
                     })
@@ -415,7 +419,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should handle invalid category in response by returning defaults', async () => {
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: ['Invalid Category', 'Healthcare', 'Groceries'],
                     })
@@ -436,7 +440,7 @@ describe('LLMAssignmentService', () => {
                     Object.create(Anthropic.AuthenticationError.prototype) as Error,
                     { message: 'Invalid API key provided' }
                 );
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(authError);
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(authError);
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
@@ -456,7 +460,7 @@ describe('LLMAssignmentService', () => {
                     Object.create(Anthropic.PermissionDeniedError.prototype) as Error,
                     { message: 'forbidden' }
                 );
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(permError);
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(permError);
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
@@ -468,7 +472,7 @@ describe('LLMAssignmentService', () => {
                     Object.create(Anthropic.BadRequestError.prototype) as Error,
                     { message: 'invalid model' }
                 );
-                mockClaudeClient.chat = jest.fn().mockRejectedValue(badRequest);
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(badRequest);
 
                 await expect(
                     service.assign('budget', mockTransactions, validBudgets)
@@ -478,7 +482,7 @@ describe('LLMAssignmentService', () => {
             it('should degrade (not throw) on plain errors mentioning auth words', async () => {
                 // String matching is gone: only typed SDK errors are critical
                 mockClaudeClient.chat = jest
-                    .fn()
+                    .fn<ChatFn>()
                     .mockRejectedValue(new Error('authentication failed'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);
@@ -490,7 +494,7 @@ describe('LLMAssignmentService', () => {
         describe('edge cases', () => {
             it('should handle single transaction', async () => {
                 const singleTransaction = [mockTransactions[0]];
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: ['Groceries'],
                     })
@@ -512,7 +516,7 @@ describe('LLMAssignmentService', () => {
                         })
                     );
 
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: Array(10).fill('Groceries'),
                     })
@@ -537,7 +541,7 @@ describe('LLMAssignmentService', () => {
                     // Missing optional fields
                 });
 
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: ['Groceries'],
                     })
@@ -555,7 +559,7 @@ describe('LLMAssignmentService', () => {
 
             it('should handle single valid option', async () => {
                 const singleCategory = ['Groceries'];
-                mockClaudeClient.chat = jest.fn().mockResolvedValue(
+                mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                     JSON.stringify({
                         categories: ['Groceries', 'Groceries', 'Groceries'],
                     })
@@ -589,7 +593,9 @@ describe('LLMAssignmentService', () => {
 
             // Each chat call resolves with the chunk index so ordering is provable
             let call = 0;
-            mockClaudeClient.chat = jest.fn().mockImplementation(async () => String(call++));
+            mockClaudeClient.chat = jest
+                .fn<ChatFn>()
+                .mockImplementation(async () => String(call++));
             (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
                 (_type, resp, count) => Array(count as number).fill(`chunk-${resp as string}`)
             );
@@ -611,7 +617,7 @@ describe('LLMAssignmentService', () => {
             const transactions = makeTransactions(25);
 
             let call = 0;
-            mockClaudeClient.chat = jest.fn().mockImplementation(async () => {
+            mockClaudeClient.chat = jest.fn<ChatFn>().mockImplementation(async () => {
                 const index = call++;
                 if (index === 1) {
                     throw new Error('connection reset');
@@ -637,7 +643,7 @@ describe('LLMAssignmentService', () => {
                 Object.create(Anthropic.AuthenticationError.prototype) as Error,
                 { message: 'invalid key' }
             );
-            mockClaudeClient.chat = jest.fn().mockRejectedValue(authError);
+            mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(authError);
 
             await expect(service.assign('category', transactions, validCategories)).rejects.toThrow(
                 'invalid key'
@@ -647,7 +653,7 @@ describe('LLMAssignmentService', () => {
 
     describe('assignCategories', () => {
         it('should delegate to assign with category type', async () => {
-            mockClaudeClient.chat = jest.fn().mockResolvedValue(
+            mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                 JSON.stringify({
                     categories: ['Groceries', 'Healthcare', 'Groceries'],
                 })
@@ -671,7 +677,7 @@ describe('LLMAssignmentService', () => {
         });
 
         it('should handle errors from assign method', async () => {
-            mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('API Error'));
+            mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(new Error('API Error'));
             (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
                 '(no category)',
                 '(no category)',
@@ -686,7 +692,7 @@ describe('LLMAssignmentService', () => {
 
     describe('assignBudgets', () => {
         it('should delegate to assign with budget type', async () => {
-            mockClaudeClient.chat = jest.fn().mockResolvedValue(
+            mockClaudeClient.chat = jest.fn<ChatFn>().mockResolvedValue(
                 JSON.stringify({
                     budgets: ['Food', 'Medical', 'Food'],
                 })
@@ -710,7 +716,7 @@ describe('LLMAssignmentService', () => {
         });
 
         it('should handle errors from assign method', async () => {
-            mockClaudeClient.chat = jest.fn().mockRejectedValue(new Error('API Error'));
+            mockClaudeClient.chat = jest.fn<ChatFn>().mockRejectedValue(new Error('API Error'));
             (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
                 '(no budget)',
                 '(no budget)',

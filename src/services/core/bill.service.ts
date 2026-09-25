@@ -10,18 +10,6 @@ export class BillService {
         private readonly dateRangeService: IDateRangeService
     ) {}
 
-    async getBills(): Promise<BillRead[]> {
-        return fetchAllPages(
-            page => this.client.bills.listBill(undefined, PAGE_SIZE, page),
-            'fetch bills'
-        );
-    }
-
-    async getActiveBills(): Promise<BillRead[]> {
-        const bills = await this.getBills();
-        return bills.filter(bill => bill.attributes.active ?? false);
-    }
-
     /**
      * Get all bills with pay_dates populated for the specified month.
      * When date range is provided, Firefly III populates the pay_dates array
@@ -42,13 +30,5 @@ export class BillService {
             page => this.client.bills.listBill(undefined, PAGE_SIZE, page, start, end),
             'fetch bills'
         );
-    }
-
-    /**
-     * Get active bills with pay_dates populated for the specified month.
-     */
-    async getActiveBillsForMonth(month: number, year: number): Promise<BillRead[]> {
-        const bills = await this.getBillsForMonth(month, year);
-        return bills.filter(bill => bill.attributes.active ?? false);
     }
 }

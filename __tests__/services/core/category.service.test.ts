@@ -3,8 +3,6 @@ import { CategoryArray, CategoryRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 import { jest } from '@jest/globals';
 
-jest.mock('../../../src/api/firefly-client-with-certs');
-
 describe('CategoryService', () => {
     let service: CategoryService;
     let mockClient: jest.Mocked<FireflyClientWithCerts>;
@@ -33,7 +31,7 @@ describe('CategoryService', () => {
                 },
             ] as CategoryRead[];
 
-            (mockClient.categories.listCategory as jest.Mock).mockResolvedValueOnce({
+            jest.mocked(mockClient.categories.listCategory).mockResolvedValueOnce({
                 data: mockCategories,
             } as CategoryArray);
 
@@ -44,7 +42,7 @@ describe('CategoryService', () => {
         });
 
         it('should throw error when API call fails', async () => {
-            (mockClient.categories.listCategory as jest.Mock).mockRejectedValueOnce(
+            jest.mocked(mockClient.categories.listCategory).mockRejectedValueOnce(
                 new Error('API Error')
             );
 
