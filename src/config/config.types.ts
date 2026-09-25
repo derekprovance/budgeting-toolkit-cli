@@ -7,7 +7,20 @@ export interface AppConfig {
     accounts: AccountsConfig;
     transactions: TransactionsConfig;
     llm: LLMConfig;
+    categorize: CategorizeConfig;
     logging: LoggingConfig;
+}
+
+/**
+ * `categorize` command configuration
+ */
+export interface CategorizeConfig {
+    /**
+     * How many months back to look for an earlier transaction with the same
+     * description, whose category and budget are suggested instead of asking
+     * the AI. 0 disables history.
+     */
+    historyMonths: number;
 }
 
 /**

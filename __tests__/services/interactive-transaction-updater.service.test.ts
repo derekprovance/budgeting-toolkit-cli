@@ -66,6 +66,7 @@ describe('InteractiveTransactionUpdater', () => {
             shouldEditCategoryBudget: jest.fn(),
             getNewCategory: jest.fn(),
             getNewBudget: jest.fn(),
+            printSeparator: jest.fn(),
         } as unknown as jest.Mocked<UserInputService>;
 
         mockAIValidator = {
@@ -148,6 +149,28 @@ describe('InteractiveTransactionUpdater', () => {
                 mockTransaction,
                 'New Category',
                 '2'
+            );
+        });
+
+        it('passes suggestion sources through to the prompt', async () => {
+            mockValidator.validateTransactionData.mockReturnValue(true);
+            mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Skip);
+            mockTransactionService.getTransactionReadBySplit.mockReturnValue(
+                mockTransaction as any
+            );
+
+            await service.updateTransaction(mockTransaction as TransactionSplit, {
+                '1': {
+                    ...mockAIResults['1'],
+                    source: { category: 'history', budget: 'ai' },
+                },
+            });
+
+            expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledWith(
+                mockTransaction,
+                undefined,
+                expect.objectContaining({ source: { category: 'history', budget: 'ai' } })
             );
         });
 
@@ -628,7 +651,8 @@ describe('InteractiveTransactionUpdater', () => {
 
             const result = await service.updateTransaction(
                 mockTransaction as TransactionSplit,
-                mockAIResults
+                mockAIResults,
+                { index: 3, total: 26 }
             );
 
             expect(result.ok).toBe(true);
@@ -638,6 +662,13 @@ describe('InteractiveTransactionUpdater', () => {
             expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledTimes(3);
             expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalledTimes(2);
             expect(mockUserInputService.getNewCategory).toHaveBeenCalledTimes(2);
+            // Every re-prompt keeps its position, but the separator is printed once
+            for (const call of mockUserInputService.askToUpdateTransaction.mock.calls) {
+                expect(call[2]).toEqual(
+                    expect.objectContaining({ progress: { index: 3, total: 26 } })
+                );
+            }
+            expect(mockUserInputService.printSeparator).toHaveBeenCalledTimes(1);
         });
 
         it('should preserve original AI suggestions through multiple edit cycles', async () => {

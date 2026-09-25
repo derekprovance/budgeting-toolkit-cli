@@ -12,10 +12,23 @@ import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
 import { CategorizeMode } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
+import { AIResult } from './ai/llm-transaction-processing.service.js';
 
-export interface AIResults {
-    category?: string;
-    budget?: string;
+export type AIResults = AIResult;
+
+/** Position of a transaction in the review, shown to the user as `[index/total]` */
+export interface ReviewProgress {
+    index: number;
+    total: number;
+}
+
+/** A validated suggestion that will change the transaction, ready to prompt for */
+export interface PreparedUpdate {
+    transaction: TransactionSplit;
+    journalId: string;
+    category?: CategoryProperties;
+    budget?: BudgetRead;
+    source?: AIResult['source'];
 }
 
 /**
@@ -33,18 +46,38 @@ export class InteractiveTransactionUpdater {
     ) {}
 
     /**
-     * Updates a transaction with AI-suggested category and budget.
-     * Returns Result type for explicit error handling.
+     * Updates a transaction with AI-suggested category and budget:
+     * `prepareUpdate` followed by `applyUpdate`.
      *
      * @param transaction The transaction to update
      * @param aiResults The AI-suggested category and budget
-     * @param updateMode The mode indicating what to update (category, budget, or both)
+     * @param progress Position of this transaction in the review, for display
      * @returns Result containing updated transaction or validation error
      */
     async updateTransaction(
         transaction: TransactionSplit,
-        aiResults: Record<string, AIResults>
+        aiResults: Record<string, AIResults>,
+        progress?: ReviewProgress
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        const prepared = await this.prepareUpdate(transaction, aiResults);
+        if (!prepared.ok) {
+            return Result.err(prepared.error);
+        }
+        if (!prepared.value) {
+            return Result.ok(undefined);
+        }
+        return this.applyUpdate(prepared.value, progress);
+    }
+
+    /**
+     * Validates the suggestion for a transaction without prompting. Resolves
+     * to `undefined` when there is nothing to change, so the caller can count
+     * the prompts that will follow before showing the first one.
+     */
+    async prepareUpdate(
+        transaction: TransactionSplit,
+        aiResults: Record<string, AIResults>
+    ): Promise<Result<PreparedUpdate | undefined, TransactionValidationError>> {
         // Validate transaction data
         if (!this.validator.validateTransactionData(transaction, aiResults)) {
             return Result.err({
@@ -72,7 +105,6 @@ export class InteractiveTransactionUpdater {
         }
 
         try {
-            // Validate and prepare update
             const prepareResult = await this.validateAndPrepareUpdate(
                 transaction,
                 aiResults[journalId]
@@ -92,29 +124,63 @@ export class InteractiveTransactionUpdater {
                 return Result.ok(undefined);
             }
 
-            // Handle dry-run mode
+            return Result.ok({
+                transaction,
+                journalId,
+                category,
+                budget,
+                source: aiResults[journalId]?.source,
+            });
+        } catch (error) {
+            return Result.err(this.toUpdateError(transaction, journalId, error));
+        }
+    }
+
+    /**
+     * Shows a prepared update to the user (or reports it in dry-run mode) and
+     * applies their decision.
+     */
+    async applyUpdate(
+        update: PreparedUpdate,
+        progress?: ReviewProgress
+    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        const { transaction, journalId, category, budget, source } = update;
+        try {
             if (this.dryRun) {
                 return this.executeDryRun(transaction, journalId, category, budget);
             }
 
-            // Execute interactive workflow
-            return await this.executeInteractiveUpdate(transaction, category, budget);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.error(
-                { description: transaction.description, error: err.message },
-                'Error processing transaction'
+            return await this.executeInteractiveUpdate(
+                transaction,
+                category,
+                budget,
+                source,
+                progress
             );
-
-            return Result.err({
-                field: 'unknown',
-                message: err.message,
-                userMessage: `Failed to update transaction: ${err.message}`,
-                transactionId: journalId,
-                transactionDescription: transaction.description || 'No description',
-                details: { error: err },
-            });
+        } catch (error) {
+            return Result.err(this.toUpdateError(transaction, journalId, error));
         }
+    }
+
+    private toUpdateError(
+        transaction: TransactionSplit,
+        journalId: string,
+        error: unknown
+    ): TransactionValidationError {
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.error(
+            { description: transaction.description, error: err.message },
+            'Error processing transaction'
+        );
+
+        return {
+            field: 'unknown',
+            message: err.message,
+            userMessage: `Failed to update transaction: ${err.message}`,
+            transactionId: journalId,
+            transactionDescription: transaction.description || 'No description',
+            details: { error: err },
+        };
     }
 
     /**
@@ -184,7 +250,9 @@ export class InteractiveTransactionUpdater {
     private async executeInteractiveUpdate(
         transaction: TransactionSplit,
         category?: CategoryProperties,
-        budget?: BudgetRead
+        budget?: BudgetRead,
+        source?: AIResult['source'],
+        progress?: ReviewProgress
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
         const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
         if (!transactionRead) {
@@ -201,7 +269,9 @@ export class InteractiveTransactionUpdater {
             transaction,
             transactionRead,
             category,
-            budget
+            budget,
+            source,
+            progress
         );
 
         if (!workflowResult.ok) {
@@ -218,8 +288,13 @@ export class InteractiveTransactionUpdater {
         transaction: TransactionSplit,
         transactionRead: TransactionRead,
         category?: CategoryProperties,
-        budget?: BudgetRead
+        budget?: BudgetRead,
+        source?: AIResult['source'],
+        progress?: ReviewProgress
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
+        // Once per transaction: an Edit re-prompts below without a new separator
+        this.userInputService.printSeparator();
+
         // Store original AI suggestions (immutable)
         const originalAISuggestion = {
             category: category,
@@ -237,6 +312,19 @@ export class InteractiveTransactionUpdater {
                 {
                     category: currentCategory?.name,
                     budget: currentBudget?.attributes.name,
+                    // A label describes the suggestion, so it is dropped once
+                    // the user edits that field to something else
+                    source: {
+                        ...(source?.category &&
+                            currentCategory?.name === category?.name && {
+                                category: source.category,
+                            }),
+                        ...(source?.budget &&
+                            currentBudget?.attributes.name === budget?.attributes.name && {
+                                budget: source.budget,
+                            }),
+                    },
+                    progress,
                 }
             );
 

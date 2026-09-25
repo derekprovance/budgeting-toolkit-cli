@@ -18,9 +18,18 @@ import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 import { CategorizeStatus } from '../types/enums.js';
 import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
-import { InteractiveTransactionUpdater } from './interactive-transaction-updater.service.js';
+import {
+    InteractiveTransactionUpdater,
+    PreparedUpdate,
+} from './interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../types/result.type.js';
 import { isCertificateError } from '../utils/error-detection.utils.js';
+import { TransactionHistoryService } from './transaction-history.service.js';
+
+interface SuggestionCounts {
+    category: { history: number; ai: number };
+    budget: { history: number; ai: number };
+}
 
 interface TransactionError {
     transaction: TransactionSplit;
@@ -36,7 +45,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: ITransactionValidatorService,
         private readonly force: boolean = false,
-        private readonly dryRun: boolean = false
+        private readonly dryRun: boolean = false,
+        private readonly history?: TransactionHistoryService
     ) {}
 
     async updateTransactionsByTag(
@@ -92,6 +102,10 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 'Processing transactions'
             );
 
+            // History spans up to years of transactions, so it is fetched
+            // alongside the category and budget lists rather than after them
+            const historyReady = this.loadHistory(transactions);
+
             let categories: CategoryProperties[] | undefined;
             if (updateMode !== CategorizeMode.Budget) {
                 categories = await this.categoryService.getCategories();
@@ -102,9 +116,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 budgets = await this.budgetService.getBudgets();
             }
 
-            // Show spinner during AI processing
+            // Show spinner while history and the AI produce suggestions
             const spinner = ora(
-                `Processing ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''} with AI...`
+                `Finding suggestions for ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}...`
             ).start();
 
             try {
@@ -112,12 +126,12 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     transactions,
                     updateMode,
                     categories,
-                    budgets
+                    budgets,
+                    historyReady
                 );
 
-                spinner.succeed(
-                    `AI processing complete (${transactions.length} transaction${transactions.length !== 1 ? 's' : ''})`
-                );
+                // Cleared without a summary: the prompts follow straight away
+                spinner.stop();
 
                 const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
                     transactions,
@@ -180,11 +194,34 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         }
     }
 
+    /**
+     * Builds the history index for `transactions`. History is an optimisation
+     * over the AI, so a failed fetch only costs its suggestions: it is logged
+     * and the index stays empty. Never rejects.
+     */
+    private async loadHistory(transactions: TransactionSplit[]): Promise<void> {
+        if (!this.history) {
+            return;
+        }
+        const own = new Set(
+            transactions.flatMap(t => (t.transaction_journal_id ? [t.transaction_journal_id] : []))
+        );
+        try {
+            await this.history.load(own);
+        } catch (error) {
+            logger.warn(
+                { error: error instanceof Error ? error.message : String(error) },
+                'Transaction history unavailable; every suggestion will come from the AI'
+            );
+        }
+    }
+
     private async getAIResultsForTransactions(
         transactions: TransactionSplit[],
         updateMode: CategorizeMode,
         categories?: CategoryProperties[],
-        budgets?: BudgetRead[]
+        budgets?: BudgetRead[],
+        historyReady: Promise<void> = this.loadHistory(transactions)
     ): Promise<AIResponse> {
         // The no-match sentinel is handled inside LLMAssignmentService — plain
         // option lists are all that's needed here
@@ -215,68 +252,143 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         });
 
         // Group B: has category, no budget — budget assignment only
-        const budgetOnlyCandidates = this.force
-            ? []
-            : identifiableTransactions.filter(t => this.validator.isBudgetOnlyCandidate(t));
-        const budgetOnlySet = new Set(budgetOnlyCandidates);
-        // Category mode leaves Group B alone: its category is kept without
-        // --force, and assigning a budget is outside the mode
-        const budgetOnlyTransactions = budgetNames ? budgetOnlyCandidates : [];
+        const budgetOnlySet = new Set(
+            this.force
+                ? []
+                : identifiableTransactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
+        );
 
-        // Group A: all others — full assignment per updateMode
-        const normalTransactions = identifiableTransactions.filter(t => !budgetOnlySet.has(t));
+        await historyReady;
 
-        const aiResults: AIResponse = {};
+        const results: AIResponse = {};
+        const counts: SuggestionCounts = {
+            category: { history: 0, ai: 0 },
+            budget: { history: 0, ai: 0 },
+        };
+        const needsBoth: TransactionSplit[] = [];
+        const needsCategory: TransactionSplit[] = [];
+        const needsBudget: TransactionSplit[] = [];
 
-        // Process Group A (existing behavior)
-        if (normalTransactions.length > 0) {
-            const groupAResults = await this.llmService.processTransactions(
-                normalTransactions,
-                updateMode !== CategorizeMode.Budget ? categoryNames : undefined,
-                updateMode !== CategorizeMode.Category ? budgetNames : undefined
-            );
-            Object.assign(aiResults, groupAResults);
-        }
+        for (const t of identifiableTransactions) {
+            // Group A gets every field the mode asks for. Group B keeps its
+            // category, and category mode leaves it alone entirely
+            const isBudgetOnly = budgetOnlySet.has(t);
+            const wantsCategory = !!categoryNames && !isBudgetOnly;
+            // The validator's rule: never a deposit (Firefly drops the budget,
+            // VERIFICATION.md V8), a bill-linked or a disposable-income one
+            const wantsBudget = !!budgetNames && this.validator.shouldSetBudget(t);
+            if (!wantsCategory && !wantsBudget) {
+                continue;
+            }
 
-        // Process Group B (budget only, category preserved)
-        if (budgetOnlyTransactions.length > 0) {
-            const groupBResults = await this.llmService.processTransactions(
-                budgetOnlyTransactions,
-                undefined, // don't reassign category
-                budgetNames
-            );
-            Object.assign(aiResults, groupBResults);
-        }
+            // A history value is only used while it still names an existing
+            // category or budget; otherwise the field falls through to the AI
+            const suggestion = this.history?.suggest(t);
+            const category = wantsCategory
+                ? TransactionHistoryService.resolveName(suggestion?.category, categoryNames)
+                : undefined;
+            const budget = wantsBudget
+                ? TransactionHistoryService.resolveName(suggestion?.budget, budgetNames)
+                : undefined;
+            // A match that was deliberately left unbudgeted last time is the
+            // answer: keep it unbudgeted rather than asking the AI for one
+            const keptUnbudgeted = wantsBudget && suggestion?.budget === null;
 
-        const expectedCount = normalTransactions.length + budgetOnlyTransactions.length;
-        if (Object.keys(aiResults).length !== expectedCount) {
-            const error = new Error(
-                `LLM categorization result count (${
-                    Object.keys(aiResults).length
-                }) doesn't match transaction count (${expectedCount})`
-            );
-            logger.error(
-                {
-                    expectedCount,
-                    actualCount: Object.keys(aiResults).length,
+            const missingCategory = wantsCategory && !category;
+            const missingBudget = wantsBudget && !budget && !keptUnbudgeted;
+
+            if (wantsCategory) counts.category[missingCategory ? 'ai' : 'history']++;
+            if (wantsBudget) counts.budget[missingBudget ? 'ai' : 'history']++;
+
+            if (!category && !budget && !missingCategory && !missingBudget) {
+                // Nothing to suggest and nothing left to ask
+                continue;
+            }
+
+            results[t.transaction_journal_id as string] = {
+                ...(category && { category }),
+                ...(budget && { budget }),
+                source: {
+                    ...(category && { category: 'history' as const }),
+                    ...(budget && { budget: 'history' as const }),
                 },
-                'AI result count mismatch'
-            );
-            throw error;
+            };
+
+            if (missingCategory && missingBudget) needsBoth.push(t);
+            else if (missingCategory) needsCategory.push(t);
+            else if (missingBudget) needsBudget.push(t);
         }
 
-        return aiResults;
+        const aiCalls: Array<[TransactionSplit[], string[] | undefined, string[] | undefined]> = [
+            [needsBoth, categoryNames, budgetNames],
+            [needsCategory, categoryNames, undefined],
+            [needsBudget, undefined, budgetNames],
+        ];
+
+        for (const [batch, categoryOptions, budgetOptions] of aiCalls) {
+            if (batch.length === 0) {
+                continue;
+            }
+
+            const aiResults = await this.llmService.processTransactions(
+                batch,
+                categoryOptions,
+                budgetOptions
+            );
+
+            if (Object.keys(aiResults).length !== batch.length) {
+                const error = new Error(
+                    `LLM categorization result count (${
+                        Object.keys(aiResults).length
+                    }) doesn't match transaction count (${batch.length})`
+                );
+                logger.error(
+                    {
+                        expectedCount: batch.length,
+                        actualCount: Object.keys(aiResults).length,
+                    },
+                    'AI result count mismatch'
+                );
+                throw error;
+            }
+
+            for (const t of batch) {
+                const journalId = t.transaction_journal_id as string;
+                const ai = aiResults[journalId] ?? {};
+                const entry = results[journalId];
+                if (!entry) {
+                    continue;
+                }
+                if (categoryOptions && ai.category) {
+                    entry.category = ai.category;
+                    entry.source = { ...entry.source, category: 'ai' };
+                }
+                if (budgetOptions && ai.budget) {
+                    entry.budget = ai.budget;
+                    entry.source = { ...entry.source, budget: 'ai' };
+                }
+            }
+        }
+
+        logger.debug(counts, 'Suggestions resolved');
+
+        return results;
     }
 
     private async updateTransactionsWithAIResults(
         transactions: TransactionSplit[],
-        aiResults: Record<string, { category?: string; budget?: string }>
+        aiResults: AIResponse
     ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
         const results: TransactionRead[] = [];
         const errors: TransactionError[] = [];
 
         try {
+            // Every suggestion is validated before the first prompt, so the
+            // `[index/total]` counter counts exactly the prompts that follow:
+            // a suggestion that fails validation or changes nothing never
+            // reaches the user and must not take a number
+            const prepared: PreparedUpdate[] = [];
             for (const transaction of transactions) {
                 const journalId = transaction.transaction_journal_id;
                 if (!journalId) {
@@ -286,7 +398,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     );
                     continue;
                 }
-
                 if (!aiResults[journalId]) {
                     logger.debug(
                         { description: transaction.description },
@@ -295,10 +406,22 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     continue;
                 }
 
-                const updateResult = await this.interactiveTransactionUpdater.updateTransaction(
+                const prepareResult = await this.interactiveTransactionUpdater.prepareUpdate(
                     transaction,
                     aiResults
                 );
+                if (!prepareResult.ok) {
+                    errors.push({ transaction, error: prepareResult.error });
+                } else if (prepareResult.value) {
+                    prepared.push(prepareResult.value);
+                }
+            }
+
+            for (const [i, update] of prepared.entries()) {
+                const updateResult = await this.interactiveTransactionUpdater.applyUpdate(update, {
+                    index: i + 1,
+                    total: prepared.length,
+                });
 
                 if (updateResult.ok) {
                     if (updateResult.value) {
@@ -306,12 +429,15 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     }
                 } else if (updateResult.error) {
                     errors.push({
-                        transaction,
+                        transaction: update.transaction,
                         error: updateResult.error,
                     });
 
                     if (updateResult.error.message.includes('SIGINT')) {
-                        logger.debug(transaction, 'Transaction update(s) terminated with SIGINT');
+                        logger.debug(
+                            update.transaction,
+                            'Transaction update(s) terminated with SIGINT'
+                        );
                         break;
                     }
                 }

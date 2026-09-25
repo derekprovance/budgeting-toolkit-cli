@@ -49,6 +49,7 @@ export const createMockTransactionService = (): jest.Mocked<TransactionService> 
         getTransactionReadBySplit: jest.fn(),
         getTransactionsByTag: jest.fn(),
         tagExists: jest.fn(),
+        getTransactionsInRange: jest.fn(),
         getMostRecentTransactionDate: jest.fn(),
         clearCache: jest.fn(),
     } as unknown as jest.Mocked<TransactionService>;
@@ -125,6 +126,7 @@ export const createMockUserInputService = (): jest.Mocked<UserInputService> => {
         getCustomSplitText: jest.fn(),
         confirmSplit: jest.fn(),
         validateSplitAmount: jest.fn(),
+        printSeparator: jest.fn(),
     } as unknown as jest.Mocked<UserInputService>;
 };
 
@@ -135,6 +137,8 @@ export const createMockInteractiveTransactionUpdater =
     (): jest.Mocked<InteractiveTransactionUpdater> => {
         return {
             updateTransaction: jest.fn(),
+            prepareUpdate: jest.fn(),
+            applyUpdate: jest.fn(),
             updateTransactions: jest.fn(),
         } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
     };

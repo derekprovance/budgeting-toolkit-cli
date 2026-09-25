@@ -53,6 +53,9 @@ export const DEFAULT_CONFIG: AppConfig = {
             resetTimeout: 60000,
         },
     },
+    categorize: {
+        historyMonths: 12,
+    },
     logging: {
         level: 'silent',
     },

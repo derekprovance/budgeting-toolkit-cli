@@ -58,6 +58,25 @@ export class TransactionService implements ITransactionService {
     }
 
     /**
+     * Retrieves transactions between two inclusive `YYYY-MM-DD` dates, using
+     * cache when available
+     */
+    async getTransactionsInRange(start: string, end: string): Promise<TransactionSplit[]> {
+        try {
+            const cacheKey = `range-${start}-${end}`;
+            return await this.getFromCacheOrFetch(cacheKey, () =>
+                this.fetchTransactionsFromAPIByRange(
+                    start,
+                    end,
+                    `fetch transactions for range: ${start}..${end}`
+                )
+            );
+        } catch (error) {
+            throw this.handleError('fetch transactions for range', `${start}..${end}`, error);
+        }
+    }
+
+    /**
      * The date of the most recent transaction, for reporting how current the
      * data is.
      *
@@ -258,16 +277,28 @@ export class TransactionService implements ITransactionService {
         year: number
     ): Promise<TransactionRead[]> {
         const range = this.dateRangeService.getDateRange(month, year);
+        return this.fetchTransactionsFromAPIByRange(
+            range.startDateString,
+            range.endDateString,
+            `fetch transactions for month: ${month}`
+        );
+    }
+
+    private async fetchTransactionsFromAPIByRange(
+        start: string,
+        end: string,
+        operation: string
+    ): Promise<TransactionRead[]> {
         return fetchAllPages(
             page =>
                 this.client.transactions.listTransaction(
                     undefined, // xTraceId
                     PAGE_SIZE,
                     page,
-                    range.startDateString,
-                    range.endDateString
+                    start,
+                    end
                 ),
-            `fetch transactions for month: ${month}`,
+            operation,
             this.logger
         );
     }

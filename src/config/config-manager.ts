@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as os from 'os';
 import dotenv from 'dotenv';
-import { AppConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
+import { AppConfig, CategorizeConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
 
@@ -21,6 +21,7 @@ interface YamlConfig {
     };
 
     llm?: DeepPartial<LLMConfig>;
+    categorize?: Partial<CategorizeConfig>;
 }
 
 /**
@@ -370,6 +371,7 @@ export class ConfigManager {
         'excludedTransactions',
         'tags',
         'llm',
+        'categorize',
     ]);
 
     /**
@@ -434,6 +436,11 @@ export class ConfigManager {
         // LLM Configuration - Use deep merge for nested structures
         if (yamlConfig.llm) {
             this.deepMerge(config.llm, yamlConfig.llm);
+        }
+
+        // Categorize Configuration
+        if (yamlConfig.categorize) {
+            this.deepMerge(config.categorize, yamlConfig.categorize);
         }
     }
 

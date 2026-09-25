@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+### Added
+
+- `categorize` suggests from history first: the latest transaction in the last
+  `categorize.historyMonths` months (default 12, `0` disables) with the same
+  description, ignoring reference codes and store numbers, supplies the
+  category and budget before the AI is asked. Only fields history cannot fill
+  go to the AI, and the confirm prompt labels each value `(history)` or `(AI)`.
+  The budget comes only from a match that could carry one, so a refund
+  deposit never leaves a merchant unbudgeted. History is optional: if the
+  lookback fetch fails, the run continues on AI suggestions alone.
+- The confirm prompt shows `[index/total]`, counting exactly the prompts that
+  will be shown, and a suggestion equal to the current value reads
+  `(unchanged)`.
+
+### Changed
+
+- `categorize` no longer asks the AI for a budget on a transaction that can
+  never receive one (a deposit, a bill-linked or a disposable-income
+  transaction); before, the answer was requested and then discarded.
+
 ## 10.0.0
 
 Rebuilds classification around **`RULES.md`**, a single source of truth for

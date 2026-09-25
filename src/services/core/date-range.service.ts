@@ -17,7 +17,7 @@ export class DateRangeService implements IDateRangeService {
      * Formats using local date parts. `toISOString()` converts to UTC, which
      * shifts local midnight to the previous day in UTC+ timezones.
      */
-    private static toLocalDateString(date: Date): string {
+    static toLocalDateString(date: Date): string {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');

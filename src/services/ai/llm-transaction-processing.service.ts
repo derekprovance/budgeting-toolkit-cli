@@ -11,9 +11,13 @@ interface ITransactionProcessor {
     ): Promise<AIResponse>;
 }
 
+export type SuggestionSource = 'history' | 'ai';
+
 export interface AIResult {
     category?: string;
     budget?: string;
+    /** Where each suggested field came from, for labelling the prompt */
+    source?: { category?: SuggestionSource; budget?: SuggestionSource };
 }
 
 export interface AIResponse {

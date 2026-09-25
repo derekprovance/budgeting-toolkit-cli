@@ -6,6 +6,7 @@ import { EditTransactionAttribute } from '../types/enums.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { DisplayFormatterUtils } from '../utils/display-formatter.utils.js';
+import { SuggestionSource } from './ai/llm-transaction-processing.service.js';
 
 /**
  * Interface for transaction update options
@@ -13,6 +14,10 @@ import { DisplayFormatterUtils } from '../utils/display-formatter.utils.js';
 interface TransactionUpdateOptions {
     category?: string;
     budget?: string;
+    /** Where each suggestion came from; shown after the proposed value */
+    source?: { category?: SuggestionSource; budget?: SuggestionSource };
+    /** Position of this transaction in the review, shown as `[index/total]` */
+    progress?: { index: number; total: number };
 }
 
 /**
@@ -55,10 +60,22 @@ export class UserInputService {
             return CategorizeMode.Skip;
         }
 
-        const message = this.formatUpdateMessage(transaction, transactionId, changes);
+        const message = this.formatUpdateMessage(
+            transaction,
+            transactionId,
+            changes,
+            options.progress
+        );
         const isDeposit = transaction.type === 'deposit';
 
         return this.promptUser(message, isDeposit);
+    }
+
+    /**
+     * Prints a blank line that separates one transaction's review from the previous one
+     */
+    printSeparator(): void {
+        console.log();
     }
 
     async shouldEditCategoryBudget(isDeposit: boolean = false): Promise<string[]> {
@@ -193,13 +210,16 @@ export class UserInputService {
         // If AI has a suggestion, show as change. Otherwise, just show current value.
 
         // Category field
-        if (options.category) {
+        if (options.category && options.category === transaction.category_name) {
+            changes.push(this.formatUnchanged(EditTransactionAttribute.Category, options.category));
+        } else if (options.category) {
             // AI has a suggestion - show as change
             changes.push(
                 this.formatChange(
                     EditTransactionAttribute.Category,
                     transaction.category_name ?? undefined,
-                    options.category
+                    options.category,
+                    options.source?.category
                 )
             );
         } else {
@@ -216,13 +236,16 @@ export class UserInputService {
         if (transaction.type === 'deposit') {
             // Deposits cannot have budgets in Firefly III - show N/A
             changes.push(`${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`);
+        } else if (options.budget && options.budget === transaction.budget_name) {
+            changes.push(this.formatUnchanged(EditTransactionAttribute.Budget, options.budget));
         } else if (options.budget) {
             // AI has a suggestion - show as change
             changes.push(
                 this.formatChange(
                     EditTransactionAttribute.Budget,
                     transaction.budget_name ?? undefined,
-                    options.budget
+                    options.budget,
+                    options.source?.budget
                 )
             );
         } else {
@@ -241,8 +264,14 @@ export class UserInputService {
     /**
      * Formats a single change for display (old value → new value)
      */
-    private formatChange(field: string, oldValue: string | undefined, newValue: string): string {
-        return `${chalk.bold(field)}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}`;
+    private formatChange(
+        field: string,
+        oldValue: string | undefined,
+        newValue: string,
+        source?: SuggestionSource
+    ): string {
+        const label = source ? ` ${chalk.dim(source === 'history' ? '(history)' : '(AI)')}` : '';
+        return `${chalk.bold(field)}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}${label}`;
     }
 
     /**
@@ -250,6 +279,13 @@ export class UserInputService {
      */
     private formatCurrentValue(field: string, currentValue: string | undefined): string {
         return `${chalk.bold(field)}: ${chalk.dim(currentValue || 'None')}`;
+    }
+
+    /**
+     * Formats a suggestion that matches the current value
+     */
+    private formatUnchanged(field: string, value: string): string {
+        return `${this.formatCurrentValue(field, value)} ${chalk.dim('(unchanged)')}`;
     }
 
     /**
@@ -272,7 +308,8 @@ export class UserInputService {
     private formatUpdateMessage(
         transaction: TransactionSplit,
         transactionId: string | undefined,
-        changes: string[]
+        changes: string[],
+        progress?: { index: number; total: number }
     ): string {
         const rawAmount = TransactionCalculationUtils.parseAmountSafe(transaction.amount);
         const formatted = CurrencyUtils.formatWithSymbol(
@@ -288,8 +325,11 @@ export class UserInputService {
             amountDisplay = chalk.dim(formatted);
         }
 
+        // No leading newline: the prompt prefix (? / ✔) belongs on this line
+        const counter = progress ? `${chalk.dim(`[${progress.index}/${progress.total}]`)} ` : '';
+
         return [
-            `${chalk.bold('\nTransaction:')} "${chalk.yellow(
+            `${counter}${chalk.bold('Transaction:')} "${chalk.yellow(
                 this.formatDescription(transaction.description, transactionId)
             )}" ${amountDisplay}`,
             `${chalk.bold('Proposed changes:')}`,

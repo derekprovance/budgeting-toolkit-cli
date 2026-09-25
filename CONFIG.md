@@ -101,6 +101,9 @@ Use this quick reference to see what each command needs:
 - `llm.model` - Claude model to use
 - `llm.batchSize` - Transactions per batch (default: 10)
 - `llm.maxConcurrent` - Concurrent requests (default: 3)
+- `categorize.historyMonths` - Months to look back for an earlier transaction
+  with the same description; its category and budget are suggested before
+  asking the AI (default: 12, `0` disables, max 120)
 
 ---
 

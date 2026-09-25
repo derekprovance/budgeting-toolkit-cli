@@ -147,6 +147,10 @@ Any other top-level key is reported as an unknown setting and ignored. Old confi
 - `tags.disposableIncome` - Tag name for identifying disposable income transactions (default: "Disposable Income")
 - `tags.paycheck` - Tag name for identifying paycheck transactions (default: "Paycheck")
 
+**Categorize Configuration:**
+
+- `categorize.historyMonths` - Months `categorize` looks back for an earlier transaction with the same normalized description (`normalizeDescription`, `src/utils/description-normalizer.ts`: lower-cased, tokens containing a digit dropped). Its category and budget are suggested first; only fields history cannot fill (or whose name no longer exists) go to the AI. Default 12, `0` disables, integer 0–120
+
 **LLM Configuration:**
 
 - `llm.model` - Claude model name
@@ -189,6 +193,8 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`. 
 2. **report** (alias: `st`) - Shows the budget report for a given month: per-budget rows, bills, top expenses and the **Unbudgeted Expenses** bucket. Every figure comes from the same buckets `analyze` uses, so the two commands always agree. Activity in outside accounts is not shown
 
 3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
+    - Suggestions come from history first (`TransactionHistoryService`: the latest matching transaction in the last `categorize.historyMonths` months), then the AI for whatever is left; the confirm prompt labels each value `(history)` or `(AI)`. The category comes from the newest match of either direction; the budget only from the newest match that could carry one (`shouldSetBudget`: not a deposit, bill-linked or disposable-income transaction). Such a match with no budget keeps the transaction unbudgeted (no AI call), while a refund deposit says nothing about the budget. A budget is never asked for on a transaction the validator would refuse it on (V8). History is optional: a failed fetch is logged and every suggestion comes from the AI
+    - Every suggestion is validated (`InteractiveTransactionUpdater.prepareUpdate`) before the first prompt, so the `[index/total]` counter counts exactly the prompts shown
     - By default, processes uncategorized transactions and transactions with category but no budget
     - Transactions with both category and budget are skipped unless `--force` is used
     - `--force` also lets the AI category replace an existing one (without it, an existing `category_id` is preserved)

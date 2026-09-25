@@ -37,6 +37,8 @@ export class ConfigValidator {
         // LLM Configuration Validation (zero/negative values cause hangs)
         this.validateLlmConfig(config, errors);
 
+        this.validateCategorizeConfig(config, errors);
+
         // Exclusion rules (a malformed rule would silently match nothing)
         this.validateExcludedTransactions(config, errors);
 
@@ -114,6 +116,15 @@ export class ConfigValidator {
 
         if (typeof config.llm.model !== 'string' || !config.llm.model.trim()) {
             errors.push('llm.model must be a non-empty string');
+        }
+    }
+
+    private validateCategorizeConfig(config: AppConfig, errors: string[]): void {
+        const months = config.categorize.historyMonths;
+        if (!Number.isInteger(months) || months < 0 || months > 120) {
+            errors.push(
+                `categorize.historyMonths must be an integer from 0 to 120 (got: ${months})`
+            );
         }
     }
 

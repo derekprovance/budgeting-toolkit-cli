@@ -78,6 +78,9 @@ describe('ConfigValidator', () => {
                     resetTimeout: 60000,
                 },
             },
+            categorize: {
+                historyMonths: 12,
+            },
             logging: {
                 level: 'info',
             },
@@ -319,6 +322,27 @@ qZXQ
             const result = validator.validate(validConfig);
 
             expect(result.ok).toBe(true);
+        });
+    });
+
+    describe('categorize configuration validation', () => {
+        it.each([-1, 1.5, 121, NaN])('should reject categorize.historyMonths of %s', months => {
+            validConfig.categorize.historyMonths = months;
+
+            const result = validator.validate(validConfig);
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect((result.error.details as { errors: string[] }).errors.join('\n')).toContain(
+                    'categorize.historyMonths'
+                );
+            }
+        });
+
+        it.each([0, 12, 120])('should accept categorize.historyMonths of %s', months => {
+            validConfig.categorize.historyMonths = months;
+
+            expect(validator.validate(validConfig).ok).toBe(true);
         });
     });
 

@@ -463,6 +463,55 @@ describe('TransactionService', () => {
         });
     });
 
+    describe('getTransactionsInRange', () => {
+        it('requests the given inclusive range and follows pagination', async () => {
+            const page = (id: string, totalPages: number) =>
+                ({
+                    data: [
+                        {
+                            id,
+                            attributes: {
+                                transactions: [
+                                    {
+                                        transaction_journal_id: id,
+                                        description: `Tx ${id}`,
+                                        date: '2024-02-01',
+                                        type: 'withdrawal' as TransactionTypeProperty,
+                                        amount: '1.00',
+                                    } as TransactionSplit,
+                                ],
+                            },
+                        } as TransactionRead,
+                    ],
+                    meta: { pagination: { total_pages: totalPages } },
+                }) as TransactionArray;
+            mockApiClient.transactions.listTransaction
+                .mockResolvedValueOnce(page('1', 2))
+                .mockResolvedValueOnce(page('2', 2));
+            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+
+            const result = await service.getTransactionsInRange('2023-09-25', '2024-09-25');
+
+            expect(result.map(t => t.transaction_journal_id)).toEqual(['1', '2']);
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenNthCalledWith(
+                1,
+                undefined,
+                expect.any(Number),
+                1,
+                '2023-09-25',
+                '2024-09-25'
+            );
+            expect(mockApiClient.transactions.listTransaction).toHaveBeenNthCalledWith(
+                2,
+                undefined,
+                expect.any(Number),
+                2,
+                '2023-09-25',
+                '2024-09-25'
+            );
+        });
+    });
+
     describe('getMostRecentTransactionDate', () => {
         it('should return the transaction date, not the import timestamp', async () => {
             // The two differ whenever a backdated batch is imported, and

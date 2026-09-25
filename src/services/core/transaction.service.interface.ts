@@ -11,6 +11,11 @@ export interface ITransactionService {
     getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]>;
 
     /**
+     * Retrieves transactions between two inclusive `YYYY-MM-DD` dates
+     */
+    getTransactionsInRange(start: string, end: string): Promise<TransactionSplit[]>;
+
+    /**
      * Gets the most recent transaction date
      */
     getMostRecentTransactionDate(): Promise<Date | null>;

@@ -69,6 +69,7 @@ The application searches for configuration files in this priority order:
 4. **Defaults**: Built-in defaults if no config file found
 
 **Example:** Using a custom config path
+
 ```bash
 btk --config /etc/budgeting/config.yaml categorize Import-2025-06-23
 npm start -- --config ./custom-config.yaml categorize Import-2025-06-23
@@ -78,18 +79,19 @@ npm start -- --config ./custom-config.yaml categorize Import-2025-06-23
 
 The `.env` file must contain your API credentials:
 
-| Variable | Purpose | Required For | Default |
-|----------|---------|--------------|---------|
-| `FIREFLY_API_URL` | Firefly III API endpoint | All commands | - |
-| `FIREFLY_API_TOKEN` | API authentication token | All commands | - |
-| `ANTHROPIC_API_KEY` | Claude AI API key | `categorize` only | - |
-| `LOG_LEVEL` | Logging verbosity (`trace`…`error`, `silent`) | Optional | `silent` |
+| Variable            | Purpose                                       | Required For      | Default  |
+| ------------------- | --------------------------------------------- | ----------------- | -------- |
+| `FIREFLY_API_URL`   | Firefly III API endpoint                      | All commands      | -        |
+| `FIREFLY_API_TOKEN` | API authentication token                      | All commands      | -        |
+| `ANTHROPIC_API_KEY` | Claude AI API key                             | `categorize` only | -        |
+| `LOG_LEVEL`         | Logging verbosity (`trace`…`error`, `silent`) | Optional          | `silent` |
 
 ### Optional YAML Configuration
 
 `config.yaml` contains application settings. **All fields are optional** with sensible defaults defined in `src/config/config.defaults.ts`.
 
 **Key defaults:**
+
 - LLM model: `claude-sonnet-5`
 - Max tokens: `16000`
 - Batch size: `10`
@@ -99,12 +101,12 @@ See `config.yaml.example` for all available options or [CONFIG.md](CONFIG.md) fo
 
 ## Commands
 
-| Command | Alias | Purpose | Example | Key Config |
-|---------|-------|---------|---------|------------|
-| **`categorize <tag>`** | `cat` | AI-powered transaction categorization | `btk categorize Import-2025-06-23` | `ANTHROPIC_API_KEY` |
-| `report` | `st` | Current budget status for a month | `btk report -m 8 -y 2024` | - |
-| `analyze` | `an` | Budget surplus/deficit analysis | `btk analyze -m 6 -y 2024` | `expectedMonthlyPaycheck` |
-| `split <id>` | `sp` | Interactive transaction splitting | `btk split 123` | - |
+| Command                | Alias | Purpose                               | Example                            | Key Config                |
+| ---------------------- | ----- | ------------------------------------- | ---------------------------------- | ------------------------- |
+| **`categorize <tag>`** | `cat` | AI-powered transaction categorization | `btk categorize Import-2025-06-23` | `ANTHROPIC_API_KEY`       |
+| `report`               | `st`  | Current budget status for a month     | `btk report -m 8 -y 2024`          | -                         |
+| `analyze`              | `an`  | Budget surplus/deficit analysis       | `btk analyze -m 6 -y 2024`         | `expectedMonthlyPaycheck` |
+| `split <id>`           | `sp`  | Interactive transaction splitting     | `btk split 123`                    | -                         |
 
 What `analyze` and `report` count as income and spending — the cost-of-living
 envelope, transfers, refunds — is defined in [RULES.md](RULES.md).
@@ -112,12 +114,14 @@ envelope, transfers, refunds — is defined in [RULES.md](RULES.md).
 ### Common Options
 
 Per-command options:
+
 - `-m, --month <1-12>` - Target month (default: current) — `report`, `analyze`
 - `-y, --year <year>` - Target year (default: current) — `report`, `analyze`
 - `--json` - Print only a machine-readable JSON document to stdout — `report`, `analyze`. Logs always go to stderr
 - `-h, --help` - Display help
 
 Program-level options — these go **before** the subcommand (`btk --verbose report`):
+
 - `-v, --verbose` - Detailed output
 - `--config <path>` - Custom config file path (priority over defaults)
 
@@ -145,6 +149,7 @@ LOG_LEVEL=debug npm start -- categorize Import-2025-06-23
 ```
 
 **Options:**
+
 - `-m, --mode <type>` - Update `category`, `budget`, or `both` (default: `both`)
 - `-f, --force` - Re-run the AI on transactions that already have both a category and a budget. Also lets an AI category replace an existing one; without it an existing `category_id` is preserved
 - `-n, --dry-run` - Preview changes without applying
@@ -165,6 +170,7 @@ btk split 123 -a 50.00 -d "- Groceries" -d "- Hardware" -y
 ```
 
 **Options:**
+
 - `-a, --amount <amount>` - Amount for first split (remainder goes to second)
 - `-d, --descriptions <text...>` - Custom text to append to split descriptions
 - `-y, --yes` - Skip confirmation prompt
@@ -213,6 +219,7 @@ A local Firefly III + PostgreSQL stack (pinned images, bound to 127.0.0.1), plus
 See [DOCKER.md](DOCKER.md) for complete setup instructions.
 
 Quick start:
+
 ```bash
 cp .env.docker.example .env.docker   # container settings only
 # Fill in POSTGRES_PASSWORD and a 32-char FIREFLY_APP_KEY

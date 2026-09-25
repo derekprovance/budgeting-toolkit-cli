@@ -61,6 +61,19 @@ describe('UserInputService', () => {
         mockConfirm.mockReset();
     });
 
+    describe('printSeparator', () => {
+        it('prints a blank line', () => {
+            const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+            try {
+                service.printSeparator();
+                expect(log).toHaveBeenCalledTimes(1);
+                expect(log.mock.calls[0]).toEqual([]);
+            } finally {
+                log.mockRestore();
+            }
+        });
+    });
+
     describe('askToUpdateTransaction', () => {
         const mockTransaction: Partial<TransactionSplit> = {
             description: 'Test Transaction',
@@ -98,6 +111,83 @@ describe('UserInputService', () => {
             expect(result).toBe(CategorizeMode.Skip);
             // Should still prompt user since both fields are always displayed
             expect(mockExpand).toHaveBeenCalled();
+        });
+
+        it('labels each suggestion with where it came from', async () => {
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(
+                mockTransaction as TransactionSplit,
+                mockTransactionId,
+                {
+                    category: 'Groceries',
+                    budget: 'Food',
+                    source: { category: 'history', budget: 'ai' },
+                }
+            );
+
+            const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
+            expect(message).toMatch(/Category.*Groceries \(history\)/);
+            expect(message).toMatch(/Budget.*Food \(AI\)/);
+        });
+
+        it('marks a suggestion equal to the current value as unchanged', async () => {
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(
+                mockTransaction as TransactionSplit,
+                mockTransactionId,
+                {
+                    category: 'Groceries',
+                    budget: 'Old Budget',
+                    source: { category: 'history', budget: 'history' },
+                }
+            );
+
+            const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
+            expect(message).toMatch(/Budget: Old Budget \(unchanged\)/);
+            expect(message).not.toMatch(/Budget:.*→/);
+            expect(message).toMatch(/Category: Old Category → Groceries \(history\)/);
+        });
+
+        it('starts the prompt on the transaction line with its position', async () => {
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(
+                mockTransaction as TransactionSplit,
+                mockTransactionId,
+                { category: 'Groceries', progress: { index: 3, total: 26 } }
+            );
+
+            const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
+            // A leading newline would leave the prompt prefix alone on a line
+            expect(message.startsWith('[3/26] Transaction:')).toBe(true);
+        });
+
+        it('shows no position when progress is not given', async () => {
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(
+                mockTransaction as TransactionSplit,
+                mockTransactionId,
+                { category: 'Groceries' }
+            );
+
+            const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
+            expect(message.startsWith('Transaction:')).toBe(true);
+        });
+
+        it('shows no label when the source is unknown', async () => {
+            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+
+            await service.askToUpdateTransaction(
+                mockTransaction as TransactionSplit,
+                mockTransactionId,
+                { category: 'Groceries' }
+            );
+
+            const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
+            expect(message).not.toMatch(/\((history|AI)\)/);
         });
 
         it('should prompt for category change only', async () => {

@@ -47,6 +47,13 @@ excludedTransactions:
     - description: 'TRANSFER TO SAVINGS'
       reason: 'Internal transfer, not an expense'
 
+# Categorize Configuration
+categorize:
+    # Months to look back for an earlier transaction with the same description
+    # (reference codes and store numbers ignored). Its category and budget are
+    # suggested instead of asking the AI. 0 sends everything to the AI.
+    historyMonths: 12
+
 # LLM Configuration (Advanced)
 llm:
     # Basic LLM Settings

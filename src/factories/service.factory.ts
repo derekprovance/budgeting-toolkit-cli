@@ -11,6 +11,7 @@ import { TransactionValidatorService } from '../services/core/transaction-valida
 import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
 import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service.js';
+import { TransactionHistoryService } from '../services/transaction-history.service.js';
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
 import { LLMConfig } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
@@ -148,7 +149,14 @@ export class ServiceFactory {
             llmProcessingService,
             services.transactionValidatorService,
             force,
-            dryRun
+            dryRun,
+            new TransactionHistoryService(
+                services.transactionService,
+                config.categorize.historyMonths,
+                {
+                    canCarryBudget: t => services.transactionValidatorService.shouldSetBudget(t),
+                }
+            )
         );
     }
 }
