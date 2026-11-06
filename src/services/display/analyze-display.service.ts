@@ -369,7 +369,7 @@ export class AnalyzeDisplayService {
         // An unpaid bill's "variance" is just its whole amount, which reads as
         // a saving. Say when it is due instead.
         const trailer = isUpcoming
-            ? chalk.dim(`(due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)})`)
+            ? chalk.dim(`(due ${DisplayFormatterUtils.formatShortDate(bill.dueDate)})`)
             : `(${DisplayFormatterUtils.formatSignedAmount(variance, symbol, false)})`;
 
         // Format frequency with capitalization

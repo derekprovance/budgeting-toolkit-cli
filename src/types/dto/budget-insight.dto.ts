@@ -8,9 +8,8 @@ export interface BudgetInsight {
      * - 'warning': Issue that needs attention (overspending, unexpected bills)
      * - 'success': Positive performance (under budget, good control)
      * - 'info': Neutral information (transaction counts, frequency)
-     * - 'alert': Critical issue requiring action
      */
-    type: 'warning' | 'success' | 'info' | 'alert';
+    type: 'warning' | 'success' | 'info';
 
     /**
      * Human-readable insight message

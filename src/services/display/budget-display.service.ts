@@ -403,7 +403,7 @@ export class BudgetDisplayService {
                 name: bill.name,
                 actual: bill.actual,
                 trailer: chalk.dim(
-                    `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${upcoming} of ${predicted})`
+                    `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate)} (${upcoming} of ${predicted})`
                 ),
             },
             symbol
@@ -581,7 +581,6 @@ export class BudgetDisplayService {
     > = {
         warning: { color: chalk.yellow, icon: '⚠' },
         success: { color: chalk.green, icon: '✓' },
-        alert: { color: chalk.red, icon: '🔴' },
         info: { color: chalk.cyan, icon: '•' },
     };
 }
