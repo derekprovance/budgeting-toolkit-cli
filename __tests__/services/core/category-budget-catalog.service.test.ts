@@ -4,6 +4,7 @@ import { ICategoryService } from '../../../src/services/core/category.service.in
 import { IBudgetService } from '../../../src/services/core/budget.service.interface.js';
 import { CategoryProperties, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { createMockTransaction } from '../../shared/test-data.js';
+import { partialMock } from '../../shared/mocks.js';
 
 const budget = (id: string, name: string): BudgetRead =>
     ({ id, type: 'budgets', attributes: { name, active: true } }) as BudgetRead;
@@ -29,8 +30,8 @@ describe('CategoryBudgetCatalog', () => {
         getCategories = jest.fn<ICategoryService['getCategories']>(async () => categories);
         getBudgets = jest.fn<IBudgetService['getBudgets']>(async () => budgets);
         catalog = await CategoryBudgetCatalog.load(
-            { getCategories } as unknown as ICategoryService,
-            { getBudgets } as unknown as IBudgetService
+            partialMock<ICategoryService>({ getCategories }),
+            partialMock<IBudgetService>({ getBudgets })
         );
     });
 
@@ -59,8 +60,8 @@ describe('CategoryBudgetCatalog', () => {
         it('leaves out a category without a name', async () => {
             getCategories.mockResolvedValue([{ name: 'Groceries' }, {} as CategoryProperties]);
             const loaded = await CategoryBudgetCatalog.load(
-                { getCategories } as unknown as ICategoryService,
-                { getBudgets } as unknown as IBudgetService
+                partialMock<ICategoryService>({ getCategories }),
+                partialMock<IBudgetService>({ getBudgets })
             );
 
             expect(loaded.categoryNames()).toEqual(['Groceries']);

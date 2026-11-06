@@ -10,7 +10,7 @@ import {
     ToolCall,
 } from '../../../src/api/claude.client.js';
 import { createMockTransaction } from '../../shared/test-data.js';
-import { createMockLogger } from '../../shared/mocks.js';
+import { createMockLogger, partialMock } from '../../shared/mocks.js';
 
 type CallToolFn = ClaudeClient['callTool'];
 
@@ -41,7 +41,7 @@ describe('LLMAssignmentService', () => {
 
         callTool = jest.fn<CallToolFn>();
         service = new LLMAssignmentService(
-            { callTool } as unknown as ClaudeClient,
+            partialMock<ClaudeClient>({ callTool }),
             { batchSize: 10, maxConcurrent: 3 },
             mockLogger
         );

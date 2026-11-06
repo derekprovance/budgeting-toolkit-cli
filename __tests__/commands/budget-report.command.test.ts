@@ -5,7 +5,7 @@ import { BudgetDisplayService } from '../../src/services/display/budget-display.
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
-import { buckets, createMockCashFlowService } from '../shared/mocks.js';
+import { buckets, createMockCashFlowService, partialMock } from '../shared/mocks.js';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
@@ -53,44 +53,38 @@ describe('BudgetReportCommand', () => {
         jest.clearAllMocks();
 
         // Setup service mocks
-        budgetAnalyticsService = {
+        budgetAnalyticsService = partialMock<BudgetAnalyticsService>({
             getBudgetReport: jest
-                .fn<
-                    (
-                        month: number,
-                        year: number,
-                        historyMonths: number
-                    ) => Promise<BudgetReportDto[]>
-                >()
+                .fn<BudgetAnalyticsService['getBudgetReport']>()
                 .mockResolvedValue(mockBudgets),
             getTopExpenses: jest
-                .fn<(month: number, year: number, limit: number) => Promise<any>>()
+                .fn<BudgetAnalyticsService['getTopExpenses']>()
                 .mockResolvedValue([]),
-        } as unknown as jest.Mocked<BudgetAnalyticsService>;
+        });
 
-        budgetInsightService = {
+        budgetInsightService = partialMock<BudgetInsightService>({
             generateInsights: jest
-                .fn<(budgets: BudgetReportDto[], billComparison: BillComparisonDto) => any[]>()
+                .fn<BudgetInsightService['generateInsights']>()
                 .mockReturnValue([]),
-        } as unknown as jest.Mocked<BudgetInsightService>;
+        });
 
-        budgetDisplayService = {
+        budgetDisplayService = partialMock<BudgetDisplayService>({
             formatReport: jest
-                .fn<(reportData: any, verbose?: boolean) => string>()
+                .fn<BudgetDisplayService['formatReport']>()
                 .mockReturnValue('Formatted Enhanced Report'),
-        } as unknown as jest.Mocked<BudgetDisplayService>;
+        });
 
-        billComparisonService = {
+        billComparisonService = partialMock<BillComparisonService>({
             calculateBillComparison: jest
-                .fn<(month: number, year: number) => Promise<any>>()
+                .fn<BillComparisonService['calculateBillComparison']>()
                 .mockResolvedValue({ ok: true, value: mockBillComparison }),
-        } as unknown as jest.Mocked<BillComparisonService>;
+        });
 
-        transactionService = {
+        transactionService = partialMock<TransactionService>({
             getMostRecentTransactionDate: jest
-                .fn<() => Promise<Date | null>>()
+                .fn<TransactionService['getMostRecentTransactionDate']>()
                 .mockResolvedValue(new Date('2024-05-15')),
-        } as unknown as jest.Mocked<TransactionService>;
+        });
 
         cashFlowService = createMockCashFlowService();
 

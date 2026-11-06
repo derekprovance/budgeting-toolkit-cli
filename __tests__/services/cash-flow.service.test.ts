@@ -3,7 +3,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
-import { createMockAccountScopeService, createMockLogger } from '../shared/mocks.js';
+import { createMockAccountScopeService, createMockLogger, partialMock } from '../shared/mocks.js';
 import { deposit, transfer, withdrawal } from '../shared/test-data.js';
 
 const CHK = '1';
@@ -19,7 +19,7 @@ describe('CashFlowService', () => {
     ) => {
         const getTransactionsForMonth = jest.fn<GetTransactions>().mockResolvedValue(transactions);
         const service = new CashFlowService(
-            { getTransactionsForMonth } as unknown as ITransactionService,
+            partialMock<ITransactionService>({ getTransactionsForMonth }),
             new TransactionClassificationService('Disposable Income', 'Paycheck'),
             accountScope,
             createMockLogger()

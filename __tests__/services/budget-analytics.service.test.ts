@@ -8,7 +8,7 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { MonthError } from '../../src/types/error/month.error.js';
 import { withdrawal } from '../shared/test-data.js';
-import { createMockAccountScopeService, createMockLogger } from '../shared/mocks.js';
+import { createMockAccountScopeService, createMockLogger, partialMock } from '../shared/mocks.js';
 
 /** Envelope accounts: the builders' default source, and a card */
 const CHECKING = 'source1';
@@ -43,12 +43,12 @@ describe('BudgetAnalyticsService', () => {
         jest.clearAllMocks();
 
         // Each test installs the methods it needs; nothing else is reachable.
-        budgetReportService = {
+        budgetReportService = partialMock<BudgetReportService>({
             getBudgetReport: jest.fn<GetReport>(),
-        } as unknown as jest.Mocked<BudgetReportService>;
-        transactionService = {
+        });
+        transactionService = partialMock<TransactionService>({
             getTransactionsForMonth: jest.fn<GetTransactions>(),
-        } as unknown as jest.Mocked<TransactionService>;
+        });
         // A real CashFlowService over the mocked month, so statistics and top
         // expenses see exactly the buckets the classifier produces
         service = new BudgetAnalyticsService(

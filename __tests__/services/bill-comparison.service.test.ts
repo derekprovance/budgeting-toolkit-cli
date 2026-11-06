@@ -5,7 +5,7 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
-import { createMockAccountScopeService, createMockLogger } from '../shared/mocks.js';
+import { createMockAccountScopeService, createMockLogger, partialMock } from '../shared/mocks.js';
 
 /** The envelope account every fixture here pays from */
 const ENVELOPE = 'source1';
@@ -67,14 +67,14 @@ describe('BillComparisonService', () => {
         }) as TransactionSplit;
 
     beforeEach(() => {
-        mockBillService = {
-            getBillsForMonth: jest.fn(),
-        } as unknown as jest.Mocked<BillService>;
+        mockBillService = partialMock<BillService>({
+            getBillsForMonth: jest.fn<BillService['getBillsForMonth']>(),
+        });
 
-        mockTransactionService = {
+        mockTransactionService = partialMock<TransactionService>({
             getTransactionsForMonth:
                 jest.fn<(month: number, year: number) => Promise<TransactionSplit[]>>(),
-        } as unknown as jest.Mocked<TransactionService>;
+        });
 
         // A real CashFlowService over the mocked month, so the bill bucket is
         // exactly what the classifier puts there

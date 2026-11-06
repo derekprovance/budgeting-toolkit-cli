@@ -15,6 +15,7 @@ import { ReviewCancelledError } from '../../src/services/user-input.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 import { deposit, transfer, withdrawal } from '../shared/test-data.js';
+import { partialMock } from '../shared/mocks.js';
 
 const budget = (id: string, name: string): BudgetRead =>
     ({ id, type: 'budgets', attributes: { name } }) as BudgetRead;
@@ -63,23 +64,25 @@ describe('AITransactionUpdateOrchestrator', () => {
 
     const build = async ({ past = [], force = false, historyFails = false }: BuildOptions = {}) => {
         const catalog = await CategoryBudgetCatalog.load(
-            { getCategories: async () => CATEGORIES.map(name => ({ name })) } as ICategoryService,
-            { getBudgets: async () => BUDGETS } as unknown as IBudgetService
+            partialMock<ICategoryService>({
+                getCategories: async () => CATEGORIES.map(name => ({ name })),
+            }),
+            partialMock<IBudgetService>({ getBudgets: async () => BUDGETS })
         );
         const validator = new TransactionValidatorService(
             new TransactionClassificationService('Disposable Income', 'Paycheck')
         );
-        const historySource = {
+        const historySource = partialMock<ITransactionService>({
             getTransactionsInRange: async () => {
                 if (historyFails) throw new Error('Firefly timed out on page 7');
                 return past;
             },
-        } as unknown as ITransactionService;
+        });
         return new AITransactionUpdateOrchestrator(
             mockTransactionService,
             mockUpdater,
             catalog,
-            { assign } as unknown as LLMAssignmentService,
+            partialMock<LLMAssignmentService>({ assign }),
             validator,
             new TransactionHistoryService(historySource, 12, {
                 canCarryBudget: t => validator.shouldSetBudget(t),
@@ -124,12 +127,12 @@ describe('AITransactionUpdateOrchestrator', () => {
     beforeEach(() => {
         tagged = [];
         aiAnswers = {};
-        mockTransactionService = {
+        mockTransactionService = partialMock<TransactionService>({
             tagExists: jest.fn<TransactionService['tagExists']>().mockResolvedValue(true),
             getTransactionsByTag: jest
                 .fn<TransactionService['getTransactionsByTag']>()
                 .mockImplementation(async () => tagged),
-        } as unknown as jest.Mocked<TransactionService>;
+        });
 
         assign = jest.fn<LLMAssignmentService['assign']>(async (type, transactions) =>
             transactions.map(t => aiAnswers[t.transaction_journal_id ?? '']?.[type])
@@ -137,7 +140,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         // By default every suggestion that names something validates and the
         // user accepts it
-        mockUpdater = {
+        mockUpdater = partialMock<InteractiveTransactionUpdater>({
             prepareUpdate: jest.fn<InteractiveTransactionUpdater['prepareUpdate']>(
                 ({ transaction, category, budget, source }) => ({
                     ok: true,
@@ -148,7 +151,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 ok: true,
                 value: {} as TransactionRead,
             })),
-        } as unknown as jest.Mocked<InteractiveTransactionUpdater>;
+        });
     });
 
     describe('what is processed', () => {

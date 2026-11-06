@@ -3,7 +3,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
 import { deposit, transfer, withdrawal } from '../shared/test-data.js';
-import { createMockLogger } from '../shared/mocks.js';
+import { createMockLogger, partialMock } from '../shared/mocks.js';
 
 describe('TransactionHistoryService', () => {
     const logger = createMockLogger();
@@ -16,7 +16,7 @@ describe('TransactionHistoryService', () => {
             async () => past
         );
         return new TransactionHistoryService(
-            { getTransactionsInRange } as unknown as ITransactionService,
+            partialMock<ITransactionService>({ getTransactionsInRange }),
             months,
             { logger, now: at, canCarryBudget: tx => tx.type === 'withdrawal' }
         );
@@ -134,7 +134,7 @@ describe('TransactionHistoryService', () => {
             ]
         );
         const history = new TransactionHistoryService(
-            { getTransactionsInRange } as unknown as ITransactionService,
+            partialMock<ITransactionService>({ getTransactionsInRange }),
             12,
             { logger, now, canCarryBudget: tx => !tx.bill_id }
         );
