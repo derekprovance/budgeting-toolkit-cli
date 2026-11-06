@@ -16,6 +16,13 @@ export interface TransactionJson {
     billId: string | null;
 }
 
+/** What to move to or from the disposable pool (R-DISP-1) */
+export interface DisposablePoolActionJson {
+    direction: 'fromPool' | 'toPool';
+    /** Positive, rounded to cents */
+    amount: number;
+}
+
 export interface AnalyzeReportJson {
     schemaVersion: 2;
     month: number;
@@ -36,7 +43,7 @@ export interface AnalyzeReportJson {
         balance: number;
         transactions: TransactionJson[];
         /** fromPool when balance > 0, toPool when balance < 0, null at 0. */
-        action: { direction: 'fromPool' | 'toPool'; amount: number } | null;
+        action: DisposablePoolActionJson | null;
     };
     netCashFlow: number;
 }

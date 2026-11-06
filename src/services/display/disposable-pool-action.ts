@@ -1,12 +1,10 @@
 import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { DisposablePoolActionJson } from '../../types/dto/report-json.types.js';
 
-export type DisposablePoolDirection = 'fromPool' | 'toPool';
+/** The `--json` contract's shape is the one definition */
+export type DisposablePoolAction = DisposablePoolActionJson;
 
-export interface DisposablePoolAction {
-    direction: DisposablePoolDirection;
-    /** Positive, rounded to cents */
-    amount: number;
-}
+export type DisposablePoolDirection = DisposablePoolAction['direction'];
 
 /**
  * What the owner still has to move to or from the disposable pool (R-DISP-1).
