@@ -1,6 +1,7 @@
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { AnalyzeReportJson } from '../../types/dto/report-json.types.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { disposablePoolAction } from './disposable-pool-action.js';
 import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
 
 const { toCents } = CurrencyUtils;
@@ -12,8 +13,6 @@ const { toCents } = CurrencyUtils;
  * nothing is recomputed, so the JSON and the text report cannot disagree.
  */
 export function serializeAnalyzeReport(report: AnalyzeReportDto): AnalyzeReportJson {
-    const balance = toCents(report.disposableIncome);
-
     return {
         schemaVersion: 2,
         month: report.month,
@@ -49,16 +48,9 @@ export function serializeAnalyzeReport(report: AnalyzeReportDto): AnalyzeReportJ
             })),
         },
         disposable: {
-            balance,
+            balance: toCents(report.disposableIncome),
             transactions: report.disposableIncomeTransactions.map(toTransactionJson),
-            // Mirrors the text report's action line: a positive balance is a
-            // transfer out of the pool, a negative one a return to it.
-            action:
-                balance > 0
-                    ? { direction: 'fromPool', amount: balance }
-                    : balance < 0
-                      ? { direction: 'toPool', amount: toCents(Math.abs(balance)) }
-                      : null,
+            action: disposablePoolAction(report.disposableIncome),
         },
         netCashFlow: toCents(report.netImpact),
     };

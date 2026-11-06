@@ -5,6 +5,7 @@ import { ITransactionClassificationService } from '../core/transaction-classific
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { BillDetailDto, isBillUpcoming } from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
+import { DisposablePoolDirection, disposablePoolAction } from './disposable-pool-action.js';
 
 /**
  * Service for formatting and displaying comprehensive budget analysis information
@@ -137,7 +138,8 @@ export class AnalyzeDisplayService {
             // direction instead. Deliberately not a negative amount: this
             // section states an action, and formatDisposableAction inverts the
             // instruction rather than printing a negative transfer.
-            const isReimbursement = this.disposableBalance(data) >= 0;
+            const isReimbursement =
+                disposablePoolAction(data.disposableIncome)?.direction !== 'toPool';
             lines.push('');
             lines.push(
                 `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
@@ -229,37 +231,21 @@ export class AnalyzeDisplayService {
      * all three signs are handled rather than assuming a positive amount.
      */
     private formatDisposableAction(data: AnalyzeReportDto): string[] {
-        const balance = this.disposableBalance(data);
-        if (balance === 0) {
+        const action = disposablePoolAction(data.disposableIncome);
+        if (!action) {
             return [];
         }
 
         const count = data.disposableIncomeTransactions.length;
         const countText = count > 0 ? transactionCount(count) : '';
-        const amount = CurrencyUtils.formatWithSymbol(Math.abs(balance), data.currencySymbol);
+        const amount = CurrencyUtils.formatWithSymbol(action.amount, data.currencySymbol);
+        const { arrow, label, note } = DISPOSABLE_ACTION_TEXT[action.direction];
 
-        if (balance > 0) {
-            return [
-                '',
-                `  ${chalk.cyan('→')} ${chalk.bold('Transfer from disposable pool:'.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
-                chalk.dim('    Not included in the net — covers tagged card purchases.'),
-            ];
-        }
-
-        // Refunds outran spending: the pool is owed money rather than owing it.
         return [
             '',
-            `  ${chalk.cyan('←')} ${chalk.bold('Return to disposable pool:'.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
-            chalk.dim('    Not included in the net — tagged refunds exceeded tagged spending.'),
+            `  ${chalk.cyan(arrow)} ${chalk.bold(label.padEnd(30))} ${chalk.cyan(amount)}${countText}`,
+            chalk.dim(`    Not included in the net — ${note}.`),
         ];
-    }
-
-    /**
-     * The disposable balance in cents, as the JSON report rounds it, so float
-     * noise from refunds that cancel spending never prints a $0.00 transfer
-     */
-    private disposableBalance(data: AnalyzeReportDto): number {
-        return CurrencyUtils.toCents(data.disposableIncome);
     }
 
     /**
@@ -396,6 +382,23 @@ export class AnalyzeDisplayService {
         return `    ${DisplayFormatterUtils.fitWidth(bill.name, 30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)} | Actual: ${CurrencyUtils.formatWithSymbol(bill.actual, symbol)} ${trailer}`;
     }
 }
+
+const DISPOSABLE_ACTION_TEXT: Record<
+    DisposablePoolDirection,
+    { arrow: string; label: string; note: string }
+> = {
+    fromPool: {
+        arrow: '→',
+        label: 'Transfer from disposable pool:',
+        note: 'covers tagged card purchases',
+    },
+    // Refunds outran spending: the pool is owed money rather than owing it
+    toPool: {
+        arrow: '←',
+        label: 'Return to disposable pool:',
+        note: 'tagged refunds exceeded tagged spending',
+    },
+};
 
 /** The dimmed " [N transactions]" suffix after a total */
 function transactionCount(count: number): string {
