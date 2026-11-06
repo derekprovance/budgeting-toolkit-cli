@@ -16,6 +16,44 @@ describe('BudgetDisplayService', () => {
     });
 
     describe('formatReport - Bills Section', () => {
+        it('should mark an upcoming bill rather than judging its variance', () => {
+            // Rendering it green puts it beside genuinely cheap bills and
+            // invites the reader to bank money they still owe
+            const billComparison: BillComparisonDto = {
+                predictedTotal: 50,
+                actualTotal: 0,
+                variance: -50,
+                bills: [
+                    {
+                        id: 'starry',
+                        name: 'Starry Internet',
+                        actual: 0,
+                        predicted: 50,
+                        frequency: 'monthly',
+                        dueDate: new Date('2099-08-27T00:00:00Z'),
+                        upcomingAmount: 50,
+                    },
+                ],
+                currencySymbol: '$',
+                currencyCode: 'USD',
+            };
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison,
+                unbudgeted: [],
+                insights: [],
+                month: 8,
+                year: 2099,
+            };
+
+            const billLine = stripAnsi(service.formatReport(reportData, false))
+                .split('\n')
+                .find(line => line.includes('Starry Internet'));
+
+            expect(billLine).toMatch(/^⏳ /);
+        });
+
         it('should show top 4 bills when verbose=false', () => {
             const mockBill = (name: string, actual: number, predicted: number) => ({
                 id: name.replace(/\s/g, '_'),

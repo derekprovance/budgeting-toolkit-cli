@@ -38,7 +38,7 @@ export class BudgetDisplayService {
      * @param verbose Whether to show detailed information
      * @returns Formatted report string
      */
-    formatReport(data: BudgetReportResult, verbose = false): string {
+    formatReport(data: BudgetReportResult, verbose: boolean): string {
         const sections: string[] = [];
 
         // Header
@@ -106,8 +106,6 @@ export class BudgetDisplayService {
         } = budgetTotals(data.budgets);
         const isOverBudget = totalSpent > totalBudget;
 
-        const statusEmoji = EmojiUtils.getStatusEmoji(percentageUsed, isOverBudget);
-
         const header = DisplayFormatterUtils.createBoxHeader(
             `BUDGET REPORT - ${DisplayFormatterUtils.formatMonthYear(data.month, data.year).toUpperCase()}`
         );
@@ -133,11 +131,11 @@ export class BudgetDisplayService {
                 data.billComparison.currencySymbol
             );
             lines.push(
-                `${chalk.bold('Status:')}           ${statusEmoji} OVER BUDGET by ${overFormatted} (${percentageUsed.toFixed(1)}%)`
+                `${chalk.bold('Status:')}           🔴 OVER BUDGET by ${overFormatted} (${percentageUsed.toFixed(1)}%)`
             );
         } else {
             lines.push(
-                `${chalk.bold('Status:')}           ${statusEmoji} ON TRACK (${percentageUsed.toFixed(1)}% spent)`
+                `${chalk.bold('Status:')}           ${EmojiUtils.getStatusEmoji(percentageUsed)} ON TRACK (${percentageUsed.toFixed(1)}% spent)`
             );
         }
 
@@ -171,7 +169,7 @@ export class BudgetDisplayService {
     private formatAttentionNeededSection(
         budgets: BudgetReportDto[],
         currencySymbol: string,
-        verbose = false
+        verbose: boolean
     ): string {
         return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
             sectionTitle: 'ATTENTION NEEDED',
@@ -188,7 +186,7 @@ export class BudgetDisplayService {
     private formatOnTrackSection(
         budgets: BudgetReportDto[],
         currencySymbol: string,
-        verbose = false
+        verbose: boolean
     ): string {
         return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
             sectionTitle: 'ON TRACK',
@@ -252,19 +250,9 @@ export class BudgetDisplayService {
         });
 
         lines.push('');
-
-        // Display statistics below all budgets if verbose
         if (verbose) {
-            sorted.forEach(budget => {
-                const stats = this.formatBudgetStatistics(budget, currencySymbol);
-                if (stats) {
-                    lines.push(budget.name.toUpperCase());
-                    lines.push(stats);
-                    lines.push('');
-                }
-            });
+            lines.push(...this.formatVerboseStatistics(sorted, currencySymbol));
         }
-
         lines.push('');
         return lines.join('\n');
     }
@@ -304,6 +292,15 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
+    /** Each budget's statistics, listed below the section's rows in verbose mode */
+    private formatVerboseStatistics(budgets: BudgetReportDto[], currencySymbol: string): string[] {
+        return budgets.flatMap(budget => [
+            budget.name.toUpperCase(),
+            this.formatBudgetStatistics(budget, currencySymbol),
+            '',
+        ]);
+    }
+
     /**
      * Formats budget statistics for verbose output
      */
@@ -334,7 +331,7 @@ export class BudgetDisplayService {
     /**
      * Formats the bills and recurring section
      */
-    private formatBillsSection(billComparison: BillComparisonDto, verbose = false): string {
+    private formatBillsSection(billComparison: BillComparisonDto, verbose: boolean): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'));
         lines.push('');
@@ -396,11 +393,12 @@ export class BudgetDisplayService {
             );
             const variance = bill.actual - bill.predicted;
             const isUpcoming = isBillUpcoming(bill);
-            const varianceEmoji = EmojiUtils.getBillVarianceEmoji(
-                variance,
-                bill.predicted,
-                isUpcoming
-            );
+            // A bill that has not come around yet is not "under budget": it is
+            // simply unpaid, and rendering it green beside genuinely cheap bills
+            // invites the reader to bank money they still owe
+            const varianceEmoji = isUpcoming
+                ? EmojiUtils.UPCOMING_BILL_EMOJI
+                : EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
 
             const name = DisplayFormatterUtils.fitWidth(
                 bill.name,

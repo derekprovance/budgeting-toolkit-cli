@@ -5,16 +5,15 @@ import { BUSINESS_CONSTANTS } from './business-constants.js';
  * Provides consistent emoji indicators for the report display
  */
 export class EmojiUtils {
+    /** Marks a bill that has not come around yet, in place of a variance emoji */
+    static readonly UPCOMING_BILL_EMOJI = '⏳';
+
     /**
-     * Gets a status emoji based on budget percentage and overage status
-     * @param percentage The percentage of budget used (0-100+)
-     * @param isOverBudget Whether the budget is over the limit
-     * @returns Status emoji: 🔴 (over), 🟡 (warning), or 🟢 (good)
+     * Gets the status emoji of a budget total that is not over its limit
+     * @param percentage The percentage of budget used (0-100)
+     * @returns 🟡 (nearly spent) or 🟢 (good)
      */
-    static getStatusEmoji(percentage: number, isOverBudget: boolean): string {
-        if (isOverBudget) {
-            return '🔴';
-        }
+    static getStatusEmoji(percentage: number): string {
         // Same boundary as BudgetAnalyticsService.determineStatus
         if (percentage >= BUSINESS_CONSTANTS.BUDGET.ON_TRACK_THRESHOLD) {
             return '🟡';
@@ -28,19 +27,7 @@ export class EmojiUtils {
      * @param predictedAmount The expected/predicted bill amount
      * @returns Emoji indicating bill variance status
      */
-    static getBillVarianceEmoji(
-        variance: number,
-        predictedAmount: number,
-        isUpcoming: boolean = false
-    ): string {
-        // A bill that has not come around yet is not "under budget" — it is
-        // simply unpaid, and rendering it green alongside genuinely cheap bills
-        // invites the reader to bank money they still owe. Whether it counts as
-        // upcoming is BillDetailDto's call, not ours.
-        if (isUpcoming) {
-            return '⏳';
-        }
-
+    static getBillVarianceEmoji(variance: number, predictedAmount: number): string {
         // Handle zero predicted amount case
         if (predictedAmount === 0) {
             return variance > 0 ? '🔴' : '🟢';

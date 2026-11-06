@@ -24,22 +24,12 @@ describe('bill status', () => {
     });
 
     describe('getBillVarianceEmoji', () => {
-        it('should mark an upcoming bill rather than judging it', () => {
-            // Rendering it green puts it beside genuinely cheap bills and
-            // invites the reader to bank money they still owe.
-            expect(EmojiUtils.getBillVarianceEmoji(-50, 50, true)).toBe('⏳');
-        });
-
-        it('should judge a bill normally when it is not upcoming', () => {
-            expect(EmojiUtils.getBillVarianceEmoji(-50, 50, false)).not.toBe('⏳');
-        });
-
-        it('should default to judging normally', () => {
+        it('should judge a bill on its variance', () => {
             expect(EmojiUtils.getBillVarianceEmoji(0, 50)).toBe('🟢');
         });
 
         it('should still flag an overspend', () => {
-            expect(EmojiUtils.getBillVarianceEmoji(30, 5, false)).toBe('🔴');
+            expect(EmojiUtils.getBillVarianceEmoji(30, 5)).toBe('🔴');
         });
     });
 });
