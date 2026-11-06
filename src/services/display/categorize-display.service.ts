@@ -2,18 +2,18 @@ import chalk from 'chalk';
 import { CategorizeMode } from '../../types/enums.js';
 import { isCertificateError } from '../../utils/error-detection.utils.js';
 
+const MODE_TEXT: Record<CategorizeMode, string> = {
+    [CategorizeMode.Both]: 'categories and budgets',
+    [CategorizeMode.Category]: 'categories',
+    [CategorizeMode.Budget]: 'budgets',
+};
+
 export class CategorizeDisplayService {
     /**
      * Formats the processing header
      */
     formatProcessingHeader(tag: string, updateMode: CategorizeMode, dryRun?: boolean): string {
-        const modeText =
-            updateMode === CategorizeMode.Both
-                ? 'categories and budgets'
-                : updateMode === CategorizeMode.Category
-                  ? 'categories'
-                  : 'budgets';
-
+        const modeText = MODE_TEXT[updateMode];
         const dryRunText = dryRun ? ' (Dry Run)' : '';
 
         return [

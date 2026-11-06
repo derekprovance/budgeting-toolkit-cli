@@ -1,7 +1,7 @@
 import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
-import { CategorizeMode } from '../types/enums.js';
+import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
@@ -43,21 +43,21 @@ export class UserInputService {
      * @param transactionId The transaction ID for linking
      * @param options The proposed changes to the transaction
      * @param updateMode The mode indicating what to update (category, budget, or both)
-     * @returns Promise<CategorizeMode> The user's choice
+     * @returns Promise<ReviewAction> The user's choice
      * @throws Error if the transaction is invalid
      */
     async askToUpdateTransaction(
         transaction: TransactionSplit,
         transactionId: string | undefined,
         options: TransactionUpdateOptions
-    ): Promise<CategorizeMode> {
+    ): Promise<ReviewAction> {
         if (!transaction) {
             throw new Error('Transaction cannot be null or undefined');
         }
 
         const changes = this.getChangeList(transaction, options);
         if (changes.length === 0) {
-            return CategorizeMode.Skip;
+            return ReviewAction.Skip;
         }
 
         const message = this.formatUpdateMessage(
@@ -341,18 +341,18 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    private async promptUser(message: string, isDeposit: boolean = false): Promise<CategorizeMode> {
+    private async promptUser(message: string, isDeposit: boolean = false): Promise<ReviewAction> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
             key: InquirerKey;
             name: string;
-            value: CategorizeMode;
+            value: ReviewAction;
         }> = [
             {
                 key: 'a',
                 name: 'Update all',
-                value: CategorizeMode.Both,
+                value: ReviewAction.UpdateAll,
             },
         ];
 
@@ -362,26 +362,26 @@ export class UserInputService {
             choices.push({
                 key: 'b',
                 name: 'Update only the budget',
-                value: CategorizeMode.Budget,
+                value: ReviewAction.UpdateBudget,
             });
         }
 
         choices.push({
             key: 'c',
             name: 'Update only the category',
-            value: CategorizeMode.Category,
+            value: ReviewAction.UpdateCategory,
         });
 
         choices.push({
             key: 'e',
             name: 'Edit',
-            value: CategorizeMode.Edit,
+            value: ReviewAction.Edit,
         });
 
         choices.push({
             key: 's',
             name: 'Skip',
-            value: CategorizeMode.Skip,
+            value: ReviewAction.Skip,
         });
 
         const answer = await expand({

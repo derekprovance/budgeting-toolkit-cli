@@ -6,10 +6,8 @@ export interface BudgetDateOptions {
 }
 
 export interface CategorizeOptions {
-    tag: string;
     mode: CategorizeMode;
     force?: boolean;
-    yes?: boolean;
     dryRun?: boolean;
 }
 

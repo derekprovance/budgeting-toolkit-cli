@@ -10,7 +10,7 @@ import { TransactionAIResultValidator } from './core/transaction-ai-result-valid
 import { UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
-import { CategorizeMode } from '../types/enums.js';
+import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { AIResult } from './ai/llm-transaction-processing.service.js';
 
@@ -303,7 +303,7 @@ export class InteractiveTransactionUpdater {
 
         let currentCategory = category;
         let currentBudget = budget;
-        let action: CategorizeMode;
+        let action: ReviewAction;
 
         do {
             action = await this.userInputService.askToUpdateTransaction(
@@ -328,7 +328,7 @@ export class InteractiveTransactionUpdater {
                 }
             );
 
-            if (action === CategorizeMode.Skip) {
+            if (action === ReviewAction.Skip) {
                 logger.debug(
                     { description: transaction.description },
                     'User skipped transaction update'
@@ -336,7 +336,7 @@ export class InteractiveTransactionUpdater {
                 return Result.ok(undefined);
             }
 
-            if (action === CategorizeMode.Edit) {
+            if (action === ReviewAction.Edit) {
                 [currentCategory, currentBudget] = await this.processEditCommand(
                     transaction,
                     currentCategory,
@@ -344,7 +344,7 @@ export class InteractiveTransactionUpdater {
                     originalAISuggestion
                 );
             }
-        } while (action === CategorizeMode.Edit);
+        } while (action === ReviewAction.Edit);
 
         // Apply the final update
         const updatedTransaction = await this.applyTransactionUpdate(
@@ -421,11 +421,11 @@ export class InteractiveTransactionUpdater {
      */
     private async applyTransactionUpdate(
         transaction: TransactionSplit,
-        mode: CategorizeMode,
+        action: ReviewAction,
         category?: CategoryProperties,
         budget?: BudgetRead
     ): Promise<TransactionRead | undefined> {
-        const { categoryName, budgetId } = this.getUpdateParameters(mode, category, budget);
+        const { categoryName, budgetId } = this.getUpdateParameters(action, category, budget);
         return await this.transactionService.updateTransaction(transaction, categoryName, budgetId);
     }
 
@@ -433,19 +433,24 @@ export class InteractiveTransactionUpdater {
      * Determines which parameters to update based on mode
      */
     private getUpdateParameters(
-        mode: CategorizeMode,
+        action: ReviewAction,
         category?: CategoryProperties,
         budget?: BudgetRead
     ): { categoryName?: string; budgetId?: string } {
-        switch (mode) {
-            case CategorizeMode.Both:
+        switch (action) {
+            case ReviewAction.UpdateAll:
                 return { categoryName: category?.name, budgetId: budget?.id };
-            case CategorizeMode.Budget:
+            case ReviewAction.UpdateBudget:
                 return { budgetId: budget?.id };
-            case CategorizeMode.Category:
+            case ReviewAction.UpdateCategory:
                 return { categoryName: category?.name };
-            default:
+            case ReviewAction.Edit:
+            case ReviewAction.Skip:
                 return {};
+            default: {
+                const unhandled: never = action;
+                throw new Error(`Unhandled review action: ${String(unhandled)}`);
+            }
         }
     }
 }

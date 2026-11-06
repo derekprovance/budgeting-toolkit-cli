@@ -10,7 +10,7 @@ import {
     TransactionRead,
 } from '@derekprovance/firefly-iii-sdk';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { CategorizeMode, EditTransactionAttribute } from '../../src/types/enums.js';
+import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 import { withdrawal } from '../shared/test-data.js';
 
 describe('InteractiveTransactionUpdater', () => {
@@ -62,7 +62,7 @@ describe('InteractiveTransactionUpdater', () => {
         mockUserInputService = {
             askToUpdateTransaction: jest
                 .fn<UserInputService['askToUpdateTransaction']>()
-                .mockResolvedValue(CategorizeMode.Both),
+                .mockResolvedValue(ReviewAction.UpdateAll),
             shouldEditCategoryBudget: jest.fn(),
             getNewCategory: jest.fn(),
             getNewBudget: jest.fn(),
@@ -130,7 +130,7 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Both);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(ReviewAction.UpdateAll);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -155,7 +155,7 @@ describe('InteractiveTransactionUpdater', () => {
         it('passes suggestion sources through to the prompt', async () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Skip);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(ReviewAction.Skip);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
             );
@@ -207,7 +207,7 @@ describe('InteractiveTransactionUpdater', () => {
                     budget: undefined, // shouldSetBudget returned false
                 },
             });
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Both);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(ReviewAction.UpdateAll);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -243,7 +243,7 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Skip);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(ReviewAction.Skip);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
             );
@@ -503,8 +503,8 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
                 EditTransactionAttribute.Budget,
@@ -551,8 +551,8 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
@@ -594,8 +594,8 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Budget,
             ]);
@@ -635,9 +635,9 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
@@ -685,9 +685,9 @@ describe('InteractiveTransactionUpdater', () => {
             // Second prompt: user edits again (this is where we verify AI suggestion is preserved)
             // Third prompt: user confirms final selection
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
@@ -742,7 +742,9 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                ReviewAction.UpdateBudget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -781,7 +783,9 @@ describe('InteractiveTransactionUpdater', () => {
                     budget: mockBudgets[0],
                 },
             });
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                ReviewAction.UpdateBudget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -823,7 +827,7 @@ describe('InteractiveTransactionUpdater', () => {
                     budget: undefined,
                 },
             });
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Both);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(ReviewAction.UpdateAll);
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -853,7 +857,9 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockReturnValue(false); // No budget needed
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Category);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                ReviewAction.UpdateCategory
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -891,7 +897,9 @@ describe('InteractiveTransactionUpdater', () => {
                     budget: mockBudgets[0],
                 },
             });
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                ReviewAction.UpdateBudget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -969,7 +977,9 @@ describe('InteractiveTransactionUpdater', () => {
                     budget: mockBudgets[0],
                 },
             });
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                ReviewAction.UpdateBudget
+            );
             mockTransactionService.updateTransaction.mockResolvedValue(mockTransaction as any);
             mockTransactionService.getTransactionReadBySplit.mockReturnValue(
                 mockTransaction as any
@@ -1006,8 +1016,8 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Budget,
             ]);
@@ -1042,8 +1052,8 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Both);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateAll);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Category,
             ]);
@@ -1079,8 +1089,8 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockUserInputService.askToUpdateTransaction
-                .mockResolvedValueOnce(CategorizeMode.Edit)
-                .mockResolvedValueOnce(CategorizeMode.Budget);
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.UpdateBudget);
             mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                 EditTransactionAttribute.Budget,
             ]);
@@ -1113,7 +1123,9 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.shouldSetBudget.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
-            mockUserInputService.askToUpdateTransaction.mockResolvedValue(CategorizeMode.Budget);
+            mockUserInputService.askToUpdateTransaction.mockResolvedValue(
+                ReviewAction.UpdateBudget
+            );
             mockAIValidator.validateAIResults.mockResolvedValue({
                 ok: true,
                 value: { category: undefined, budget: validBudget },

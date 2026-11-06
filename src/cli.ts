@@ -284,8 +284,8 @@ Examples:
         .description('AI-powered transaction categorization and budget assignment')
         .addOption(
             new Option('-m, --mode <mode>', 'what to update')
-                .choices(['category', 'budget', 'both'])
-                .default('both', 'categories and budgets')
+                .choices(Object.values(CategorizeMode))
+                .default(CategorizeMode.Both, 'categories and budgets')
         )
         .option(
             '-f, --force',
@@ -329,7 +329,7 @@ Examples:
                 const command = new CategorizeCommand(aiTransactionUpdateOrchestrator);
                 await command.execute({
                     tag,
-                    updateMode: opts.mode as CategorizeMode,
+                    updateMode: opts.mode,
                     dryRun: opts.dryRun,
                 });
             } catch (error) {

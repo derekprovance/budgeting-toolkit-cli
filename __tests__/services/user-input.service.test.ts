@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { CategorizeMode, EditTransactionAttribute } from '../../src/types/enums.js';
+import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 
 // The subset of an @inquirer/prompts config these tests read back
 type PromptConfig = {
@@ -12,7 +12,7 @@ type PromptConfig = {
 type PromptFn<R> = (config: PromptConfig) => Promise<R>;
 
 // Create mock functions first
-const mockExpand = jest.fn<PromptFn<CategorizeMode>>();
+const mockExpand = jest.fn<PromptFn<ReviewAction>>();
 const mockCheckbox = jest.fn<PromptFn<EditTransactionAttribute[]>>();
 const mockSelect = jest.fn<PromptFn<string>>();
 const mockSearch = jest.fn<PromptFn<string>>();
@@ -97,7 +97,7 @@ describe('UserInputService', () => {
         });
 
         it('should always show both fields even when values match current', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -108,13 +108,13 @@ describe('UserInputService', () => {
                 }
             );
 
-            expect(result).toBe(CategorizeMode.Skip);
+            expect(result).toBe(ReviewAction.Skip);
             // Should still prompt user since both fields are always displayed
             expect(mockExpand).toHaveBeenCalled();
         });
 
         it('labels each suggestion with where it came from', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -132,7 +132,7 @@ describe('UserInputService', () => {
         });
 
         it('marks a suggestion equal to the current value as unchanged', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -151,7 +151,7 @@ describe('UserInputService', () => {
         });
 
         it('starts the prompt on the transaction line with its position', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -165,7 +165,7 @@ describe('UserInputService', () => {
         });
 
         it('shows no position when progress is not given', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -178,7 +178,7 @@ describe('UserInputService', () => {
         });
 
         it('shows no label when the source is unknown', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -192,7 +192,7 @@ describe('UserInputService', () => {
 
         it('should prompt for category change only', async () => {
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Category);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateCategory);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -200,7 +200,7 @@ describe('UserInputService', () => {
                 { category: newCategory }
             );
 
-            expect(result).toBe(CategorizeMode.Category);
+            expect(result).toBe(ReviewAction.UpdateCategory);
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
@@ -209,17 +209,17 @@ describe('UserInputService', () => {
                         expect.objectContaining({
                             key: 'a',
                             name: 'Update all',
-                            value: CategorizeMode.Both,
+                            value: ReviewAction.UpdateAll,
                         }),
                         expect.objectContaining({
                             key: 'c',
                             name: 'Update only the category',
-                            value: CategorizeMode.Category,
+                            value: ReviewAction.UpdateCategory,
                         }),
                         expect.objectContaining({
                             key: 's',
                             name: 'Skip',
-                            value: CategorizeMode.Skip,
+                            value: ReviewAction.Skip,
                         }),
                     ]),
                 })
@@ -228,7 +228,7 @@ describe('UserInputService', () => {
 
         it('should prompt for budget change only', async () => {
             const newBudget = 'New Budget';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Budget);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateBudget);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -236,7 +236,7 @@ describe('UserInputService', () => {
                 { budget: newBudget }
             );
 
-            expect(result).toBe(CategorizeMode.Budget);
+            expect(result).toBe(ReviewAction.UpdateBudget);
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
@@ -245,17 +245,17 @@ describe('UserInputService', () => {
                         expect.objectContaining({
                             key: 'a',
                             name: 'Update all',
-                            value: CategorizeMode.Both,
+                            value: ReviewAction.UpdateAll,
                         }),
                         expect.objectContaining({
                             key: 'b',
                             name: 'Update only the budget',
-                            value: CategorizeMode.Budget,
+                            value: ReviewAction.UpdateBudget,
                         }),
                         expect.objectContaining({
                             key: 's',
                             name: 'Skip',
-                            value: CategorizeMode.Skip,
+                            value: ReviewAction.Skip,
                         }),
                     ]),
                 })
@@ -265,7 +265,7 @@ describe('UserInputService', () => {
         it('should prompt for both category and budget changes', async () => {
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -273,7 +273,7 @@ describe('UserInputService', () => {
                 { category: newCategory, budget: newBudget }
             );
 
-            expect(result).toBe(CategorizeMode.Both);
+            expect(result).toBe(ReviewAction.UpdateAll);
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
@@ -282,22 +282,22 @@ describe('UserInputService', () => {
                         expect.objectContaining({
                             key: 'a',
                             name: 'Update all',
-                            value: CategorizeMode.Both,
+                            value: ReviewAction.UpdateAll,
                         }),
                         expect.objectContaining({
                             key: 'b',
                             name: 'Update only the budget',
-                            value: CategorizeMode.Budget,
+                            value: ReviewAction.UpdateBudget,
                         }),
                         expect.objectContaining({
                             key: 'c',
                             name: 'Update only the category',
-                            value: CategorizeMode.Category,
+                            value: ReviewAction.UpdateCategory,
                         }),
                         expect.objectContaining({
                             key: 's',
                             name: 'Skip',
-                            value: CategorizeMode.Skip,
+                            value: ReviewAction.Skip,
                         }),
                     ]),
                 })
@@ -314,7 +314,7 @@ describe('UserInputService', () => {
 
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             const result = await service.askToUpdateTransaction(
                 mockTransactionWithoutValues as TransactionSplit,
@@ -322,7 +322,7 @@ describe('UserInputService', () => {
                 { category: newCategory, budget: newBudget }
             );
 
-            expect(result).toBe(CategorizeMode.Both);
+            expect(result).toBe(ReviewAction.UpdateAll);
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('Apply these changes?'),
@@ -342,7 +342,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
             };
 
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             const result = await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
@@ -350,7 +350,7 @@ describe('UserInputService', () => {
                 { category: 'New Category', budget: 'New Budget' }
             );
 
-            expect(result).toBe(CategorizeMode.Both);
+            expect(result).toBe(ReviewAction.UpdateAll);
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('...'),
@@ -360,7 +360,7 @@ describe('UserInputService', () => {
 
         it('should return Skip when user selects abort option', async () => {
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             const result = await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -368,7 +368,7 @@ describe('UserInputService', () => {
                 { category: newCategory }
             );
 
-            expect(result).toBe(CategorizeMode.Skip);
+            expect(result).toBe(ReviewAction.Skip);
         });
 
         it('should show all update options including individual category and budget', async () => {
@@ -381,7 +381,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
             };
 
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(
                 mockTransactionNoBudget as TransactionSplit,
@@ -395,22 +395,22 @@ describe('UserInputService', () => {
                         expect.objectContaining({
                             key: 'a',
                             name: 'Update all',
-                            value: CategorizeMode.Both,
+                            value: ReviewAction.UpdateAll,
                         }),
                         expect.objectContaining({
                             key: 'b',
                             name: 'Update only the budget',
-                            value: CategorizeMode.Budget,
+                            value: ReviewAction.UpdateBudget,
                         }),
                         expect.objectContaining({
                             key: 'c',
                             name: 'Update only the category',
-                            value: CategorizeMode.Category,
+                            value: ReviewAction.UpdateCategory,
                         }),
                         expect.objectContaining({
                             key: 's',
                             name: 'Skip',
-                            value: CategorizeMode.Skip,
+                            value: ReviewAction.Skip,
                         }),
                     ]),
                 })
@@ -427,7 +427,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
                 category_name: 'Food',
             };
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(withdrawal as TransactionSplit, '1', {
                 category: 'Dining',
@@ -448,7 +448,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
                 category_name: 'Income',
             };
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(deposit as TransactionSplit, '2', {
                 category: 'Salary',
@@ -469,7 +469,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
                 category_name: 'Transfer',
             };
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(transfer as TransactionSplit, '3', {
                 category: 'Transfer',
@@ -488,7 +488,7 @@ describe('UserInputService', () => {
                 amount: '10.00',
                 category_name: 'Misc',
             };
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(transaction as TransactionSplit, '4', {
                 category: 'Other',
@@ -515,7 +515,7 @@ describe('UserInputService', () => {
         it('should include hyperlink in description when transaction ID is provided', async () => {
             const transactionId = '123';
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -535,7 +535,7 @@ describe('UserInputService', () => {
 
         it('should not include hyperlink when transaction ID is undefined', async () => {
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(mockTransaction as TransactionSplit, undefined, {
                 category: newCategory,
@@ -567,7 +567,7 @@ describe('UserInputService', () => {
             };
             const transactionId = '456';
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(
                 mockTransactionWithLongDesc as TransactionSplit,
@@ -591,7 +591,7 @@ describe('UserInputService', () => {
             const customService = new UserInputService(customBaseUrl);
             const transactionId = '789';
             const newBudget = 'New Budget';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await customService.askToUpdateTransaction(
                 mockTransaction as TransactionSplit,
@@ -611,7 +611,7 @@ describe('UserInputService', () => {
 
         it('should handle empty transaction ID as no hyperlink', async () => {
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(mockTransaction as TransactionSplit, '', {
                 category: newCategory,
@@ -642,7 +642,7 @@ describe('UserInputService', () => {
             };
             const transactionId = '999';
             const newCategory = 'New Category';
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(
                 specialDescTransaction as TransactionSplit,
@@ -672,7 +672,7 @@ describe('UserInputService', () => {
         };
 
         it('should show Budget: N/A for deposits instead of None', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Skip);
+            mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
                 category: 'Salary',
@@ -686,7 +686,7 @@ describe('UserInputService', () => {
         });
 
         it('should not show "Update only the budget" option for deposits', async () => {
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
                 category: 'Salary',
@@ -730,7 +730,7 @@ describe('UserInputService', () => {
                 currency_symbol: '$',
             };
 
-            mockExpand.mockResolvedValueOnce(CategorizeMode.Both);
+            mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             await service.askToUpdateTransaction(mockBill as TransactionSplit, '5', {
                 category: 'Food',
