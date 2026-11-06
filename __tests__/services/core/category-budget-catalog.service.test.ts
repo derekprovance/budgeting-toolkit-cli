@@ -3,7 +3,7 @@ import { CategoryBudgetCatalog } from '../../../src/services/core/category-budge
 import { ICategoryService } from '../../../src/services/core/category.service.interface.js';
 import { IBudgetService } from '../../../src/services/core/budget.service.interface.js';
 import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
-import { budgetRead, createMockTransaction } from '../../shared/test-data.js';
+import { budgetRead, withdrawal } from '../../shared/test-data.js';
 import { partialMock } from '../../shared/mocks.js';
 
 describe('CategoryBudgetCatalog', () => {
@@ -18,7 +18,7 @@ describe('CategoryBudgetCatalog', () => {
         budgetRead('2', 'Medical'),
         budgetRead('3', 'Utilities'),
     ];
-    const transaction = createMockTransaction({
+    const transaction = withdrawal('150.00', {
         transaction_journal_id: '1',
         description: 'Test Transaction',
     });

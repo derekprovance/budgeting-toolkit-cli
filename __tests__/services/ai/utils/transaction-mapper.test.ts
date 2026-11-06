@@ -2,18 +2,16 @@ import {
     mapTransactionForLLM,
     LLMTransactionData,
 } from '../../../../src/services/ai/utils/transaction-mapper.js';
-import { createMockTransaction } from '../../../shared/test-data.js';
+import { deposit, transfer, withdrawal } from '../../../shared/test-data.js';
 
 describe('transaction-mapper', () => {
     describe('mapTransactionForLLM', () => {
         it('should map all required fields correctly', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('150.00', {
                 description: 'Walmart Supercenter',
-                amount: '150.00',
                 date: '2025-01-15T10:30:00Z',
                 source_name: 'Checking Account',
                 destination_name: 'Walmart',
-                type: 'withdrawal',
                 notes: 'Weekly grocery shopping',
             });
 
@@ -31,13 +29,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle transaction with null notes', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('75.00', {
                 description: 'Amazon Fresh',
-                amount: '75.00',
                 date: '2025-01-16',
                 source_name: 'Checking',
                 destination_name: 'Amazon',
-                type: 'withdrawal',
                 notes: null,
             });
 
@@ -47,13 +43,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle transaction with undefined source_name', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test Transaction',
-                amount: '100.00',
                 date: '2025-01-15',
                 source_name: undefined,
                 destination_name: 'Destination',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -62,13 +56,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle transaction with undefined destination_name', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test Transaction',
-                amount: '100.00',
                 date: '2025-01-15',
                 source_name: 'Source',
                 destination_name: undefined,
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -77,13 +69,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle deposit transaction type', () => {
-            const transaction = createMockTransaction({
+            const transaction = deposit('5000.00', {
                 description: 'Paycheck',
-                amount: '5000.00',
                 date: '2025-01-15',
                 source_name: 'Employer',
                 destination_name: 'Checking Account',
-                type: 'deposit',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -92,13 +82,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle transfer transaction type', () => {
-            const transaction = createMockTransaction({
+            const transaction = transfer('500.00', {
                 description: 'Transfer to Savings',
-                amount: '500.00',
                 date: '2025-01-15',
                 source_name: 'Checking Account',
                 destination_name: 'Savings Account',
-                type: 'transfer',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -109,11 +97,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle empty string description', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('50.00', {
                 description: '',
-                amount: '50.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -122,11 +108,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle zero amount', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('0.00', {
                 description: 'Zero Amount Transaction',
-                amount: '0.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -135,11 +119,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle large amount with decimals', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('9999999.99', {
                 description: 'Large Purchase',
-                amount: '9999999.99',
                 date: '2025-01-15',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -150,11 +132,9 @@ describe('transaction-mapper', () => {
         it('should pass a refund through as an unsigned deposit', () => {
             // Firefly never signs amounts: a refund is a deposit, and the
             // direction reaches the model through `type`.
-            const transaction = createMockTransaction({
+            const transaction = deposit('50.00', {
                 description: 'Refund',
-                amount: '50.00',
                 date: '2025-01-15',
-                type: 'deposit',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -164,11 +144,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle special characters in description', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('25.00', {
                 description: 'Café & Bakery - "Special" Items (50% off)',
-                amount: '25.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -177,13 +155,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle special characters in account names', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test',
-                amount: '100.00',
                 date: '2025-01-15',
                 source_name: "O'Reilly's Account",
                 destination_name: 'Vendor & Co.',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -193,13 +169,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should not include extra fields from TransactionSplit', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test',
-                amount: '100.00',
                 date: '2025-01-15',
                 source_name: 'Source',
                 destination_name: 'Destination',
-                type: 'withdrawal',
                 // These fields should NOT be in LLMTransactionData
                 transaction_journal_id: '12345',
                 budget_id: 'budget-123',
@@ -224,11 +198,9 @@ describe('transaction-mapper', () => {
 
         it('should handle long description text', () => {
             const longDescription = 'A'.repeat(500);
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: longDescription,
-                amount: '100.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -238,11 +210,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle multiline notes', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test',
-                amount: '100.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
                 notes: 'Line 1\nLine 2\nLine 3',
             });
 
@@ -252,11 +222,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle ISO date format', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test',
-                amount: '100.00',
                 date: '2025-01-15T14:30:00.000Z',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -265,11 +233,9 @@ describe('transaction-mapper', () => {
         });
 
         it('should handle simple date format', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test',
-                amount: '100.00',
                 date: '2025-01-15',
-                type: 'withdrawal',
             });
 
             const result = mapTransactionForLLM(transaction);
@@ -278,13 +244,11 @@ describe('transaction-mapper', () => {
         });
 
         it('should preserve type information correctly', () => {
-            const transaction = createMockTransaction({
+            const transaction = withdrawal('100.00', {
                 description: 'Test',
-                amount: '100.00',
                 date: '2025-01-15',
                 source_name: 'Source',
                 destination_name: 'Destination',
-                type: 'withdrawal',
             });
 
             const result: LLMTransactionData = mapTransactionForLLM(transaction);
