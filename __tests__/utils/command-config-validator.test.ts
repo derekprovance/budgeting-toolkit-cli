@@ -1,8 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import {
-    CommandConfigValidator,
-    requireCommandConfig,
-} from '../../src/utils/command-config-validator.js';
+import { requireCommandConfig } from '../../src/utils/command-config-validator.js';
 import { AppConfig } from '../../src/config/config.types.js';
 import { DEFAULT_CONFIG } from '../../src/config/config.defaults.js';
 
@@ -73,12 +70,6 @@ describe('requireCommandConfig', () => {
             expect(message).toContain('ANTHROPIC_API_KEY is required for categorize command');
             expect(message).toContain('https://console.anthropic.com');
             expect(message).toContain('See CONFIG.md');
-        });
-
-        it('should throw the same guidance through validateCategorizeCommand', () => {
-            expect(() =>
-                CommandConfigValidator.validateCategorizeCommand(buildConfig({ claudeApiKey: '' }))
-            ).toThrow('ANTHROPIC_API_KEY is required for categorize command');
         });
     });
 });

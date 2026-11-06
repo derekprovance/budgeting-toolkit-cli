@@ -37,8 +37,3 @@ export function requireCommandConfig(config: AppConfig, command: ConfiguredComma
         throw new Error(requirement.guidance);
     }
 }
-
-export const CommandConfigValidator = {
-    validateCategorizeCommand: (config: AppConfig): void =>
-        requireCommandConfig(config, 'categorize'),
-};

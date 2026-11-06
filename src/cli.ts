@@ -13,7 +13,7 @@ import { CategorizeOptions } from './types/categorize.types.js';
 import { BudgetDateParams } from './types/common.types.js';
 import { AppConfig } from './config/config.types.js';
 import { CategorizeMode } from './types/enums.js';
-import { CommandConfigValidator, requireCommandConfig } from './utils/command-config-validator.js';
+import { requireCommandConfig } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
 import { errorMessage } from './utils/error-detection.utils.js';
 import { readFileSync } from 'fs';
@@ -272,7 +272,7 @@ Examples:
 
             try {
                 const config = ConfigManager.getInstance().getConfig();
-                CommandConfigValidator.validateCategorizeCommand(config);
+                requireCommandConfig(config, 'categorize');
 
                 const options: CategorizeOptions = {
                     force: opts.force ?? false,
