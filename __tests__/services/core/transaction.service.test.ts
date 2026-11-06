@@ -3,6 +3,7 @@ import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
 import { TransactionService } from '../../../src/services/core/transaction.service.js';
 import {
+    ApiError,
     TransactionArray,
     TransactionRead,
     TransactionSplit,
@@ -15,6 +16,14 @@ import {
     createMockFireflyClient,
 } from '../../setup/mock-services.js';
 import { withdrawal } from '../../shared/test-data.js';
+
+/** What the Firefly SDK throws for an HTTP error status */
+const apiError = (status: number) =>
+    new ApiError(
+        { method: 'GET', url: '/v1/tags/x' },
+        { url: '/v1/tags/x', ok: false, status, statusText: '', body: undefined },
+        'error'
+    );
 
 // Partial Firefly responses: only the fields the service reads.
 type TagSingleResponse = Awaited<ReturnType<FireflyClientWithCerts['tags']['getTag']>>;
@@ -540,29 +549,24 @@ describe('TransactionService', () => {
             expect(result).toBe(true);
         });
 
-        it('should return false when tag does not exist (API throws)', async () => {
-            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('Tag not found'));
+        it('should return false when Firefly has no such tag', async () => {
+            mockApiClient.tags.getTag.mockRejectedValueOnce(apiError(404));
 
             const result = await service.tagExists('nonexistent-tag');
 
             expect(result).toBe(false);
         });
 
-        it('should return false for empty tag string', async () => {
-            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('Invalid tag'));
+        it('should fail rather than report a tag missing when Firefly cannot be asked', async () => {
+            mockApiClient.tags.getTag.mockRejectedValueOnce(apiError(401));
 
-            const result = await service.tagExists('');
-
-            expect(result).toBe(false);
-            expect(mockApiClient.tags.getTag).toHaveBeenCalledWith('');
+            await expect(service.tagExists('test-tag')).rejects.toThrow();
         });
 
-        it('should handle API errors gracefully', async () => {
-            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('API Error'));
+        it('should fail on a network error', async () => {
+            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
-            const result = await service.tagExists('test-tag');
-
-            expect(result).toBe(false);
+            await expect(service.tagExists('test-tag')).rejects.toThrow('ECONNREFUSED');
         });
 
         it('should return false when API returns undefined data', async () => {

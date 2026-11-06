@@ -1,4 +1,5 @@
 import {
+    ApiError,
     TransactionRead,
     TransactionSplit,
     TransactionUpdate,
@@ -87,13 +88,16 @@ export class TransactionService implements ITransactionService {
         }
     }
 
+    /** @throws when Firefly cannot be asked; only its 404 means the tag is absent */
     async tagExists(tag: string): Promise<boolean> {
         try {
             const response = await this.client.tags.getTag(tag);
             return response?.data !== undefined;
-        } catch {
-            // Tag doesn't exist
-            return false;
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 404) {
+                return false;
+            }
+            throw error;
         }
     }
 
