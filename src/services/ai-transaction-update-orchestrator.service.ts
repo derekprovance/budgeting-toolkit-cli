@@ -1,14 +1,8 @@
-import {
-    BudgetRead,
-    CategoryProperties,
-    TransactionRead,
-    TransactionSplit,
-} from '@derekprovance/firefly-iii-sdk';
+import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import ora from 'ora';
 import { logger } from '../logger.js';
-import { ICategoryService } from './core/category.service.interface.js';
 import { TransactionService } from './core/transaction.service.js';
-import { IBudgetService } from './core/budget.service.interface.js';
+import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
 import {
     AIResponse,
     LLMTransactionProcessingService,
@@ -41,8 +35,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     constructor(
         private readonly transactionService: TransactionService,
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
-        private readonly categoryService: ICategoryService,
-        private readonly budgetService: IBudgetService,
+        private readonly catalog: CategoryBudgetCatalog,
         private readonly llmService: LLMTransactionProcessingService,
         private readonly validator: ITransactionValidatorService,
         private readonly force: boolean = false,
@@ -103,33 +96,13 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 'Processing transactions'
             );
 
-            // History spans up to years of transactions, so it is fetched
-            // alongside the category and budget lists rather than after them
-            const historyReady = this.loadHistory(transactions);
-
-            let categories: CategoryProperties[] | undefined;
-            if (updateMode !== CategorizeMode.Budget) {
-                categories = await this.categoryService.getCategories();
-            }
-
-            let budgets: BudgetRead[] | undefined;
-            if (updateMode !== CategorizeMode.Category) {
-                budgets = await this.budgetService.getBudgets();
-            }
-
             // Show spinner while history and the AI produce suggestions
             const spinner = ora(
                 `Finding suggestions for ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}...`
             ).start();
 
             try {
-                const aiResults = await this.getAIResultsForTransactions(
-                    transactions,
-                    updateMode,
-                    categories,
-                    budgets,
-                    historyReady
-                );
+                const aiResults = await this.getAIResultsForTransactions(transactions, updateMode);
 
                 // Cleared without a summary: the prompts follow straight away
                 spinner.stop();
@@ -152,8 +125,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                         totalTransactions: transactions.length,
                         updatedTransactions: updatedTransactions.length,
                         validationErrors: errors.length,
-                        categories: categories?.length,
-                        budgets: budgets?.length,
                     },
                     'Transaction update complete'
                 );
@@ -229,15 +200,12 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
     private async getAIResultsForTransactions(
         transactions: JournaledTransaction[],
-        updateMode: CategorizeMode,
-        categories?: CategoryProperties[],
-        budgets?: BudgetRead[],
-        historyReady: Promise<void> = this.loadHistory(transactions)
+        updateMode: CategorizeMode
     ): Promise<AIResponse> {
-        // The no-match sentinel is handled inside LLMAssignmentService — plain
-        // option lists are all that's needed here
-        const categoryNames = categories?.map(c => c.name);
-        const budgetNames = budgets?.map(b => b.attributes.name);
+        const categoryNames =
+            updateMode !== CategorizeMode.Budget ? this.catalog.categoryNames() : undefined;
+        const budgetNames =
+            updateMode !== CategorizeMode.Category ? this.catalog.budgetNames() : undefined;
 
         logger.debug(
             {
@@ -254,7 +222,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             this.force ? [] : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
         );
 
-        await historyReady;
+        await this.loadHistory(transactions);
 
         const results: AIResponse = {};
         const counts: SuggestionCounts = {
@@ -281,10 +249,10 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             // category or budget; otherwise the field falls through to the AI
             const suggestion = this.history?.suggest(t);
             const category = wantsCategory
-                ? TransactionHistoryService.resolveName(suggestion?.category, categoryNames)
+                ? this.catalog.findCategory(suggestion?.category)?.name
                 : undefined;
             const budget = wantsBudget
-                ? TransactionHistoryService.resolveName(suggestion?.budget, budgetNames)
+                ? this.catalog.findBudget(suggestion?.budget)?.attributes.name
                 : undefined;
             // A match that was deliberately left unbudgeted last time is the
             // answer: keep it unbudgeted rather than asking the AI for one

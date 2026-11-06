@@ -6,7 +6,7 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service.js';
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
-import { TransactionAIResultValidator } from './core/transaction-ai-result-validator.service.js';
+import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
 import { UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
@@ -38,7 +38,7 @@ export class InteractiveTransactionUpdater {
     constructor(
         private readonly transactionService: TransactionService,
         private readonly validator: ITransactionValidatorService,
-        private readonly aiValidator: TransactionAIResultValidator,
+        private readonly catalog: CategoryBudgetCatalog,
         private readonly userInputService: UserInputService,
         private readonly dryRun: boolean = false
     ) {}
@@ -55,10 +55,7 @@ export class InteractiveTransactionUpdater {
         const journalId = transaction.transaction_journal_id;
 
         try {
-            const prepareResult = await this.validateAndPrepareUpdate(
-                transaction,
-                aiResults[journalId]
-            );
+            const prepareResult = this.validateAndPrepareUpdate(transaction, aiResults[journalId]);
             if (!prepareResult.ok) {
                 return Result.err(prepareResult.error);
             }
@@ -136,20 +133,14 @@ export class InteractiveTransactionUpdater {
     /**
      * Validates AI results and prepares update data
      */
-    private async validateAndPrepareUpdate(
+    private validateAndPrepareUpdate(
         transaction: TransactionSplit,
         aiResult?: AIResult
-    ): Promise<
-        Result<
-            { category?: CategoryProperties; budget?: BudgetRead; hasChanges: boolean },
-            TransactionValidationError
-        >
+    ): Result<
+        { category?: CategoryProperties; budget?: BudgetRead; hasChanges: boolean },
+        TransactionValidationError
     > {
-        const validationResult = await this.aiValidator.validateAIResults(
-            transaction,
-            aiResult?.category,
-            aiResult?.budget
-        );
+        const validationResult = this.catalog.resolve(transaction, aiResult ?? {});
 
         if (!validationResult.ok) {
             return Result.err(validationResult.error);
@@ -330,14 +321,14 @@ export class InteractiveTransactionUpdater {
 
         for (const answer of answers) {
             if (answer === EditTransactionAttribute.Category) {
-                const categoryNames = this.aiValidator.getAvailableCategoryNames();
+                const categoryNames = this.catalog.categoryNames();
                 newCategory = await this.userInputService.getNewCategory(
                     categoryNames,
                     currentCategory?.name,
                     aiSuggestion?.category?.name
                 );
             } else if (answer === EditTransactionAttribute.Budget) {
-                const budgetNames = this.aiValidator.getAvailableBudgetNames();
+                const budgetNames = this.catalog.budgetNames();
                 newBudget = await this.userInputService.getNewBudget(
                     budgetNames,
                     currentBudget?.attributes.name,
@@ -347,7 +338,7 @@ export class InteractiveTransactionUpdater {
         }
 
         if (newBudget && (!newBudget.id || newBudget.id === '')) {
-            const resolvedBudget = this.aiValidator.getBudgetByName(newBudget.attributes.name);
+            const resolvedBudget = this.catalog.findBudget(newBudget.attributes.name);
             if (resolvedBudget) {
                 newBudget = resolvedBudget;
                 logger.debug(

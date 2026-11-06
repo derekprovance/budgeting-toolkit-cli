@@ -24,7 +24,7 @@ const { AITransactionUpdateOrchestrator } =
 const { BudgetService } = await import('../../src/services/core/budget.service.js');
 const { CategoryService } = await import('../../src/services/core/category.service.js');
 
-// TransactionAIResultValidator.create loads the available budgets and
+// CategoryBudgetCatalog.load fetches the available budgets and
 // categories; stub them on the real prototypes so no API call is made.
 jest.spyOn(BudgetService.prototype, 'getBudgets').mockResolvedValue([]);
 jest.spyOn(CategoryService.prototype, 'getCategories').mockResolvedValue([]);

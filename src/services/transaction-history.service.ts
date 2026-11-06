@@ -4,7 +4,6 @@ import { DateRangeService } from './core/date-range.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 import { normalizeDescription } from '../utils/description-normalizer.js';
-import { StringUtils } from '../utils/string.utils.js';
 
 export interface HistorySuggestion {
     category?: string;
@@ -119,21 +118,6 @@ export class TransactionHistoryService {
             ...(latest.category_name && { category: latest.category_name }),
             ...(latestBudgetable && { budget: latestBudgetable.budget_name || null }),
         };
-    }
-
-    /**
-     * The canonical spelling of `name` in `options`, compared the same way the
-     * AI result validator does; undefined when it is no longer listed.
-     */
-    static resolveName(
-        name: string | null | undefined,
-        options: string[] | undefined
-    ): string | undefined {
-        if (!name || !options) {
-            return undefined;
-        }
-        const wanted = StringUtils.normalizeForMatching(name);
-        return options.find(option => StringUtils.normalizeForMatching(option) === wanted);
     }
 
     /**

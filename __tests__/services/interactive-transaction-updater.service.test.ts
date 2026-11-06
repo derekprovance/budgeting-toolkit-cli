@@ -4,18 +4,15 @@ import {
 } from '../../src/services/interactive-transaction-updater.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
-import { TransactionAIResultValidator } from '../../src/services/core/transaction-ai-result-validator.service.js';
+import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-catalog.service.js';
+import { ICategoryService } from '../../src/services/core/category.service.interface.js';
+import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
 import { UserInputService } from '../../src/services/user-input.service.js';
 import { AIResult } from '../../src/services/ai/llm-transaction-processing.service.js';
-import {
-    TransactionSplit,
-    CategoryProperties,
-    BudgetRead,
-    TransactionRead,
-} from '@derekprovance/firefly-iii-sdk';
+import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
-import { Result, TransactionValidationError } from '../../src/types/result.type.js';
+import { Result } from '../../src/types/result.type.js';
 import { withdrawal } from '../shared/test-data.js';
 import { JournaledTransaction } from '../../src/types/categorize.types.js';
 
@@ -32,7 +29,7 @@ const suggestion: AIResult = { category: 'New Category', budget: 'New Budget' };
 describe('InteractiveTransactionUpdater', () => {
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockValidator: jest.Mocked<TransactionValidatorService>;
-    let mockAIValidator: jest.Mocked<TransactionAIResultValidator>;
+    let catalog: CategoryBudgetCatalog;
     let mockUserInputService: jest.Mocked<UserInputService>;
     let transaction: JournaledTransaction;
     let transactionRead: TransactionRead;
@@ -41,7 +38,7 @@ describe('InteractiveTransactionUpdater', () => {
         new InteractiveTransactionUpdater(
             mockTransactionService,
             mockValidator,
-            mockAIValidator,
+            catalog,
             mockUserInputService,
             dryRun
         );
@@ -60,7 +57,7 @@ describe('InteractiveTransactionUpdater', () => {
     const review = async (ai: AIResult = suggestion, updater = build()) =>
         updater.applyUpdate(await prepared(ai, updater), { index: 3, total: 26 });
 
-    beforeEach(() => {
+    beforeEach(async () => {
         transaction = {
             ...withdrawal('100.00', {
                 description: 'Test Transaction',
@@ -95,20 +92,10 @@ describe('InteractiveTransactionUpdater', () => {
             printSeparator: jest.fn(),
         } as unknown as jest.Mocked<UserInputService>;
 
-        mockAIValidator = {
-            validateAIResults: jest.fn(
-                async (_tx: TransactionSplit, categoryName?: string, budgetName?: string) =>
-                    Result.ok({
-                        category: categories.find(c => c.name === categoryName),
-                        budget: budgets.find(b => b.attributes.name === budgetName),
-                    })
-            ),
-            getBudgetByName: jest.fn((name: string) =>
-                budgets.find(b => b.attributes.name === name)
-            ),
-            getAvailableCategoryNames: jest.fn(() => categories.map(c => c.name)),
-            getAvailableBudgetNames: jest.fn(() => budgets.map(b => b.attributes.name)),
-        } as unknown as jest.Mocked<TransactionAIResultValidator>;
+        catalog = await CategoryBudgetCatalog.load(
+            { getCategories: async () => categories } as ICategoryService,
+            { getBudgets: async () => budgets } as unknown as IBudgetService
+        );
     });
 
     describe('prepareUpdate', () => {
@@ -127,16 +114,13 @@ describe('InteractiveTransactionUpdater', () => {
         });
 
         it('returns the validation error for a suggestion that does not resolve', async () => {
-            const error: TransactionValidationError = {
-                field: 'category',
-                message: 'Invalid category',
-                userMessage: 'The suggested category "Nope" does not exist',
-                transactionId: '1',
-                transactionDescription: 'Test Transaction',
-            };
-            mockAIValidator.validateAIResults.mockResolvedValueOnce(Result.err(error));
+            const result = await prepare({ category: 'Nope' });
 
-            expect(await prepare({ category: 'Nope' })).toEqual(Result.err(error));
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error.field).toBe('category');
+                expect(result.error.transactionId).toBe('1');
+            }
         });
 
         it('resolves to undefined when the suggestion changes nothing', async () => {
@@ -146,7 +130,9 @@ describe('InteractiveTransactionUpdater', () => {
         });
 
         it('turns a thrown error into a validation error', async () => {
-            mockAIValidator.validateAIResults.mockRejectedValueOnce(new Error('boom'));
+            mockValidator.categoryOrBudgetChanged.mockImplementation(() => {
+                throw new Error('boom');
+            });
 
             const result = await prepare();
 
@@ -277,12 +263,12 @@ describe('InteractiveTransactionUpdater', () => {
                 await review();
 
                 expect(mockUserInputService.getNewCategory).toHaveBeenCalledWith(
-                    ['New Category', 'Groceries'],
+                    ['Groceries', 'New Category'],
                     'New Category',
                     'New Category'
                 );
                 expect(mockUserInputService.getNewBudget).toHaveBeenCalledWith(
-                    ['New Budget', 'Food'],
+                    ['Food', 'New Budget'],
                     'New Budget',
                     'New Budget'
                 );

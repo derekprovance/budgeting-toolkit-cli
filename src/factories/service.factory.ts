@@ -8,7 +8,7 @@ import { TransactionClassificationService } from '../services/core/transaction-c
 import { AccountScopeService } from '../services/core/account-scope.service.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
-import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
+import { CategoryBudgetCatalog } from '../services/core/category-budget-catalog.service.js';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
 import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service.js';
 import { TransactionHistoryService } from '../services/transaction-history.service.js';
@@ -121,18 +121,16 @@ export class ServiceFactory {
         });
         const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
-        // Create AI validator service using factory method
-        const aiValidator = await TransactionAIResultValidator.create(
+        const catalog = await CategoryBudgetCatalog.load(
             services.categoryService,
-            services.budgetService,
-            services.transactionValidatorService
+            services.budgetService
         );
 
         // Create interactive transaction updater with service dependencies
         const interactiveTransactionUpdater = new InteractiveTransactionUpdater(
             services.transactionService,
             services.transactionValidatorService,
-            aiValidator,
+            catalog,
             services.userInputService,
             dryRun
         );
@@ -140,8 +138,7 @@ export class ServiceFactory {
         return new AITransactionUpdateOrchestrator(
             services.transactionService,
             interactiveTransactionUpdater,
-            services.categoryService,
-            services.budgetService,
+            catalog,
             llmProcessingService,
             services.transactionValidatorService,
             force,
