@@ -27,9 +27,9 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 // Dynamic imports after mocks
-const { createCustomAxiosInstance } = await import('../../src/utils/custom-fetch.js');
+const { createCertificateAxios } = await import('../../src/utils/certificate-axios.utils.js');
 
-describe('createCustomAxiosInstance', () => {
+describe('createCertificateAxios', () => {
     beforeEach(() => {
         // Reset mocks
         mockExistsSync.mockReset();
@@ -48,7 +48,7 @@ describe('createCustomAxiosInstance', () => {
         it('should create a custom agent that trusts the CA', () => {
             mockReadFileSync.mockReturnValue(Buffer.from('ca-data'));
 
-            createCustomAxiosInstance({ caCertPath: '/path/to/ca.pem' });
+            createCertificateAxios({ caCertPath: '/path/to/ca.pem' });
 
             expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/ca.pem');
             expect(mockAxiosCreate).toHaveBeenCalledWith(
@@ -64,7 +64,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should create axios instance with P12 certificate and password', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.p12',
                 clientCertPassword: 'secret',
             });
@@ -79,7 +79,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should create axios instance with PFX certificate and password', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.pfx',
                 clientCertPassword: 'secret',
             });
@@ -94,7 +94,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should create axios instance with P12 certificate without password', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.p12',
             });
 
@@ -107,7 +107,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should load CA certificate if provided', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 caCertPath: '/path/to/ca.pem',
                 clientCertPath: '/path/to/client.p12',
             });
@@ -124,7 +124,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should load PEM certificate and key file', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.pem',
             });
 
@@ -134,7 +134,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should load CRT certificate and key file', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.crt',
             });
 
@@ -149,7 +149,7 @@ describe('createCustomAxiosInstance', () => {
                 return false;
             });
 
-            const axiosInstance = createCustomAxiosInstance({
+            const axiosInstance = createCertificateAxios({
                 clientCertPath: '/path/to/client.pem',
             });
 
@@ -167,7 +167,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should enable TLS validation when CA cert is provided', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 caCertPath: '/path/to/ca.pem',
                 clientCertPath: '/path/to/client.p12',
             });
@@ -180,7 +180,7 @@ describe('createCustomAxiosInstance', () => {
         });
 
         it('should disable TLS validation when no CA cert is provided', () => {
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.p12',
             });
 
@@ -194,7 +194,7 @@ describe('createCustomAxiosInstance', () => {
         it('should respect STRICT_TLS=false environment variable', () => {
             process.env.STRICT_TLS = 'false';
 
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 caCertPath: '/path/to/ca.pem',
                 clientCertPath: '/path/to/client.p12',
             });
@@ -209,7 +209,7 @@ describe('createCustomAxiosInstance', () => {
         it('should respect STRICT_TLS=true environment variable', () => {
             process.env.STRICT_TLS = 'true';
 
-            createCustomAxiosInstance({
+            createCertificateAxios({
                 clientCertPath: '/path/to/client.p12',
             });
 
@@ -228,9 +228,9 @@ describe('createCustomAxiosInstance', () => {
                 throw new Error("ENOENT: no such file or directory, open '/path/to/client.p12'");
             });
 
-            expect(() =>
-                createCustomAxiosInstance({ clientCertPath: '/path/to/client.p12' })
-            ).toThrow('ENOENT');
+            expect(() => createCertificateAxios({ clientCertPath: '/path/to/client.p12' })).toThrow(
+                'ENOENT'
+            );
             expect(mockAxiosCreate).not.toHaveBeenCalled();
         });
 
@@ -243,7 +243,7 @@ describe('createCustomAxiosInstance', () => {
             });
 
             expect(() =>
-                createCustomAxiosInstance({
+                createCertificateAxios({
                     caCertPath: '/path/to/ca.pem',
                     clientCertPath: '/path/to/client.p12',
                 })

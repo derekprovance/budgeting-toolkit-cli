@@ -14,7 +14,7 @@ const REQUEST_TIMEOUT_MS = 30000;
  * @throws when a certificate file cannot be read; there is no fallback to
  *   plain axios, which would silently drop mTLS
  */
-export function createCustomAxiosInstance(config: CertificateConfig): AxiosInstance {
+export function createCertificateAxios(config: CertificateConfig): AxiosInstance {
     logger.debug('Creating axios instance with certificate support');
     return axios.create({
         httpsAgent: new Agent({

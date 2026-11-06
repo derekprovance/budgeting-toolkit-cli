@@ -1,14 +1,14 @@
 import { jest } from '@jest/globals';
 import {
     FireflyClientWithCerts,
-    CustomAxiosFactory,
+    CertificateAxiosFactory,
 } from '../../src/api/firefly-client-with-certs.js';
 
 describe('FireflyClientWithCerts', () => {
-    let mockCustomAxiosFactory: jest.MockedFunction<CustomAxiosFactory>;
+    let mockCertificateAxiosFactory: jest.MockedFunction<CertificateAxiosFactory>;
 
     beforeEach(() => {
-        mockCustomAxiosFactory = jest.fn<CustomAxiosFactory>().mockReturnValue({} as any);
+        mockCertificateAxiosFactory = jest.fn<CertificateAxiosFactory>().mockReturnValue({} as any);
     });
 
     afterEach(() => {
@@ -22,40 +22,40 @@ describe('FireflyClientWithCerts', () => {
                     BASE: 'https://firefly.example.com/api',
                     TOKEN: 'test-token-123',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
             expect(client).toBeDefined();
         });
 
-        it('should not call createCustomAxiosInstance when no clientCertPath', () => {
+        it('should not call createCertificateAxios when no clientCertPath', () => {
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
                     TOKEN: 'test-token-123',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).not.toHaveBeenCalled();
+            expect(mockCertificateAxiosFactory).not.toHaveBeenCalled();
         });
 
-        it('should not call createCustomAxiosInstance when clientCertPath is empty', () => {
+        it('should not call createCertificateAxios when clientCertPath is empty', () => {
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
                     TOKEN: 'test-token-123',
                     clientCertPath: '',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).not.toHaveBeenCalled();
+            expect(mockCertificateAxiosFactory).not.toHaveBeenCalled();
         });
 
-        it('should call createCustomAxiosInstance with certificate config when clientCertPath provided', () => {
+        it('should call createCertificateAxios with certificate config when clientCertPath provided', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -65,10 +65,10 @@ describe('FireflyClientWithCerts', () => {
                     caCertPath: '/path/to/ca.pem',
                     clientCertPassword: 'secret',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalledWith({
+            expect(mockCertificateAxiosFactory).toHaveBeenCalledWith({
                 caCertPath: '/path/to/ca.pem',
                 clientCertPath: '/path/to/client.p12',
                 clientCertPassword: 'secret',
@@ -77,7 +77,7 @@ describe('FireflyClientWithCerts', () => {
 
         it('should create custom axios instance when certificates are provided', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -85,15 +85,15 @@ describe('FireflyClientWithCerts', () => {
                     TOKEN: 'test-token-123',
                     clientCertPath: '/path/to/client.p12',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalled();
+            expect(mockCertificateAxiosFactory).toHaveBeenCalled();
         });
 
         it('should work with only clientCertPath (no CA cert)', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -101,10 +101,10 @@ describe('FireflyClientWithCerts', () => {
                     TOKEN: 'test-token-123',
                     clientCertPath: '/path/to/client.p12',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalledWith({
+            expect(mockCertificateAxiosFactory).toHaveBeenCalledWith({
                 caCertPath: undefined,
                 clientCertPath: '/path/to/client.p12',
                 clientCertPassword: undefined,
@@ -113,7 +113,7 @@ describe('FireflyClientWithCerts', () => {
 
         it('should work with only clientCertPath and password (no CA cert)', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -122,10 +122,10 @@ describe('FireflyClientWithCerts', () => {
                     clientCertPath: '/path/to/client.p12',
                     clientCertPassword: 'secret',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalledWith({
+            expect(mockCertificateAxiosFactory).toHaveBeenCalledWith({
                 caCertPath: undefined,
                 clientCertPath: '/path/to/client.p12',
                 clientCertPassword: 'secret',
@@ -140,7 +140,7 @@ describe('FireflyClientWithCerts', () => {
                     BASE: 'https://firefly.example.com/api',
                     TOKEN: 'test-token-123',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
             // Verify core services are available
@@ -157,7 +157,7 @@ describe('FireflyClientWithCerts', () => {
                     BASE: 'https://firefly.example.com/api',
                     TOKEN: 'test-token-123',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
             const expectedServices = [
@@ -202,7 +202,7 @@ describe('FireflyClientWithCerts', () => {
                     BASE: 'https://custom.firefly.com/api',
                     TOKEN: 'token',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
             expect(client).toBeDefined();
@@ -215,7 +215,7 @@ describe('FireflyClientWithCerts', () => {
                     BASE: 'https://first.firefly.com/api',
                     TOKEN: 'first-token',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
             const client2 = new FireflyClientWithCerts(
@@ -223,7 +223,7 @@ describe('FireflyClientWithCerts', () => {
                     BASE: 'https://second.firefly.com/api',
                     TOKEN: 'second-token',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
             expect(client1).toBeDefined();
@@ -234,7 +234,7 @@ describe('FireflyClientWithCerts', () => {
     describe('certificate configuration combinations', () => {
         it('should handle full certificate config', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -244,10 +244,10 @@ describe('FireflyClientWithCerts', () => {
                     clientCertPath: '/client.p12',
                     clientCertPassword: 'pass',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalledWith({
+            expect(mockCertificateAxiosFactory).toHaveBeenCalledWith({
                 caCertPath: '/ca.pem',
                 clientCertPath: '/client.p12',
                 clientCertPassword: 'pass',
@@ -256,7 +256,7 @@ describe('FireflyClientWithCerts', () => {
 
         it('should handle certificate config without password', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -265,10 +265,10 @@ describe('FireflyClientWithCerts', () => {
                     caCertPath: '/ca.pem',
                     clientCertPath: '/client.pem',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalledWith({
+            expect(mockCertificateAxiosFactory).toHaveBeenCalledWith({
                 caCertPath: '/ca.pem',
                 clientCertPath: '/client.pem',
                 clientCertPassword: undefined,
@@ -277,7 +277,7 @@ describe('FireflyClientWithCerts', () => {
 
         it('should handle certificate config without CA cert', () => {
             const mockAxiosInstance = {} as any;
-            mockCustomAxiosFactory.mockReturnValue(mockAxiosInstance);
+            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
 
             new FireflyClientWithCerts(
                 {
@@ -286,10 +286,10 @@ describe('FireflyClientWithCerts', () => {
                     clientCertPath: '/client.p12',
                     clientCertPassword: 'pass',
                 },
-                mockCustomAxiosFactory
+                mockCertificateAxiosFactory
             );
 
-            expect(mockCustomAxiosFactory).toHaveBeenCalledWith({
+            expect(mockCertificateAxiosFactory).toHaveBeenCalledWith({
                 caCertPath: undefined,
                 clientCertPath: '/client.p12',
                 clientCertPassword: 'pass',
