@@ -1,10 +1,3 @@
-/**
- * Centralized service mocks for all tests
- *
- * Provides factory functions to create mocked services with common defaults.
- * This reduces duplication and makes tests more maintainable.
- */
-
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service.js';
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { ILogger } from '../../src/types/interface/logger.interface.js';

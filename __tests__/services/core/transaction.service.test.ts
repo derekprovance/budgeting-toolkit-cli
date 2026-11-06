@@ -14,7 +14,7 @@ import { ExcludedTransactionService } from '../../../src/services/excluded-trans
 import {
     createMockExcludedTransactionService,
     createMockFireflyClient,
-} from '../../setup/mock-services.js';
+} from '../../shared/mocks.js';
 import { withdrawal } from '../../shared/test-data.js';
 
 /** What the Firefly SDK throws for an HTTP error status */

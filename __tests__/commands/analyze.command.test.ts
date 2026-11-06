@@ -6,7 +6,7 @@ import { IBudgetService } from '../../src/services/core/budget.service.interface
 import { AnalyzeDisplayService } from '../../src/services/display/analyze-display.service.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { Result } from '../../src/types/result.type.js';
-import { buckets, createMockCashFlowService } from '../setup/mock-services.js';
+import { buckets, createMockCashFlowService } from '../shared/mocks.js';
 import { deposit, withdrawal } from '../shared/test-data.js';
 
 const limit = (amount: string) => ({ attributes: { amount } }) as unknown as BudgetLimitRead;

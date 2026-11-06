@@ -5,7 +5,7 @@ import { BudgetDisplayService } from '../../src/services/display/budget-display.
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
-import { buckets, createMockCashFlowService } from '../setup/mock-services.js';
+import { buckets, createMockCashFlowService } from '../shared/mocks.js';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';

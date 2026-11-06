@@ -5,7 +5,7 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
-import { createMockAccountScopeService, createMockLogger } from '../setup/mock-services.js';
+import { createMockAccountScopeService, createMockLogger } from '../shared/mocks.js';
 
 /** The envelope account every fixture here pays from */
 const ENVELOPE = 'source1';

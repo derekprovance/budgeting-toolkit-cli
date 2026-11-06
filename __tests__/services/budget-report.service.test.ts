@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import { BudgetLimitRead, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
-import { buckets, createMockCashFlowService } from '../setup/mock-services.js';
+import { buckets, createMockCashFlowService } from '../shared/mocks.js';
 import { deposit, withdrawal } from '../shared/test-data.js';
 
 const budget = (id: string, name: string, active = true) =>

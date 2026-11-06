@@ -8,7 +8,7 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { MonthError } from '../../src/types/error/month.error.js';
 import { withdrawal } from '../shared/test-data.js';
-import { createMockAccountScopeService, createMockLogger } from '../setup/mock-services.js';
+import { createMockAccountScopeService, createMockLogger } from '../shared/mocks.js';
 
 /** Envelope accounts: the builders' default source, and a card */
 const CHECKING = 'source1';
