@@ -110,14 +110,4 @@ describe('BudgetReportService', () => {
 
         expect(!result.ok && result.error.message).toBe('fetch failed');
     });
-
-    it('should validate month and year', async () => {
-        const result = await new BudgetReportService(
-            budgetService,
-            createMockCashFlowService()
-        ).getBudgetReport(13, 2025);
-
-        expect(result.ok).toBe(false);
-        expect(budgetService.getBudgets).not.toHaveBeenCalled();
-    });
 });

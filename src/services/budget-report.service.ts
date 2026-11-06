@@ -3,7 +3,6 @@ import { IBudgetService } from './core/budget.service.interface.js';
 import { allocationsByBudget } from './core/budget.service.js';
 import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface.js';
 import { CashFlowService } from './cash-flow.service.js';
-import { DateUtils } from '../utils/date.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { logger } from '../logger.js';
 import { Result } from '../types/result.type.js';
@@ -28,17 +27,6 @@ export class BudgetReportService implements IBudgetReportService {
         year: number
     ): Promise<Result<BudgetLimitDto[], BudgetError>> {
         const operation = 'getBudgetReport';
-
-        const dateValidation = DateUtils.validateMonthYearResult(
-            month,
-            year,
-            operation,
-            (m, y, op, err) =>
-                BudgetErrorFactory.create(BudgetErrorType.INVALID_DATE, m, y, op, err)
-        );
-        if (!dateValidation.ok) {
-            return Result.err(dateValidation.error);
-        }
 
         logger.debug({ month, year }, 'Fetching budget report');
 

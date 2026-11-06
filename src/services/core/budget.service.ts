@@ -1,6 +1,6 @@
 import { BudgetLimitRead, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import { DateUtils, monthRange } from '../../utils/date.utils.js';
+import { monthRange } from '../../utils/date.utils.js';
 import { IBudgetService } from './budget.service.interface.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 import { logger } from '../../logger.js';
@@ -14,7 +14,6 @@ export class BudgetService implements IBudgetService {
     }
 
     async getBudgetLimits(month: number, year: number): Promise<BudgetLimitRead[]> {
-        DateUtils.validateMonthYear(month, year);
         const { start, end } = monthRange(month, year);
 
         let results: Awaited<ReturnType<typeof this.client.budgets.listBudgetLimit>> | undefined;

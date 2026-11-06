@@ -1,6 +1,6 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import { DateUtils, monthRange } from '../../utils/date.utils.js';
+import { monthRange } from '../../utils/date.utils.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 
 export class BillService {
@@ -14,10 +14,9 @@ export class BillService {
      * @param month - Month number (1-12)
      * @param year - Four-digit year
      * @returns Promise resolving to array of BillRead with populated pay_dates
-     * @throws Error if month/year is invalid or API fails
+     * @throws Error if month/year is invalid or the API fails
      */
     async getBillsForMonth(month: number, year: number): Promise<BillRead[]> {
-        DateUtils.validateMonthYear(month, year);
         const { start, end } = monthRange(month, year);
 
         return fetchAllPages(

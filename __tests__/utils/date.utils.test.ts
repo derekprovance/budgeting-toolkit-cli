@@ -1,4 +1,4 @@
-import { DateUtils, localDay, monthRange, toDay } from '../../src/utils/date.utils.js';
+import { localDay, monthRange, toDay } from '../../src/utils/date.utils.js';
 
 describe('monthRange', () => {
     it('[R-TIME-1] should bound a month by its first and last day', () => {
@@ -12,21 +12,20 @@ describe('monthRange', () => {
     });
 
     it('should give every month its own length', () => {
-        const ends = Array.from({ length: 12 }, (_, i) => monthRange(i + 1, 2023).end.slice(8));
-        expect(ends).toEqual([
-            '31',
-            '28',
-            '31',
-            '30',
-            '31',
-            '30',
-            '31',
-            '31',
-            '30',
-            '31',
-            '30',
-            '31',
-        ]);
+        const ends = Array.from({ length: 12 }, (_, i) =>
+            Number(monthRange(i + 1, 2023).end.slice(8))
+        );
+        expect(ends).toEqual([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
+    });
+});
+
+describe('monthRange validation', () => {
+    it.each([0, 13, 1.5])('should reject month %p', month => {
+        expect(() => monthRange(month, 2024)).toThrow('Month must be an integer between 1 and 12');
+    });
+
+    it.each([1899, 10000, 2024.5])('should reject year %p', year => {
+        expect(() => monthRange(1, year)).toThrow('Year must be a valid 4-digit year');
     });
 });
 
@@ -41,50 +40,5 @@ describe('toDay', () => {
 describe('localDay', () => {
     it('should format the local calendar day', () => {
         expect(localDay(new Date(2025, 0, 5, 23, 30))).toBe('2025-01-05');
-    });
-});
-
-describe('DateUtils', () => {
-    describe('validateMonthYear', () => {
-        it('should validate valid month and year', () => {
-            expect(() => DateUtils.validateMonthYear(1, 2024)).not.toThrow();
-            expect(() => DateUtils.validateMonthYear(12, 2024)).not.toThrow();
-        });
-
-        it('should throw for month less than 1', () => {
-            expect(() => DateUtils.validateMonthYear(0, 2024)).toThrow(
-                'Month must be an integer between 1 and 12'
-            );
-        });
-
-        it('should throw for month greater than 12', () => {
-            expect(() => DateUtils.validateMonthYear(13, 2024)).toThrow(
-                'Month must be an integer between 1 and 12'
-            );
-        });
-
-        it('should throw for non-integer month', () => {
-            expect(() => DateUtils.validateMonthYear(1.5, 2024)).toThrow(
-                'Month must be an integer between 1 and 12'
-            );
-        });
-
-        it('should throw for year less than 1900', () => {
-            expect(() => DateUtils.validateMonthYear(1, 1899)).toThrow(
-                'Year must be a valid 4-digit year'
-            );
-        });
-
-        it('should throw for year greater than 9999', () => {
-            expect(() => DateUtils.validateMonthYear(1, 10000)).toThrow(
-                'Year must be a valid 4-digit year'
-            );
-        });
-
-        it('should throw for non-integer year', () => {
-            expect(() => DateUtils.validateMonthYear(1, 2024.5)).toThrow(
-                'Year must be a valid 4-digit year'
-            );
-        });
     });
 });

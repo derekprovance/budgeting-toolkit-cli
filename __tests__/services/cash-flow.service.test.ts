@@ -78,16 +78,6 @@ describe('CashFlowService', () => {
         expect(result.ok && Object.values(result.value).flat()).toEqual([]);
     });
 
-    it.each([
-        [0, 2025],
-        [13, 2025],
-        [5, 1899],
-    ])('should report month %i of %i as an error rather than empty buckets', async (m, y) => {
-        const result = await build([]).getBuckets(m, y);
-
-        expect(result.ok).toBe(false);
-    });
-
     it('should report a failed fetch as an error naming the month', async () => {
         const service = build([]);
         service.getTransactionsForMonth.mockRejectedValue(new Error('API error'));

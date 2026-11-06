@@ -9,7 +9,6 @@ import { AccountScopeService } from './core/account-scope.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 import { Result } from '../types/result.type.js';
-import { DateUtils } from '../utils/date.utils.js';
 import {
     TransactionAnalysisError,
     TransactionAnalysisErrorFactory,
@@ -41,23 +40,6 @@ export class CashFlowService {
         month: number,
         year: number
     ): Promise<Result<MonthBuckets, TransactionAnalysisError>> {
-        const dateValidation = DateUtils.validateMonthYearResult(
-            month,
-            year,
-            OPERATION,
-            (m, y, op, err) =>
-                TransactionAnalysisErrorFactory.create(
-                    TransactionAnalysisErrorType.INVALID_DATE,
-                    m,
-                    y,
-                    op,
-                    err
-                )
-        );
-        if (!dateValidation.ok) {
-            return Result.err(dateValidation.error);
-        }
-
         let transactions: TransactionSplit[];
         try {
             transactions = await this.transactionService.getTransactionsForMonth(month, year);

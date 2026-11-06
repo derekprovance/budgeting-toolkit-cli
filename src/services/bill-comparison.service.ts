@@ -2,7 +2,7 @@ import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
 import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
-import { DateUtils, Day, localDay, monthRange, toDay } from '../utils/date.utils.js';
+import { Day, localDay, monthRange, toDay } from '../utils/date.utils.js';
 import { dueDatesInMonth } from '../utils/bill-schedule.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { BillService } from './core/bill.service.js';
@@ -29,16 +29,6 @@ export class BillComparisonService implements IBillComparisonService {
         year: number
     ): Promise<Result<BillComparisonDto, BillError>> {
         const operation = 'calculateBillComparison';
-
-        const dateValidation = DateUtils.validateMonthYearResult(
-            month,
-            year,
-            operation,
-            (m, y, op, err) => BillErrorFactory.create(BillErrorType.INVALID_DATE, m, y, op, err)
-        );
-        if (!dateValidation.ok) {
-            return Result.err(dateValidation.error);
-        }
 
         try {
             // All bills with pay_dates populated for this month. Deactivated
