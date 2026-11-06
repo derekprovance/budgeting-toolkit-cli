@@ -38,14 +38,8 @@ export function serializeBudgetReport(
             remaining: toCents(budget.remaining),
             percentageUsed: toCents(budget.percentageUsed),
             status: budget.status,
-            previousMonthSpent:
-                budget.historicalComparison?.previousMonthSpent !== undefined
-                    ? toCents(budget.historicalComparison.previousMonthSpent)
-                    : null,
-            averageSpent:
-                budget.historicalComparison?.averageSpent !== undefined
-                    ? toCents(budget.historicalComparison.averageSpent)
-                    : null,
+            previousMonthSpent: toCents(budget.historicalComparison.previousMonthSpent),
+            averageSpent: toCents(budget.historicalComparison.averageSpent),
         })),
         bills: toBillTotalsJson(data.billComparison),
         unbudgetedExpenses: {
