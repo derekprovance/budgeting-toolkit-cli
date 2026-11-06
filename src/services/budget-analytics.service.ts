@@ -181,7 +181,7 @@ function statistics(transactions: TransactionSplit[]): TransactionStats {
     }
 
     // Signed, so a refund in the bucket reduces the average
-    const total = TransactionCalculationUtils.calculateNetSpend(transactions, logger);
+    const total = TransactionCalculationUtils.calculateNetSpend(transactions);
     return {
         count: transactions.length,
         average: total / transactions.length,

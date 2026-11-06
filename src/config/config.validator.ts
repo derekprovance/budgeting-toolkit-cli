@@ -144,8 +144,7 @@ export class ConfigValidator {
             // Parsed with the same helper the matcher uses, so validation can
             // never accept an amount that matching would then reject
             if (entry.amount !== undefined) {
-                const parsed = TransactionCalculationUtils.parseAmountSafe(entry.amount, NaN);
-                if (Number.isNaN(parsed)) {
+                if (TransactionCalculationUtils.parseAmount(entry.amount) === undefined) {
                     errors.push(`${field}.amount must be a valid amount (got: ${entry.amount})`);
                 }
             }

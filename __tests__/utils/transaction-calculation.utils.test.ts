@@ -1,7 +1,7 @@
 import { describe, it, expect, jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionCalculationUtils } from '../../src/utils/transaction-calculation.utils.js';
-import { ILogger } from '../../src/types/interface/logger.interface.js';
+import { logger } from '../../src/logger.js';
 
 const txn = (amount: string): TransactionSplit => ({ amount }) as TransactionSplit;
 
@@ -34,27 +34,35 @@ describe('TransactionCalculationUtils', () => {
             expect(TransactionCalculationUtils.parseAmountSafe('100.126')).toBe(100.13);
         });
 
-        it('should return the default for invalid input', () => {
+        it('should read invalid input as 0', () => {
             expect(TransactionCalculationUtils.parseAmountSafe('invalid')).toBe(0);
-            expect(TransactionCalculationUtils.parseAmountSafe('$123abc', -1)).toBe(-1);
             expect(TransactionCalculationUtils.parseAmountSafe('')).toBe(0);
         });
+    });
 
-        it('should support NaN as a default for never-equal matching', () => {
-            expect(TransactionCalculationUtils.parseAmountSafe('garbage', NaN)).toBeNaN();
+    describe('parseAmount', () => {
+        it('should return undefined for anything that is not an amount', () => {
+            expect(TransactionCalculationUtils.parseAmount('$123abc')).toBeUndefined();
+            expect(TransactionCalculationUtils.parseAmount('')).toBeUndefined();
+        });
+
+        it('should parse what parseAmountSafe parses', () => {
+            expect(TransactionCalculationUtils.parseAmount('($2,000.00)')).toBe(-2000);
         });
     });
 
     describe('calculateNetSpend with bad data', () => {
         it('should skip unparseable amounts and warn instead of poisoning the total', () => {
-            const logger = { warn: jest.fn() } as unknown as ILogger;
+            const warn = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
             const spend = (amount: string) => ({ ...txn(amount), type: 'withdrawal' as const });
-            const total = TransactionCalculationUtils.calculateNetSpend(
-                [spend('100'), spend('not-a-number'), spend('50')],
-                logger
-            );
+            const total = TransactionCalculationUtils.calculateNetSpend([
+                spend('100'),
+                spend('not-a-number'),
+                spend('50'),
+            ]);
             expect(total).toBe(150);
-            expect(logger.warn).toHaveBeenCalledTimes(1);
+            expect(warn).toHaveBeenCalledTimes(1);
+            warn.mockRestore();
         });
     });
 });

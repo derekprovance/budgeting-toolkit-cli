@@ -112,7 +112,7 @@ function compareBill(
     }
 
     const amount = expectedBillAmount(bill);
-    const actualAmount = TransactionCalculationUtils.calculateNetSpend(paid, logger);
+    const actualAmount = TransactionCalculationUtils.calculateNetSpend(paid);
     const predictedAmount = amount * dueDates.length;
     const upcoming = isActive
         ? unpaidDatesInMonth(bill, month, year).filter(day => day >= today)
@@ -158,7 +158,7 @@ function unlistedBills(
             return billId !== undefined && !listed.has(billId);
         })
         .map(([billId, paid]) => {
-            const actualAmount = TransactionCalculationUtils.calculateNetSpend(paid, logger);
+            const actualAmount = TransactionCalculationUtils.calculateNetSpend(paid);
             logger.warn(
                 { billId, transactionCount: paid.length, actualAmount, month, year },
                 'Transactions reference a bill that is not in the bill list - counted as bills paid with no prediction'

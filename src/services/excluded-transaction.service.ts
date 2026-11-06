@@ -25,7 +25,7 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
     isExcludedTransaction(description: string, amount: string): boolean {
         // NaN never equals anything, so an unparseable amount simply fails
         // amount-based matches instead of aborting the whole transaction fetch
-        const convertedAmount = TransactionCalculationUtils.parseAmountSafe(amount, NaN);
+        const convertedAmount = TransactionCalculationUtils.parseAmount(amount) ?? NaN;
 
         const isExcluded = this.excludedTransactions.some(transaction => {
             // Description is required. The validator rejects a rule without one,
@@ -52,7 +52,7 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
             // a currency-formatted rule ("$1,200.00") cannot silently mean
             // something else than it reads. NaN keeps an unparseable rule
             // non-matching rather than throwing mid-fetch.
-            const ruleAmount = TransactionCalculationUtils.parseAmountSafe(transaction.amount, NaN);
+            const ruleAmount = TransactionCalculationUtils.parseAmount(transaction.amount) ?? NaN;
 
             return Math.abs(ruleAmount) === Math.abs(convertedAmount);
         });
