@@ -208,10 +208,10 @@ export class LLMAssignmentService {
         try {
             const userPrompt = this.deps.getUserPrompt(type, chunk, validOptions);
 
-            const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
+            const result = await this.claudeClient.callTool({
                 systemPrompt,
-                tools: [functionSchema],
-                toolChoice: { type: 'tool', name: functionSchema.name },
+                userPrompt,
+                tool: functionSchema,
             });
 
             return {

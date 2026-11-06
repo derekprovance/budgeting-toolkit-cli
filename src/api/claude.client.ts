@@ -2,9 +2,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '../logger.js';
 import { ClaudeApiConfig, LLMConfig } from '../config/config.types.js';
 
-/** Kept as an alias so call sites and tests keep their import */
-export type ChatMessage = Anthropic.MessageParam;
-
 export interface ClaudeClientConfig {
     /** Transport settings; `maxRetries` is owned entirely by the SDK, which
      * honors retry-after and only retries retryable failures */
@@ -12,14 +9,11 @@ export interface ClaudeClientConfig {
     llm: LLMConfig;
 }
 
-export interface ChatOptions {
-    systemPrompt?: string;
-    tools?: Anthropic.Tool[];
-    toolChoice?: Anthropic.ToolChoice;
-    maxTokens?: number;
-    model?: string;
-    /** Overrides {@link DEFAULT_EFFORT} for a single request */
-    effort?: NonNullable<Anthropic.OutputConfig['effort']>;
+export interface ToolCall {
+    systemPrompt: string;
+    userPrompt: string;
+    /** Forced: the model must answer by calling this tool */
+    tool: Anthropic.Tool;
 }
 
 /**
@@ -33,7 +27,7 @@ export interface ChatOptions {
  * is rejected outright on some current models, whereas every one of them accepts
  * a low effort level.
  */
-const DEFAULT_EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
+const EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
 
 /** Thrown when the circuit breaker rejects a request without calling the API */
 export class CircuitOpenError extends Error {
@@ -47,7 +41,7 @@ export class CircuitOpenError extends Error {
  * refused, or missing the forced tool call) */
 export class ClaudeResponseError extends Error {
     constructor(
-        public readonly reason: 'truncated' | 'refusal' | 'missing_tool_use' | 'empty',
+        public readonly reason: 'truncated' | 'refusal' | 'missing_tool_use',
         message: string
     ) {
         super(message);
@@ -101,32 +95,31 @@ export class ClaudeClient {
     }
 
     /**
-     * Sends one chat request. Transport retries are handled by the SDK; the
-     * circuit breaker sees one failure per exhausted logical request.
+     * Sends one request that forces `call.tool` and returns that tool call's
+     * input as JSON. Any preamble text is ignored, so mixed content can never
+     * corrupt the structured payload. Transport retries are handled by the
+     * SDK; the circuit breaker sees one failure per exhausted logical request.
      *
-     * When a tool is forced via toolChoice, only the matching tool_use block
-     * is returned (as JSON), ignoring any preamble text — mixed content must
-     * never corrupt the structured payload.
+     * @throws ClaudeResponseError when the response is truncated, refused or
+     *   lacks the tool call; CircuitOpenError when the breaker is open
      */
-    async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+    async callTool(call: ToolCall): Promise<string> {
         this.assertCircuitAllows();
         await this.waitForRateLimit();
 
         const request: Anthropic.MessageCreateParamsNonStreaming = {
-            model: options.model ?? this.llmConfig.model,
-            max_tokens: options.maxTokens ?? this.llmConfig.maxTokens,
-            messages,
-            ...(options.systemPrompt && { system: options.systemPrompt }),
-            ...(options.tools && { tools: options.tools }),
-            ...(options.toolChoice && { tool_choice: options.toolChoice }),
+            model: this.llmConfig.model,
+            max_tokens: this.llmConfig.maxTokens,
+            messages: [{ role: 'user', content: call.userPrompt }],
+            system: call.systemPrompt,
+            tools: [call.tool],
+            tool_choice: { type: 'tool', name: call.tool.name },
         };
 
         let response: Anthropic.Message;
         try {
             response = await this.client.messages.create(
-                this.effortUnsupported
-                    ? request
-                    : { ...request, output_config: { effort: options.effort ?? DEFAULT_EFFORT } }
+                this.effortUnsupported ? request : { ...request, output_config: { effort: EFFORT } }
             );
         } catch (error) {
             // `llm.model` is user-configurable and validated only as a non-empty
@@ -158,12 +151,10 @@ export class ClaudeClient {
         // Extraction failures below are semantic and must not open it.
         this.onRequestSuccess();
 
-        const forcedToolName =
-            options.toolChoice?.type === 'tool' ? options.toolChoice.name : undefined;
-        return this.extractResult(response, forcedToolName);
+        return this.extractToolInput(response, call.tool.name);
     }
 
-    private extractResult(response: Anthropic.Message, expectedToolName?: string): string {
+    private extractToolInput(response: Anthropic.Message, toolName: string): string {
         if (response.stop_reason === 'max_tokens') {
             throw new ClaudeResponseError(
                 'truncated',
@@ -174,30 +165,17 @@ export class ClaudeClient {
             throw new ClaudeResponseError('refusal', 'Claude refused the request');
         }
 
-        if (expectedToolName) {
-            const toolBlock = response.content.find(
-                (block): block is Anthropic.ToolUseBlock =>
-                    block.type === 'tool_use' && block.name === expectedToolName
+        const toolBlock = response.content.find(
+            (block): block is Anthropic.ToolUseBlock =>
+                block.type === 'tool_use' && block.name === toolName
+        );
+        if (!toolBlock) {
+            throw new ClaudeResponseError(
+                'missing_tool_use',
+                `Forced tool "${toolName}" was not used in the response`
             );
-            if (!toolBlock) {
-                throw new ClaudeResponseError(
-                    'missing_tool_use',
-                    `Forced tool "${expectedToolName}" was not used in the response`
-                );
-            }
-            return JSON.stringify(toolBlock.input);
         }
-
-        const text = response.content
-            .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-            .map(block => block.text)
-            .join('\n');
-
-        if (!text) {
-            throw new ClaudeResponseError('empty', 'No text content found in response');
-        }
-
-        return text;
+        return JSON.stringify(toolBlock.input);
     }
 
     private async waitForRateLimit(): Promise<void> {
