@@ -14,8 +14,6 @@ import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { AIResult } from './ai/llm-transaction-processing.service.js';
 
-export type AIResults = AIResult;
-
 /** Position of a transaction in the review, shown to the user as `[index/total]` */
 export interface ReviewProgress {
     index: number;
@@ -46,37 +44,13 @@ export class InteractiveTransactionUpdater {
     ) {}
 
     /**
-     * Updates a transaction with AI-suggested category and budget:
-     * `prepareUpdate` followed by `applyUpdate`.
-     *
-     * @param transaction The transaction to update
-     * @param aiResults The AI-suggested category and budget
-     * @param progress Position of this transaction in the review, for display
-     * @returns Result containing updated transaction or validation error
-     */
-    async updateTransaction(
-        transaction: TransactionSplit,
-        aiResults: Record<string, AIResults>,
-        progress?: ReviewProgress
-    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
-        const prepared = await this.prepareUpdate(transaction, aiResults);
-        if (!prepared.ok) {
-            return Result.err(prepared.error);
-        }
-        if (!prepared.value) {
-            return Result.ok(undefined);
-        }
-        return this.applyUpdate(prepared.value, progress);
-    }
-
-    /**
      * Validates the suggestion for a transaction without prompting. Resolves
      * to `undefined` when there is nothing to change, so the caller can count
      * the prompts that will follow before showing the first one.
      */
     async prepareUpdate(
         transaction: TransactionSplit,
-        aiResults: Record<string, AIResults>
+        aiResults: Record<string, AIResult>
     ): Promise<Result<PreparedUpdate | undefined, TransactionValidationError>> {
         // Validate transaction data
         if (!this.validator.validateTransactionData(transaction, aiResults)) {
@@ -188,7 +162,7 @@ export class InteractiveTransactionUpdater {
      */
     private async validateAndPrepareUpdate(
         transaction: TransactionSplit,
-        aiResult?: AIResults
+        aiResult?: AIResult
     ): Promise<
         Result<
             { category?: CategoryProperties; budget?: BudgetRead; hasChanges: boolean },
