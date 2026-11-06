@@ -1,8 +1,6 @@
-import chalk from 'chalk';
 import { Command } from '../types/interface/command.interface.js';
 import { BudgetDateParams } from '../types/common.types.js';
 import { logger } from '../logger.js';
-import ora from 'ora';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
@@ -12,13 +10,12 @@ import { CashFlowService } from '../services/cash-flow.service.js';
 import { BudgetReportResult } from '../types/dto/budget-report-result.dto.js';
 import { daysLeftInMonth } from '../utils/days-left.utils.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
+import { ReportProgress } from './report-progress.js';
 
 /**
  * Command for displaying budget report with insights and categorized sections
  */
 export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDateParams> {
-    private readonly BUDGET_GEN_FAIL = 'Failed to generate budget report';
-
     constructor(
         private readonly budgetAnalyticsService: BudgetAnalyticsService,
         private readonly budgetInsightService: BudgetInsightService,
@@ -29,12 +26,9 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
     ) {}
 
     /**
-     * Executes the budget report command
+     * Prints the month's budget report as text or, in `json` format, as the
+     * JSON document alone (see ReportProgress).
      *
-     * In `json` format the spinner is silenced and stdout carries nothing but
-     * the JSON document, so it stays parseable; warnings go to stderr.
-     *
-     * @param params The month, year, and flags to display budget report for
      * @returns The report data the output was built from
      */
     async execute({
@@ -43,85 +37,67 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
         verbose,
         format = 'text',
     }: BudgetDateParams): Promise<BudgetReportResult> {
-        const json = format === 'json';
-        const spinner = ora({ text: 'Generating budget report...', isSilent: json }).start();
+        const progress = new ReportProgress(
+            'Generating budget report...',
+            'Failed to generate budget report',
+            format
+        );
+        return progress.run(async () => {
+            const report = await this.buildReport(month, year, progress);
+            progress.print(
+                () => serializeBudgetReport(report),
+                () => this.budgetDisplayService.formatReport(report, verbose || false)
+            );
+            return report;
+        });
+    }
 
-        try {
-            const daysInfo = await this.getDaysInfo(month, year);
+    private async buildReport(
+        month: number,
+        year: number,
+        progress: ReportProgress
+    ): Promise<BudgetReportResult> {
+        const daysInfo = await this.getDaysInfo(month, year);
 
-            // Fetch all data in parallel
-            spinner.text = 'Fetching budget data...';
-            const [budgets, topExpenses, billComparisonResult, bucketsResult] = await Promise.all([
-                this.budgetAnalyticsService.getBudgetReport(month, year, 1),
-                this.budgetAnalyticsService.getTopExpenses(month, year, 5),
-                this.billComparisonService.calculateBillComparison(month, year),
-                this.cashFlowService.getBuckets(month, year),
-            ]);
+        progress.step('Fetching budget data...');
+        const [budgets, topExpenses, billComparisonResult, bucketsResult] = await Promise.all([
+            this.budgetAnalyticsService.getBudgetReport(month, year, 1),
+            this.budgetAnalyticsService.getTopExpenses(month, year, 5),
+            this.billComparisonService.calculateBillComparison(month, year),
+            this.cashFlowService.getBuckets(month, year),
+        ]);
 
-            if (!bucketsResult.ok) {
-                spinner.fail('Failed to generate budget report');
-                console.error(
-                    chalk.red('Error sorting transactions:'),
-                    chalk.red.bold(bucketsResult.error.userMessage)
-                );
-                throw new Error(bucketsResult.error.message);
-            }
+        const buckets = progress.unwrap(bucketsResult, 'Error sorting transactions');
 
-            if (!billComparisonResult.ok) {
-                spinner.warn('Warning: Bill comparison data unavailable');
-                if (json) {
-                    // The spinner is silent in JSON mode; keep the warning visible
-                    console.error('Warning: Bill comparison data unavailable');
-                }
-                logger.warn(
-                    { error: billComparisonResult.error.message },
-                    'Failed to fetch bill comparison'
-                );
-            }
-
-            spinner.text = 'Generating insights...';
-
-            const billComparison = billComparisonResult.ok
-                ? billComparisonResult.value
-                : this.createEmptyBillComparison();
-
-            // Generate insights from budget data
-            const insights = this.budgetInsightService.generateInsights(budgets, billComparison);
-
-            spinner.succeed('Budget report generated');
-
-            // Format and display the report
-            const reportData: BudgetReportResult = {
-                budgets: budgets,
-                topExpenses,
-                billComparison,
-                // The bucket that feeds the cash-flow net, same definition analyze uses
-                unbudgeted: bucketsResult.value.unbudgeted,
-                insights,
-                month,
-                year,
-                daysInfo,
-            };
-
-            if (json) {
-                console.log(JSON.stringify(serializeBudgetReport(reportData), null, 2));
-            } else {
-                const formattedReport = this.budgetDisplayService.formatReport(
-                    reportData,
-                    verbose || false
-                );
-                console.log(formattedReport);
-            }
-
-            return reportData;
-        } catch (error) {
-            // A Result error already failed the spinner; only an unexpected
-            // throw leaves it spinning (AnalyzeCommand does the same)
-            if (spinner.isSpinning) {
-                spinner.fail(this.BUDGET_GEN_FAIL);
-            }
-            throw error;
+        if (!billComparisonResult.ok) {
+            progress.warn('Warning: Bill comparison data unavailable');
+            logger.warn(
+                { error: billComparisonResult.error.message },
+                'Failed to fetch bill comparison'
+            );
         }
+
+        progress.step('Generating insights...');
+
+        const billComparison = billComparisonResult.ok
+            ? billComparisonResult.value
+            : this.createEmptyBillComparison();
+
+        const insights = this.budgetInsightService.generateInsights(budgets, billComparison);
+
+        progress.succeed('Budget report generated');
+
+        return {
+            budgets,
+            topExpenses,
+            billComparison,
+            // The bucket that feeds the cash-flow net, same definition analyze uses
+            unbudgeted: buckets.unbudgeted,
+            insights,
+            month,
+            year,
+            daysInfo,
+        };
     }
 
     /** Days left and data freshness, for the current month only */
