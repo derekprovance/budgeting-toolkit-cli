@@ -338,7 +338,7 @@ export class AnalyzeDisplayService {
         const typeLabel = this.getTransactionTypeLabel(transaction);
         const description = transaction.description || 'No description';
         const amount = CurrencyUtils.formatWithSymbol(parseFloat(transaction.amount), symbol);
-        const date = transaction.date ? chalk.dim(transaction.date.split('T')[0]) : '';
+        const date = chalk.dim(DisplayFormatterUtils.isoDay(transaction.date));
 
         return `    ${typeLabel} ${DisplayFormatterUtils.fitWidth(description, 40)} ${amount} ${date}`;
     }

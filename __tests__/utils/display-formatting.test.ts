@@ -26,6 +26,12 @@ describe('fitWidth', () => {
     });
 });
 
+describe('isoDay', () => {
+    it('keeps only the day of a Firefly timestamp', () => {
+        expect(DisplayFormatterUtils.isoDay('2025-04-12T00:00:00+02:00')).toBe('2025-04-12');
+    });
+});
+
 describe('category emoji', () => {
     it.each([
         ['Healthcare', '🏥'],

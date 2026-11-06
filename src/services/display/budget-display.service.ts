@@ -484,7 +484,7 @@ export class BudgetDisplayService {
                 amount,
                 transaction.currency_symbol || currencySymbol
             );
-            const date = (transaction.date || new Date().toISOString()).split('T')[0];
+            const date = DisplayFormatterUtils.isoDay(transaction.date);
 
             const transactionId = transaction.transaction_journal_id;
             const formattedDescription = this.formatDescription(

@@ -37,6 +37,11 @@ export class DisplayFormatterUtils {
         return `${monthName} ${year}`;
     }
 
+    /** The YYYY-MM-DD day of a Firefly ISO timestamp, as printed beside a transaction */
+    static isoDay(timestamp: string): string {
+        return timestamp.split('T')[0];
+    }
+
     /**
      * Short "Aug 27" style date, for annotating a row without stealing width.
      * Formatted in UTC to match Firefly's date handling.
