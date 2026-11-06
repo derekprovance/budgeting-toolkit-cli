@@ -8,10 +8,9 @@ import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
 import { AppServices, ServiceFactory } from './factories/service.factory.js';
 import { createAnalyzeCommand, createBudgetReportCommand } from './factories/command.factory.js';
-import {
-    BudgetDateOptions,
-    CategorizeOptions,
-} from './types/interface/command-options.interface.js';
+import { CategorizeOptions } from './types/interface/command-options.interface.js';
+import { BudgetDateParams } from './types/common.types.js';
+import { AppConfig } from './config/config.types.js';
 import { CategorizeMode } from './types/enums.js';
 import { CommandConfigValidator, requireCommandConfig } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
@@ -65,8 +64,44 @@ const withDateOptions = (command: Command): Command =>
                 .default(getCurrentYear(), 'current year')
         );
 
-/** Options shared by the report commands (`analyze`, `report`) */
-type ReportCommandOptions = BudgetDateOptions & { json?: boolean };
+/** What commander passes a report command; month and year always have defaults */
+interface ReportCommandOptions {
+    month: number;
+    year: number;
+    json?: boolean;
+}
+
+interface ReportCommandSpec {
+    name: string;
+    alias: string;
+    description: string;
+    examples: string;
+    /** For the failure line: "Error <operation>: …" */
+    operation: string;
+    run: (params: BudgetDateParams) => Promise<unknown>;
+}
+
+/** Registers a report command (`analyze`, `report`) with the shared date and --json options */
+const addReportCommand = (program: Command, spec: ReportCommandSpec): void => {
+    withJsonOption(
+        withDateOptions(program.command(spec.name).alias(spec.alias).description(spec.description))
+    )
+        .addHelpText('after', spec.examples)
+        .action(async (opts: ReportCommandOptions) => {
+            try {
+                await spec.run(toReportParams(opts, program));
+            } catch (error) {
+                handleError(error, spec.operation);
+            }
+        });
+};
+
+const toReportParams = (opts: ReportCommandOptions, program: Command): BudgetDateParams => ({
+    month: opts.month,
+    year: opts.year,
+    verbose: program.opts<{ verbose?: boolean }>().verbose ?? false,
+    format: opts.json ? 'json' : 'text',
+});
 
 /**
  * Adds the `--json` flag to a report command
@@ -151,6 +186,33 @@ const printValidationFailure = (error: ConfigValidationError): void => {
     console.error('\nSee example file: .env.example\n');
 };
 
+/**
+ * Loads configuration and wires the services every command uses; on failure
+ * explains why and exits 1.
+ */
+const loadServices = (configPath?: string): { config: AppConfig; services: AppServices } => {
+    try {
+        const config = ConfigManager.getInstance(configPath).getConfig();
+
+        // Apply the configured log level now that configuration is loaded
+        // (the logger initializes from LOG_LEVEL/'info' at import time)
+        logger.level = config.logging.level;
+
+        const apiClient = new FireflyClientWithCerts({
+            BASE: config.api.firefly.url + '/api',
+            TOKEN: config.api.firefly.token,
+            caCertPath: config.api.firefly.certificates?.caCertPath,
+            clientCertPath: config.api.firefly.certificates?.clientCertPath,
+            clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
+        });
+
+        return { config, services: ServiceFactory.createServices(apiClient, config) };
+    } catch (error) {
+        printConfigFailure(error);
+        process.exit(1);
+    }
+};
+
 export const createCli = (configPath?: string): Command => {
     const program = new Command();
 
@@ -161,99 +223,39 @@ export const createCli = (configPath?: string): Command => {
         .option('-v, --verbose', 'show detailed transaction breakdowns in reports')
         .option('-c, --config <path>', 'path to config.yaml file');
 
-    // Try to initialize API client and services for other commands
-    let apiClient: FireflyClientWithCerts;
-    let services: AppServices;
+    const { config, services } = loadServices(configPath);
 
-    try {
-        const configManager = ConfigManager.getInstance(configPath);
-        const config = configManager.getConfig();
-
-        // Apply the configured log level now that configuration is loaded
-        // (the logger initializes from LOG_LEVEL/'info' at import time)
-        logger.level = config.logging.level;
-
-        // Create Firefly client with properly formatted config
-        apiClient = new FireflyClientWithCerts({
-            BASE: config.api.firefly.url + '/api',
-            TOKEN: config.api.firefly.token,
-            caCertPath: config.api.firefly.certificates?.caCertPath,
-            clientCertPath: config.api.firefly.certificates?.clientCertPath,
-            clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
-        });
-
-        services = ServiceFactory.createServices(apiClient, config);
-    } catch (error) {
-        printConfigFailure(error);
-        process.exit(1);
-    }
-
-    withJsonOption(
-        withDateOptions(
-            program
-                .command('analyze')
-                .alias('an')
-                .description('Budget analysis with surplus/deficit variance')
-        )
-    )
-        .addHelpText(
-            'after',
-            `
+    addReportCommand(program, {
+        name: 'analyze',
+        alias: 'an',
+        description: 'Budget analysis with surplus/deficit variance',
+        examples: `
 Examples:
   $ budgeting-toolkit analyze                   # current month
   $ budgeting-toolkit analyze -m 6              # June, current year
   $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
   $ budgeting-toolkit an -m 3                   # March (using alias)
-  $ budgeting-toolkit analyze -m 6 --json       # machine-readable output`
-        )
-        .action(async (opts: ReportCommandOptions) => {
-            try {
-                const configManager = ConfigManager.getInstance(configPath);
-                const config = configManager.getConfig();
-                requireCommandConfig(config, 'analyze');
+  $ budgeting-toolkit analyze -m 6 --json       # machine-readable output`,
+        operation: 'analyzing budget',
+        run: params => {
+            requireCommandConfig(config, 'analyze');
+            return createAnalyzeCommand(services, config).execute(params);
+        },
+    });
 
-                const command = createAnalyzeCommand(services, config);
-                await command.execute({
-                    month: opts.month!,
-                    year: opts.year!,
-                    verbose: program?.opts().verbose || false,
-                    format: opts.json ? 'json' : 'text',
-                });
-            } catch (error) {
-                handleError(error, 'analyzing budget');
-            }
-        });
-
-    withJsonOption(
-        withDateOptions(
-            program
-                .command('report')
-                .alias('st')
-                .description('Display current budget report and spending analysis')
-        )
-    )
-        .addHelpText(
-            'after',
-            `
+    addReportCommand(program, {
+        name: 'report',
+        alias: 'st',
+        description: 'Display current budget report and spending analysis',
+        examples: `
 Examples:
   $ budgeting-toolkit report                      # current month report
   $ budgeting-toolkit report -m 8                 # August report
   $ budgeting-toolkit st                          # current month (using alias)
-  $ budgeting-toolkit report -m 8 --json          # machine-readable output`
-        )
-        .action(async (opts: ReportCommandOptions) => {
-            try {
-                const command = createBudgetReportCommand(services);
-                await command.execute({
-                    month: opts.month!,
-                    year: opts.year!,
-                    verbose: program?.opts().verbose || false,
-                    format: opts.json ? 'json' : 'text',
-                });
-            } catch (error) {
-                handleError(error, 'getting budget report');
-            }
-        });
+  $ budgeting-toolkit report -m 8 --json          # machine-readable output`,
+        operation: 'getting budget report',
+        run: params => createBudgetReportCommand(services).execute(params),
+    });
 
     program
         .command('categorize <tag>')
