@@ -10,7 +10,6 @@ import { TransactionClassificationService } from '../../src/services/core/transa
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
 import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
-import { Suggestion } from '../../src/types/categorize.types.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
@@ -42,6 +41,12 @@ const validationError = (id: string): TransactionValidationError => ({
     transactionDescription: `Transaction ${id}`,
 });
 
+/** The AI's answer for one transaction; a field left out is "no match" */
+interface AIAnswer {
+    category?: string;
+    budget?: string;
+}
+
 interface BuildOptions {
     past?: TransactionSplit[];
     force?: boolean;
@@ -50,7 +55,7 @@ interface BuildOptions {
 
 describe('AITransactionUpdateOrchestrator', () => {
     let tagged: TransactionSplit[];
-    let aiAnswers: Record<string, Suggestion>;
+    let aiAnswers: Record<string, AIAnswer>;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockUpdater: jest.Mocked<InteractiveTransactionUpdater>;
     let assign: jest.Mock<LLMAssignmentService['assign']>;
@@ -86,7 +91,7 @@ describe('AITransactionUpdateOrchestrator', () => {
         (await build(options)).updateTransactionsByTag('tag', mode);
 
     /** The AI's answers, by journal id; a field left out is "no match" */
-    const givenAI = (answers: Record<string, Suggestion>) => {
+    const givenAI = (answers: Record<string, AIAnswer>) => {
         aiAnswers = answers;
     };
 
@@ -103,13 +108,17 @@ describe('AITransactionUpdateOrchestrator', () => {
     /** The suggestion handed to the updater for `journalId` */
     const suggestionFor = (journalId: string) => {
         const call = mockUpdater.prepareUpdate.mock.calls.find(
-            ([transaction]) => transaction.transaction_journal_id === journalId
+            ([suggestion]) => suggestion.transaction.transaction_journal_id === journalId
         );
-        return call?.[1][journalId];
+        return (
+            call && { category: call[0].category, budget: call[0].budget, source: call[0].source }
+        );
     };
 
     const appliedJournalIds = () =>
-        mockUpdater.applyUpdate.mock.calls.map(([update]) => update.journalId);
+        mockUpdater.applyUpdate.mock.calls.map(
+            ([update]) => update.transaction.transaction_journal_id
+        );
 
     beforeEach(() => {
         tagged = [];
@@ -129,16 +138,10 @@ describe('AITransactionUpdateOrchestrator', () => {
         // user accepts it
         mockUpdater = {
             prepareUpdate: jest.fn<InteractiveTransactionUpdater['prepareUpdate']>(
-                async (transaction, suggestions) => {
-                    const { category, budget } = suggestions[transaction.transaction_journal_id];
-                    return {
-                        ok: true,
-                        value:
-                            category || budget
-                                ? { transaction, journalId: transaction.transaction_journal_id }
-                                : undefined,
-                    };
-                }
+                ({ transaction, category, budget, source }) => ({
+                    ok: true,
+                    value: category || budget ? { transaction, source } : undefined,
+                })
             ),
             applyUpdate: jest.fn<InteractiveTransactionUpdater['applyUpdate']>(async () => ({
                 ok: true,
@@ -305,8 +308,8 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('numbers only the prompts that survive validation', async () => {
             mockUpdater.prepareUpdate
-                .mockResolvedValueOnce({ ok: true, value: undefined })
-                .mockResolvedValueOnce({ ok: false, error: validationError('2') });
+                .mockReturnValueOnce({ ok: true, value: undefined })
+                .mockReturnValueOnce({ ok: false, error: validationError('2') });
 
             const result = await run();
 

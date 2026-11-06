@@ -23,7 +23,10 @@ const budget = (id: string, name: string): BudgetRead =>
 const categories = [category('New Category'), category('Groceries')];
 const budgets = [budget('2', 'New Budget'), budget('3', 'Food')];
 
-const suggestion: Suggestion = { category: 'New Category', budget: 'New Budget' };
+/** A suggestion without its transaction, which each test fills in */
+type Names = Partial<Omit<Suggestion, 'transaction'>>;
+
+const suggestion: Names = { category: 'New Category', budget: 'New Budget' };
 
 describe('InteractiveTransactionUpdater', () => {
     let mockTransactionService: jest.Mocked<TransactionService>;
@@ -42,19 +45,19 @@ describe('InteractiveTransactionUpdater', () => {
             { force: false, dryRun }
         );
 
-    const prepare = (ai: Suggestion = suggestion, updater = build()) =>
-        updater.prepareUpdate(transaction, { '1': ai });
+    const prepare = (names: Names = suggestion, updater = build()) =>
+        updater.prepareUpdate({ transaction, source: {}, ...names });
 
-    const prepared = async (ai: Suggestion = suggestion, updater = build()) => {
-        const result = await prepare(ai, updater);
+    const prepared = (names: Names = suggestion, updater = build()) => {
+        const result = prepare(names, updater);
         if (!result.ok || !result.value) {
             throw new Error('expected a prepared update');
         }
         return result.value;
     };
 
-    const review = async (ai: Suggestion = suggestion, updater = build()) =>
-        updater.applyUpdate(await prepared(ai, updater), { index: 3, total: 26 });
+    const review = (names: Names = suggestion, updater = build()) =>
+        updater.applyUpdate(prepared(names, updater), { index: 3, total: 26 });
 
     beforeEach(async () => {
         transaction = {
@@ -99,12 +102,11 @@ describe('InteractiveTransactionUpdater', () => {
 
     describe('prepareUpdate', () => {
         it('resolves the suggestion into a prepared update', async () => {
-            const result = await prepare({ ...suggestion, source: { category: 'history' } });
+            const result = prepare({ ...suggestion, source: { category: 'history' } });
 
             expect(result).toEqual(
                 Result.ok<PreparedUpdate>({
                     transaction,
-                    journalId: '1',
                     category: categories[0],
                     budget: budgets[0],
                     source: { category: 'history' },
@@ -113,7 +115,7 @@ describe('InteractiveTransactionUpdater', () => {
         });
 
         it('returns the validation error for a suggestion that does not resolve', async () => {
-            const result = await prepare({ category: 'Nope' });
+            const result = prepare({ category: 'Nope' });
 
             expect(result.ok).toBe(false);
             if (!result.ok) {
@@ -125,20 +127,7 @@ describe('InteractiveTransactionUpdater', () => {
         it('resolves to undefined when the suggestion changes nothing', async () => {
             mockValidator.categoryOrBudgetChanged.mockReturnValue(false);
 
-            expect(await prepare()).toEqual(Result.ok(undefined));
-        });
-
-        it('turns a thrown error into a validation error', async () => {
-            mockValidator.categoryOrBudgetChanged.mockImplementation(() => {
-                throw new Error('boom');
-            });
-
-            const result = await prepare();
-
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(result.error.userMessage).toBe('Failed to update transaction: boom');
-            }
+            expect(prepare()).toEqual(Result.ok(undefined));
         });
     });
 

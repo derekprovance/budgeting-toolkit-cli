@@ -265,6 +265,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             }
 
             results[t.transaction_journal_id] = {
+                transaction: t,
                 ...(category && { category }),
                 ...(budget && { budget }),
                 source: {
@@ -328,18 +329,12 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             // reaches the user and must not take a number
             const prepared: PreparedUpdate[] = [];
             for (const transaction of transactions) {
-                if (!aiResults[transaction.transaction_journal_id]) {
-                    logger.debug(
-                        { description: transaction.description },
-                        'No AI results for transaction:'
-                    );
+                const suggestion = aiResults[transaction.transaction_journal_id];
+                if (!suggestion) {
                     continue;
                 }
 
-                const prepareResult = await this.interactiveTransactionUpdater.prepareUpdate(
-                    transaction,
-                    aiResults
-                );
+                const prepareResult = this.interactiveTransactionUpdater.prepareUpdate(suggestion);
                 if (!prepareResult.ok) {
                     errors.push({ transaction, error: prepareResult.error });
                 } else if (prepareResult.value) {

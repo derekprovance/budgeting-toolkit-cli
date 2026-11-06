@@ -1,9 +1,4 @@
-import {
-    TransactionSplit,
-    CategoryProperties,
-    BudgetRead,
-    TransactionRead,
-} from '@derekprovance/firefly-iii-sdk';
+import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { TransactionService } from './core/transaction.service.js';
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
@@ -12,7 +7,12 @@ import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
 import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
-import { CategorizeOptions, JournaledTransaction, Suggestion } from '../types/categorize.types.js';
+import {
+    CategorizeOptions,
+    JournaledTransaction,
+    Suggestion,
+    SuggestionSource,
+} from '../types/categorize.types.js';
 
 /** Position of a transaction in the review, shown to the user as `[index/total]` */
 export interface ReviewProgress {
@@ -22,16 +22,20 @@ export interface ReviewProgress {
 
 /** A validated suggestion that will change the transaction, ready to prompt for */
 export interface PreparedUpdate {
-    transaction: JournaledTransaction;
-    journalId: string;
+    readonly transaction: JournaledTransaction;
+    readonly category?: CategoryProperties;
+    readonly budget?: BudgetRead;
+    readonly source: Suggestion['source'];
+}
+
+interface Choice {
     category?: CategoryProperties;
     budget?: BudgetRead;
-    source?: Suggestion['source'];
 }
 
 /**
- * Service for managing interactive transaction updates with AI-suggested categories and budgets.
- * Handles user workflow, validation, and dry-run mode.
+ * Turns suggestions into updates: validates them up front, then shows each to
+ * the user (or reports it in dry-run mode) and applies their decision.
  */
 export class InteractiveTransactionUpdater {
     constructor(
@@ -43,74 +47,164 @@ export class InteractiveTransactionUpdater {
     ) {}
 
     /**
-     * Validates the suggestion for a transaction without prompting. Resolves
-     * to `undefined` when there is nothing to change, so the caller can count
-     * the prompts that will follow before showing the first one.
+     * Validates a suggestion without prompting. Resolves to `undefined` when it
+     * changes nothing, so the caller can count the prompts that will follow
+     * before showing the first one.
      */
-    async prepareUpdate(
-        transaction: JournaledTransaction,
-        aiResults: Record<string, Suggestion>
-    ): Promise<Result<PreparedUpdate | undefined, TransactionValidationError>> {
-        const journalId = transaction.transaction_journal_id;
-
-        try {
-            const prepareResult = this.validateAndPrepareUpdate(transaction, aiResults[journalId]);
-            if (!prepareResult.ok) {
-                return Result.err(prepareResult.error);
-            }
-
-            const { category, budget, hasChanges } = prepareResult.value;
-
-            // Skip if no changes detected
-            if (!hasChanges) {
-                logger.debug(
-                    { transactionId: journalId, description: transaction.description },
-                    'No changes detected for transaction'
-                );
-                return Result.ok(undefined);
-            }
-
-            return Result.ok({
-                transaction,
-                journalId,
-                category,
-                budget,
-                source: aiResults[journalId]?.source,
-            });
-        } catch (error) {
-            return Result.err(this.toUpdateError(transaction, journalId, error));
+    prepareUpdate(
+        suggestion: Suggestion
+    ): Result<PreparedUpdate | undefined, TransactionValidationError> {
+        const { transaction, source } = suggestion;
+        const resolved = this.catalog.resolve(transaction, suggestion);
+        if (!resolved.ok) {
+            return Result.err(resolved.error);
         }
+
+        const { category, budget } = resolved.value;
+        if (!this.validator.categoryOrBudgetChanged(transaction, category, budget)) {
+            logger.debug(
+                { transactionId: transaction.transaction_journal_id },
+                'No changes detected for transaction'
+            );
+            return Result.ok(undefined);
+        }
+        return Result.ok({ transaction, category, budget, source });
     }
 
     /**
-     * Shows a prepared update to the user (or reports it in dry-run mode) and
-     * applies their decision.
+     * Shows a prepared update to the user and applies their decision; in
+     * dry-run mode only returns the transaction. Resolves to `undefined` when
+     * the user skips it, and to an error when it cannot be applied.
      */
     async applyUpdate(
         update: PreparedUpdate,
-        progress?: ReviewProgress
+        progress: ReviewProgress
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
-        const { transaction, journalId, category, budget, source } = update;
+        if (this.options.dryRun) {
+            return Result.ok(this.transactionService.getTransactionReadBySplit(update.transaction));
+        }
         try {
-            if (this.options.dryRun) {
-                return this.executeDryRun(transaction, journalId, category, budget);
-            }
-
-            return await this.executeInteractiveUpdate(
-                transaction,
-                category,
-                budget,
-                source,
-                progress
-            );
+            return Result.ok(await this.review(update, progress));
         } catch (error) {
-            return Result.err(this.toUpdateError(transaction, journalId, error));
+            return Result.err(this.toUpdateError(update.transaction, error));
         }
     }
 
+    private async review(
+        update: PreparedUpdate,
+        progress: ReviewProgress
+    ): Promise<TransactionRead | undefined> {
+        const { transaction } = update;
+        const { id: transactionId } = this.findTransactionRead(transaction);
+        // Once per transaction: an Edit re-prompts below without a new separator
+        this.userInputService.printSeparator();
+
+        let choice: Choice = { category: update.category, budget: update.budget };
+        for (;;) {
+            const action = await this.userInputService.askToUpdateTransaction(
+                transaction,
+                transactionId,
+                {
+                    category: choice.category?.name,
+                    budget: choice.budget?.attributes.name,
+                    source: this.sourceOf(update, choice),
+                    progress,
+                }
+            );
+
+            switch (action) {
+                case ReviewAction.Skip:
+                    return undefined;
+                case ReviewAction.Edit:
+                    choice = await this.edit(update, choice);
+                    break;
+                case ReviewAction.UpdateAll:
+                    return this.apply(transaction, choice);
+                case ReviewAction.UpdateCategory:
+                    return this.apply(transaction, { category: choice.category });
+                case ReviewAction.UpdateBudget:
+                    return this.apply(transaction, { budget: choice.budget });
+                default: {
+                    const unhandled: never = action;
+                    throw new Error(`Unhandled review action: ${String(unhandled)}`);
+                }
+            }
+        }
+    }
+
+    /** A label describes the suggestion, so it is dropped once the user edits that field */
+    private sourceOf(
+        update: PreparedUpdate,
+        choice: Choice
+    ): { category?: SuggestionSource; budget?: SuggestionSource } {
+        return {
+            ...(update.source.category &&
+                choice.category?.name === update.category?.name && {
+                    category: update.source.category,
+                }),
+            ...(update.source.budget &&
+                choice.budget?.attributes.name === update.budget?.attributes.name && {
+                    budget: update.source.budget,
+                }),
+        };
+    }
+
+    /** Asks which fields to change and for their new values; keeps the rest */
+    private async edit(update: PreparedUpdate, choice: Choice): Promise<Choice> {
+        const fields = await this.userInputService.shouldEditCategoryBudget(
+            update.transaction.type === 'deposit'
+        );
+
+        const edited = { ...choice };
+        for (const field of fields) {
+            switch (field) {
+                case EditTransactionAttribute.Category:
+                    edited.category = this.catalog.findCategory(
+                        await this.userInputService.getNewCategory(
+                            this.catalog.categoryNames(),
+                            choice.category?.name,
+                            update.category?.name
+                        )
+                    );
+                    break;
+                case EditTransactionAttribute.Budget:
+                    edited.budget = this.catalog.findBudget(
+                        await this.userInputService.getNewBudget(
+                            this.catalog.budgetNames(),
+                            choice.budget?.attributes.name,
+                            update.budget?.attributes.name
+                        )
+                    );
+                    break;
+                default: {
+                    const unhandled: never = field;
+                    throw new Error(`Unhandled edit attribute: ${String(unhandled)}`);
+                }
+            }
+        }
+        return edited;
+    }
+
+    private apply(transaction: JournaledTransaction, choice: Choice): Promise<TransactionRead> {
+        return this.transactionService.updateTransaction(
+            transaction,
+            choice.category?.name,
+            choice.budget?.id
+        );
+    }
+
+    private findTransactionRead(transaction: JournaledTransaction): TransactionRead {
+        const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
+        if (!transactionRead) {
+            throw new Error(
+                `Could not retrieve transaction details for journal ${transaction.transaction_journal_id}`
+            );
+        }
+        return transactionRead;
+    }
+
     private toUpdateError(
-        transaction: TransactionSplit,
-        journalId: string,
+        transaction: JournaledTransaction,
         error: unknown
     ): TransactionValidationError {
         const err = error instanceof Error ? error : new Error(String(error));
@@ -123,266 +217,9 @@ export class InteractiveTransactionUpdater {
             field: 'unknown',
             message: err.message,
             userMessage: `Failed to update transaction: ${err.message}`,
-            transactionId: journalId,
+            transactionId: transaction.transaction_journal_id,
             transactionDescription: transaction.description || 'No description',
             details: { error: err },
         };
-    }
-
-    /**
-     * Validates AI results and prepares update data
-     */
-    private validateAndPrepareUpdate(
-        transaction: TransactionSplit,
-        aiResult?: Suggestion
-    ): Result<
-        { category?: CategoryProperties; budget?: BudgetRead; hasChanges: boolean },
-        TransactionValidationError
-    > {
-        const validationResult = this.catalog.resolve(transaction, aiResult ?? {});
-
-        if (!validationResult.ok) {
-            return Result.err(validationResult.error);
-        }
-
-        const { category, budget } = validationResult.value;
-
-        // Check if changes actually exist
-        const hasChanges = this.validator.categoryOrBudgetChanged(transaction, category, budget);
-
-        return Result.ok({ category, budget, hasChanges });
-    }
-
-    /**
-     * Executes dry-run mode - displays proposed changes without applying
-     */
-    private executeDryRun(
-        transaction: TransactionSplit,
-        journalId: string,
-        category?: CategoryProperties,
-        budget?: BudgetRead
-    ): Result<TransactionRead | undefined, TransactionValidationError> {
-        logger.debug(
-            {
-                transactionId: journalId,
-                description: transaction.description,
-                proposedCategory: category?.name,
-                proposedBudget: budget?.attributes.name,
-            },
-            'Dry run - showing proposed changes'
-        );
-
-        const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
-        if (!transactionRead) {
-            logger.warn(
-                { transactionId: journalId, description: transaction.description },
-                'Could not retrieve TransactionRead for dry-run display'
-            );
-        }
-
-        return Result.ok(transactionRead);
-    }
-
-    /**
-     * Executes interactive workflow with user prompts
-     */
-    private async executeInteractiveUpdate(
-        transaction: TransactionSplit,
-        category?: CategoryProperties,
-        budget?: BudgetRead,
-        source?: Suggestion['source'],
-        progress?: ReviewProgress
-    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
-        const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
-        if (!transactionRead) {
-            return Result.err({
-                field: 'transactionRead',
-                message: 'Could not retrieve transaction details',
-                userMessage: 'Unable to load transaction details for update',
-                transactionId: transaction.transaction_journal_id || 'unknown',
-                transactionDescription: transaction.description || 'No description',
-            });
-        }
-
-        const workflowResult = await this.handleUpdateWorkflow(
-            transaction,
-            transactionRead,
-            category,
-            budget,
-            source,
-            progress
-        );
-
-        if (!workflowResult.ok) {
-            return Result.err(workflowResult.error);
-        }
-
-        return Result.ok(workflowResult.value);
-    }
-
-    /**
-     * Handles the interactive update workflow with user prompts
-     */
-    private async handleUpdateWorkflow(
-        transaction: TransactionSplit,
-        transactionRead: TransactionRead,
-        category?: CategoryProperties,
-        budget?: BudgetRead,
-        source?: Suggestion['source'],
-        progress?: ReviewProgress
-    ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
-        // Once per transaction: an Edit re-prompts below without a new separator
-        this.userInputService.printSeparator();
-
-        // Store original AI suggestions (immutable)
-        const originalAISuggestion = {
-            category: category,
-            budget: budget,
-        };
-
-        let currentCategory = category;
-        let currentBudget = budget;
-        let action: ReviewAction;
-
-        do {
-            action = await this.userInputService.askToUpdateTransaction(
-                transaction,
-                transactionRead.id,
-                {
-                    category: currentCategory?.name,
-                    budget: currentBudget?.attributes.name,
-                    // A label describes the suggestion, so it is dropped once
-                    // the user edits that field to something else
-                    source: {
-                        ...(source?.category &&
-                            currentCategory?.name === category?.name && {
-                                category: source.category,
-                            }),
-                        ...(source?.budget &&
-                            currentBudget?.attributes.name === budget?.attributes.name && {
-                                budget: source.budget,
-                            }),
-                    },
-                    progress,
-                }
-            );
-
-            if (action === ReviewAction.Skip) {
-                logger.debug(
-                    { description: transaction.description },
-                    'User skipped transaction update'
-                );
-                return Result.ok(undefined);
-            }
-
-            if (action === ReviewAction.Edit) {
-                [currentCategory, currentBudget] = await this.processEditCommand(
-                    transaction,
-                    currentCategory,
-                    currentBudget,
-                    originalAISuggestion
-                );
-            }
-        } while (action === ReviewAction.Edit);
-
-        // Apply the final update
-        const updatedTransaction = await this.applyTransactionUpdate(
-            transaction,
-            action,
-            currentCategory,
-            currentBudget
-        );
-
-        return Result.ok(updatedTransaction);
-    }
-
-    /**
-     * Handles edit mode workflow
-     * Preserves current values for attributes not being edited
-     */
-    private async processEditCommand(
-        transaction: TransactionSplit,
-        currentCategory?: CategoryProperties,
-        currentBudget?: BudgetRead,
-        aiSuggestion?: {
-            category?: CategoryProperties;
-            budget?: BudgetRead;
-        }
-    ): Promise<[CategoryProperties | undefined, BudgetRead | undefined]> {
-        logger.debug({ description: transaction.description }, 'User chose the edit option');
-
-        const isDeposit = transaction.type === 'deposit';
-        const answers = await this.userInputService.shouldEditCategoryBudget(isDeposit);
-
-        // Initialize with current values to preserve unedited attributes
-        let newCategory: CategoryProperties | undefined = currentCategory;
-        let newBudget: BudgetRead | undefined = currentBudget;
-
-        for (const answer of answers) {
-            switch (answer) {
-                case EditTransactionAttribute.Category:
-                    newCategory = this.catalog.findCategory(
-                        await this.userInputService.getNewCategory(
-                            this.catalog.categoryNames(),
-                            currentCategory?.name,
-                            aiSuggestion?.category?.name
-                        )
-                    );
-                    break;
-                case EditTransactionAttribute.Budget:
-                    newBudget = this.catalog.findBudget(
-                        await this.userInputService.getNewBudget(
-                            this.catalog.budgetNames(),
-                            currentBudget?.attributes.name,
-                            aiSuggestion?.budget?.attributes.name
-                        )
-                    );
-                    break;
-                default: {
-                    const unhandled: never = answer;
-                    throw new Error(`Unhandled edit attribute: ${String(unhandled)}`);
-                }
-            }
-        }
-
-        return [newCategory, newBudget];
-    }
-
-    /**
-     * Applies the final transaction update based on user selection
-     */
-    private async applyTransactionUpdate(
-        transaction: TransactionSplit,
-        action: ReviewAction,
-        category?: CategoryProperties,
-        budget?: BudgetRead
-    ): Promise<TransactionRead | undefined> {
-        const { categoryName, budgetId } = this.getUpdateParameters(action, category, budget);
-        return await this.transactionService.updateTransaction(transaction, categoryName, budgetId);
-    }
-
-    /**
-     * Determines which parameters to update based on mode
-     */
-    private getUpdateParameters(
-        action: ReviewAction,
-        category?: CategoryProperties,
-        budget?: BudgetRead
-    ): { categoryName?: string; budgetId?: string } {
-        switch (action) {
-            case ReviewAction.UpdateAll:
-                return { categoryName: category?.name, budgetId: budget?.id };
-            case ReviewAction.UpdateBudget:
-                return { budgetId: budget?.id };
-            case ReviewAction.UpdateCategory:
-                return { categoryName: category?.name };
-            case ReviewAction.Edit:
-            case ReviewAction.Skip:
-                return {};
-            default: {
-                const unhandled: never = action;
-                throw new Error(`Unhandled review action: ${String(unhandled)}`);
-            }
-        }
     }
 }
