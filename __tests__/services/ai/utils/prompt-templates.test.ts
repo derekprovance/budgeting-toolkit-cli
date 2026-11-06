@@ -2,11 +2,21 @@ import {
     getFunctionSchema,
     getSystemPrompt,
     getUserPrompt,
+    isNoMatch,
     parseAssignmentResponse,
 } from '../../../../src/services/ai/utils/prompt-templates.js';
 import { LLMTransactionData } from '../../../../src/services/ai/utils/transaction-mapper.js';
 
 describe('prompt-templates', () => {
+    describe('isNoMatch', () => {
+        it('recognizes the sentinel however it is cased or padded', () => {
+            expect(isNoMatch('category', '(no category)')).toBe(true);
+            expect(isNoMatch('category', ' (No Category) ')).toBe(true);
+            expect(isNoMatch('budget', undefined)).toBe(true);
+            expect(isNoMatch('budget', 'Food')).toBe(false);
+        });
+    });
+
     describe('getFunctionSchema', () => {
         it('should generate correct schema for category type', () => {
             const validCategories = ['Groceries', 'Healthcare', '(no category)'];
@@ -212,16 +222,13 @@ describe('prompt-templates', () => {
     });
 
     describe('parseAssignmentResponse', () => {
-        const validCategories = ['Groceries', 'Healthcare', 'Shopping', '(no category)'];
-        const validBudgets = ['Food', 'Medical', 'Shopping', '(no budget)'];
-
         describe('successful parsing', () => {
             it('should parse valid category response', () => {
                 const response = JSON.stringify({
                     categories: ['Groceries', 'Healthcare', 'Shopping'],
                 });
 
-                const result = parseAssignmentResponse('category', response, 3, validCategories);
+                const result = parseAssignmentResponse('category', response, 3);
 
                 expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
             });
@@ -231,7 +238,7 @@ describe('prompt-templates', () => {
                     budgets: ['Food', 'Medical', 'Shopping'],
                 });
 
-                const result = parseAssignmentResponse('budget', response, 3, validBudgets);
+                const result = parseAssignmentResponse('budget', response, 3);
 
                 expect(result).toEqual(['Food', 'Medical', 'Shopping']);
             });
@@ -241,7 +248,7 @@ describe('prompt-templates', () => {
                     categories: ['Groceries', '(no category)', 'Shopping'],
                 });
 
-                const result = parseAssignmentResponse('category', response, 3, validCategories);
+                const result = parseAssignmentResponse('category', response, 3);
 
                 expect(result).toEqual(['Groceries', '(no category)', 'Shopping']);
             });
@@ -251,7 +258,7 @@ describe('prompt-templates', () => {
                     budgets: ['(no budget)', '(no budget)', '(no budget)'],
                 });
 
-                const result = parseAssignmentResponse('budget', response, 3, validBudgets);
+                const result = parseAssignmentResponse('budget', response, 3);
 
                 expect(result).toEqual(['(no budget)', '(no budget)', '(no budget)']);
             });
@@ -261,7 +268,7 @@ describe('prompt-templates', () => {
                     categories: ['Groceries'],
                 });
 
-                const result = parseAssignmentResponse('category', response, 1, validCategories);
+                const result = parseAssignmentResponse('category', response, 1);
 
                 expect(result).toEqual(['Groceries']);
             });
@@ -271,9 +278,9 @@ describe('prompt-templates', () => {
             it('should throw error for invalid JSON', () => {
                 const response = 'Invalid JSON {]';
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Failed to parse category assignment response');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Failed to parse category assignment response'
+                );
             });
 
             it('should throw error when response is missing categories array', () => {
@@ -281,9 +288,9 @@ describe('prompt-templates', () => {
                     wrong_field: ['Groceries', 'Healthcare'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 2, validCategories)
-                ).toThrow('Response does not contain a categories array');
+                expect(() => parseAssignmentResponse('category', response, 2)).toThrow(
+                    'Response does not contain a categories array'
+                );
             });
 
             it('should throw error when response is missing budgets array', () => {
@@ -291,7 +298,7 @@ describe('prompt-templates', () => {
                     categories: ['Food', 'Medical'],
                 });
 
-                expect(() => parseAssignmentResponse('budget', response, 2, validBudgets)).toThrow(
+                expect(() => parseAssignmentResponse('budget', response, 2)).toThrow(
                     'Response does not contain a budgets array'
                 );
             });
@@ -301,9 +308,9 @@ describe('prompt-templates', () => {
                     categories: 'not an array',
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Response does not contain a categories array');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Response does not contain a categories array'
+                );
             });
 
             it('should throw error when count mismatch - too few', () => {
@@ -311,9 +318,9 @@ describe('prompt-templates', () => {
                     categories: ['Groceries', 'Healthcare'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Expected 3 categories, got 2');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Expected 3 categories, got 2'
+                );
             });
 
             it('should throw error when count mismatch - too many', () => {
@@ -321,45 +328,47 @@ describe('prompt-templates', () => {
                     categories: ['Groceries', 'Healthcare', 'Shopping', 'Groceries'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Expected 3 categories, got 4');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Expected 3 categories, got 4'
+                );
             });
 
-            it('should throw error when category is not in valid options', () => {
+            it('should return an answer that names no option as given', () => {
                 const response = JSON.stringify({
                     categories: ['InvalidCategory', 'Healthcare', 'Shopping'],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Invalid category at index 0: "InvalidCategory"');
+                expect(parseAssignmentResponse('category', response, 3)).toEqual([
+                    'InvalidCategory',
+                    'Healthcare',
+                    'Shopping',
+                ]);
             });
 
-            it('should throw error when budget is not in valid options', () => {
+            it('should throw error when an answer is not a string', () => {
                 const response = JSON.stringify({
-                    budgets: ['Food', 'InvalidBudget', 'Shopping'],
+                    budgets: ['Food', 42, 'Shopping'],
                 });
 
-                expect(() => parseAssignmentResponse('budget', response, 3, validBudgets)).toThrow(
-                    'Invalid budget at index 1: "InvalidBudget"'
+                expect(() => parseAssignmentResponse('budget', response, 3)).toThrow(
+                    'Invalid budget at index 1: not a string'
                 );
             });
 
             it('should throw error for null response', () => {
                 const response = 'null';
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Failed to parse category assignment response');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Failed to parse category assignment response'
+                );
             });
 
             it('should throw error for empty object', () => {
                 const response = JSON.stringify({});
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Response does not contain a categories array');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Response does not contain a categories array'
+                );
             });
 
             it('should throw error for empty array response', () => {
@@ -367,9 +376,9 @@ describe('prompt-templates', () => {
                     categories: [],
                 });
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Expected 3 categories, got 0');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Expected 3 categories, got 0'
+                );
             });
         });
 
@@ -377,9 +386,9 @@ describe('prompt-templates', () => {
             it('should handle empty response string', () => {
                 const response = '';
 
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Failed to parse category assignment response');
+                expect(() => parseAssignmentResponse('category', response, 3)).toThrow(
+                    'Failed to parse category assignment response'
+                );
             });
 
             it('should handle response with extra fields', () => {
@@ -389,53 +398,21 @@ describe('prompt-templates', () => {
                     metadata: { count: 3 },
                 });
 
-                const result = parseAssignmentResponse('category', response, 3, validCategories);
+                const result = parseAssignmentResponse('category', response, 3);
 
                 expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
             });
 
-            it('should handle case-insensitive category matching', () => {
+            it('should leave case and whitespace for the catalog to match', () => {
                 const response = JSON.stringify({
-                    categories: ['groceries', 'HEALTHCARE', 'Shopping'],
+                    categories: [' GROCERIES ', 'healthcare', 'Shopping'],
                 });
 
-                const result = parseAssignmentResponse('category', response, 3, validCategories);
-
-                // Should normalize to the exact case from validCategories
-                expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
-            });
-
-            it('should handle whitespace in response', () => {
-                // The valid option has no whitespace, response has extra space
-                const response = JSON.stringify({
-                    categories: ['Groceries ', ' Healthcare', '  Shopping  '],
-                });
-
-                const result = parseAssignmentResponse('category', response, 3, validCategories);
-
-                // Should trim and match correctly
-                expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
-            });
-
-            it('should handle mixed case and whitespace variations', () => {
-                const response = JSON.stringify({
-                    categories: [' GROCERIES ', '  healthcare', 'ShOpPiNg '],
-                });
-
-                const result = parseAssignmentResponse('category', response, 3, validCategories);
-
-                // Should normalize all variations to exact matches
-                expect(result).toEqual(['Groceries', 'Healthcare', 'Shopping']);
-            });
-
-            it('should throw error for truly invalid category after normalization', () => {
-                const response = JSON.stringify({
-                    categories: ['InvalidCategory', 'Healthcare', 'Shopping'],
-                });
-
-                expect(() =>
-                    parseAssignmentResponse('category', response, 3, validCategories)
-                ).toThrow('Invalid category at index 0: "InvalidCategory"');
+                expect(parseAssignmentResponse('category', response, 3)).toEqual([
+                    ' GROCERIES ',
+                    'healthcare',
+                    'Shopping',
+                ]);
             });
         });
     });

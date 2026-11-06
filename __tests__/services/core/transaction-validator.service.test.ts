@@ -151,41 +151,6 @@ describe('TransactionValidatorService', () => {
         });
     });
 
-    describe('validateTransactionData', () => {
-        const mockAIResults = {
-            '1': { category: 'New Category', budget: 'New Budget' },
-        };
-
-        it('should return true for valid transaction data', () => {
-            const result = service.validateTransactionData(
-                mockTransaction as TransactionSplit,
-                mockAIResults
-            );
-
-            expect(result).toBe(true);
-        });
-
-        it('should return false when transaction has no journal ID', () => {
-            const invalidTransaction = {
-                ...mockTransaction,
-                transaction_journal_id: undefined,
-            };
-
-            const result = service.validateTransactionData(
-                invalidTransaction as TransactionSplit,
-                mockAIResults
-            );
-
-            expect(result).toBe(false);
-        });
-
-        it('should return false when AI results do not contain transaction data', () => {
-            const result = service.validateTransactionData(mockTransaction as TransactionSplit, {});
-
-            expect(result).toBe(false);
-        });
-    });
-
     describe('isBudgetOnlyCandidate', () => {
         it('should return true when transaction has category but no budget', () => {
             mockPropertyService.hasCategory.mockReturnValue(true);

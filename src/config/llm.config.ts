@@ -1,36 +1,14 @@
 import { ClaudeClient } from '../api/claude.client.js';
-import { ConfigManager } from './config-manager.js';
+import { AppConfig } from './config.types.js';
 
-export class LLMConfig {
-    static createClient(claudeAPIKey?: string): ClaudeClient {
-        const config = ConfigManager.getInstance().getConfig();
-        // Use provided key or fall back to default from environment
-        const apiKey = claudeAPIKey ?? config.api.claude.apiKey;
-
-        // API key validation now handled by CommandConfigValidator.validateCategorizeCommand()
-        if (!apiKey) {
-            throw new Error('ANTHROPIC_API_KEY is required but not set');
-        }
-
-        // Get LLM configuration from ConfigManager
-        const llmConfig = config.llm;
-
-        return new ClaudeClient(
-            {
-                // Authentication from environment (secure)
-                apiKey: apiKey,
-
-                // SDK transport settings (retries/timeouts owned by the SDK)
-                baseURL: config.api.claude.baseURL,
-                timeout: config.api.claude.timeout,
-                maxRetries: config.api.claude.maxRetries,
-
-                // Model settings from configuration (user-configurable)
-                model: llmConfig.model,
-                maxTokens: llmConfig.maxTokens,
-            },
-            undefined, // client
-            llmConfig // Pass full LLM config for rate limiting and circuit breaker
-        );
+/**
+ * Builds the Claude client from the application config.
+ *
+ * @throws Error when `api.claude.apiKey` is empty (`ANTHROPIC_API_KEY` unset)
+ */
+export function createClaudeClient(config: AppConfig): ClaudeClient {
+    if (!config.api.claude.apiKey) {
+        throw new Error('ANTHROPIC_API_KEY is required but not set');
     }
+    return new ClaudeClient({ api: config.api.claude, llm: config.llm });
 }

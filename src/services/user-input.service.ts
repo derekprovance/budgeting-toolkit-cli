@@ -1,23 +1,51 @@
-import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
-import { CategorizeMode } from '../types/enums.js';
+import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { DisplayFormatterUtils } from '../utils/display-formatter.utils.js';
-import { SuggestionSource } from './ai/llm-transaction-processing.service.js';
+import { SuggestionSource } from '../types/categorize.types.js';
 
 /**
  * Interface for transaction update options
  */
 interface TransactionUpdateOptions {
+    /**
+     * Whether the transaction may be given a budget (the validator's
+     * shouldSetBudget). When false the budget shows as N/A and cannot be chosen.
+     */
+    canSetBudget: boolean;
     category?: string;
     budget?: string;
     /** Where each suggestion came from; shown after the proposed value */
     source?: { category?: SuggestionSource; budget?: SuggestionSource };
     /** Position of this transaction in the review, shown as `[index/total]` */
     progress?: { index: number; total: number };
+}
+
+/** The user ended the review (Ctrl-C at a prompt); nothing further should be asked */
+export class ReviewCancelledError extends Error {
+    constructor(options?: ErrorOptions) {
+        super('Review cancelled by the user', options);
+        this.name = 'ReviewCancelledError';
+    }
+}
+
+/**
+ * Awaits a review prompt. Inquirer rejects with an `ExitPromptError` when the
+ * user presses Ctrl-C; that becomes a ReviewCancelledError.
+ */
+async function reviewPrompt<T>(prompt: Promise<T>): Promise<T> {
+    try {
+        return await prompt;
+    } catch (error) {
+        if (error instanceof Error && error.name === 'ExitPromptError') {
+            throw new ReviewCancelledError({ cause: error });
+        }
+        throw error;
+    }
 }
 
 /**
@@ -39,36 +67,22 @@ export class UserInputService {
 
     /**
      * Asks the user whether to update a transaction with new category and/or budget
-     * @param transaction The transaction to potentially update
-     * @param transactionId The transaction ID for linking
-     * @param options The proposed changes to the transaction
-     * @param updateMode The mode indicating what to update (category, budget, or both)
-     * @returns Promise<CategorizeMode> The user's choice
-     * @throws Error if the transaction is invalid
+     * @param transactionId The Firefly transaction id, for the link; none when undefined
+     * @throws ReviewCancelledError when the user presses Ctrl-C
      */
     async askToUpdateTransaction(
         transaction: TransactionSplit,
         transactionId: string | undefined,
         options: TransactionUpdateOptions
-    ): Promise<CategorizeMode> {
-        if (!transaction) {
-            throw new Error('Transaction cannot be null or undefined');
-        }
-
+    ): Promise<ReviewAction> {
         const changes = this.getChangeList(transaction, options);
-        if (changes.length === 0) {
-            return CategorizeMode.Skip;
-        }
-
         const message = this.formatUpdateMessage(
             transaction,
             transactionId,
             changes,
             options.progress
         );
-        const isDeposit = transaction.type === 'deposit';
-
-        return this.promptUser(message, isDeposit);
+        return this.promptUser(message, options.canSetBudget);
     }
 
     /**
@@ -78,8 +92,8 @@ export class UserInputService {
         console.log();
     }
 
-    async shouldEditCategoryBudget(isDeposit: boolean = false): Promise<string[]> {
-        const choices = [
+    async shouldEditCategoryBudget(canSetBudget: boolean): Promise<EditTransactionAttribute[]> {
+        const choices: { name: string; value: EditTransactionAttribute; description: string }[] = [
             {
                 name: 'Modify Category',
                 value: EditTransactionAttribute.Category,
@@ -87,8 +101,7 @@ export class UserInputService {
             },
         ];
 
-        // Only allow budget modification for non-deposit transactions
-        if (!isDeposit) {
+        if (canSetBudget) {
             choices.push({
                 name: 'Modify Budget',
                 value: EditTransactionAttribute.Budget,
@@ -96,57 +109,35 @@ export class UserInputService {
             });
         }
 
-        const answer = await checkbox({
-            message: 'What do you want to edit?',
-            choices,
-        });
-
-        return answer;
+        return reviewPrompt(checkbox({ message: 'What do you want to edit?', choices }));
     }
 
+    /** @returns The chosen name, one of `categoryNames` */
     async getNewCategory(
         categoryNames: string[],
         suggestedCategory?: string,
         aiSuggestion?: string
-    ): Promise<CategoryProperties | undefined> {
-        const answer = await this.createSearchableDropdown(
+    ): Promise<string> {
+        return this.createSearchableDropdown(
             categoryNames,
             'Select a new Category (type to search)',
             suggestedCategory,
             aiSuggestion
         );
-
-        if (!answer) {
-            return undefined;
-        }
-
-        // Return a minimal object with just the name
-        // Will be resolved to full object in processEditCommand()
-        return { name: answer } as CategoryProperties;
     }
 
+    /** @returns The chosen name, one of `budgetNames` */
     async getNewBudget(
         budgetNames: string[],
         suggestedBudget?: string,
         aiSuggestion?: string
-    ): Promise<BudgetRead | undefined> {
-        const answer = await this.createSearchableDropdown(
+    ): Promise<string> {
+        return this.createSearchableDropdown(
             budgetNames,
             'Select a new Budget (type to search)',
             suggestedBudget,
             aiSuggestion
         );
-
-        if (!answer) {
-            return undefined;
-        }
-
-        // Return a minimal object with just the name
-        // Will be resolved to full object in processEditCommand()
-        return {
-            id: '',
-            attributes: { name: answer },
-        } as BudgetRead;
     }
 
     private async createSearchableDropdown(
@@ -154,7 +145,7 @@ export class UserInputService {
         message: string,
         currentValue?: string,
         aiSuggestion?: string
-    ): Promise<string | undefined> {
+    ): Promise<string> {
         // AI suggestion takes precedence when a value is both current and suggested
         const toChoice = (name: string) => {
             let label = name;
@@ -166,99 +157,71 @@ export class UserInputService {
             return { value: name, name: label };
         };
 
-        return await search({
-            message,
-            source: async input => {
-                if (!input) {
-                    const choices = values.map(toChoice);
+        return reviewPrompt(
+            search({
+                message,
+                source: async input => {
+                    if (!input) {
+                        const choices = values.map(toChoice);
 
-                    // Sort: current first, then AI suggestion, then alphabetical
-                    choices.sort((a, b) => {
-                        if (a.value === currentValue) return -1;
-                        if (b.value === currentValue) return 1;
-                        if (a.value === aiSuggestion) return -1;
-                        if (b.value === aiSuggestion) return 1;
-                        return a.value.localeCompare(b.value);
-                    });
+                        // Sort: current first, then AI suggestion, then alphabetical
+                        choices.sort((a, b) => {
+                            if (a.value === currentValue) return -1;
+                            if (b.value === currentValue) return 1;
+                            if (a.value === aiSuggestion) return -1;
+                            if (b.value === aiSuggestion) return 1;
+                            return a.value.localeCompare(b.value);
+                        });
 
-                    return choices;
-                }
+                        return choices;
+                    }
 
-                // Filter based on user input (case-insensitive)
-                const searchLower = input.toLowerCase();
-                return values
-                    .filter(name => name.toLowerCase().includes(searchLower))
-                    .map(toChoice);
-            },
-        });
+                    // Filter based on user input (case-insensitive)
+                    const searchLower = input.toLowerCase();
+                    return values
+                        .filter(name => name.toLowerCase().includes(searchLower))
+                        .map(toChoice);
+                },
+            })
+        );
     }
 
-    /**
-     * Gets a list of changes to be made to the transaction
-     * @param transaction The transaction being updated
-     * @param options The proposed changes (category and/or budget)
-     * @param updateMode The mode indicating what to update (category, budget, or both)
-     * @returns Array of formatted change strings to display
-     */
+    /** One row per field: its suggested change, or its current value */
     private getChangeList(
         transaction: TransactionSplit,
         options: TransactionUpdateOptions
     ): string[] {
-        const changes: string[] = [];
+        return [
+            this.describeField(
+                EditTransactionAttribute.Category,
+                transaction.category_name,
+                options.category,
+                options.source?.category
+            ),
+            options.canSetBudget
+                ? this.describeField(
+                      EditTransactionAttribute.Budget,
+                      transaction.budget_name,
+                      options.budget,
+                      options.source?.budget
+                  )
+                : `${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`,
+        ];
+    }
 
-        // Always show both fields for all modes - this gives users flexibility to manually set either field
-        // If AI has a suggestion, show as change. Otherwise, just show current value.
-
-        // Category field
-        if (options.category && options.category === transaction.category_name) {
-            changes.push(this.formatUnchanged(EditTransactionAttribute.Category, options.category));
-        } else if (options.category) {
-            // AI has a suggestion - show as change
-            changes.push(
-                this.formatChange(
-                    EditTransactionAttribute.Category,
-                    transaction.category_name ?? undefined,
-                    options.category,
-                    options.source?.category
-                )
-            );
-        } else {
-            // No AI suggestion - just show current value
-            changes.push(
-                this.formatCurrentValue(
-                    EditTransactionAttribute.Category,
-                    transaction.category_name ?? undefined
-                )
-            );
+    private describeField(
+        field: EditTransactionAttribute,
+        current: string | null | undefined,
+        suggested: string | undefined,
+        source: SuggestionSource | undefined
+    ): string {
+        if (!suggested) {
+            return this.formatCurrentValue(field, current ?? undefined);
         }
-
-        // Budget field
-        if (transaction.type === 'deposit') {
-            // Deposits cannot have budgets in Firefly III - show N/A
-            changes.push(`${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`);
-        } else if (options.budget && options.budget === transaction.budget_name) {
-            changes.push(this.formatUnchanged(EditTransactionAttribute.Budget, options.budget));
-        } else if (options.budget) {
-            // AI has a suggestion - show as change
-            changes.push(
-                this.formatChange(
-                    EditTransactionAttribute.Budget,
-                    transaction.budget_name ?? undefined,
-                    options.budget,
-                    options.source?.budget
-                )
-            );
-        } else {
-            // No AI suggestion - just show current value
-            changes.push(
-                this.formatCurrentValue(
-                    EditTransactionAttribute.Budget,
-                    transaction.budget_name ?? undefined
-                )
-            );
+        if (suggested === current) {
+            return this.formatUnchanged(field, suggested);
         }
-
-        return changes;
+        return this.formatChange(field, current ?? undefined, suggested, source);
     }
 
     /**
@@ -341,56 +304,48 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    private async promptUser(message: string, isDeposit: boolean = false): Promise<CategorizeMode> {
+    private async promptUser(message: string, canSetBudget: boolean): Promise<ReviewAction> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
             key: InquirerKey;
             name: string;
-            value: CategorizeMode;
+            value: ReviewAction;
         }> = [
             {
                 key: 'a',
                 name: 'Update all',
-                value: CategorizeMode.Both,
+                value: ReviewAction.UpdateAll,
             },
         ];
 
-        // Only offer budget option for non-deposit transactions
-        // This allows users to manually set fields via Edit even when AI didn't suggest a value
-        if (!isDeposit) {
+        if (canSetBudget) {
             choices.push({
                 key: 'b',
                 name: 'Update only the budget',
-                value: CategorizeMode.Budget,
+                value: ReviewAction.UpdateBudget,
             });
         }
 
         choices.push({
             key: 'c',
             name: 'Update only the category',
-            value: CategorizeMode.Category,
+            value: ReviewAction.UpdateCategory,
         });
 
         choices.push({
             key: 'e',
             name: 'Edit',
-            value: CategorizeMode.Edit,
+            value: ReviewAction.Edit,
         });
 
         choices.push({
             key: 's',
             name: 'Skip',
-            value: CategorizeMode.Skip,
+            value: ReviewAction.Skip,
         });
 
-        const answer = await expand({
-            message,
-            default: 'a',
-            choices,
-        });
-
-        return answer;
+        return reviewPrompt(expand({ message, default: 'a', choices }));
     }
 
     /*

@@ -198,8 +198,9 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`. 
 2. **report** (alias: `st`) - Shows the budget report for a given month: per-budget rows, bills, top expenses and the **Unbudgeted Expenses** bucket. Every figure comes from the same buckets `analyze` uses, so the two commands always agree. Activity in outside accounts is not shown
 
 3. **categorize** `<tag>` (alias: `cat`) - Uses Claude AI to automatically categorize and budget transactions. Requires a positional `<tag>` argument (the Firefly III import tag, e.g., `Import-2025-06-23`) identifying which transactions to process.
-    - Suggestions come from history first (`TransactionHistoryService`: the latest matching transaction in the last `categorize.historyMonths` months), then the AI for whatever is left; the confirm prompt labels each value `(history)` or `(AI)`. The category comes from the newest match of either direction; the budget only from the newest match that could carry one (`shouldSetBudget`: not a deposit, bill-linked or disposable-income transaction). Such a match with no budget keeps the transaction unbudgeted (no AI call), while a refund deposit says nothing about the budget. A budget is never asked for on a transaction the validator would refuse it on (V8). History is optional: a failed fetch is logged and every suggestion comes from the AI
-    - Every suggestion is validated (`InteractiveTransactionUpdater.prepareUpdate`) before the first prompt, so the `[index/total]` counter counts exactly the prompts shown
+    - Suggestions come from history first (`TransactionHistoryService`: the latest matching transaction in the last `categorize.historyMonths` months), then the AI for whatever is left; the confirm prompt labels each value `(history)` or `(AI)`. The category comes from the newest match of either direction; the budget only from the newest match that could carry one (`shouldSetBudget`: not a deposit, bill-linked or disposable-income transaction). Such a match with no budget keeps the transaction unbudgeted (no AI call), while a refund deposit says nothing about the budget. A budget is never asked for, offered in the prompt or offered in Edit on a transaction the validator would refuse it on (V8). History is optional: a failed fetch is logged and every suggestion comes from the AI
+    - Every suggestion is validated (`InteractiveTransactionUpdater.prepareUpdate`) before the first prompt, so the `[index/total]` counter counts exactly the prompts shown. Category and budget names, from history, the AI or Edit, are all matched by `CategoryBudgetCatalog` (`src/services/core/category-budget-catalog.service.ts`), which fetches both lists once per run
+    - A failure (auth, Firefly unreachable, a critical AI error) propagates to `cli.ts`, which prints it once and exits 1. A transaction that fails validation or cannot be updated is listed after the run without failing it. Ctrl-C at a review prompt (`ReviewCancelledError`) ends the review and is not counted as a failure
     - By default, processes uncategorized transactions and transactions with category but no budget
     - Transactions with both category and budget are skipped unless `--force` is used
     - `--force` also lets the AI category replace an existing one (without it, an existing `category_id` is preserved)
@@ -259,7 +260,7 @@ The `TransactionSplitService` provides functionality for splitting transactions 
 
 Claude AI integration through `@anthropic-ai/sdk`:
 
-- Configuration in `src/config/llm.config.ts`
+- `createClaudeClient(config)` (`src/config/llm.config.ts`) builds the client from the injected `AppConfig`; `ClaudeClient` reads no environment and has no defaults of its own
 - **Tool Use**: Uses Claude's tool-use API (`Anthropic.Tool` + forced `tool_choice`) for structured responses
     - Eliminates need for fuzzy string matching
     - Enforces response schema with enum validation (the `(no category)`/`(no budget)` sentinel is added by the schema, not by callers)
@@ -269,7 +270,7 @@ Claude AI integration through `@anthropic-ai/sdk`:
     - A recoverable chunk failure degrades only that chunk to the sentinel; auth/permission/bad-request errors abort the run
 - **Retries**: Owned entirely by the Anthropic SDK (`api.claude.maxRetries`), which honors `retry-after`
 - **Circuit Breaker**: One failure per logical request; HALF_OPEN requires a single successful probe to close
-- **Validation**: AI responses validated against available options before applying
+- **Validation**: the response parser checks only shape and count; each answer is matched to a category or budget by `CategoryBudgetCatalog` before the first prompt, so an answer naming no option fails validation for that transaction alone
 - **Dry-run mode**: Test AI suggestions without making changes
 
 ## Key Files and Patterns

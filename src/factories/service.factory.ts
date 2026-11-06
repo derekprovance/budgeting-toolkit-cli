@@ -8,12 +8,11 @@ import { TransactionClassificationService } from '../services/core/transaction-c
 import { AccountScopeService } from '../services/core/account-scope.service.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
-import { TransactionAIResultValidator } from '../services/core/transaction-ai-result-validator.service.js';
+import { CategoryBudgetCatalog } from '../services/core/category-budget-catalog.service.js';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
-import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service.js';
 import { TransactionHistoryService } from '../services/transaction-history.service.js';
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
-import { LLMConfig } from '../config/llm.config.js';
+import { createClaudeClient } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
 import { ConfigManager } from '../config/config-manager.js';
@@ -26,6 +25,7 @@ import { BudgetAnalyticsService } from '../services/budget-analytics.service.js'
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { AppConfig } from '../config/config.types.js';
+import { CategorizeOptions } from '../types/categorize.types.js';
 
 /** Every service the CLI wires, as returned by {@link ServiceFactory.createServices}. */
 export type AppServices = ReturnType<typeof ServiceFactory.createServices>;
@@ -105,52 +105,42 @@ export class ServiceFactory {
 
     static async createAITransactionUpdateOrchestrator(
         services: AppServices,
-        force: boolean = false,
-        dryRun: boolean = false,
-        config: AppConfig = ConfigManager.getInstance().getConfig()
+        config: AppConfig,
+        options: CategorizeOptions
     ): Promise<AITransactionUpdateOrchestrator> {
-        const claudeClient = LLMConfig.createClient();
-
-        const llmConfig = config.llm;
-        const llmAssignmentService = new LLMAssignmentService(claudeClient, {
-            batchSize: llmConfig.batchSize,
-            maxConcurrent: llmConfig.maxConcurrent,
+        const llmAssignmentService = new LLMAssignmentService(createClaudeClient(config), {
+            batchSize: config.llm.batchSize,
+            maxConcurrent: config.llm.maxConcurrent,
         });
-        const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
-        // Create AI validator service using factory method
-        const aiValidator = await TransactionAIResultValidator.create(
+        const catalog = await CategoryBudgetCatalog.load(
             services.categoryService,
-            services.budgetService,
-            services.transactionValidatorService
+            services.budgetService
         );
 
         // Create interactive transaction updater with service dependencies
         const interactiveTransactionUpdater = new InteractiveTransactionUpdater(
             services.transactionService,
             services.transactionValidatorService,
-            aiValidator,
+            catalog,
             services.userInputService,
-            dryRun,
-            force
+            options
         );
 
         return new AITransactionUpdateOrchestrator(
             services.transactionService,
             interactiveTransactionUpdater,
-            services.categoryService,
-            services.budgetService,
-            llmProcessingService,
+            catalog,
+            llmAssignmentService,
             services.transactionValidatorService,
-            force,
-            dryRun,
             new TransactionHistoryService(
                 services.transactionService,
                 config.categorize.historyMonths,
                 {
                     canCarryBudget: t => services.transactionValidatorService.shouldSetBudget(t),
                 }
-            )
+            ),
+            options
         );
     }
 }

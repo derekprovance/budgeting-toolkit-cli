@@ -5,10 +5,8 @@ export interface BudgetDateOptions {
     year?: number;
 }
 
-export interface CategorizeOptions {
-    tag: string;
+export interface CategorizeCliOptions {
     mode: CategorizeMode;
     force?: boolean;
-    yes?: boolean;
     dryRun?: boolean;
 }

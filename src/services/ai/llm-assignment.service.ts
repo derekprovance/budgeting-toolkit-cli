@@ -6,6 +6,7 @@ import {
     AssignmentType,
     getFunctionSchema,
     getNoMatchValue,
+    isNoMatch,
     getSystemPrompt,
     getUserPrompt,
     parseAssignmentResponse,
@@ -31,27 +32,6 @@ export interface LLMBatchOptions {
 }
 
 /**
- * Dependencies for LLMAssignmentService (for testing)
- */
-export interface LLMAssignmentDependencies {
-    mapTransactionForLLM: (tx: TransactionSplit) => LLMTransactionData;
-    getSystemPrompt: (type: AssignmentType) => string;
-    getUserPrompt: (
-        type: AssignmentType,
-        transactions: LLMTransactionData[],
-        validOptions: string[]
-    ) => string;
-    getFunctionSchema: (type: AssignmentType, validOptions: string[]) => Anthropic.Tool;
-    parseAssignmentResponse: (
-        type: AssignmentType,
-        responseText: string,
-        expectedCount: number,
-        validOptions: string[]
-    ) => string[];
-    logger: ILogger;
-}
-
-/**
  * Unified service for LLM-powered transaction assignments.
  * Handles both category and budget assignments using the same underlying logic.
  *
@@ -60,28 +40,11 @@ export interface LLMAssignmentDependencies {
  * no-match sentinel; critical errors (auth, bad request) abort the whole run.
  */
 export class LLMAssignmentService {
-    private readonly deps: LLMAssignmentDependencies;
-    private readonly batchOptions: LLMBatchOptions;
-
     constructor(
         private readonly claudeClient: ClaudeClient,
-        batchOptions?: Partial<LLMBatchOptions>,
-        deps?: Partial<LLMAssignmentDependencies>
-    ) {
-        this.batchOptions = {
-            batchSize: batchOptions?.batchSize ?? 10,
-            maxConcurrent: batchOptions?.maxConcurrent ?? 3,
-        };
-        this.deps = {
-            mapTransactionForLLM,
-            getSystemPrompt,
-            getUserPrompt,
-            getFunctionSchema,
-            parseAssignmentResponse,
-            logger: defaultLogger,
-            ...deps,
-        };
-    }
+        private readonly batchOptions: LLMBatchOptions,
+        private readonly logger: ILogger = defaultLogger
+    ) {}
 
     /**
      * Assigns categories or budgets to transactions using Claude AI.
@@ -90,16 +53,18 @@ export class LLMAssignmentService {
      * @param transactions - Array of transactions to process
      * @param validOptions - Array of valid categories or budgets (the no-match
      * sentinel is handled internally — callers should not append it)
-     * @returns Array of assigned values in the same order as transactions
+     * @returns One value per transaction, in order; `undefined` where no
+     *   option fits or the chunk degraded
+     * @throws on a critical error (see isCriticalError) or when `validOptions` is empty
      */
     async assign(
         type: AssignmentType,
         transactions: TransactionSplit[],
         validOptions: string[]
-    ): Promise<string[]> {
+    ): Promise<(string | undefined)[]> {
         // Validation
         if (!transactions || transactions.length === 0) {
-            this.deps.logger.warn(`No transactions provided for ${type} assignment`);
+            this.logger.warn(`No transactions provided for ${type} assignment`);
             return [];
         }
 
@@ -107,7 +72,7 @@ export class LLMAssignmentService {
             throw new Error(`No valid ${type} options provided`);
         }
 
-        this.deps.logger.debug(
+        this.logger.debug(
             {
                 type,
                 transactionCount: transactions.length,
@@ -119,12 +84,12 @@ export class LLMAssignmentService {
         );
 
         // Map transactions to LLM format and chunk them
-        const transactionData = transactions.map(this.deps.mapTransactionForLLM);
+        const transactionData = transactions.map(mapTransactionForLLM);
         const chunks = LLMAssignmentService.chunk(transactionData, this.batchOptions.batchSize);
 
         // Built once — identical across chunks (stable prompt prefix)
-        const systemPrompt = this.deps.getSystemPrompt(type);
-        const functionSchema = this.deps.getFunctionSchema(type, validOptions);
+        const systemPrompt = getSystemPrompt(type);
+        const functionSchema = getFunctionSchema(type, validOptions);
 
         // Bounded worker pool with order-preserving results
         const results: ChunkResult[] = new Array(chunks.length);
@@ -161,7 +126,7 @@ export class LLMAssignmentService {
             .reduce((sum, result) => sum + result.values.length, 0);
 
         if (degradedTransactionCount > 0) {
-            this.deps.logger.warn(
+            this.logger.warn(
                 {
                     type,
                     degradedTransactionCount,
@@ -175,7 +140,7 @@ export class LLMAssignmentService {
 
         // Log each transaction's AI assignment for debugging
         assignments.forEach((assignment, index) => {
-            this.deps.logger.trace(
+            this.logger.trace(
                 {
                     index,
                     transactionDescription: transactionData[index]?.description,
@@ -186,7 +151,7 @@ export class LLMAssignmentService {
             );
         });
 
-        this.deps.logger.debug(
+        this.logger.debug(
             {
                 type,
                 assignedCount: assignments.length,
@@ -195,7 +160,9 @@ export class LLMAssignmentService {
             `${type} assignment completed`
         );
 
-        return assignments;
+        return assignments.map(assignment =>
+            isNoMatch(type, assignment) ? undefined : assignment
+        );
     }
 
     /**
@@ -211,21 +178,21 @@ export class LLMAssignmentService {
         chunkIndex: number
     ): Promise<ChunkResult> {
         try {
-            const userPrompt = this.deps.getUserPrompt(type, chunk, validOptions);
+            const userPrompt = getUserPrompt(type, chunk, validOptions);
 
-            const result = await this.claudeClient.chat([{ role: 'user', content: userPrompt }], {
+            const result = await this.claudeClient.callTool({
                 systemPrompt,
-                tools: [functionSchema],
-                toolChoice: { type: 'tool', name: functionSchema.name },
+                userPrompt,
+                tool: functionSchema,
             });
 
             return {
-                values: this.deps.parseAssignmentResponse(type, result, chunk.length, validOptions),
+                values: parseAssignmentResponse(type, result, chunk.length),
                 degraded: false,
             };
         } catch (error) {
             if (this.isCriticalError(error)) {
-                this.deps.logger.error(
+                this.logger.error(
                     {
                         error: error instanceof Error ? error.message : String(error),
                         type,
@@ -237,7 +204,7 @@ export class LLMAssignmentService {
                 throw error;
             }
 
-            this.deps.logger.warn(
+            this.logger.warn(
                 {
                     error: error instanceof Error ? error.message : String(error),
                     type,
@@ -278,28 +245,6 @@ export class LLMAssignmentService {
             error instanceof Anthropic.BadRequestError ||
             error instanceof CircuitOpenError
         );
-    }
-
-    /**
-     * Assigns categories to transactions.
-     * Convenience method that wraps assign() with type='category'.
-     */
-    async assignCategories(
-        transactions: TransactionSplit[],
-        validCategories: string[]
-    ): Promise<string[]> {
-        return this.assign('category', transactions, validCategories);
-    }
-
-    /**
-     * Assigns budgets to transactions.
-     * Convenience method that wraps assign() with type='budget'.
-     */
-    async assignBudgets(
-        transactions: TransactionSplit[],
-        validBudgets: string[]
-    ): Promise<string[]> {
-        return this.assign('budget', transactions, validBudgets);
     }
 
     private static chunk<T>(array: T[], size: number): T[][] {

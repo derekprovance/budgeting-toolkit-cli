@@ -1,197 +1,140 @@
-import {
-    BudgetRead,
-    CategoryProperties,
-    TransactionRead,
-    TransactionSplit,
-} from '@derekprovance/firefly-iii-sdk';
+import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import ora from 'ora';
 import { logger } from '../logger.js';
-import { ICategoryService } from './core/category.service.interface.js';
 import { TransactionService } from './core/transaction.service.js';
-import { IBudgetService } from './core/budget.service.interface.js';
-import {
-    AIResponse,
-    LLMTransactionProcessingService,
-} from './ai/llm-transaction-processing.service.js';
+import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
+import { LLMAssignmentService } from './ai/llm-assignment.service.js';
+import { AssignmentType } from './ai/utils/prompt-templates.js';
 import { CategorizeMode } from '../types/enums.js';
 import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 import { CategorizeStatus } from '../types/enums.js';
-import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import {
     InteractiveTransactionUpdater,
     PreparedUpdate,
 } from './interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../types/result.type.js';
-import { isCertificateError } from '../utils/error-detection.utils.js';
 import { TransactionHistoryService } from './transaction-history.service.js';
+import { ReviewCancelledError } from './user-input.service.js';
+import {
+    CategorizeOptions,
+    JournaledTransaction,
+    Suggestion,
+    SuggestionSource,
+    hasJournalId,
+} from '../types/categorize.types.js';
 
-interface SuggestionCounts {
-    category: { history: number; ai: number };
-    budget: { history: number; ai: number };
+/** What one transaction needs once history has answered what it can */
+interface SuggestionPlan {
+    readonly transaction: JournaledTransaction;
+    /** History values that still name an existing category or budget */
+    readonly remembered: { readonly category?: string; readonly budget?: string };
+    readonly askAI: { readonly category: boolean; readonly budget: boolean };
 }
 
-interface TransactionError {
-    transaction: TransactionSplit;
-    error: TransactionValidationError;
-}
-
-export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrchestrator {
+export class AITransactionUpdateOrchestrator {
     constructor(
         private readonly transactionService: TransactionService,
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
-        private readonly categoryService: ICategoryService,
-        private readonly budgetService: IBudgetService,
-        private readonly llmService: LLMTransactionProcessingService,
+        private readonly catalog: CategoryBudgetCatalog,
+        private readonly llm: LLMAssignmentService,
         private readonly validator: ITransactionValidatorService,
-        private readonly force: boolean = false,
-        private readonly dryRun: boolean = false,
-        private readonly history?: TransactionHistoryService
+        private readonly history: TransactionHistoryService,
+        private readonly options: CategorizeOptions
     ) {}
 
     async updateTransactionsByTag(
         tag: string,
         updateMode: CategorizeMode
     ): Promise<CategorizeStatusDto> {
-        try {
-            if (!(await this.transactionService.tagExists(tag))) {
-                logger.debug(
-                    {
-                        tag,
-                        updateMode,
-                        dryRun: this.dryRun,
-                    },
-                    'Tag does not exist'
-                );
-                return {
-                    status: CategorizeStatus.NO_TAG,
-                    transactionsUpdated: 0,
-                };
-            }
-
-            const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
-
-            const transactions = unfilteredTransactions.filter(t =>
-                this.validator.shouldProcessTransaction(t, this.force)
-            );
-
-            if (!transactions.length) {
-                logger.debug(
-                    {
-                        tag,
-                        updateMode,
-                        dryRun: this.dryRun,
-                        totalTransactions: unfilteredTransactions.length,
-                        filteredTransactions: transactions.length,
-                    },
-                    'No valid transactions found for tag'
-                );
-                return {
-                    status: CategorizeStatus.EMPTY_TAG,
-                    transactionsUpdated: 0,
-                };
-            }
-
+        if (!(await this.transactionService.tagExists(tag))) {
             logger.debug(
                 {
                     tag,
                     updateMode,
-                    dryRun: this.dryRun,
-                    totalTransactions: transactions.length,
                 },
-                'Processing transactions'
+                'Tag does not exist'
             );
+            return { status: CategorizeStatus.NO_TAG, transactionsUpdated: 0, errors: [] };
+        }
 
-            // History spans up to years of transactions, so it is fetched
-            // alongside the category and budget lists rather than after them
-            const historyReady = this.loadHistory(transactions);
+        const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
 
-            let categories: CategoryProperties[] | undefined;
-            if (updateMode !== CategorizeMode.Budget) {
-                categories = await this.categoryService.getCategories();
-            }
+        const transactions = unfilteredTransactions
+            .filter(t => this.validator.shouldProcessTransaction(t, this.options.force))
+            .filter(t => this.isUpdatable(t));
 
-            let budgets: BudgetRead[] | undefined;
-            if (updateMode !== CategorizeMode.Category) {
-                budgets = await this.budgetService.getBudgets();
-            }
-
-            // Show spinner while history and the AI produce suggestions
-            const spinner = ora(
-                `Finding suggestions for ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}...`
-            ).start();
-
-            try {
-                const aiResults = await this.getAIResultsForTransactions(
-                    transactions,
-                    updateMode,
-                    categories,
-                    budgets,
-                    historyReady
-                );
-
-                // Cleared without a summary: the prompts follow straight away
-                spinner.stop();
-
-                const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
-                    transactions,
-                    aiResults
-                );
-
-                // Display validation errors to user
-                if (errors.length > 0) {
-                    this.displayValidationErrors(errors);
-                }
-
-                logger.debug(
-                    {
-                        tag,
-                        updateMode,
-                        dryRun: this.dryRun,
-                        totalTransactions: transactions.length,
-                        updatedTransactions: updatedTransactions.length,
-                        validationErrors: errors.length,
-                        categories: categories?.length,
-                        budgets: budgets?.length,
-                    },
-                    'Transaction update complete'
-                );
-
-                return {
-                    status: CategorizeStatus.HAS_RESULTS,
-                    transactionsUpdated: updatedTransactions.length,
-                    transactionErrors: errors.length,
-                };
-            } catch (aiError) {
-                spinner.fail('AI processing failed');
-                throw aiError;
-            }
-        } catch (ex) {
-            // Re-throw certificate/network errors so the command layer can display
-            // actionable remediation guidance with the full error context
-            if (isCertificateError(ex)) {
-                throw ex;
-            }
-
-            logger.error(
+        if (!transactions.length) {
+            logger.debug(
                 {
                     tag,
                     updateMode,
-                    dryRun: this.dryRun,
-                    error: ex instanceof Error ? ex.message : 'Unknown error',
+                    totalTransactions: unfilteredTransactions.length,
+                    filteredTransactions: transactions.length,
                 },
-                'Failed to update transactions'
+                'No valid transactions found for tag'
             );
-
-            return {
-                status: CategorizeStatus.PROCESSING_FAILED,
-                transactionsUpdated: 0,
-                error:
-                    ex instanceof Error
-                        ? ex.message
-                        : 'Unknown error occurred while processing transactions',
-            };
+            return { status: CategorizeStatus.EMPTY_TAG, transactionsUpdated: 0, errors: [] };
         }
+
+        logger.debug(
+            {
+                tag,
+                updateMode,
+                totalTransactions: transactions.length,
+            },
+            'Processing transactions'
+        );
+
+        const suggestions = await this.suggestWithSpinner(transactions, updateMode);
+        const { prepared, invalid } = this.prepare(suggestions);
+        const { updated, failed } = await this.review(prepared);
+
+        logger.debug(
+            {
+                tag,
+                updateMode,
+                totalTransactions: transactions.length,
+                updatedTransactions: updated.length,
+                invalid: invalid.length,
+                failed: failed.length,
+            },
+            'Transaction update complete'
+        );
+
+        return {
+            status: CategorizeStatus.HAS_RESULTS,
+            transactionsUpdated: updated.length,
+            errors: [...invalid, ...failed],
+        };
+    }
+
+    private async suggestWithSpinner(
+        transactions: JournaledTransaction[],
+        updateMode: CategorizeMode
+    ): Promise<Suggestion[]> {
+        const count = transactions.length;
+        const spinner = ora(
+            `Finding suggestions for ${count} transaction${count !== 1 ? 's' : ''}...`
+        ).start();
+        try {
+            return await this.suggest(transactions, updateMode);
+        } finally {
+            // Cleared without a summary: the prompts follow straight away
+            spinner.stop();
+        }
+    }
+
+    /** Firefly can only key and update a split with a journal id */
+    private isUpdatable(transaction: TransactionSplit): transaction is JournaledTransaction {
+        if (!hasJournalId(transaction)) {
+            logger.warn(
+                { description: transaction.description },
+                'Skipping transaction without transaction_journal_id'
+            );
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -199,13 +142,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
      * over the AI, so a failed fetch only costs its suggestions: it is logged
      * and the index stays empty. Never rejects.
      */
-    private async loadHistory(transactions: TransactionSplit[]): Promise<void> {
-        if (!this.history) {
-            return;
-        }
-        const own = new Set(
-            transactions.flatMap(t => (t.transaction_journal_id ? [t.transaction_journal_id] : []))
-        );
+    private async loadHistory(transactions: JournaledTransaction[]): Promise<void> {
+        const own = new Set(transactions.map(t => t.transaction_journal_id));
         try {
             await this.history.load(own);
         } catch (error) {
@@ -216,290 +154,172 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         }
     }
 
-    private async getAIResultsForTransactions(
-        transactions: TransactionSplit[],
-        updateMode: CategorizeMode,
-        categories?: CategoryProperties[],
-        budgets?: BudgetRead[],
-        historyReady: Promise<void> = this.loadHistory(transactions)
-    ): Promise<AIResponse> {
-        // The no-match sentinel is handled inside LLMAssignmentService — plain
-        // option lists are all that's needed here
-        const categoryNames = categories?.map(c => c.name);
-        const budgetNames = budgets?.map(b => b.attributes.name);
-
-        logger.debug(
-            {
-                updateMode,
-                transactionCount: transactions.length,
-                categoryCount: categoryNames?.length,
-                budgetCount: budgetNames?.length,
-            },
-            'Getting AI results for transactions'
+    /** Suggestions for `transactions`: from history where it can, else from the AI */
+    private async suggest(
+        transactions: JournaledTransaction[],
+        updateMode: CategorizeMode
+    ): Promise<Suggestion[]> {
+        await this.loadHistory(transactions);
+        const plans = transactions.flatMap(t => this.plan(t, updateMode) ?? []);
+        const aiCategories = await this.askAI(
+            'category',
+            plans.filter(p => p.askAI.category).map(p => p.transaction)
         );
-
-        // Transactions without a journal ID can't be keyed or updated — drop them
-        // up front so they don't collapse onto one key and fail the count check
-        const identifiableTransactions = transactions.filter(t => {
-            if (t.transaction_journal_id) {
-                return true;
-            }
-            logger.warn(
-                { description: t.description },
-                'Skipping transaction without transaction_journal_id'
-            );
-            return false;
-        });
-
-        // Group B: has category, no budget — budget assignment only
-        const budgetOnlySet = new Set(
-            this.force
-                ? []
-                : identifiableTransactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
+        const aiBudgets = await this.askAI(
+            'budget',
+            plans.filter(p => p.askAI.budget).map(p => p.transaction)
         );
-
-        await historyReady;
-
-        const results: AIResponse = {};
-        const counts: SuggestionCounts = {
-            category: { history: 0, ai: 0 },
-            budget: { history: 0, ai: 0 },
-        };
-        const needsBoth: TransactionSplit[] = [];
-        const needsCategory: TransactionSplit[] = [];
-        const needsBudget: TransactionSplit[] = [];
-
-        for (const t of identifiableTransactions) {
-            // Group A gets every field the mode asks for. Group B keeps its
-            // category, and category mode leaves it alone entirely
-            const isBudgetOnly = budgetOnlySet.has(t);
-            const wantsCategory = !!categoryNames && !isBudgetOnly;
-            // The validator's rule: never a deposit (Firefly drops the budget,
-            // VERIFICATION.md V8), a bill-linked or a disposable-income one
-            const wantsBudget = !!budgetNames && this.validator.shouldSetBudget(t);
-            if (!wantsCategory && !wantsBudget) {
-                continue;
-            }
-
-            // A history value is only used while it still names an existing
-            // category or budget; otherwise the field falls through to the AI
-            const suggestion = this.history?.suggest(t);
-            const category = wantsCategory
-                ? TransactionHistoryService.resolveName(suggestion?.category, categoryNames)
-                : undefined;
-            const budget = wantsBudget
-                ? TransactionHistoryService.resolveName(suggestion?.budget, budgetNames)
-                : undefined;
-            // A match that was deliberately left unbudgeted last time is the
-            // answer: keep it unbudgeted rather than asking the AI for one
-            const keptUnbudgeted = wantsBudget && suggestion?.budget === null;
-
-            const missingCategory = wantsCategory && !category;
-            const missingBudget = wantsBudget && !budget && !keptUnbudgeted;
-
-            if (wantsCategory) counts.category[missingCategory ? 'ai' : 'history']++;
-            if (wantsBudget) counts.budget[missingBudget ? 'ai' : 'history']++;
-
-            if (!category && !budget && !missingCategory && !missingBudget) {
-                // Nothing to suggest and nothing left to ask
-                continue;
-            }
-
-            results[t.transaction_journal_id as string] = {
-                ...(category && { category }),
-                ...(budget && { budget }),
-                source: {
-                    ...(category && { category: 'history' as const }),
-                    ...(budget && { budget: 'history' as const }),
-                },
-            };
-
-            if (missingCategory && missingBudget) needsBoth.push(t);
-            else if (missingCategory) needsCategory.push(t);
-            else if (missingBudget) needsBudget.push(t);
-        }
-
-        const aiCalls: Array<[TransactionSplit[], string[] | undefined, string[] | undefined]> = [
-            [needsBoth, categoryNames, budgetNames],
-            [needsCategory, categoryNames, undefined],
-            [needsBudget, undefined, budgetNames],
-        ];
-
-        for (const [batch, categoryOptions, budgetOptions] of aiCalls) {
-            if (batch.length === 0) {
-                continue;
-            }
-
-            const aiResults = await this.llmService.processTransactions(
-                batch,
-                categoryOptions,
-                budgetOptions
-            );
-
-            if (Object.keys(aiResults).length !== batch.length) {
-                const error = new Error(
-                    `LLM categorization result count (${
-                        Object.keys(aiResults).length
-                    }) doesn't match transaction count (${batch.length})`
-                );
-                logger.error(
-                    {
-                        expectedCount: batch.length,
-                        actualCount: Object.keys(aiResults).length,
-                    },
-                    'AI result count mismatch'
-                );
-                throw error;
-            }
-
-            for (const t of batch) {
-                const journalId = t.transaction_journal_id as string;
-                const ai = aiResults[journalId] ?? {};
-                const entry = results[journalId];
-                if (!entry) {
-                    continue;
-                }
-                if (categoryOptions && ai.category) {
-                    entry.category = ai.category;
-                    entry.source = { ...entry.source, category: 'ai' };
-                }
-                if (budgetOptions && ai.budget) {
-                    entry.budget = ai.budget;
-                    entry.source = { ...entry.source, budget: 'ai' };
-                }
-            }
-        }
-
-        logger.debug(counts, 'Suggestions resolved');
-
-        return results;
+        return plans.flatMap(
+            p =>
+                mergeSuggestion(p, aiCategories.get(p.transaction), aiBudgets.get(p.transaction)) ??
+                []
+        );
     }
 
-    private async updateTransactionsWithAIResults(
-        transactions: TransactionSplit[],
-        aiResults: AIResponse
-    ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
-        logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
-        const results: TransactionRead[] = [];
-        const errors: TransactionError[] = [];
-
-        try {
-            // Every suggestion is validated before the first prompt, so the
-            // `[index/total]` counter counts exactly the prompts that follow:
-            // a suggestion that fails validation or changes nothing never
-            // reaches the user and must not take a number
-            const prepared: PreparedUpdate[] = [];
-            for (const transaction of transactions) {
-                const journalId = transaction.transaction_journal_id;
-                if (!journalId) {
-                    logger.debug(
-                        { description: transaction.description },
-                        'Transaction missing journal ID:'
-                    );
-                    continue;
-                }
-                if (!aiResults[journalId]) {
-                    logger.debug(
-                        { description: transaction.description },
-                        'No AI results for transaction:'
-                    );
-                    continue;
-                }
-
-                const prepareResult = await this.interactiveTransactionUpdater.prepareUpdate(
-                    transaction,
-                    aiResults
-                );
-                if (!prepareResult.ok) {
-                    errors.push({ transaction, error: prepareResult.error });
-                } else if (prepareResult.value) {
-                    prepared.push(prepareResult.value);
-                }
-            }
-
-            for (const [i, update] of prepared.entries()) {
-                const updateResult = await this.interactiveTransactionUpdater.applyUpdate(update, {
-                    index: i + 1,
-                    total: prepared.length,
-                });
-
-                if (updateResult.ok) {
-                    if (updateResult.value) {
-                        results.push(updateResult.value);
-                    }
-                } else if (updateResult.error) {
-                    errors.push({
-                        transaction: update.transaction,
-                        error: updateResult.error,
-                    });
-
-                    if (updateResult.error.message.includes('SIGINT')) {
-                        logger.debug(
-                            update.transaction,
-                            'Transaction update(s) terminated with SIGINT'
-                        );
-                        break;
-                    }
-                }
-            }
-
-            const totalTransactions = transactions.length;
-            const updatedCount = results.length;
-            const errorCount = errors.length;
-            const skippedCount = totalTransactions - updatedCount - errorCount;
-
-            logger.debug(
-                {
-                    totalTransactions,
-                    updated: updatedCount,
-                    skipped: skippedCount,
-                    validationErrors: errorCount,
-                },
-                `${this.dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
-            );
-
-            if (errorCount > 0) {
-                logger.warn(
-                    {
-                        errorCount,
-                        errors: errors.map(e => ({
-                            description: e.transaction.description,
-                            field: e.error?.field,
-                            message: e.error?.message,
-                        })),
-                    },
-                    'Some transactions failed validation'
-                );
-            }
-
-            return { updatedTransactions: results, errors };
-        } catch (err) {
-            logger.error(
-                { error: err instanceof Error ? err.message : err },
-                'ERROR in updateTransactionsWithAIResults'
-            );
-            throw err;
+    /** Which fields `transaction` needs, what history says, and what is left for the AI */
+    private plan(
+        transaction: JournaledTransaction,
+        updateMode: CategorizeMode
+    ): SuggestionPlan | undefined {
+        // A transaction that has a category but no budget keeps its category
+        // unless --force; category mode leaves it alone entirely
+        const wantsCategory =
+            updateMode !== CategorizeMode.Budget &&
+            (this.options.force || !this.validator.isBudgetOnlyCandidate(transaction));
+        // The validator's rule: never a deposit (Firefly drops the budget,
+        // VERIFICATION.md V8), a bill-linked or a disposable-income one
+        const wantsBudget =
+            updateMode !== CategorizeMode.Category && this.validator.shouldSetBudget(transaction);
+        if (!wantsCategory && !wantsBudget) {
+            return undefined;
         }
+
+        // A history value is only used while it still names an existing
+        // category or budget; otherwise the field falls through to the AI
+        const remembered = this.history.suggest(transaction);
+        const category = wantsCategory
+            ? this.catalog.findCategory(remembered?.category)?.name
+            : undefined;
+        const budget = wantsBudget
+            ? this.catalog.findBudget(remembered?.budget)?.attributes.name
+            : undefined;
+        // A match that was deliberately left unbudgeted last time is the
+        // answer: keep it unbudgeted rather than asking the AI for one
+        const keptUnbudgeted = remembered?.budget === null;
+
+        return {
+            transaction,
+            remembered: { category, budget },
+            askAI: {
+                category: wantsCategory && !category,
+                budget: wantsBudget && !budget && !keptUnbudgeted,
+            },
+        };
+    }
+
+    /** The AI's answer for each of `transactions` it found a match for */
+    private async askAI(
+        type: AssignmentType,
+        transactions: JournaledTransaction[]
+    ): Promise<Map<JournaledTransaction, string>> {
+        const options =
+            type === 'category' ? this.catalog.categoryNames() : this.catalog.budgetNames();
+        if (!transactions.length || !options.length) {
+            return new Map();
+        }
+        const answers = await this.llm.assign(type, transactions, options);
+        return new Map(
+            transactions.flatMap((t, i) => {
+                const answer = answers[i];
+                return answer ? [[t, answer] as const] : [];
+            })
+        );
     }
 
     /**
-     * Displays user-friendly validation error messages
+     * Validates every suggestion before the first prompt, so the
+     * `[index/total]` counter counts exactly the prompts that follow: a
+     * suggestion that fails validation or changes nothing never reaches the
+     * user and must not take a number.
      */
-    private displayValidationErrors(errors: TransactionError[]): void {
-        if (errors.length === 0) return;
-
-        console.error(`\n⚠️  ${errors.length} transaction(s) failed validation:\n`);
-
-        for (const { transaction, error } of errors) {
-            console.error(`  • ${transaction.description || 'Unknown transaction'}`);
-            console.error(`    ${error.userMessage}`);
-            if (error.details?.suggestedCategory || error.details?.suggestedBudget) {
-                const suggested = error.details.suggestedCategory || error.details.suggestedBudget;
-                console.error(`    Suggested: "${suggested}"`);
+    private prepare(suggestions: Suggestion[]): {
+        prepared: PreparedUpdate[];
+        invalid: TransactionValidationError[];
+    } {
+        const prepared: PreparedUpdate[] = [];
+        const invalid: TransactionValidationError[] = [];
+        for (const suggestion of suggestions) {
+            const result = this.interactiveTransactionUpdater.prepareUpdate(suggestion);
+            if (!result.ok) {
+                invalid.push(result.error);
+            } else if (result.value) {
+                prepared.push(result.value);
             }
-            console.error('');
         }
-
-        console.error('Please check your categories and budgets in Firefly III.');
+        return { prepared, invalid };
     }
+
+    /** Shows each prepared update in turn and applies the user's decision */
+    private async review(prepared: PreparedUpdate[]): Promise<{
+        updated: TransactionRead[];
+        failed: TransactionValidationError[];
+    }> {
+        const updated: TransactionRead[] = [];
+        const failed: TransactionValidationError[] = [];
+        for (const [i, update] of prepared.entries()) {
+            let result;
+            try {
+                result = await this.interactiveTransactionUpdater.applyUpdate(update, {
+                    index: i + 1,
+                    total: prepared.length,
+                });
+            } catch (error) {
+                if (error instanceof ReviewCancelledError) {
+                    logger.debug('Review cancelled by the user');
+                    break;
+                }
+                throw error;
+            }
+            if (!result.ok) {
+                failed.push(result.error);
+            } else if (result.value) {
+                updated.push(result.value);
+            }
+        }
+        return { updated, failed };
+    }
+}
+
+/**
+ * One transaction's suggestion: each field from history when it has a value,
+ * else from the AI. Undefined when neither suggests anything.
+ */
+function mergeSuggestion(
+    plan: SuggestionPlan,
+    aiCategory: string | undefined,
+    aiBudget: string | undefined
+): Suggestion | undefined {
+    const category = pickSource(plan.remembered.category, aiCategory);
+    const budget = pickSource(plan.remembered.budget, aiBudget);
+    if (!category && !budget) {
+        return undefined;
+    }
+    return {
+        transaction: plan.transaction,
+        ...(category && { category: category.name }),
+        ...(budget && { budget: budget.name }),
+        source: {
+            ...(category && { category: category.source }),
+            ...(budget && { budget: budget.source }),
+        },
+    };
+}
+
+function pickSource(
+    remembered: string | undefined,
+    ai: string | undefined
+): { name: string; source: SuggestionSource } | undefined {
+    if (remembered) return { name: remembered, source: 'history' };
+    if (ai) return { name: ai, source: 'ai' };
+    return undefined;
 }

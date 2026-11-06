@@ -24,7 +24,7 @@ describe('TransactionHistoryService', () => {
         return new TransactionHistoryService(
             { getTransactionsInRange } as unknown as ITransactionService,
             months,
-            { logger, now: at }
+            { logger, now: at, canCarryBudget: tx => tx.type === 'withdrawal' }
         );
     };
 
@@ -221,23 +221,5 @@ describe('TransactionHistoryService', () => {
 
         expect(getTransactionsInRange).not.toHaveBeenCalled();
         expect(history.suggest(incoming('Anything'))).toBeUndefined();
-    });
-
-    describe('resolveName', () => {
-        it('returns the canonical spelling, case-insensitively', () => {
-            expect(TransactionHistoryService.resolveName('groceries', ['Groceries'])).toBe(
-                'Groceries'
-            );
-        });
-
-        it('returns undefined when the name is no longer listed', () => {
-            expect(TransactionHistoryService.resolveName('Gone', ['Groceries'])).toBeUndefined();
-            expect(TransactionHistoryService.resolveName('Gone', undefined)).toBeUndefined();
-        });
-
-        it('returns undefined for an unbudgeted (null) or missing name', () => {
-            expect(TransactionHistoryService.resolveName(null, ['Food'])).toBeUndefined();
-            expect(TransactionHistoryService.resolveName(undefined, ['Food'])).toBeUndefined();
-        });
     });
 });

@@ -3,6 +3,8 @@ import { CategorizeMode } from '../types/enums.js';
 import { CategorizeStatus } from '../types/enums.js';
 import { Command } from '../types/interface/command.interface.js';
 import { CategorizeDisplayService } from '../services/display/categorize-display.service.js';
+import { isCertificateError } from '../utils/error-detection.utils.js';
+import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 
 interface UpdateTransactionsParams {
     tag: string;
@@ -20,41 +22,40 @@ export class CategorizeCommand implements Command<void, UpdateTransactionsParams
     async execute({ tag, updateMode, dryRun = false }: UpdateTransactionsParams): Promise<void> {
         console.log(this.displayService.formatProcessingHeader(tag, updateMode, dryRun));
 
+        const results = await this.updateTransactionsByTag(tag, updateMode);
+
+        if (results.status === CategorizeStatus.NO_TAG) {
+            console.log(this.displayService.formatTagNotFound(tag));
+            return;
+        }
+
+        if (results.status === CategorizeStatus.EMPTY_TAG) {
+            console.log(this.displayService.formatEmptyTag(tag));
+            return;
+        }
+
+        const prefix = dryRun ? '[DRYRUN] ' : '';
+        console.log(`\n${prefix}Updated ${results.transactionsUpdated} Transaction(s)!`);
+
+        if (results.errors.length > 0) {
+            console.error(this.displayService.formatTransactionErrors(results.errors));
+        }
+    }
+
+    /** cli.ts reports a failure itself; only certificate remediation is added here */
+    private async updateTransactionsByTag(
+        tag: string,
+        updateMode: CategorizeMode
+    ): Promise<CategorizeStatusDto> {
         try {
-            const results = await this.aiTransactionUpdateOrchestrator.updateTransactionsByTag(
+            return await this.aiTransactionUpdateOrchestrator.updateTransactionsByTag(
                 tag,
                 updateMode
             );
-
-            if (results.status === CategorizeStatus.NO_TAG) {
-                console.log(this.displayService.formatTagNotFound(tag));
-                return;
-            }
-
-            if (results.status === CategorizeStatus.EMPTY_TAG) {
-                console.log(this.displayService.formatEmptyTag(tag));
-                return;
-            }
-
-            if (results.status === CategorizeStatus.PROCESSING_FAILED) {
-                console.log(
-                    this.displayService.formatError(
-                        new Error(results.error?.trim() || 'Processing failed')
-                    )
-                );
-                return;
-            }
-
-            const prefix = dryRun ? '[DRYRUN] ' : '';
-            console.log(`\n${prefix}Updated ${results.transactionsUpdated} Transaction(s)!`);
-
-            if (results.transactionErrors && results.transactionErrors > 0) {
-                console.log(
-                    `\n⚠️  Warning: ${results.transactionErrors} transaction(s) failed to update. Check logs for details.`
-                );
-            }
         } catch (error) {
-            console.log(this.displayService.formatError(error));
+            if (isCertificateError(error)) {
+                console.error(this.displayService.formatCertificateHelp());
+            }
             throw error;
         }
     }

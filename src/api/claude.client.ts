@@ -1,30 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '../logger.js';
-import { LLMConfig as LLMConfigType } from '../config/config.types.js';
-
-/** Kept as an alias so call sites and tests keep their import */
-export type ChatMessage = Anthropic.MessageParam;
+import { ClaudeApiConfig, LLMConfig } from '../config/config.types.js';
 
 export interface ClaudeClientConfig {
-    apiKey?: string;
-    baseURL?: string;
-    /** Forwarded to the SDK client */
-    timeout?: number;
-    /** Retries after the first attempt — owned entirely by the SDK, which
+    /** Transport settings; `maxRetries` is owned entirely by the SDK, which
      * honors retry-after and only retries retryable failures */
-    maxRetries?: number;
-    model: string;
-    maxTokens: number;
+    api: ClaudeApiConfig;
+    llm: LLMConfig;
 }
 
-export interface ChatOptions {
-    systemPrompt?: string;
-    tools?: Anthropic.Tool[];
-    toolChoice?: Anthropic.ToolChoice;
-    maxTokens?: number;
-    model?: string;
-    /** Overrides {@link DEFAULT_EFFORT} for a single request */
-    effort?: NonNullable<Anthropic.OutputConfig['effort']>;
+export interface ToolCall {
+    systemPrompt: string;
+    userPrompt: string;
+    /** Forced: the model must answer by calling this tool */
+    tool: Anthropic.Tool;
 }
 
 /**
@@ -38,7 +27,7 @@ export interface ChatOptions {
  * is rejected outright on some current models, whereas every one of them accepts
  * a low effort level.
  */
-const DEFAULT_EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
+const EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
 
 /** Thrown when the circuit breaker rejects a request without calling the API */
 export class CircuitOpenError extends Error {
@@ -52,7 +41,7 @@ export class CircuitOpenError extends Error {
  * refused, or missing the forced tool call) */
 export class ClaudeResponseError extends Error {
     constructor(
-        public readonly reason: 'truncated' | 'refusal' | 'missing_tool_use' | 'empty',
+        public readonly reason: 'truncated' | 'refusal' | 'missing_tool_use',
         message: string
     ) {
         super(message);
@@ -76,9 +65,8 @@ export class ClaudeClient {
     /** Set once a model rejects output_config, so later chunks skip it */
     private effortUnsupported = false;
 
-    private client: Anthropic;
-    private config: Required<Pick<ClaudeClientConfig, 'model' | 'maxTokens'>> &
-        Omit<ClaudeClientConfig, 'model' | 'maxTokens'>;
+    private readonly client: Anthropic;
+    private readonly llmConfig: LLMConfig;
     private rateLimitState: RateLimitState;
     private circuitBreaker: CircuitBreakerState = {
         failures: 0,
@@ -87,67 +75,51 @@ export class ClaudeClient {
         probeInFlight: false,
     };
 
-    // Minimal fallbacks for direct construction in tests; production always
-    // passes model/maxTokens from configuration (see llm.config.ts)
-    private static readonly DEFAULT_MODEL = 'claude-sonnet-5';
-    private static readonly DEFAULT_MAX_TOKENS = 2000;
-
-    constructor(
-        config: Partial<ClaudeClientConfig> = {},
-        client?: Anthropic,
-        private readonly llmConfig?: LLMConfigType
-    ) {
-        this.config = {
-            ...config,
-            model: config.model ?? ClaudeClient.DEFAULT_MODEL,
-            maxTokens: config.maxTokens ?? ClaudeClient.DEFAULT_MAX_TOKENS,
-        };
+    /** @param client Replaces the SDK client built from `config.api`; tests pass a fake */
+    constructor(config: ClaudeClientConfig, client?: Anthropic) {
+        this.llmConfig = config.llm;
         this.client =
-            client ||
+            client ??
             new Anthropic({
-                apiKey: this.config.apiKey || process.env.ANTHROPIC_API_KEY || '',
-                baseURL: this.config.baseURL,
-                maxRetries: this.config.maxRetries,
-                timeout: this.config.timeout,
+                apiKey: config.api.apiKey,
+                baseURL: config.api.baseURL,
+                maxRetries: config.api.maxRetries,
+                timeout: config.api.timeout,
             });
-
-        // Initialize rate limit state from config
-        const maxTokens = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
         this.rateLimitState = {
-            tokens: maxTokens,
+            tokens: this.llmConfig.rateLimit.maxTokensPerMinute,
             lastRefill: Date.now(),
         };
 
-        logger.debug(`Initializing AI Client with model: ${this.config.model}`);
+        logger.debug(`Initializing AI Client with model: ${this.llmConfig.model}`);
     }
 
     /**
-     * Sends one chat request. Transport retries are handled by the SDK; the
-     * circuit breaker sees one failure per exhausted logical request.
+     * Sends one request that forces `call.tool` and returns that tool call's
+     * input as JSON. Any preamble text is ignored, so mixed content can never
+     * corrupt the structured payload. Transport retries are handled by the
+     * SDK; the circuit breaker sees one failure per exhausted logical request.
      *
-     * When a tool is forced via toolChoice, only the matching tool_use block
-     * is returned (as JSON), ignoring any preamble text — mixed content must
-     * never corrupt the structured payload.
+     * @throws ClaudeResponseError when the response is truncated, refused or
+     *   lacks the tool call; CircuitOpenError when the breaker is open
      */
-    async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+    async callTool(call: ToolCall): Promise<string> {
         this.assertCircuitAllows();
         await this.waitForRateLimit();
 
         const request: Anthropic.MessageCreateParamsNonStreaming = {
-            model: options.model ?? this.config.model,
-            max_tokens: options.maxTokens ?? this.config.maxTokens,
-            messages,
-            ...(options.systemPrompt && { system: options.systemPrompt }),
-            ...(options.tools && { tools: options.tools }),
-            ...(options.toolChoice && { tool_choice: options.toolChoice }),
+            model: this.llmConfig.model,
+            max_tokens: this.llmConfig.maxTokens,
+            messages: [{ role: 'user', content: call.userPrompt }],
+            system: call.systemPrompt,
+            tools: [call.tool],
+            tool_choice: { type: 'tool', name: call.tool.name },
         };
 
         let response: Anthropic.Message;
         try {
             response = await this.client.messages.create(
-                this.effortUnsupported
-                    ? request
-                    : { ...request, output_config: { effort: options.effort ?? DEFAULT_EFFORT } }
+                this.effortUnsupported ? request : { ...request, output_config: { effort: EFFORT } }
             );
         } catch (error) {
             // `llm.model` is user-configurable and validated only as a non-empty
@@ -179,12 +151,10 @@ export class ClaudeClient {
         // Extraction failures below are semantic and must not open it.
         this.onRequestSuccess();
 
-        const forcedToolName =
-            options.toolChoice?.type === 'tool' ? options.toolChoice.name : undefined;
-        return this.extractResult(response, forcedToolName);
+        return this.extractToolInput(response, call.tool.name);
     }
 
-    private extractResult(response: Anthropic.Message, expectedToolName?: string): string {
+    private extractToolInput(response: Anthropic.Message, toolName: string): string {
         if (response.stop_reason === 'max_tokens') {
             throw new ClaudeResponseError(
                 'truncated',
@@ -195,35 +165,22 @@ export class ClaudeClient {
             throw new ClaudeResponseError('refusal', 'Claude refused the request');
         }
 
-        if (expectedToolName) {
-            const toolBlock = response.content.find(
-                (block): block is Anthropic.ToolUseBlock =>
-                    block.type === 'tool_use' && block.name === expectedToolName
+        const toolBlock = response.content.find(
+            (block): block is Anthropic.ToolUseBlock =>
+                block.type === 'tool_use' && block.name === toolName
+        );
+        if (!toolBlock) {
+            throw new ClaudeResponseError(
+                'missing_tool_use',
+                `Forced tool "${toolName}" was not used in the response`
             );
-            if (!toolBlock) {
-                throw new ClaudeResponseError(
-                    'missing_tool_use',
-                    `Forced tool "${expectedToolName}" was not used in the response`
-                );
-            }
-            return JSON.stringify(toolBlock.input);
         }
-
-        const text = response.content
-            .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-            .map(block => block.text)
-            .join('\n');
-
-        if (!text) {
-            throw new ClaudeResponseError('empty', 'No text content found in response');
-        }
-
-        return text;
+        return JSON.stringify(toolBlock.input);
     }
 
     private async waitForRateLimit(): Promise<void> {
-        const REFILL_INTERVAL = this.llmConfig?.rateLimit?.refillInterval ?? 60000;
-        const MAX_TOKENS = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
+        const { refillInterval: REFILL_INTERVAL, maxTokensPerMinute: MAX_TOKENS } =
+            this.llmConfig.rateLimit;
 
         for (;;) {
             const now = Date.now();
@@ -256,7 +213,7 @@ export class ClaudeClient {
      */
     private assertCircuitAllows(): void {
         const now = Date.now();
-        const RESET_TIMEOUT = this.llmConfig?.circuitBreaker?.resetTimeout ?? 60000;
+        const RESET_TIMEOUT = this.llmConfig.circuitBreaker.resetTimeout;
 
         switch (this.circuitBreaker.state) {
             case 'OPEN':
@@ -292,7 +249,7 @@ export class ClaudeClient {
     }
 
     private onRequestFailure(): void {
-        const FAILURE_THRESHOLD = this.llmConfig?.circuitBreaker?.failureThreshold ?? 5;
+        const FAILURE_THRESHOLD = this.llmConfig.circuitBreaker.failureThreshold;
         this.circuitBreaker.lastFailureTime = Date.now();
         this.circuitBreaker.probeInFlight = false;
 

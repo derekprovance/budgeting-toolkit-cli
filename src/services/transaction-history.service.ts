@@ -4,7 +4,6 @@ import { localDay } from '../utils/date.utils.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 import { normalizeDescription } from '../utils/description-normalizer.js';
-import { StringUtils } from '../utils/string.utils.js';
 
 export interface HistorySuggestion {
     category?: string;
@@ -20,9 +19,8 @@ export interface TransactionHistoryOptions {
     /**
      * Whether a past transaction could have been given a budget, so its
      * missing budget means "left unbudgeted" rather than "cannot have one".
-     * Defaults to withdrawals only; the factory passes the validator's rule.
      */
-    canCarryBudget?: (transaction: TransactionSplit) => boolean;
+    canCarryBudget: (transaction: TransactionSplit) => boolean;
     logger?: ILogger;
     now?: () => Date;
 }
@@ -50,9 +48,9 @@ export class TransactionHistoryService {
     constructor(
         private readonly transactionService: ITransactionService,
         private readonly historyMonths: number,
-        options: TransactionHistoryOptions = {}
+        options: TransactionHistoryOptions
     ) {
-        this.canCarryBudget = options.canCarryBudget ?? (tx => tx.type === 'withdrawal');
+        this.canCarryBudget = options.canCarryBudget;
         this.logger = options.logger ?? defaultLogger;
         this.now = options.now ?? (() => new Date());
     }
@@ -120,21 +118,6 @@ export class TransactionHistoryService {
             ...(latest.category_name && { category: latest.category_name }),
             ...(latestBudgetable && { budget: latestBudgetable.budget_name || null }),
         };
-    }
-
-    /**
-     * The canonical spelling of `name` in `options`, compared the same way the
-     * AI result validator does; undefined when it is no longer listed.
-     */
-    static resolveName(
-        name: string | null | undefined,
-        options: string[] | undefined
-    ): string | undefined {
-        if (!name || !options) {
-            return undefined;
-        }
-        const wanted = StringUtils.normalizeForMatching(name);
-        return options.find(option => StringUtils.normalizeForMatching(option) === wanted);
     }
 
     /**

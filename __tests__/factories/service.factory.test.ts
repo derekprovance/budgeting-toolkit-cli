@@ -6,9 +6,8 @@ import type { AppConfig } from '../../src/config/config.types.js';
 /*
  * Native ESM: `jest.mock` is inert (see __tests__/meta/esm-mocking.test.ts), so
  * the real services are built here from an injected config. ConfigManager is
- * replaced only because LLMConfig.createClient still reads the singleton; the
- * real one would look for config files (and refuses to under
- * BTK_STRICT_CONFIG).
+ * replaced so the default-config fallback can be observed without the real
+ * singleton looking for config files (it refuses to under BTK_STRICT_CONFIG).
  */
 const testConfig: AppConfig = structuredClone(DEFAULT_CONFIG);
 testConfig.api.claude.apiKey = 'test-api-key';
@@ -25,7 +24,7 @@ const { AITransactionUpdateOrchestrator } =
 const { BudgetService } = await import('../../src/services/core/budget.service.js');
 const { CategoryService } = await import('../../src/services/core/category.service.js');
 
-// TransactionAIResultValidator.create loads the available budgets and
+// CategoryBudgetCatalog.load fetches the available budgets and
 // categories; stub them on the real prototypes so no API call is made.
 jest.spyOn(BudgetService.prototype, 'getBudgets').mockResolvedValue([]);
 jest.spyOn(CategoryService.prototype, 'getCategories').mockResolvedValue([]);
@@ -84,7 +83,11 @@ describe('ServiceFactory', () => {
     describe('createAITransactionUpdateOrchestrator', () => {
         it('should create AITransactionUpdateOrchestrator with default parameters', async () => {
             const services = ServiceFactory.createServices(mockApiClient, testConfig);
-            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(services);
+            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(
+                services,
+                testConfig,
+                { force: false, dryRun: false }
+            );
 
             expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
         });
@@ -93,9 +96,8 @@ describe('ServiceFactory', () => {
             const services = ServiceFactory.createServices(mockApiClient, testConfig);
             const service = await ServiceFactory.createAITransactionUpdateOrchestrator(
                 services,
-                true, // force
-                true, // dryRun
-                testConfig
+                testConfig,
+                { force: true, dryRun: true }
             );
 
             expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
