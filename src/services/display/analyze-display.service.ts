@@ -17,7 +17,7 @@ export class AnalyzeDisplayService {
      */
     formatAnalysisReport(data: AnalyzeReportDto, verbose: boolean = false): string {
         const sections = [
-            this.formatHeader(
+            DisplayFormatterUtils.createBoxHeader(
                 `Budget Finalization Report + ${this.formatMonthHeader(data.month, data.year)}`
             ),
             this.formatIncomeSection(data, verbose),
@@ -28,13 +28,6 @@ export class AnalyzeDisplayService {
         ];
 
         return sections.join('\n');
-    }
-
-    /**
-     * Formats the header box
-     */
-    private formatHeader(text: string): string {
-        return DisplayFormatterUtils.createBoxHeader(text);
     }
 
     /**
@@ -50,7 +43,7 @@ export class AnalyzeDisplayService {
     private formatIncomeSection(data: AnalyzeReportDto, verbose: boolean): string {
         const lines = [
             '',
-            this.formatSectionHeader('INCOME SOURCES'),
+            DisplayFormatterUtils.createSectionHeader('INCOME SOURCES'),
             '',
             this.formatIncomeItem(
                 'Additional Income',
@@ -74,7 +67,7 @@ export class AnalyzeDisplayService {
      * Formats the expenses and spending section
      */
     private formatExpensesSection(data: AnalyzeReportDto, verbose: boolean): string {
-        const lines = ['', this.formatSectionHeader('EXPENSES & SPENDING'), ''];
+        const lines = ['', DisplayFormatterUtils.createSectionHeader('EXPENSES & SPENDING'), ''];
 
         // Unbudgeted Expenses section
         lines.push(
@@ -99,26 +92,26 @@ export class AnalyzeDisplayService {
 
         // Use actual values from DTO
         lines.push(
-            `    Allocated:    ${this.formatCurrency(data.budgetAllocated, data.currencySymbol)}`
+            `    Allocated:    ${CurrencyUtils.formatWithSymbol(data.budgetAllocated, data.currencySymbol)}`
         );
         lines.push(
-            `    Spent:        ${this.formatCurrency(data.budgetSpent, data.currencySymbol)}`
+            `    Spent:        ${CurrencyUtils.formatWithSymbol(data.budgetSpent, data.currencySymbol)}`
         );
         lines.push(
-            `    Remaining:    ${this.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`
+            `    Remaining:    ${DisplayFormatterUtils.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`
         );
 
         // Bills performance subsection
         lines.push('');
         lines.push(chalk.bold('  Bills Performance'));
         lines.push(
-            `    Predicted:    ${this.formatCurrency(data.billComparison.predictedTotal, data.currencySymbol)}`
+            `    Predicted:    ${CurrencyUtils.formatWithSymbol(data.billComparison.predictedTotal, data.currencySymbol)}`
         );
         lines.push(
-            `    Actual:       ${this.formatCurrency(data.billComparison.actualTotal, data.currencySymbol)}`
+            `    Actual:       ${CurrencyUtils.formatWithSymbol(data.billComparison.actualTotal, data.currencySymbol)}`
         );
         lines.push(
-            `    Variance:     ${this.formatNetImpact(data.billComparison.variance, data.currencySymbol, false)}`
+            `    Variance:     ${DisplayFormatterUtils.formatNetImpact(data.billComparison.variance, data.currencySymbol, false)}`
         );
 
         if (verbose && data.billComparison.bills.length > 0) {
@@ -139,7 +132,7 @@ export class AnalyzeDisplayService {
         // so there is nothing to net off and no breakdown to print.
         if (data.disposableIncomeTransactions.length > 0) {
             const count = data.disposableIncomeTransactions.length;
-            // Net of refunds and NOT floored at zero. formatCurrency takes an
+            // Net of refunds and NOT floored at zero. formatWithSymbol takes an
             // absolute value, so the number alone renders a refund-heavy month
             // identically to a spending one — the caption below carries the
             // direction instead. Deliberately not a negative amount: this
@@ -149,7 +142,7 @@ export class AnalyzeDisplayService {
             lines.push('');
             lines.push(
                 `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
-                    `${this.formatCurrency(data.disposableIncome, data.currencySymbol)}` +
+                    `${CurrencyUtils.formatWithSymbol(data.disposableIncome, data.currencySymbol)}` +
                     `${chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)}`
             );
             lines.push(
@@ -176,17 +169,17 @@ export class AnalyzeDisplayService {
      * Formats the paycheck analysis section
      */
     private formatPaycheckSection(data: AnalyzeReportDto): string {
-        const lines = ['', this.formatSectionHeader('PAYCHECK ANALYSIS'), ''];
+        const lines = ['', DisplayFormatterUtils.createSectionHeader('PAYCHECK ANALYSIS'), ''];
 
         // Use actual values from DTO
         lines.push(
-            `  Expected:     ${this.formatCurrency(data.expectedMonthlyPaycheck, data.currencySymbol)}`
+            `  Expected:     ${CurrencyUtils.formatWithSymbol(data.expectedMonthlyPaycheck, data.currencySymbol)}`
         );
         lines.push(
-            `  Actual:       ${this.formatCurrency(data.actualPaycheck, data.currencySymbol)}`
+            `  Actual:       ${CurrencyUtils.formatWithSymbol(data.actualPaycheck, data.currencySymbol)}`
         );
         lines.push(
-            `  Variance:     ${this.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
+            `  Variance:     ${DisplayFormatterUtils.formatNetImpact(data.paycheckSurplus, data.currencySymbol, true)}`
         );
 
         return lines.join('\n');
@@ -198,14 +191,14 @@ export class AnalyzeDisplayService {
     private formatSummarySection(data: AnalyzeReportDto): string {
         const lines = [
             '',
-            this.formatSectionHeader('FINANCIAL SUMMARY'),
+            DisplayFormatterUtils.createSectionHeader('FINANCIAL SUMMARY'),
             '',
             chalk.bold('  Total Adjustments:'),
-            `    ${this.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${this.formatSignedAmount(data.additionalIncomeTotal, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(data.actualPaycheck, true)} ${'Paycheck:'.padEnd(30)} ${this.formatSignedAmount(data.actualPaycheck, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.billComparison.actualTotal, true)} ${'Bills Paid:'.padEnd(30)} ${this.formatSignedAmount(-data.billComparison.actualTotal, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.budgetSpent, true)} ${'Budget Spent:'.padEnd(30)} ${this.formatSignedAmount(-data.budgetSpent, data.currencySymbol, true)}`,
-            `    ${this.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${this.formatSignedAmount(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
+            `    ${DisplayFormatterUtils.getStatusIcon(data.additionalIncomeTotal, true)} ${'Additional Income:'.padEnd(30)} ${DisplayFormatterUtils.formatSignedAmount(data.additionalIncomeTotal, data.currencySymbol, true)}`,
+            `    ${DisplayFormatterUtils.getStatusIcon(data.actualPaycheck, true)} ${'Paycheck:'.padEnd(30)} ${DisplayFormatterUtils.formatSignedAmount(data.actualPaycheck, data.currencySymbol, true)}`,
+            `    ${DisplayFormatterUtils.getStatusIcon(-data.billComparison.actualTotal, true)} ${'Bills Paid:'.padEnd(30)} ${DisplayFormatterUtils.formatSignedAmount(-data.billComparison.actualTotal, data.currencySymbol, true)}`,
+            `    ${DisplayFormatterUtils.getStatusIcon(-data.budgetSpent, true)} ${'Budget Spent:'.padEnd(30)} ${DisplayFormatterUtils.formatSignedAmount(-data.budgetSpent, data.currencySymbol, true)}`,
+            `    ${DisplayFormatterUtils.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${DisplayFormatterUtils.formatSignedAmount(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
         ];
 
         // Disposable spending is deliberately absent from this column. It is
@@ -218,7 +211,7 @@ export class AnalyzeDisplayService {
         const netPosition = data.netImpact;
 
         lines.push(
-            `    ${'Net Cash Flow:'.padEnd(30)} ${this.formatNetImpact(netPosition, data.currencySymbol, true)}`
+            `    ${'Net Cash Flow:'.padEnd(30)} ${DisplayFormatterUtils.formatNetImpact(netPosition, data.currencySymbol, true)}`
         );
 
         lines.push(...this.formatDisposableAction(data));
@@ -245,7 +238,7 @@ export class AnalyzeDisplayService {
         const count = data.disposableIncomeTransactions.length;
         const countText =
             count > 0 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`) : '';
-        const amount = this.formatCurrency(Math.abs(balance), data.currencySymbol);
+        const amount = CurrencyUtils.formatWithSymbol(Math.abs(balance), data.currencySymbol);
 
         if (balance > 0) {
             return [
@@ -275,7 +268,7 @@ export class AnalyzeDisplayService {
      * Formats actionable recommendations based on the data
      */
     private formatRecommendations(data: AnalyzeReportDto): string {
-        const lines = ['', this.formatSectionHeader('RECOMMENDATIONS'), ''];
+        const lines = ['', DisplayFormatterUtils.createSectionHeader('RECOMMENDATIONS'), ''];
 
         // Main recommendation based on net impact
         if (data.netImpact > 500) {
@@ -319,20 +312,13 @@ export class AnalyzeDisplayService {
             lines.push(
                 '',
                 chalk.yellow('  Budget Alert:'),
-                `    ⚠ Over budget by ${this.formatCurrency(Math.abs(data.budgetSurplus), data.currencySymbol)}`,
+                `    ⚠ Over budget by ${CurrencyUtils.formatWithSymbol(Math.abs(data.budgetSurplus), data.currencySymbol)}`,
                 '    • Review spending patterns in budget categories',
                 '    • Consider adjusting budget limits for next month'
             );
         }
 
         return lines.join('\n');
-    }
-
-    /**
-     * Formats a section header with box drawing characters
-     */
-    private formatSectionHeader(title: string): string {
-        return DisplayFormatterUtils.createSectionHeader(title);
     }
 
     /**
@@ -344,12 +330,12 @@ export class AnalyzeDisplayService {
         symbol: string,
         count?: number
     ): string {
-        const formattedAmount = this.formatCurrency(amount, symbol);
+        const formattedAmount = CurrencyUtils.formatWithSymbol(amount, symbol);
         const countText =
             count !== undefined
                 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
                 : '';
-        const icon = this.getStatusIcon(amount, true);
+        const icon = DisplayFormatterUtils.getStatusIcon(amount, true);
 
         return `  ${chalk.bold(label.padEnd(28))} ${chalk.green(formattedAmount)} ${icon}${countText}`;
     }
@@ -365,7 +351,7 @@ export class AnalyzeDisplayService {
     ): string {
         // formatNetImpact already carries the status icon; appending another
         // renders every expense line as "-$300.00 ⚠ ⚠"
-        const formattedAmount = this.formatNetImpact(-amount, symbol, true);
+        const formattedAmount = DisplayFormatterUtils.formatNetImpact(-amount, symbol, true);
         const countText =
             count !== undefined
                 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
@@ -380,7 +366,7 @@ export class AnalyzeDisplayService {
     private formatTransactionDetail(transaction: TransactionSplit, symbol: string): string {
         const typeLabel = this.getTransactionTypeLabel(transaction);
         const description = transaction.description || 'No description';
-        const amount = this.formatCurrency(parseFloat(transaction.amount), symbol);
+        const amount = CurrencyUtils.formatWithSymbol(parseFloat(transaction.amount), symbol);
         const date = transaction.date ? chalk.dim(transaction.date.split('T')[0]) : '';
 
         return `    ${typeLabel} ${description.substring(0, 40).padEnd(40)} ${amount} ${date}`;
@@ -409,53 +395,19 @@ export class AnalyzeDisplayService {
         const isUpcoming = isBillUpcoming(bill);
         const variance = bill.actual - bill.predicted;
         const varianceColor = variance > 0 ? chalk.red : chalk.green;
-        // formatCurrency renders the absolute value, so the sign must be explicit
+        // formatWithSymbol renders the absolute value, so the sign must be explicit
         const sign = variance >= 0 ? '+' : '-';
 
         // An unpaid bill's "variance" is just its whole amount, which reads as
         // a saving. Say when it is due instead.
         const trailer = isUpcoming
             ? chalk.dim(`(due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)})`)
-            : varianceColor(`(${sign}${this.formatCurrency(variance, symbol)})`);
+            : varianceColor(`(${sign}${CurrencyUtils.formatWithSymbol(variance, symbol)})`);
 
         // Format frequency with capitalization
         const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);
         const freqBadge = chalk.dim(`[${freq}]`);
 
-        return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${this.formatCurrency(bill.predicted, symbol)} | Actual: ${this.formatCurrency(bill.actual, symbol)} ${trailer}`;
-    }
-
-    /**
-     * Formats currency with symbol
-     */
-    private formatCurrency(amount: number, symbol: string): string {
-        return CurrencyUtils.formatWithSymbol(amount, symbol);
-    }
-
-    /**
-     * Formats a financial value with accounting-style display
-     */
-    private formatNetImpact(
-        amount: number,
-        symbol: string,
-        positiveIsGood: boolean = true
-    ): string {
-        return DisplayFormatterUtils.formatNetImpact(amount, symbol, positiveIsGood);
-    }
-
-    /** Signed amount without a trailing icon, for rows with an icon column */
-    private formatSignedAmount(
-        amount: number,
-        symbol: string,
-        positiveIsGood: boolean = true
-    ): string {
-        return DisplayFormatterUtils.formatSignedAmount(amount, symbol, positiveIsGood);
-    }
-
-    /**
-     * Gets appropriate status icon based on amount
-     */
-    private getStatusIcon(amount: number, positiveIsGood: boolean): string {
-        return DisplayFormatterUtils.getStatusIcon(amount, positiveIsGood);
+        return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)} | Actual: ${CurrencyUtils.formatWithSymbol(bill.actual, symbol)} ${trailer}`;
     }
 }
