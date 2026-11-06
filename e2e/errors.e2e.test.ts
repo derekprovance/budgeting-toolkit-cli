@@ -82,14 +82,11 @@ describe('errors', () => {
         fs.writeFileSync(envFile, `FIREFLY_API_URL=${url}\nFIREFLY_API_TOKEN=not-a-real-token\n`, {
             mode: 0o600,
         });
-        // The user-facing line is generic ("Failed to fetch transactions for
-        // month 1"); the cause is only in the structured error log.
-        const r = await runCli(['analyze', ...JAN], {
-            env: { ENV_FILE: envFile, LOG_LEVEL: 'error' },
-        });
+        const r = await runCli(['analyze', ...JAN], { env: { ENV_FILE: envFile } });
         expect(r.code).toBe(1);
-        expect(r.text).toContain('Error analyzing budget:');
-        expect(r.text).toContain('Unauthenticated');
+        expect(r.text).toMatch(
+            /Error analyzing budget: Failed to fetch transactions for month 1\/2025: .*(Unauthorized|Unauthenticated)/
+        );
         expect(r.stdout).not.toContain('Net Cash Flow');
     });
 

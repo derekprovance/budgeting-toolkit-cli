@@ -514,7 +514,7 @@ describe('BillComparisonService', () => {
             expect(result.ok).toBe(false);
             if (!result.ok) {
                 expect(result.error.message).toContain(
-                    'Bill comparison calculation failed for calculateBillComparison on month 10'
+                    'Bill comparison calculation failed for calculateBillComparison on 10/2024: API Error'
                 );
             }
         });

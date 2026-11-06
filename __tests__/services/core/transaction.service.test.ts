@@ -283,7 +283,7 @@ describe('TransactionService', () => {
             );
 
             await expect(service.getTransactionsForMonth(1, 2024)).rejects.toThrow(
-                'Failed to fetch transactions for month 1'
+                'Failed to fetch transactions for month 1/2024: API Error'
             );
         });
 

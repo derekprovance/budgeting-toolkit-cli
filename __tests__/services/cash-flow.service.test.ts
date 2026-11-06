@@ -78,14 +78,15 @@ describe('CashFlowService', () => {
         expect(result.ok && Object.values(result.value).flat()).toEqual([]);
     });
 
-    it('should report a failed fetch as an error naming the month', async () => {
+    it("should report a failed fetch with the fetch's own message, naming the month to the user", async () => {
         const service = build([]);
         service.getTransactionsForMonth.mockRejectedValue(new Error('API error'));
 
         const result = await service.getBuckets(5, 2024);
 
-        expect(!result.ok && result.error.message).toBe(
-            'Failed to fetch transactions for month 5: API error'
+        expect(!result.ok && result.error.message).toBe('API error');
+        expect(!result.ok && result.error.userMessage).toBe(
+            'Unable to retrieve transactions for 5/2024. Please check your connection and try again.'
         );
     });
 
@@ -96,7 +97,7 @@ describe('CashFlowService', () => {
         const result = await build([withdrawal(10)], accountScope).getBuckets(5, 2024);
 
         expect(!result.ok && result.error.message).toBe(
-            'Calculation failed for getBuckets on month 5: No income account'
+            'Calculation failed for getBuckets on 5/2024: No income account'
         );
     });
 });

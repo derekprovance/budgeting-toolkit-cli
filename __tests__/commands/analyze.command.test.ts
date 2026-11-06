@@ -6,7 +6,18 @@ import { IBudgetService } from '../../src/services/core/budget.service.interface
 import { AnalyzeDisplayService } from '../../src/services/display/analyze-display.service.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { Result } from '../../src/types/result.type.js';
-import { buckets, createMockCashFlowService, partialMock } from '../shared/mocks.js';
+import { CashFlowService } from '../../src/services/cash-flow.service.js';
+import { TransactionService } from '../../src/services/core/transaction.service.js';
+import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
+import {
+    buckets,
+    createMockAccountScopeService,
+    createMockCashFlowService,
+    createMockExcludedTransactionService,
+    createMockFireflyClient,
+    createMockLogger,
+    partialMock,
+} from '../shared/mocks.js';
 import { deposit, withdrawal } from '../shared/test-data.js';
 
 const limit = (amount: string) => ({ attributes: { amount } }) as unknown as BudgetLimitRead;
@@ -26,7 +37,7 @@ describe('AnalyzeCommand', () => {
         disposable: [withdrawal(150)],
     });
 
-    const build = (cashFlow = createMockCashFlowService(monthBuckets)) =>
+    const build = (cashFlow: CashFlowService = createMockCashFlowService(monthBuckets)) =>
         new AnalyzeCommand(
             cashFlow,
             billComparisonService,
@@ -98,6 +109,35 @@ describe('AnalyzeCommand', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
             expect.anything(),
             expect.stringContaining('Could not reach Firefly')
+        );
+    });
+
+    it("should fail with Firefly's reason and the month and year when the fetch is refused", async () => {
+        const client = createMockFireflyClient();
+        const fireflyError = new Error('Request failed with status code 401');
+        client.transactions.listTransaction.mockRejectedValue(fireflyError);
+        const cashFlow = new CashFlowService(
+            new TransactionService(
+                createMockExcludedTransactionService(),
+                client,
+                new Map(),
+                createMockLogger()
+            ),
+            new TransactionClassificationService('Disposable Income', 'Paycheck'),
+            createMockAccountScopeService(),
+            createMockLogger()
+        );
+
+        const failure = build(cashFlow).execute({ month: 5, year: 2024 });
+
+        await expect(failure).rejects.toHaveProperty(
+            'message',
+            'Failed to fetch transactions for month 5/2024: Request failed with status code 401'
+        );
+        await expect(failure).rejects.toHaveProperty('cause.cause', fireflyError);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.stringContaining('Unable to retrieve transactions for 5/2024.')
         );
     });
 

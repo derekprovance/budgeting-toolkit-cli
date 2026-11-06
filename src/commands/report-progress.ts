@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { OutputFormat } from '../types/common.types.js';
 import { Result } from '../types/result.type.js';
+import { MonthError } from '../types/error/month.error.js';
 
 /** In `json` format the spinner is silenced and stdout carries nothing but the JSON document. */
 export class ReportProgress {
@@ -33,14 +34,11 @@ export class ReportProgress {
      * @throws on an error Result, after printing its user-facing message. The spinner is
      * stopped first: ora clears its stderr line each frame and would overwrite the message.
      */
-    unwrap<T, E extends { message: string; userMessage: string }>(
-        result: Result<T, E>,
-        label: string
-    ): T {
+    unwrap<T>(result: Result<T, MonthError>, label: string): T {
         if (!result.ok) {
             this.spinner.fail(this.failText);
             console.error(chalk.red(`${label}:`), chalk.red.bold(result.error.userMessage));
-            throw new Error(result.error.message);
+            throw new Error(result.error.message, { cause: result.error.cause });
         }
         return result.value;
     }

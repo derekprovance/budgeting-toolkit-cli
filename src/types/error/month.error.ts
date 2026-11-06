@@ -20,25 +20,27 @@ export interface MonthError {
     readonly cause: Error;
 }
 
-const MESSAGES: Record<MonthErrorKind, (month: number) => { failed: string; userMessage: string }> =
-    {
-        TRANSACTIONS_FETCH_FAILED: month => ({
-            failed: `Failed to fetch transactions for month ${month}`,
-            userMessage: `Unable to retrieve transactions for month ${month}. Please check your connection and try again.`,
-        }),
-        BUCKETS_FAILED: month => ({
-            failed: `Calculation failed for getBuckets on month ${month}`,
-            userMessage: `An error occurred while calculating results for month ${month}. Please try again or contact support.`,
-        }),
-        BILL_COMPARISON_FAILED: month => ({
-            failed: `Bill comparison calculation failed for calculateBillComparison on month ${month}`,
-            userMessage: `An error occurred while calculating bill comparison for month ${month}. Please try again.`,
-        }),
-        BUDGET_REPORT_FAILED: month => ({
-            failed: `Budget calculation failed for getBudgetReport on month ${month}`,
-            userMessage: `An error occurred while calculating budget data for month ${month}. Please try again.`,
-        }),
-    };
+/** `failed` is absent where the cause already names the month and the reason */
+const MESSAGES: Record<
+    MonthErrorKind,
+    (period: string) => { failed?: string; userMessage: string }
+> = {
+    TRANSACTIONS_FETCH_FAILED: period => ({
+        userMessage: `Unable to retrieve transactions for ${period}. Please check your connection and try again.`,
+    }),
+    BUCKETS_FAILED: period => ({
+        failed: `Calculation failed for getBuckets on ${period}`,
+        userMessage: `An error occurred while calculating results for ${period}. Please try again or contact support.`,
+    }),
+    BILL_COMPARISON_FAILED: period => ({
+        failed: `Bill comparison calculation failed for calculateBillComparison on ${period}`,
+        userMessage: `An error occurred while calculating bill comparison for ${period}. Please try again.`,
+    }),
+    BUDGET_REPORT_FAILED: period => ({
+        failed: `Budget calculation failed for getBudgetReport on ${period}`,
+        userMessage: `An error occurred while calculating budget data for ${period}. Please try again.`,
+    }),
+};
 
 /** Logs the failure and returns it as a failed Result. */
 export function monthFailure<T>(
@@ -47,10 +49,10 @@ export function monthFailure<T>(
     error: unknown
 ): Result<T, MonthError> {
     const cause = toError(error);
-    const { failed, userMessage } = MESSAGES[kind](month);
+    const { failed, userMessage } = MESSAGES[kind](`${month}/${year}`);
     const monthError: MonthError = {
         kind,
-        message: `${failed}: ${cause.message}`,
+        message: failed ? `${failed}: ${cause.message}` : cause.message,
         userMessage,
         month,
         year,

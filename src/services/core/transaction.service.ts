@@ -47,7 +47,7 @@ export class TransactionService implements ITransactionService {
 
             return transactions;
         } catch (error) {
-            throw this.handleError('fetch transactions for month', month, error);
+            throw this.handleError('fetch transactions for month', `${month}/${year}`, error);
         }
     }
 
@@ -244,7 +244,7 @@ export class TransactionService implements ITransactionService {
         return this.fetchTransactionsFromAPIByRange(
             start,
             end,
-            `fetch transactions for month: ${month}`
+            `fetch transactions for month: ${month}/${year}`
         );
     }
 
@@ -274,20 +274,9 @@ export class TransactionService implements ITransactionService {
         return `${description}-${date}-${journalId}`;
     }
 
-    private handleError(
-        action: string,
-        identifier: string | number,
-        error: unknown
-    ): TransactionError {
-        const message = `Failed to ${action} ${identifier}`;
-        this.logger.error(
-            {
-                action,
-                identifier,
-                error: errorMessage(error),
-            },
-            message
-        );
+    private handleError(action: string, identifier: string, error: unknown): TransactionError {
+        const message = `Failed to ${action} ${identifier}: ${errorMessage(error)}`;
+        this.logger.error({ action, identifier }, message);
 
         return new TransactionError(message, { cause: error });
     }
