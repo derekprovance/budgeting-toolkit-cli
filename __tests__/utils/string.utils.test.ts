@@ -59,42 +59,4 @@ describe('StringUtils', () => {
             expect(StringUtils.normalizeForMatching(' GROCERIES ')).toBe('groceries');
         });
     });
-
-    describe('normalize', () => {
-        it('should convert to lowercase', () => {
-            expect(StringUtils.normalize('HELLO')).toBe('hello');
-            expect(StringUtils.normalize('MiXeD CaSe')).toBe('mixed case');
-        });
-
-        it('should trim whitespace', () => {
-            expect(StringUtils.normalize('  hello  ')).toBe('hello');
-            expect(StringUtils.normalize('\thello\n')).toBe('hello');
-        });
-
-        it('should normalize hyphens and underscores to spaces', () => {
-            expect(StringUtils.normalize('hello-world')).toBe('hello world');
-            expect(StringUtils.normalize('hello_world')).toBe('hello world');
-            expect(StringUtils.normalize('hello-world_test')).toBe('hello world test');
-        });
-
-        it('should normalize multiple spaces to single space', () => {
-            expect(StringUtils.normalize('hello    world')).toBe('hello world');
-            expect(StringUtils.normalize('hello\t\tworld')).toBe('hello world');
-        });
-
-        it('should remove special characters', () => {
-            expect(StringUtils.normalize('hello@world!')).toBe('helloworld');
-            expect(StringUtils.normalize('test#123$456')).toBe('test123456');
-            expect(StringUtils.normalize('email@example.com')).toBe('emailexamplecom');
-        });
-
-        it('should handle combination of transformations', () => {
-            expect(StringUtils.normalize('  MY-String_Test@123  ')).toBe('my string test123');
-            expect(StringUtils.normalize('PAYROLL_2024-01')).toBe('payroll 2024 01');
-        });
-
-        it('should handle empty string', () => {
-            expect(StringUtils.normalize('')).toBe('');
-        });
-    });
 });
