@@ -10,6 +10,7 @@ import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
 import { BudgetReportResult } from '../types/dto/budget-report-result.dto.js';
+import { daysLeftInMonth } from '../utils/days-left.utils.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
 
 /**
@@ -46,22 +47,7 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
         const spinner = ora({ text: 'Generating budget report...', isSilent: json }).start();
 
         try {
-            // Determine if this is the current month
-            const isCurrentMonth =
-                new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
-
-            // Get days left info for current month
-            let daysInfo: { daysLeft: number; dataThrough?: Date } | undefined;
-            if (isCurrentMonth) {
-                daysInfo = {
-                    ...this.getDaysLeftInfo(month, year),
-                    // Kept as its own signal rather than folded into daysLeft:
-                    // a month can look cheap simply because the last few days
-                    // have not been imported yet.
-                    dataThrough:
-                        (await this.transactionService.getMostRecentTransactionDate()) ?? undefined,
-                };
-            }
+            const daysInfo = await this.getDaysInfo(month, year);
 
             // Fetch all data in parallel
             spinner.text = 'Fetching budget data...';
@@ -140,22 +126,23 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
         }
     }
 
-    /**
-     * Days left in the month, counted from today and INCLUDING today.
-     *
-     * Today is a day you can still spend, so the last day of the month has one
-     * day left, not zero. Excluding it divided the remaining budget by one day
-     * too few every day, and on the final day produced a zero that
-     * BudgetDisplayService renders as "budget exhausted" no matter how much is
-     * actually left.
-     *
-     * Deliberately not derived from the most recent transaction's date: that
-     * answers "how stale is my data", not "how long do I have", and using it
-     * reported 12 days left on the 24th of a 31-day month.
-     */
-    private getDaysLeftInfo(month: number, year: number, today: Date = new Date()) {
-        const lastDay = new Date(year, month, 0).getDate();
-        return { daysLeft: Math.max(0, lastDay - today.getDate() + 1) };
+    /** Days left and data freshness, for the current month only */
+    private async getDaysInfo(
+        month: number,
+        year: number
+    ): Promise<BudgetReportResult['daysInfo']> {
+        const today = new Date();
+        if (today.getMonth() + 1 !== month || today.getFullYear() !== year) {
+            return undefined;
+        }
+        return {
+            daysLeft: daysLeftInMonth(month, year, today),
+            // Kept as its own signal rather than folded into daysLeft: a month
+            // can look cheap simply because the last few days have not been
+            // imported yet.
+            dataThrough:
+                (await this.transactionService.getMostRecentTransactionDate()) ?? undefined,
+        };
     }
 
     /**
