@@ -14,6 +14,7 @@ import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
+import { budgetTotals } from './budget-totals.js';
 
 /**
  * Service for formatting budget reports with insights and visual sections
@@ -98,9 +99,11 @@ export class BudgetDisplayService {
      * Formats the overview section with summary and status
      */
     private formatOverviewSection(data: BudgetReportResult): string {
-        const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
-        const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
-        const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+        const {
+            spent: totalSpent,
+            allocated: totalBudget,
+            percentageUsed,
+        } = budgetTotals(data.budgets);
         const isOverBudget = totalSpent > totalBudget;
 
         const statusEmoji = EmojiUtils.getStatusEmoji(percentageUsed, isOverBudget);
@@ -472,12 +475,9 @@ export class BudgetDisplayService {
         lines.push(DisplayFormatterUtils.createSectionHeader('UNBUDGETED EXPENSES'));
         lines.push('');
 
-        let total = 0;
-
         unbudgeted.forEach(transaction => {
             // Signed: a card refund in the bucket reduces the total (R-REFUND-1)
             const amount = TransactionCalculationUtils.calculateNetSpend([transaction]);
-            total += amount;
 
             // A refund keeps its minus sign so the rows visibly add up
             const amountFormatted = CurrencyUtils.formatSigned(
@@ -505,6 +505,7 @@ export class BudgetDisplayService {
         });
 
         lines.push('');
+        const total = TransactionCalculationUtils.calculateNetSpend(unbudgeted);
         lines.push(chalk.bold(`Total: ${CurrencyUtils.formatSigned(total, currencySymbol)}`));
         lines.push('');
         return lines.join('\n');
