@@ -169,6 +169,18 @@ export class DisplayFormatterUtils {
     }
 
     /**
+     * Links text to a Firefly III transaction, or returns it unchanged when
+     * there is no base URL or transaction id to link to
+     */
+    static linkedText(text: string, baseUrl: string, transactionId: string | undefined): string {
+        if (!transactionId) return text;
+        return DisplayFormatterUtils.createHyperlink(
+            text,
+            DisplayFormatterUtils.transactionUrl(baseUrl, transactionId)
+        );
+    }
+
+    /**
      * Wraps text in an OSC 8 ANSI hyperlink escape sequence
      * Returns plain text if no URL is provided
      *

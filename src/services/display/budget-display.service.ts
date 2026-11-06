@@ -28,10 +28,7 @@ export class BudgetDisplayService {
     private static readonly SECTION_WIDTH = 79;
     private static readonly DESCRIPTION_MAX_LENGTH = 60;
 
-    constructor(private readonly baseUrl: string = '') {
-        // Strip trailing slash to avoid double-slash in constructed URLs
-        this.baseUrl = this.baseUrl.replace(/\/+$/, '');
-    }
+    constructor(private readonly baseUrl: string = '') {}
 
     /**
      * Formats the complete budget report
@@ -474,12 +471,7 @@ export class BudgetDisplayService {
             description,
             BudgetDisplayService.DESCRIPTION_MAX_LENGTH
         );
-
-        const url =
-            this.baseUrl && transactionId
-                ? DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId)
-                : undefined;
-        return DisplayFormatterUtils.createHyperlink(truncated, url);
+        return DisplayFormatterUtils.linkedText(truncated, this.baseUrl, transactionId);
     }
 
     /**
