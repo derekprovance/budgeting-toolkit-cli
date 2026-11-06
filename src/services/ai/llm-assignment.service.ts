@@ -187,7 +187,7 @@ export class LLMAssignmentService {
             });
 
             return {
-                values: parseAssignmentResponse(type, result, chunk.length, validOptions),
+                values: parseAssignmentResponse(type, result, chunk.length),
                 degraded: false,
             };
         } catch (error) {

@@ -256,6 +256,16 @@ describe('LLMAssignmentService', () => {
                 expect(result).toEqual([undefined, undefined, undefined]);
             });
 
+            it('should return an off-list answer for the catalog to reject, keeping the rest', async () => {
+                callTool.mockResolvedValue(
+                    categoriesResponse('Groceries', 'Not A Category', 'Healthcare')
+                );
+
+                const result = await service.assign('category', mockTransactions, validCategories);
+
+                expect(result).toEqual(['Groceries', 'Not A Category', 'Healthcare']);
+            });
+
             it('should degrade a chunk whose response has the wrong count', async () => {
                 callTool.mockResolvedValue(categoriesResponse('Groceries', 'Healthcare'));
 
