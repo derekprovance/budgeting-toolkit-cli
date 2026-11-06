@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 import { Result, TransactionValidationError } from '../../src/types/result.type.js';
 import { withdrawal } from '../shared/test-data.js';
+import { JournaledTransaction } from '../../src/types/categorize.types.js';
 
 const category = (name: string): CategoryProperties => ({ name });
 // Partial API fixture: only the fields the updater reads
@@ -33,7 +34,7 @@ describe('InteractiveTransactionUpdater', () => {
     let mockValidator: jest.Mocked<TransactionValidatorService>;
     let mockAIValidator: jest.Mocked<TransactionAIResultValidator>;
     let mockUserInputService: jest.Mocked<UserInputService>;
-    let transaction: TransactionSplit;
+    let transaction: JournaledTransaction;
     let transactionRead: TransactionRead;
 
     const build = (dryRun = false) =>
@@ -60,13 +61,15 @@ describe('InteractiveTransactionUpdater', () => {
         updater.applyUpdate(await prepared(ai, updater), { index: 3, total: 26 });
 
     beforeEach(() => {
-        transaction = withdrawal('100.00', {
+        transaction = {
+            ...withdrawal('100.00', {
+                description: 'Test Transaction',
+                category_name: 'Old Category',
+                budget_id: '1',
+                budget_name: 'Old Budget',
+            }),
             transaction_journal_id: '1',
-            description: 'Test Transaction',
-            category_name: 'Old Category',
-            budget_id: '1',
-            budget_name: 'Old Budget',
-        });
+        };
         transactionRead = { id: '42', type: 'transactions' } as TransactionRead;
 
         mockTransactionService = {
@@ -79,7 +82,6 @@ describe('InteractiveTransactionUpdater', () => {
         } as unknown as jest.Mocked<TransactionService>;
 
         mockValidator = {
-            validateTransactionData: jest.fn().mockReturnValue(true),
             categoryOrBudgetChanged: jest.fn().mockReturnValue(true),
         } as unknown as jest.Mocked<TransactionValidatorService>;
 

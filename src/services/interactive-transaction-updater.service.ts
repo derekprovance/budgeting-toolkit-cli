@@ -13,6 +13,7 @@ import { logger } from '../logger.js';
 import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import { AIResult } from './ai/llm-transaction-processing.service.js';
+import { JournaledTransaction } from '../types/categorize.types.js';
 
 /** Position of a transaction in the review, shown to the user as `[index/total]` */
 export interface ReviewProgress {
@@ -22,7 +23,7 @@ export interface ReviewProgress {
 
 /** A validated suggestion that will change the transaction, ready to prompt for */
 export interface PreparedUpdate {
-    transaction: TransactionSplit;
+    transaction: JournaledTransaction;
     journalId: string;
     category?: CategoryProperties;
     budget?: BudgetRead;
@@ -48,34 +49,10 @@ export class InteractiveTransactionUpdater {
      * the prompts that will follow before showing the first one.
      */
     async prepareUpdate(
-        transaction: TransactionSplit,
+        transaction: JournaledTransaction,
         aiResults: Record<string, AIResult>
     ): Promise<Result<PreparedUpdate | undefined, TransactionValidationError>> {
-        // Validate transaction data
-        if (!this.validator.validateTransactionData(transaction, aiResults)) {
-            return Result.err({
-                field: 'transaction',
-                message: 'Invalid transaction data',
-                userMessage: 'Transaction data is incomplete or invalid',
-                transactionId: transaction.transaction_journal_id || 'unknown',
-                transactionDescription: transaction.description || 'No description',
-            });
-        }
-
         const journalId = transaction.transaction_journal_id;
-        if (!journalId) {
-            logger.warn(
-                { description: transaction.description },
-                'Transaction missing journal ID, skipping'
-            );
-            return Result.err({
-                field: 'journalId',
-                message: 'Transaction missing journal ID',
-                userMessage: 'Cannot update transaction without journal ID',
-                transactionId: 'unknown',
-                transactionDescription: transaction.description || 'No description',
-            });
-        }
 
         try {
             const prepareResult = await this.validateAndPrepareUpdate(

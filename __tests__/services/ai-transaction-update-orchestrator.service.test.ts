@@ -159,7 +159,6 @@ describe('AITransactionUpdateOrchestrator', () => {
         mockValidator = {
             shouldProcessTransaction: jest.fn(),
             shouldSetBudget: jest.fn(),
-            validateTransactionData: jest.fn(),
             categoryOrBudgetChanged: jest.fn(),
             isBudgetOnlyCandidate: jest.fn(),
             transactionClassificationService: mockPropertyService,
@@ -173,10 +172,6 @@ describe('AITransactionUpdateOrchestrator', () => {
         jest.spyOn(TransactionValidatorService.prototype, 'shouldSetBudget').mockImplementation(
             mockValidator.shouldSetBudget
         );
-        jest.spyOn(
-            TransactionValidatorService.prototype,
-            'validateTransactionData'
-        ).mockImplementation(mockValidator.validateTransactionData);
         jest.spyOn(
             TransactionValidatorService.prototype,
             'categoryOrBudgetChanged'
@@ -251,7 +246,6 @@ describe('AITransactionUpdateOrchestrator', () => {
                 ])
             );
             mockLLMService.processTransactions.mockResolvedValue(dynamicAIResults);
-            mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
             const result = await service.updateTransactionsByTag('test', CategorizeMode.Both);
@@ -305,7 +299,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
             mockValidator.isBudgetOnlyCandidate.mockReturnValue(false);
-            mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockInteractiveTransactionUpdater.applyUpdate.mockResolvedValue({
                 ok: true,
@@ -335,7 +328,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
-            mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
             mockInteractiveTransactionUpdater.applyUpdate.mockResolvedValue({
                 ok: true,
@@ -363,7 +355,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
-            mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
             const serviceWithDryRun = new AITransactionUpdateOrchestrator(
@@ -397,7 +388,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
-            mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
             const serviceWithDryRun = new AITransactionUpdateOrchestrator(
@@ -428,7 +418,6 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockBudgetService.getBudgets.mockResolvedValue(mockBudgets as BudgetRead[]);
             mockLLMService.processTransactions.mockResolvedValue(mockAIResults);
             mockValidator.shouldProcessTransaction.mockReturnValue(true);
-            mockValidator.validateTransactionData.mockReturnValue(true);
             mockValidator.categoryOrBudgetChanged.mockReturnValue(true);
 
             const serviceWithBoth = new AITransactionUpdateOrchestrator(
@@ -640,7 +629,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await service.updateTransactionsByTag(tag, updateMode);
 
-            expect(result.status).toBe(CategorizeStatus.HAS_RESULTS);
+            expect(result.status).toBe(CategorizeStatus.EMPTY_TAG);
             expect(mockInteractiveTransactionUpdater.applyUpdate).not.toHaveBeenCalled();
         });
 
@@ -762,7 +751,7 @@ describe('AITransactionUpdateOrchestrator', () => {
         it('numbers only the prompts that survive validation', async () => {
             const unchanged = createMockTransaction({ transaction_journal_id: '1' });
             const invalid = createMockTransaction({ transaction_journal_id: '2' });
-            const prompted = createMockTransaction({ transaction_journal_id: '3' });
+            const prompted = { ...createMockTransaction(), transaction_journal_id: '3' };
 
             mockTransactionService.tagExists.mockResolvedValue(true);
             mockTransactionService.getTransactionsByTag.mockResolvedValue([

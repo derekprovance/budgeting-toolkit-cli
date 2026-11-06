@@ -25,6 +25,7 @@ import {
 import { TransactionValidationError } from '../types/result.type.js';
 import { isCertificateError } from '../utils/error-detection.utils.js';
 import { TransactionHistoryService } from './transaction-history.service.js';
+import { JournaledTransaction, hasJournalId } from '../types/categorize.types.js';
 
 interface SuggestionCounts {
     category: { history: number; ai: number };
@@ -71,9 +72,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
             const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
 
-            const transactions = unfilteredTransactions.filter(t =>
-                this.validator.shouldProcessTransaction(t, this.force)
-            );
+            const transactions = unfilteredTransactions
+                .filter(t => this.validator.shouldProcessTransaction(t, this.force))
+                .filter(t => this.isUpdatable(t));
 
             if (!transactions.length) {
                 logger.debug(
@@ -194,18 +195,28 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         }
     }
 
+    /** Firefly can only key and update a split with a journal id */
+    private isUpdatable(transaction: TransactionSplit): transaction is JournaledTransaction {
+        if (!hasJournalId(transaction)) {
+            logger.warn(
+                { description: transaction.description },
+                'Skipping transaction without transaction_journal_id'
+            );
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Builds the history index for `transactions`. History is an optimisation
      * over the AI, so a failed fetch only costs its suggestions: it is logged
      * and the index stays empty. Never rejects.
      */
-    private async loadHistory(transactions: TransactionSplit[]): Promise<void> {
+    private async loadHistory(transactions: JournaledTransaction[]): Promise<void> {
         if (!this.history) {
             return;
         }
-        const own = new Set(
-            transactions.flatMap(t => (t.transaction_journal_id ? [t.transaction_journal_id] : []))
-        );
+        const own = new Set(transactions.map(t => t.transaction_journal_id));
         try {
             await this.history.load(own);
         } catch (error) {
@@ -217,7 +228,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     }
 
     private async getAIResultsForTransactions(
-        transactions: TransactionSplit[],
+        transactions: JournaledTransaction[],
         updateMode: CategorizeMode,
         categories?: CategoryProperties[],
         budgets?: BudgetRead[],
@@ -238,24 +249,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             'Getting AI results for transactions'
         );
 
-        // Transactions without a journal ID can't be keyed or updated — drop them
-        // up front so they don't collapse onto one key and fail the count check
-        const identifiableTransactions = transactions.filter(t => {
-            if (t.transaction_journal_id) {
-                return true;
-            }
-            logger.warn(
-                { description: t.description },
-                'Skipping transaction without transaction_journal_id'
-            );
-            return false;
-        });
-
         // Group B: has category, no budget — budget assignment only
         const budgetOnlySet = new Set(
-            this.force
-                ? []
-                : identifiableTransactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
+            this.force ? [] : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
         );
 
         await historyReady;
@@ -265,11 +261,11 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             category: { history: 0, ai: 0 },
             budget: { history: 0, ai: 0 },
         };
-        const needsBoth: TransactionSplit[] = [];
-        const needsCategory: TransactionSplit[] = [];
-        const needsBudget: TransactionSplit[] = [];
+        const needsBoth: JournaledTransaction[] = [];
+        const needsCategory: JournaledTransaction[] = [];
+        const needsBudget: JournaledTransaction[] = [];
 
-        for (const t of identifiableTransactions) {
+        for (const t of transactions) {
             // Group A gets every field the mode asks for. Group B keeps its
             // category, and category mode leaves it alone entirely
             const isBudgetOnly = budgetOnlySet.has(t);
@@ -305,7 +301,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 continue;
             }
 
-            results[t.transaction_journal_id as string] = {
+            results[t.transaction_journal_id] = {
                 ...(category && { category }),
                 ...(budget && { budget }),
                 source: {
@@ -319,11 +315,12 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             else if (missingBudget) needsBudget.push(t);
         }
 
-        const aiCalls: Array<[TransactionSplit[], string[] | undefined, string[] | undefined]> = [
-            [needsBoth, categoryNames, budgetNames],
-            [needsCategory, categoryNames, undefined],
-            [needsBudget, undefined, budgetNames],
-        ];
+        const aiCalls: Array<[JournaledTransaction[], string[] | undefined, string[] | undefined]> =
+            [
+                [needsBoth, categoryNames, budgetNames],
+                [needsCategory, categoryNames, undefined],
+                [needsBudget, undefined, budgetNames],
+            ];
 
         for (const [batch, categoryOptions, budgetOptions] of aiCalls) {
             if (batch.length === 0) {
@@ -353,9 +350,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             }
 
             for (const t of batch) {
-                const journalId = t.transaction_journal_id as string;
-                const ai = aiResults[journalId] ?? {};
-                const entry = results[journalId];
+                const ai = aiResults[t.transaction_journal_id] ?? {};
+                const entry = results[t.transaction_journal_id];
                 if (!entry) {
                     continue;
                 }
@@ -376,7 +372,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     }
 
     private async updateTransactionsWithAIResults(
-        transactions: TransactionSplit[],
+        transactions: JournaledTransaction[],
         aiResults: AIResponse
     ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
@@ -390,15 +386,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             // reaches the user and must not take a number
             const prepared: PreparedUpdate[] = [];
             for (const transaction of transactions) {
-                const journalId = transaction.transaction_journal_id;
-                if (!journalId) {
-                    logger.debug(
-                        { description: transaction.description },
-                        'Transaction missing journal ID:'
-                    );
-                    continue;
-                }
-                if (!aiResults[journalId]) {
+                if (!aiResults[transaction.transaction_journal_id]) {
                     logger.debug(
                         { description: transaction.description },
                         'No AI results for transaction:'

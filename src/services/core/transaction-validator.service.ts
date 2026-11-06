@@ -1,6 +1,5 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionClassificationService } from './transaction-classification.service.interface.js';
-import { logger } from '../../logger.js';
 import { ITransactionValidatorService } from './transaction-validator.service.interface.js';
 
 export class TransactionValidatorService implements ITransactionValidatorService {
@@ -52,31 +51,6 @@ export class TransactionValidatorService implements ITransactionValidatorService
         };
 
         return conditions.notABill && conditions.notDisposableIncome && conditions.notADeposit;
-    }
-
-    /**
-     * Validates if a transaction's data is valid for processing
-     * @param transaction The transaction to validate
-     * @param aiResults The AI results for the transaction
-     * @returns True if the transaction data is valid, false otherwise
-     */
-    validateTransactionData(
-        transaction: TransactionSplit,
-        aiResults: Record<string, { category?: string; budget?: string }>
-    ): boolean {
-        const journalId = transaction.transaction_journal_id;
-
-        if (!journalId) {
-            logger.warn({ description: transaction.description }, 'Missing journal ID:');
-            return false;
-        }
-
-        if (!aiResults[journalId]) {
-            logger.warn({ description: transaction.description }, 'No AI results found:');
-            return false;
-        }
-
-        return true;
     }
 
     /**
