@@ -1,5 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { CommandConfigValidator } from '../../src/utils/command-config-validator.js';
+import { describe, expect, it } from '@jest/globals';
+import {
+    CommandConfigValidator,
+    requireCommandConfig,
+} from '../../src/utils/command-config-validator.js';
 import { AppConfig } from '../../src/config/config.types.js';
 import { DEFAULT_CONFIG } from '../../src/config/config.defaults.js';
 
@@ -23,48 +26,20 @@ const buildConfig = (
     return config;
 };
 
-describe('CommandConfigValidator', () => {
-    let mockConsoleError: jest.SpiedFunction<typeof console.error>;
-    let mockConsoleWarn: jest.SpiedFunction<typeof console.warn>;
-    let mockProcessExit: jest.SpiedFunction<typeof process.exit>;
+/** The message requireCommandConfig threw, or '' when it did not throw */
+const failureFor = (config: AppConfig, command: 'analyze' | 'categorize'): string => {
+    try {
+        requireCommandConfig(config, command);
+        return '';
+    } catch (error) {
+        return (error as Error).message;
+    }
+};
 
-    beforeEach(() => {
-        // Mock console methods
-        mockConsoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-        mockConsoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-        // Mock process.exit
-        mockProcessExit = jest.spyOn(process, 'exit').mockImplementation(code => {
-            throw new Error(`process.exit(${code})`);
-        });
-    });
-
-    afterEach(() => {
-        mockConsoleError.mockRestore();
-        mockConsoleWarn.mockRestore();
-        mockProcessExit.mockRestore();
-    });
-
-    const errorOutput = () => mockConsoleError.mock.calls.map(call => call.join(' ')).join('\n');
-
-    describe('validateAnalyzeCommand', () => {
-        it('should not throw when all required config is present', () => {
-            const config = buildConfig();
-
-            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).not.toThrow();
-            expect(mockConsoleError).not.toHaveBeenCalled();
-            expect(mockProcessExit).not.toHaveBeenCalled();
-        });
-
-        it('should exit when expectedMonthlyPaycheck is missing', () => {
-            const config = buildConfig({ expectedMonthlyPaycheck: undefined });
-
-            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
-                'process.exit(1)'
-            );
-            expect(mockConsoleError).toHaveBeenCalled();
-            expect(errorOutput()).toContain('expectedMonthlyPaycheck is required');
-            expect(errorOutput()).toContain('config.yaml');
+describe('requireCommandConfig', () => {
+    describe('analyze', () => {
+        it('should accept a config with expectedMonthlyPaycheck', () => {
+            expect(failureFor(buildConfig(), 'analyze')).toBe('');
         });
 
         it('should not require untrackedAccounts', () => {
@@ -72,39 +47,38 @@ describe('CommandConfigValidator', () => {
             const config = buildConfig();
             expect(config.accounts.untrackedAccounts).toEqual([]);
 
-            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).not.toThrow();
+            expect(failureFor(config, 'analyze')).toBe('');
         });
 
-        it('should report multiple validation errors at once', () => {
-            const config = buildConfig({ expectedMonthlyPaycheck: undefined });
-
-            expect(() => CommandConfigValidator.validateAnalyzeCommand(config)).toThrow(
-                'process.exit(1)'
+        it('should throw guidance naming the setting, the file and the docs when expectedMonthlyPaycheck is missing', () => {
+            const message = failureFor(
+                buildConfig({ expectedMonthlyPaycheck: undefined }),
+                'analyze'
             );
-            expect(errorOutput()).toContain('expectedMonthlyPaycheck is required');
-            expect(errorOutput()).toContain('CONFIG.md');
+
+            expect(message).toContain('expectedMonthlyPaycheck is required for analyze command');
+            expect(message).toContain('Add to config.yaml:\n    expectedMonthlyPaycheck: 5000.00');
+            expect(message).toContain('See CONFIG.md');
         });
     });
 
-    describe('validateCategorizeCommand', () => {
-        it('should not throw when ANTHROPIC_API_KEY is present', () => {
-            const config = buildConfig({ claudeApiKey: 'sk-test' });
-
-            expect(() => CommandConfigValidator.validateCategorizeCommand(config)).not.toThrow();
-            expect(mockConsoleError).not.toHaveBeenCalled();
-            expect(mockProcessExit).not.toHaveBeenCalled();
+    describe('categorize', () => {
+        it('should accept a config with ANTHROPIC_API_KEY', () => {
+            expect(failureFor(buildConfig({ claudeApiKey: 'sk-test' }), 'categorize')).toBe('');
         });
 
-        it('should exit when ANTHROPIC_API_KEY is missing', () => {
-            const config = buildConfig({ claudeApiKey: '' });
+        it('should throw guidance with where to get a key when ANTHROPIC_API_KEY is missing', () => {
+            const message = failureFor(buildConfig({ claudeApiKey: '' }), 'categorize');
 
-            expect(() => CommandConfigValidator.validateCategorizeCommand(config)).toThrow(
-                'process.exit(1)'
-            );
-            expect(mockConsoleError).toHaveBeenCalled();
-            expect(errorOutput()).toContain('ANTHROPIC_API_KEY is required');
-            expect(errorOutput()).toContain('https://console.anthropic.com');
-            expect(errorOutput()).toContain('CONFIG.md');
+            expect(message).toContain('ANTHROPIC_API_KEY is required for categorize command');
+            expect(message).toContain('https://console.anthropic.com');
+            expect(message).toContain('See CONFIG.md');
+        });
+
+        it('should throw the same guidance through validateCategorizeCommand', () => {
+            expect(() =>
+                CommandConfigValidator.validateCategorizeCommand(buildConfig({ claudeApiKey: '' }))
+            ).toThrow('ANTHROPIC_API_KEY is required for categorize command');
         });
     });
 });

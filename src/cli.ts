@@ -13,7 +13,7 @@ import {
     CategorizeOptions,
 } from './types/interface/command-options.interface.js';
 import { CategorizeMode } from './types/enums.js';
-import { CommandConfigValidator } from './utils/command-config-validator.js';
+import { CommandConfigValidator, requireCommandConfig } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
 import { errorMessage } from './utils/error-detection.utils.js';
 import { readFileSync } from 'fs';
@@ -210,7 +210,7 @@ Examples:
             try {
                 const configManager = ConfigManager.getInstance(configPath);
                 const config = configManager.getConfig();
-                CommandConfigValidator.validateAnalyzeCommand(config);
+                requireCommandConfig(config, 'analyze');
 
                 const command = createAnalyzeCommand(services, config);
                 await command.execute({

@@ -313,6 +313,26 @@ describe('CLI', () => {
             });
         });
 
+        it('should exit 1 with the guidance when analyze has no expectedMonthlyPaycheck', async () => {
+            testConfig.transactions.expectedMonthlyPaycheck = undefined;
+            const cli = createCli();
+
+            try {
+                await expect(
+                    cli.parseAsync(argv('analyze', '-m', '1', '-y', '2025'))
+                ).rejects.toThrow('process.exit called');
+            } finally {
+                testConfig.transactions.expectedMonthlyPaycheck = 2000;
+            }
+            expect(processExitSpy).toHaveBeenCalledWith(1);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining(
+                    'Error analyzing budget: expectedMonthlyPaycheck is required for analyze command'
+                )
+            );
+            expect(mockAnalyzeExecute).not.toHaveBeenCalled();
+        });
+
         it('should still exit 1 when a json-mode command fails', async () => {
             mockAnalyzeExecute.mockRejectedValueOnce(new Error('boom'));
             const cli = createCli();
