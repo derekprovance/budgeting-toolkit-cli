@@ -11,6 +11,7 @@ import { TransactionValidatorService } from '../../src/services/core/transaction
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
 import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
+import { ReviewCancelledError } from '../../src/services/user-input.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 import { deposit, transfer, withdrawal } from '../shared/test-data.js';
@@ -338,18 +339,14 @@ describe('AITransactionUpdateOrchestrator', () => {
         it('stops reviewing when the user presses Ctrl-C', async () => {
             mockUpdater.applyUpdate
                 .mockResolvedValueOnce({ ok: true, value: {} as TransactionRead })
-                .mockResolvedValueOnce({
-                    ok: false,
-                    error: {
-                        ...validationError('2'),
-                        message: 'User force closed the prompt with SIGINT',
-                    },
-                });
+                .mockRejectedValueOnce(new ReviewCancelledError());
 
             const result = await run();
 
             expect(appliedJournalIds()).toEqual(['1', '2']);
             expect(result.transactionsUpdated).toBe(1);
+            // Cancelling is the user's choice, not a failed transaction
+            expect(result.errors).toEqual([]);
         });
     });
 

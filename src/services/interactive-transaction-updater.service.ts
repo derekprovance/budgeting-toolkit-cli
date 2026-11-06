@@ -2,7 +2,7 @@ import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/
 import { TransactionService } from './core/transaction.service.js';
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
-import { UserInputService } from './user-input.service.js';
+import { ReviewCancelledError, UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
 import { ReviewAction } from '../types/enums.js';
@@ -75,6 +75,8 @@ export class InteractiveTransactionUpdater {
      * Shows a prepared update to the user and applies their decision; in
      * dry-run mode only returns the transaction. Resolves to `undefined` when
      * the user skips it, and to an error when it cannot be applied.
+     *
+     * @throws ReviewCancelledError when the user ends the review
      */
     async applyUpdate(
         update: PreparedUpdate,
@@ -86,6 +88,9 @@ export class InteractiveTransactionUpdater {
         try {
             return Result.ok(await this.review(update, progress));
         } catch (error) {
+            if (error instanceof ReviewCancelledError) {
+                throw error;
+            }
             return Result.err(this.toUpdateError(update.transaction, error));
         }
     }

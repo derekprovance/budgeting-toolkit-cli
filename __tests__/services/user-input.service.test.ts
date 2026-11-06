@@ -32,7 +32,8 @@ jest.unstable_mockModule('@inquirer/prompts', () => ({
 }));
 
 // Dynamic imports after mocks
-const { UserInputService } = await import('../../src/services/user-input.service.js');
+const { UserInputService, ReviewCancelledError } =
+    await import('../../src/services/user-input.service.js');
 
 describe('UserInputService', () => {
     let service: InstanceType<typeof UserInputService>;
@@ -356,6 +357,32 @@ describe('UserInputService', () => {
                     message: expect.stringContaining('...'),
                 })
             );
+        });
+
+        it('turns Ctrl-C at the prompt into a ReviewCancelledError', async () => {
+            // @inquirer/prompts rejects with an error named ExitPromptError
+            mockExpand.mockRejectedValueOnce(
+                Object.assign(new Error('User force closed the prompt with SIGINT'), {
+                    name: 'ExitPromptError',
+                })
+            );
+
+            await expect(
+                service.askToUpdateTransaction(mockTransaction as TransactionSplit, '1', {
+                    category: 'New Category',
+                })
+            ).rejects.toBeInstanceOf(ReviewCancelledError);
+        });
+
+        it('lets any other prompt failure through unchanged', async () => {
+            const failure = new Error('stdin closed');
+            mockExpand.mockRejectedValueOnce(failure);
+
+            await expect(
+                service.askToUpdateTransaction(mockTransaction as TransactionSplit, '1', {
+                    category: 'New Category',
+                })
+            ).rejects.toBe(failure);
         });
 
         it('should return Skip when user selects abort option', async () => {

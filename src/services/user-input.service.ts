@@ -20,6 +20,29 @@ interface TransactionUpdateOptions {
     progress?: { index: number; total: number };
 }
 
+/** The user ended the review (Ctrl-C at a prompt); nothing further should be asked */
+export class ReviewCancelledError extends Error {
+    constructor(options?: ErrorOptions) {
+        super('Review cancelled by the user', options);
+        this.name = 'ReviewCancelledError';
+    }
+}
+
+/**
+ * Awaits a review prompt. Inquirer rejects with an `ExitPromptError` when the
+ * user presses Ctrl-C; that becomes a ReviewCancelledError.
+ */
+async function reviewPrompt<T>(prompt: Promise<T>): Promise<T> {
+    try {
+        return await prompt;
+    } catch (error) {
+        if (error instanceof Error && error.name === 'ExitPromptError') {
+            throw new ReviewCancelledError({ cause: error });
+        }
+        throw error;
+    }
+}
+
 /**
  * Service for handling user input interactions
  */
@@ -98,12 +121,7 @@ export class UserInputService {
             });
         }
 
-        const answer = await checkbox({
-            message: 'What do you want to edit?',
-            choices,
-        });
-
-        return answer;
+        return reviewPrompt(checkbox({ message: 'What do you want to edit?', choices }));
     }
 
     /** @returns The chosen name, one of `categoryNames` */
@@ -151,31 +169,33 @@ export class UserInputService {
             return { value: name, name: label };
         };
 
-        return await search({
-            message,
-            source: async input => {
-                if (!input) {
-                    const choices = values.map(toChoice);
+        return reviewPrompt(
+            search({
+                message,
+                source: async input => {
+                    if (!input) {
+                        const choices = values.map(toChoice);
 
-                    // Sort: current first, then AI suggestion, then alphabetical
-                    choices.sort((a, b) => {
-                        if (a.value === currentValue) return -1;
-                        if (b.value === currentValue) return 1;
-                        if (a.value === aiSuggestion) return -1;
-                        if (b.value === aiSuggestion) return 1;
-                        return a.value.localeCompare(b.value);
-                    });
+                        // Sort: current first, then AI suggestion, then alphabetical
+                        choices.sort((a, b) => {
+                            if (a.value === currentValue) return -1;
+                            if (b.value === currentValue) return 1;
+                            if (a.value === aiSuggestion) return -1;
+                            if (b.value === aiSuggestion) return 1;
+                            return a.value.localeCompare(b.value);
+                        });
 
-                    return choices;
-                }
+                        return choices;
+                    }
 
-                // Filter based on user input (case-insensitive)
-                const searchLower = input.toLowerCase();
-                return values
-                    .filter(name => name.toLowerCase().includes(searchLower))
-                    .map(toChoice);
-            },
-        });
+                    // Filter based on user input (case-insensitive)
+                    const searchLower = input.toLowerCase();
+                    return values
+                        .filter(name => name.toLowerCase().includes(searchLower))
+                        .map(toChoice);
+                },
+            })
+        );
     }
 
     /**
@@ -369,13 +389,7 @@ export class UserInputService {
             value: ReviewAction.Skip,
         });
 
-        const answer = await expand({
-            message,
-            default: 'a',
-            choices,
-        });
-
-        return answer;
+        return reviewPrompt(expand({ message, default: 'a', choices }));
     }
 
     /*

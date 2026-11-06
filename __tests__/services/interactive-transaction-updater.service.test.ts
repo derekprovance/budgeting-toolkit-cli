@@ -7,7 +7,7 @@ import { TransactionValidatorService } from '../../src/services/core/transaction
 import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-catalog.service.js';
 import { ICategoryService } from '../../src/services/core/category.service.interface.js';
 import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
-import { UserInputService } from '../../src/services/user-input.service.js';
+import { ReviewCancelledError, UserInputService } from '../../src/services/user-input.service.js';
 import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
@@ -210,6 +210,13 @@ describe('InteractiveTransactionUpdater', () => {
 
             expect(result.ok).toBe(false);
             expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
+        });
+
+        it('lets a cancelled review propagate', async () => {
+            const cancelled = new ReviewCancelledError();
+            mockUserInputService.askToUpdateTransaction.mockRejectedValue(cancelled);
+
+            await expect(review()).rejects.toBe(cancelled);
         });
 
         it('returns an error when Firefly rejects the update', async () => {

@@ -16,6 +16,7 @@ import {
 } from './interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../types/result.type.js';
 import { TransactionHistoryService } from './transaction-history.service.js';
+import { ReviewCancelledError } from './user-input.service.js';
 import {
     CategorizeOptions,
     JournaledTransaction,
@@ -267,20 +268,23 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         const updated: TransactionRead[] = [];
         const failed: TransactionValidationError[] = [];
         for (const [i, update] of prepared.entries()) {
-            const result = await this.interactiveTransactionUpdater.applyUpdate(update, {
-                index: i + 1,
-                total: prepared.length,
-            });
-            if (result.ok) {
-                if (result.value) {
-                    updated.push(result.value);
+            let result;
+            try {
+                result = await this.interactiveTransactionUpdater.applyUpdate(update, {
+                    index: i + 1,
+                    total: prepared.length,
+                });
+            } catch (error) {
+                if (error instanceof ReviewCancelledError) {
+                    logger.debug('Review cancelled by the user');
+                    break;
                 }
-                continue;
+                throw error;
             }
-            failed.push(result.error);
-            if (result.error.message.includes('SIGINT')) {
-                logger.debug(update.transaction, 'Transaction update(s) terminated with SIGINT');
-                break;
+            if (!result.ok) {
+                failed.push(result.error);
+            } else if (result.value) {
+                updated.push(result.value);
             }
         }
         return { updated, failed };
