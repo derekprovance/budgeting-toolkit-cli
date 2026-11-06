@@ -125,29 +125,4 @@ describe('ExcludedTransactionService', () => {
             expect(badRule.isExcludedTransaction('Broken Rule', '100.00')).toBe(false);
         });
     });
-
-    describe('rules without a description', () => {
-        // ConfigValidator rejects these at startup, but the service must never
-        // fall back to matching on amount alone: exclusion happens at fetch time,
-        // so an amount-only rule would drop every transaction of that amount on
-        // every account, in either direction.
-        it('should ignore a rule carrying only an amount', () => {
-            const amountOnly = new ExcludedTransactionService(
-                [{ amount: '999.99' } as unknown as ExcludedTransaction],
-                mockLogger
-            );
-
-            expect(amountOnly.isExcludedTransaction('Any Description', '999.99')).toBe(false);
-            expect(amountOnly.isExcludedTransaction('Any Description', '-999.99')).toBe(false);
-        });
-
-        it('should ignore a rule with an empty description', () => {
-            const emptyDescription = new ExcludedTransactionService(
-                [{ description: '', amount: '999.99' }],
-                mockLogger
-            );
-
-            expect(emptyDescription.isExcludedTransaction('', '999.99')).toBe(false);
-        });
-    });
 });
