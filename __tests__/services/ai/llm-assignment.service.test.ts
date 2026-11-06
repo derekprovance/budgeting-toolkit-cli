@@ -10,6 +10,7 @@ import {
     ToolCall,
 } from '../../../src/api/claude.client.js';
 import { createMockTransaction } from '../../shared/test-data.js';
+import { createMockLogger } from '../../shared/mocks.js';
 
 type CallToolFn = ClaudeClient['callTool'];
 
@@ -36,13 +37,7 @@ describe('LLMAssignmentService', () => {
     const validBudgets = ['Food', 'Medical', 'Shopping'];
 
     beforeEach(() => {
-        mockLogger = {
-            info: jest.fn<(obj: unknown, msg: string) => void>(),
-            warn: jest.fn<(obj: unknown, msg: string) => void>(),
-            error: jest.fn<(obj: unknown, msg: string) => void>(),
-            debug: jest.fn<(obj: unknown, msg: string) => void>(),
-            trace: jest.fn<(obj: unknown, msg: string) => void>(),
-        } as jest.Mocked<ILogger>;
+        mockLogger = createMockLogger();
 
         callTool = jest.fn<CallToolFn>();
         service = new LLMAssignmentService(

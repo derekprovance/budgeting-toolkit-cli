@@ -2,10 +2,11 @@ import { jest } from '@jest/globals';
 import { ILogger } from '../../src/types/interface/logger.interface.js';
 import { ExcludedTransaction } from '../../src/config/config.types.js';
 import { ExcludedTransactionService } from '../../src/services/excluded-transaction.service.js';
+import { createMockLogger } from '../shared/mocks.js';
 
 describe('ExcludedTransactionService', () => {
     let service: ExcludedTransactionService;
-    let mockLogger: ILogger;
+    let mockLogger: jest.Mocked<ILogger>;
 
     const mockExcludedTransactions: ExcludedTransaction[] = [
         {
@@ -29,14 +30,7 @@ describe('ExcludedTransactionService', () => {
     ];
 
     beforeEach(() => {
-        // Create mock logger
-        mockLogger = {
-            debug: jest.fn<(obj: unknown, msg?: string) => void>(),
-            info: jest.fn<(obj: unknown, msg?: string) => void>(),
-            warn: jest.fn<(obj: unknown, msg?: string) => void>(),
-            error: jest.fn<(obj: unknown, msg?: string) => void>(),
-            trace: jest.fn<(obj: unknown, msg?: string) => void>(),
-        };
+        mockLogger = createMockLogger();
 
         service = new ExcludedTransactionService(mockExcludedTransactions, mockLogger);
     });

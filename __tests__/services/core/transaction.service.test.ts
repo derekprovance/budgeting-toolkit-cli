@@ -1,5 +1,4 @@
 import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
-import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
 import { TransactionService } from '../../../src/services/core/transaction.service.js';
 import {
@@ -14,8 +13,10 @@ import { ExcludedTransactionService } from '../../../src/services/excluded-trans
 import {
     createMockExcludedTransactionService,
     createMockFireflyClient,
+    createMockLogger,
 } from '../../shared/mocks.js';
 import { withdrawal } from '../../shared/test-data.js';
+import { ILogger } from '../../../src/types/interface/logger.interface.js';
 
 /** What the Firefly SDK throws for an HTTP error status */
 const apiError = (status: number) =>
@@ -32,9 +33,10 @@ describe('TransactionService', () => {
     let service: TransactionService;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
+    let mockLogger: jest.Mocked<ILogger>;
 
     beforeEach(() => {
-        resetMockLogger();
+        mockLogger = createMockLogger();
         mockExcludedTransactionService = createMockExcludedTransactionService();
         mockApiClient = createMockFireflyClient();
         service = new TransactionService(

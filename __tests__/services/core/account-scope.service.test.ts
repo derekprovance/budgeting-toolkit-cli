@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { AccountScopeService } from '../../../src/services/core/account-scope.service.js';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
-import { ILogger } from '../../../src/types/interface/logger.interface.js';
+import { createMockLogger } from '../../shared/mocks.js';
 
 type Role = 'defaultAsset' | 'savingAsset' | 'ccAsset' | 'sharedAsset' | 'cashWalletAsset';
 
@@ -10,15 +10,6 @@ const account = (id: string, role: Role, active = true) => ({
     id,
     attributes: { name: `Account ${id}`, type: 'asset', account_role: role, active },
 });
-
-const mockLogger = (): ILogger =>
-    ({
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        debug: jest.fn(),
-        trace: jest.fn(),
-    }) as unknown as ILogger;
 
 describe('AccountScopeService', () => {
     // Mirrors the real shape: checking, savings, three cards, a brokerage, the
@@ -52,7 +43,7 @@ describe('AccountScopeService', () => {
     const UNTRACKED = ['2', '27', '39'];
 
     const build = (untracked: string[] = UNTRACKED) =>
-        new AccountScopeService(client, untracked, mockLogger());
+        new AccountScopeService(client, untracked, createMockLogger());
 
     const scopeOf = async (untracked?: string[]) => {
         const scope = await build(untracked).getScope();
@@ -85,7 +76,7 @@ describe('AccountScopeService', () => {
         });
 
         it('should warn about an untracked id that matches no account', async () => {
-            const logger = mockLogger();
+            const logger = createMockLogger();
             await new AccountScopeService(client, ['2', '999'], logger).getScope();
 
             expect(logger.warn).toHaveBeenCalledWith(
