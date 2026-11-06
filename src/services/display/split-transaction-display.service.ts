@@ -95,19 +95,6 @@ export class SplitTransactionDisplayService {
     }
 
     /**
-     * Formats error message for display
-     * @param error The error that occurred
-     * @returns Formatted error message
-     */
-    formatError(error: Error): string {
-        return [
-            chalk.red.bold('\n✗ Failed to split transaction'),
-            ``,
-            chalk.red(`Error: ${error.message}`),
-        ].join('\n');
-    }
-
-    /**
      * Formats the header for split operation
      * @param transactionId The ID of the transaction being split
      * @returns Formatted header banner

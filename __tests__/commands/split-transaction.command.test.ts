@@ -61,7 +61,6 @@ describe('SplitTransactionCommand', () => {
             formatRemainder: jest.fn().mockReturnValue('Mock Remainder'),
             formatSplitPreview: jest.fn().mockReturnValue('Mock Preview'),
             formatSuccess: jest.fn().mockReturnValue('Mock Success'),
-            formatError: jest.fn().mockReturnValue('Mock Error'),
         } as unknown as jest.Mocked<SplitTransactionDisplayService>;
 
         userInputService = {
@@ -91,10 +90,7 @@ describe('SplitTransactionCommand', () => {
         it('should split transaction successfully in non-interactive mode with all parameters', async () => {
             const mockTransaction = createMockTransactionRead();
             splitService.getTransaction.mockResolvedValue(mockTransaction);
-            splitService.splitTransaction.mockResolvedValue({
-                success: true,
-                transaction: mockTransaction,
-            });
+            splitService.splitTransaction.mockResolvedValue(mockTransaction);
 
             await command.execute({
                 transactionId: '123',
@@ -187,23 +183,25 @@ describe('SplitTransactionCommand', () => {
             expect(splitService.splitTransaction).not.toHaveBeenCalled();
         });
 
-        it('should handle split service returning failure', async () => {
-            const mockTransaction = createMockTransactionRead();
-            splitService.getTransaction.mockResolvedValue(mockTransaction);
-            splitService.splitTransaction.mockResolvedValue({
-                success: false,
-                error: new Error('API error'),
-            });
+        it('should reject, without printing the error itself, when the split fails', async () => {
+            splitService.getTransaction.mockResolvedValue(createMockTransactionRead());
+            splitService.splitTransaction.mockRejectedValue(
+                new Error('Failed to split transaction 123: API error')
+            );
 
-            await command.execute({
-                transactionId: '123',
-                amount: '60.00',
-                descriptions: ['- Part 1', '- Part 2'],
-                yes: true,
-            });
+            await expect(
+                command.execute({
+                    transactionId: '123',
+                    amount: '60.00',
+                    descriptions: ['- Part 1', '- Part 2'],
+                    yes: true,
+                })
+            ).rejects.toThrow('Failed to split transaction 123: API error');
 
-            expect(displayService.formatError).toHaveBeenCalled();
-            expect(consoleLogSpy).toHaveBeenCalled();
+            // The CLI's handleError prints it once and exits 1
+            const printed = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+            expect(printed).not.toContain('API error');
+            expect(displayService.formatSuccess).not.toHaveBeenCalled();
         });
 
         it('should cancel split when user does not confirm', async () => {
@@ -228,10 +226,7 @@ describe('SplitTransactionCommand', () => {
             userInputService.getSplitAmount.mockResolvedValue(60);
             userInputService.getCustomSplitText.mockResolvedValue('');
             userInputService.confirmSplit.mockResolvedValue(true);
-            splitService.splitTransaction.mockResolvedValue({
-                success: true,
-                transaction: mockTransaction,
-            });
+            splitService.splitTransaction.mockResolvedValue(mockTransaction);
 
             await command.execute({
                 transactionId: '123',
@@ -250,10 +245,7 @@ describe('SplitTransactionCommand', () => {
             userInputService.getSplitAmount.mockResolvedValue(60);
             userInputService.getCustomSplitText.mockResolvedValue(' - custom text');
             userInputService.confirmSplit.mockResolvedValue(true);
-            splitService.splitTransaction.mockResolvedValue({
-                success: true,
-                transaction: mockTransaction,
-            });
+            splitService.splitTransaction.mockResolvedValue(mockTransaction);
 
             await command.execute({
                 transactionId: '123',
@@ -291,10 +283,7 @@ describe('SplitTransactionCommand', () => {
         it('should use yes flag to skip confirmation prompt', async () => {
             const mockTransaction = createMockTransactionRead();
             splitService.getTransaction.mockResolvedValue(mockTransaction);
-            splitService.splitTransaction.mockResolvedValue({
-                success: true,
-                transaction: mockTransaction,
-            });
+            splitService.splitTransaction.mockResolvedValue(mockTransaction);
 
             await command.execute({
                 transactionId: '123',
@@ -329,10 +318,7 @@ describe('SplitTransactionCommand', () => {
             userInputService.getSplitAmount.mockResolvedValue(60);
             userInputService.getCustomSplitText.mockResolvedValue('');
             userInputService.confirmSplit.mockResolvedValue(true);
-            splitService.splitTransaction.mockResolvedValue({
-                success: true,
-                transaction: mockTransaction,
-            });
+            splitService.splitTransaction.mockResolvedValue(mockTransaction);
 
             await command.execute({
                 transactionId: '123',
@@ -362,10 +348,7 @@ describe('SplitTransactionCommand', () => {
                 },
             });
             splitService.getTransaction.mockResolvedValue(mockTransaction);
-            splitService.splitTransaction.mockResolvedValue({
-                success: true,
-                transaction: mockTransaction,
-            });
+            splitService.splitTransaction.mockResolvedValue(mockTransaction);
 
             await command.execute({
                 transactionId: '123',

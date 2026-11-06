@@ -120,23 +120,6 @@ describe('SplitTransactionDisplayService', () => {
         });
     });
 
-    describe('formatError', () => {
-        it('should format error message', () => {
-            const error = new Error('Transaction not found');
-            const result = service.formatError(error);
-
-            expect(result).toContain('Failed to split transaction');
-            expect(result).toContain('Error: Transaction not found');
-        });
-
-        it('should handle errors with detailed messages', () => {
-            const error = new Error('Split amounts do not equal original amount');
-            const result = service.formatError(error);
-
-            expect(result).toContain('Split amounts do not equal original amount');
-        });
-    });
-
     describe('formatHeader', () => {
         it('should format header with transaction ID', () => {
             const result = service.formatHeader('123');

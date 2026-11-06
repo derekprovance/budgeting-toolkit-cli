@@ -1,11 +1,9 @@
-import ora from 'ora';
+import ora, { Ora } from 'ora';
 import chalk from 'chalk';
 import { Command } from '../types/interface/command.interface.js';
 import { TransactionSplitService, SplitData } from '../services/transaction-split.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
-import { logger } from '../logger.js';
-import { toError } from '../utils/error-detection.utils.js';
 
 /**
  * Parameters for split transaction command
@@ -23,7 +21,6 @@ interface SplitTransactionParams {
 export class SplitTransactionCommand implements Command<void, SplitTransactionParams> {
     /** Default currency symbol if transaction doesn't specify one */
     private static readonly DEFAULT_CURRENCY_SYMBOL = '$';
-    private readonly SPLIT_CMD_FAIL = 'Failed to split transaction';
 
     constructor(
         private readonly splitService: TransactionSplitService,
@@ -31,6 +28,10 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         private readonly userInputService: UserInputService
     ) {}
 
+    /**
+     * @throws when the transaction cannot be fetched or split; the spinner is
+     *   marked failed, and printing the error is left to the caller
+     */
     async execute(params: SplitTransactionParams): Promise<void> {
         const { transactionId, amount, descriptions, yes } = params;
 
@@ -41,152 +42,116 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         console.log(this.displayService.formatHeader(transactionId));
 
         const spinner = ora('Fetching transaction...').start();
-
-        try {
-            // Fetch the original transaction
-            const transaction = await this.splitService.getTransaction(transactionId);
-
-            if (!transaction) {
-                spinner.fail(chalk.red(`Transaction ${transactionId} not found`));
-                throw new Error(`Transaction ${transactionId} not found`);
+        const transaction = await failSpinnerOnError(
+            spinner,
+            'Failed to fetch transaction',
+            async () => {
+                const fetched = await this.splitService.getTransaction(transactionId);
+                if (!fetched) {
+                    throw new Error(`Transaction ${transactionId} not found`);
+                }
+                return fetched;
             }
-            const splits = transaction.attributes.transactions;
+        );
+        const splits = transaction.attributes.transactions;
 
-            if (!splits || splits.length === 0) {
-                spinner.fail(chalk.red('Transaction has no splits'));
-                throw new Error('Transaction has no splits');
-            }
+        if (!splits || splits.length === 0) {
+            spinner.fail('Transaction has no splits');
+            throw new Error('Transaction has no splits');
+        }
 
-            if (splits.length > 1) {
-                spinner.fail(
-                    chalk.red(
-                        `Transaction already has ${splits.length} splits. Only single transactions can be split.`
-                    )
-                );
-                throw new Error(
-                    `Transaction already has ${splits.length} splits. Only single transactions can be split.`
-                );
-            }
+        if (splits.length > 1) {
+            const message = `Transaction already has ${splits.length} splits. Only single transactions can be split.`;
+            spinner.fail(message);
+            throw new Error(message);
+        }
 
-            const originalSplit = splits[0];
-            const originalAmount = parseFloat(originalSplit.amount);
+        const originalSplit = splits[0];
+        const originalAmount = parseFloat(originalSplit.amount);
 
-            spinner.succeed('Transaction fetched');
+        spinner.succeed('Transaction fetched');
 
-            // Display original transaction
-            console.log(
-                this.displayService.formatOriginalTransaction(originalSplit, transactionId)
-            );
+        // Display original transaction
+        console.log(this.displayService.formatOriginalTransaction(originalSplit, transactionId));
 
-            const currencySymbol =
-                originalSplit.currency_symbol || SplitTransactionCommand.DEFAULT_CURRENCY_SYMBOL;
+        const currencySymbol =
+            originalSplit.currency_symbol || SplitTransactionCommand.DEFAULT_CURRENCY_SYMBOL;
 
-            // Get split amount: use CLI parameter if provided, otherwise prompt
-            const firstSplitAmount = amount
-                ? this.validateAndParseSplitAmount(amount, originalAmount, currencySymbol)
-                : await this.userInputService.getSplitAmount(originalAmount, currencySymbol);
+        // Get split amount: use CLI parameter if provided, otherwise prompt
+        const firstSplitAmount = amount
+            ? this.validateAndParseSplitAmount(amount, originalAmount, currencySymbol)
+            : await this.userInputService.getSplitAmount(originalAmount, currencySymbol);
 
-            const secondSplitAmount = UserInputService.remainderAmount(
-                originalAmount,
-                firstSplitAmount
-            );
+        const secondSplitAmount = UserInputService.remainderAmount(
+            originalAmount,
+            firstSplitAmount
+        );
 
-            // Show remainder
-            console.log(this.displayService.formatRemainder(secondSplitAmount, currencySymbol));
+        // Show remainder
+        console.log(this.displayService.formatRemainder(secondSplitAmount, currencySymbol));
 
-            // Get custom text for split 1: use CLI parameter if provided, otherwise prompt
-            const firstCustomText =
-                description1 !== undefined
-                    ? description1
-                    : await this.userInputService.getCustomSplitText(1);
-            const firstDescription = firstCustomText
-                ? `${originalSplit.description} ${firstCustomText}`
-                : originalSplit.description;
+        // Get custom text for split 1: use CLI parameter if provided, otherwise prompt
+        const firstCustomText =
+            description1 !== undefined
+                ? description1
+                : await this.userInputService.getCustomSplitText(1);
+        const firstDescription = firstCustomText
+            ? `${originalSplit.description} ${firstCustomText}`
+            : originalSplit.description;
 
-            // Get custom text for split 2: use CLI parameter if provided, otherwise prompt
-            const secondCustomText =
-                description2 !== undefined
-                    ? description2
-                    : await this.userInputService.getCustomSplitText(2);
-            const secondDescription = secondCustomText
-                ? `${originalSplit.description} ${secondCustomText}`
-                : originalSplit.description;
+        // Get custom text for split 2: use CLI parameter if provided, otherwise prompt
+        const secondCustomText =
+            description2 !== undefined
+                ? description2
+                : await this.userInputService.getCustomSplitText(2);
+        const secondDescription = secondCustomText
+            ? `${originalSplit.description} ${secondCustomText}`
+            : originalSplit.description;
 
-            // Prepare split data
-            const firstSplitData: SplitData = {
-                amount: firstSplitAmount.toFixed(2),
-                description: firstDescription,
-            };
+        // Prepare split data
+        const firstSplitData: SplitData = {
+            amount: firstSplitAmount.toFixed(2),
+            description: firstDescription,
+        };
 
-            const secondSplitData: SplitData = {
-                amount: secondSplitAmount.toFixed(2),
-                description: secondDescription,
-            };
+        const secondSplitData: SplitData = {
+            amount: secondSplitAmount.toFixed(2),
+            description: secondDescription,
+        };
 
-            // Show preview with parent description
-            console.log(
-                this.displayService.formatSplitPreview(
-                    originalSplit.description, // Parent transaction title
-                    firstSplitData.amount,
-                    firstSplitData.description || originalSplit.description,
-                    secondSplitData.amount,
-                    secondSplitData.description || originalSplit.description,
-                    currencySymbol
-                )
-            );
+        // Show preview with parent description
+        console.log(
+            this.displayService.formatSplitPreview(
+                originalSplit.description, // Parent transaction title
+                firstSplitData.amount,
+                firstSplitData.description || originalSplit.description,
+                secondSplitData.amount,
+                secondSplitData.description || originalSplit.description,
+                currencySymbol
+            )
+        );
 
-            // Confirm with user: skip if --yes flag provided
-            const confirmed = yes || (await this.userInputService.confirmSplit());
+        // Confirm with user: skip if --yes flag provided
+        const confirmed = yes || (await this.userInputService.confirmSplit());
 
-            if (!confirmed) {
-                console.log(chalk.yellow('\nSplit cancelled.'));
-                return;
-            }
+        if (!confirmed) {
+            console.log(chalk.yellow('\nSplit cancelled.'));
+            return;
+        }
 
-            // Execute the split
-            spinner.start('Splitting transaction...');
-
-            const result = await this.splitService.splitTransaction(
+        spinner.start('Splitting transaction...');
+        const updated = await failSpinnerOnError(spinner, 'Failed to split transaction', () =>
+            this.splitService.splitTransaction(
                 transactionId,
                 firstSplitData.amount,
                 firstSplitData,
                 secondSplitData
-            );
-
-            if (result.success && result.transaction) {
-                spinner.succeed('Transaction split successfully');
-                console.log(
-                    this.displayService.formatSuccess(
-                        transactionId,
-                        result.transaction.attributes.transactions?.length || 2
-                    )
-                );
-            } else {
-                spinner.fail(this.SPLIT_CMD_FAIL);
-                if (result.error) {
-                    console.log(this.displayService.formatError(result.error));
-                }
-            }
-        } catch (error) {
-            spinner.fail(this.SPLIT_CMD_FAIL);
-            const errorObject = toError(error);
-
-            // Diagnostic logging for troubleshooting
-            logger.error(
-                {
-                    error: errorObject.message,
-                    stack: errorObject.stack,
-                    transactionId,
-                },
-                this.SPLIT_CMD_FAIL
-            );
-
-            // User-facing output
-            console.log(this.displayService.formatError(errorObject));
-
-            // Re-throw error to let CLI framework handle exit
-            throw errorObject;
-        }
+            )
+        );
+        spinner.succeed('Transaction split successfully');
+        console.log(
+            this.displayService.formatSuccess(transactionId, updated.attributes.transactions.length)
+        );
     }
 
     /**
@@ -213,5 +178,22 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         }
 
         return parseFloat(amountStr.trim());
+    }
+}
+
+/**
+ * Runs `work`, marking the spinner failed if it throws. The error itself is
+ * rethrown for the CLI to print once.
+ */
+async function failSpinnerOnError<T>(
+    spinner: Ora,
+    failureText: string,
+    work: () => Promise<T>
+): Promise<T> {
+    try {
+        return await work();
+    } catch (error) {
+        spinner.fail(failureText);
+        throw error;
     }
 }

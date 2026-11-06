@@ -146,9 +146,28 @@ describe('TransactionSplitService', () => {
                 { amount: '40.00', description: 'Test Transaction - Part 2' }
             );
 
-            expect(result.success).toBe(true);
-            expect(result.transaction).toEqual(mockTransaction);
+            expect(result).toEqual(mockTransaction);
             expect(mockClient.transactions.updateTransaction).toHaveBeenCalled();
+        });
+
+        it('should throw with the transaction id, keeping the Firefly error as cause, when the update fails', async () => {
+            const fireflyError = new Error('Unauthenticated');
+            mockClient.transactions.getTransaction.mockResolvedValue({
+                data: createMockTransaction(),
+            });
+            mockClient.transactions.updateTransaction.mockRejectedValue(fireflyError);
+
+            const failure = service.splitTransaction(
+                '123',
+                '60.00',
+                { amount: '60.00', description: 'Part 1' },
+                { amount: '40.00', description: 'Part 2' }
+            );
+
+            await expect(failure).rejects.toThrow(
+                'Failed to split transaction 123: Unauthenticated'
+            );
+            await expect(failure).rejects.toMatchObject({ cause: fireflyError });
         });
 
         it('should throw error when transaction not found', async () => {
@@ -156,16 +175,9 @@ describe('TransactionSplitService', () => {
                 data: undefined as unknown as TransactionRead,
             });
 
-            const result = await service.splitTransaction(
-                '999',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '40.00' }
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('not found');
+            await expect(
+                service.splitTransaction('999', '60.00', { amount: '60.00' }, { amount: '40.00' })
+            ).rejects.toThrow('not found');
         });
 
         it('should throw error when transaction has no splits', async () => {
@@ -175,15 +187,9 @@ describe('TransactionSplitService', () => {
             };
             mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
 
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '40.00' }
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error?.message).toContain('no splits');
+            await expect(
+                service.splitTransaction('123', '60.00', { amount: '60.00' }, { amount: '40.00' })
+            ).rejects.toThrow('no splits');
         });
 
         it('should throw error when transaction already split (>1 splits)', async () => {
@@ -199,30 +205,23 @@ describe('TransactionSplitService', () => {
             };
             mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
 
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '40.00' }
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error?.message).toContain('already has');
+            await expect(
+                service.splitTransaction('123', '60.00', { amount: '60.00' }, { amount: '40.00' })
+            ).rejects.toThrow('already has');
         });
 
         it('should throw error when split amounts do not sum to original', async () => {
             const mockTransaction = createMockTransaction();
             mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
 
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '50.00' } // Sum is 110, not 100
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error?.message).toContain('do not equal');
+            await expect(
+                service.splitTransaction(
+                    '123',
+                    '60.00',
+                    { amount: '60.00' },
+                    { amount: '50.00' } // Sum is 110, not 100
+                )
+            ).rejects.toThrow('do not equal');
         });
 
         describe('metadata handling', () => {

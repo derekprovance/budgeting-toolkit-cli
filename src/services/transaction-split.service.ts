@@ -7,7 +7,7 @@ import {
 import { FireflyClientWithCerts } from '../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../logger.js';
 import { ILogger } from '../types/interface/logger.interface.js';
-import { errorMessage, toError } from '../utils/error-detection.utils.js';
+import { errorMessage } from '../utils/error-detection.utils.js';
 
 /**
  * Data for a single split portion
@@ -15,15 +15,6 @@ import { errorMessage, toError } from '../utils/error-detection.utils.js';
 export interface SplitData {
     amount: string;
     description?: string;
-}
-
-/**
- * Result of a split operation
- */
-export interface SplitResult {
-    success: boolean;
-    transaction?: TransactionRead;
-    error?: Error;
 }
 
 /**
@@ -72,100 +63,96 @@ export class TransactionSplitService {
      * @param firstSplitAmount Amount for the first split (original will be updated to this)
      * @param firstSplitData Data for the first split (category, budget, description with optional custom text)
      * @param secondSplitData Data for the second split (remainder with optional custom text)
-     * @returns SplitResult with success status and updated transaction or error
+     * @returns The updated transaction
+     * @throws when the transaction cannot be split or Firefly rejects the update
      */
     async splitTransaction(
         transactionId: string,
         firstSplitAmount: string,
         firstSplitData: SplitData,
         secondSplitData: SplitData
-    ): Promise<SplitResult> {
-        try {
-            // Fetch the original transaction
-            const originalTransaction =
-                await this.client.transactions.getTransaction(transactionId);
+    ): Promise<TransactionRead> {
+        // Fetch the original transaction
+        const originalTransaction = await this.client.transactions.getTransaction(transactionId);
 
-            if (!originalTransaction?.data) {
-                throw new Error(`Transaction ${transactionId} not found`);
-            }
+        if (!originalTransaction?.data) {
+            throw new Error(`Transaction ${transactionId} not found`);
+        }
 
-            const transactionData = originalTransaction.data;
-            const splits = transactionData.attributes.transactions;
+        const transactionData = originalTransaction.data;
+        const splits = transactionData.attributes.transactions;
 
-            if (!splits || splits.length === 0) {
-                throw new Error(`Transaction ${transactionId} has no splits`);
-            }
+        if (!splits || splits.length === 0) {
+            throw new Error(`Transaction ${transactionId} has no splits`);
+        }
 
-            // For now, we only support splitting single-split transactions
-            if (splits.length > 1) {
-                throw new Error(
-                    `Transaction ${transactionId} already has ${splits.length} splits. Only single transactions can be split.`
-                );
-            }
-
-            const originalSplit = splits[0];
-
-            // Validate the split amounts
-            const originalAmount = parseFloat(originalSplit.amount);
-            const firstAmount = parseFloat(firstSplitAmount);
-            const secondAmount = parseFloat(secondSplitData.amount);
-
-            if (!this.validateSplitAmounts(originalAmount, [firstAmount, secondAmount])) {
-                throw new Error(
-                    `Split amounts (${firstAmount} + ${secondAmount} = ${firstAmount + secondAmount}) ` +
-                        `do not equal original amount (${originalAmount})`
-                );
-            }
-
-            // Build the update payload
-            const updatePayload = this.createSplitPayload(
-                originalSplit,
-                firstSplitAmount,
-                firstSplitData,
-                secondSplitData
+        // For now, we only support splitting single-split transactions
+        if (splits.length > 1) {
+            throw new Error(
+                `Transaction ${transactionId} already has ${splits.length} splits. Only single transactions can be split.`
             );
+        }
 
-            this.logger.debug(
-                {
-                    transactionId,
-                    originalAmount,
-                    firstAmount,
-                    secondAmount,
-                },
-                'Splitting transaction'
+        const originalSplit = splits[0];
+
+        // Validate the split amounts
+        const originalAmount = parseFloat(originalSplit.amount);
+        const firstAmount = parseFloat(firstSplitAmount);
+        const secondAmount = parseFloat(secondSplitData.amount);
+
+        if (!this.validateSplitAmounts(originalAmount, [firstAmount, secondAmount])) {
+            throw new Error(
+                `Split amounts (${firstAmount} + ${secondAmount} = ${firstAmount + secondAmount}) ` +
+                    `do not equal original amount (${originalAmount})`
             );
+        }
 
-            // Execute the split via SDK
-            const result = await this.client.transactions.updateTransaction(
+        // Build the update payload
+        const updatePayload = this.createSplitPayload(
+            originalSplit,
+            firstSplitAmount,
+            firstSplitData,
+            secondSplitData
+        );
+
+        this.logger.debug(
+            {
                 transactionId,
-                updatePayload
-            );
+                originalAmount,
+                firstAmount,
+                secondAmount,
+            },
+            'Splitting transaction'
+        );
 
-            this.logger.debug(
-                {
-                    transactionId,
-                    splitsCreated: result.data?.attributes.transactions?.length,
-                },
-                'Transaction split successfully'
-            );
+        const updated = await this.sendUpdate(transactionId, updatePayload);
 
-            return {
-                success: true,
-                transaction: result.data,
-            };
+        this.logger.debug(
+            {
+                transactionId,
+                splitsCreated: updated.attributes.transactions.length,
+            },
+            'Transaction split successfully'
+        );
+
+        return updated;
+    }
+
+    private async sendUpdate(
+        transactionId: string,
+        payload: TransactionUpdate
+    ): Promise<TransactionRead> {
+        try {
+            const response = await this.client.transactions.updateTransaction(
+                transactionId,
+                payload
+            );
+            return response.data;
         } catch (error) {
-            this.logger.error(
-                {
-                    error: errorMessage(error),
-                    transactionId,
-                },
-                'Failed to split transaction'
+            throw new Error(
+                `Failed to split transaction ${transactionId}: ${errorMessage(error)}`,
+                { cause: error }
             );
-
-            return {
-                success: false,
-                error: toError(error),
-            };
         }
     }
 
