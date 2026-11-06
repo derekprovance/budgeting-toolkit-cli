@@ -60,7 +60,6 @@ export function fieldTest(
 ): void {
     const defect = findKnownDefect(command, month, fieldPath);
     if (defect) {
-        // KNOWN DEFECT — see defect.doc; the literal is the model, not the code
         test.failing(`${fieldPath} [${defect.id}]`, body);
     } else {
         test(fieldPath, body);

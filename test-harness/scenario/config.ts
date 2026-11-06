@@ -30,8 +30,7 @@ export function buildScenarioConfig(idMap: ConfigIdMap): ScenarioYamlConfig {
     const a = idMap.accounts;
     return {
         expectedMonthlyPaycheck: 2100,
-        // Everything outside the envelope (R-SCOPE-1). OLD is outside because
-        // it is inactive, so it needs no entry.
+        // Everything outside the envelope (R-SCOPE-1); inactive OLD stays inside.
         untrackedAccounts: [a.SAV, a.BRK, a.POOL],
         excludedTransactions: [
             {

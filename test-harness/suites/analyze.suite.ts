@@ -37,11 +37,7 @@ const TOP_LEVEL_KEYS = [
     'year',
 ];
 
-/**
- * @param run   produces the `--json` document and the text output for a month
- * @param idMap from the seeder; either the object or a getter (for layers
- *              that only know it after their own beforeAll has seeded)
- */
+/** `idMap` may be a getter, for layers that only know it after their own beforeAll has seeded */
 export function defineAnalyzeSuite(run: AnalyzeRun, idMap: IdMap | (() => IdMap)): void {
     const ids = typeof idMap === 'function' ? idMap : () => idMap;
 

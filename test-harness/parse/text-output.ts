@@ -11,7 +11,7 @@ import stripAnsiLib from 'strip-ansi';
 export const PREAMBLE = '(preamble)';
 
 // OSC 8 hyperlinks: ESC ] 8 ; params ; url (ST | BEL) — removed explicitly in
-// case strip-ansi leaves them (PENDING V18).
+// case strip-ansi leaves them.
 // eslint-disable-next-line no-control-regex
 const OSC8 = /\u001B\]8;[^\u0007\u001B]*(?:\u0007|\u001B\\)/g;
 

@@ -32,8 +32,6 @@ import { addDays, inRange, occurrence, toDay, toWireDate } from './dates.js';
 import { formatMoney, parseMoney } from './money.js';
 import { PAGINATION_BEHAVIOR } from '../scenario/firefly-contract.js';
 
-// ─── State ──────────────────────────────────────────────────────────────────
-
 type AccountType = 'asset' | 'expense' | 'revenue' | 'cash';
 
 const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
@@ -173,8 +171,6 @@ function nowIso(): string {
     return new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
 }
 
-// ─── Server ─────────────────────────────────────────────────────────────────
-
 export class FakeFirefly {
     readonly token: string;
     private readonly userEmail: string;
@@ -270,8 +266,6 @@ export class FakeFirefly {
                 Object.entries(match).every(([k, v]) => r.query.get(k) === v)
         );
     }
-
-    // ─── Dispatch ───────────────────────────────────────────────────────────
 
     private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
         const method = req.method ?? 'GET';
@@ -467,8 +461,6 @@ export class FakeFirefly {
         throw this.unknownRoute(method, `/api${path}`);
     }
 
-    // ─── Pagination ─────────────────────────────────────────────────────────
-
     /** Laravel-style pagination: limit honored with no cap (V14) */
     private page<T>(q: URLSearchParams, items: readonly T[], toRes: (item: T) => unknown) {
         const limitRaw = Number(q.get('limit'));
@@ -495,8 +487,6 @@ export class FakeFirefly {
             links: { self: '', first: '', last: '' },
         };
     }
-
-    // ─── About / currencies ─────────────────────────────────────────────────
 
     private about() {
         return {
@@ -547,8 +537,6 @@ export class FakeFirefly {
             },
         };
     }
-
-    // ─── Accounts ───────────────────────────────────────────────────────────
 
     private listAccounts(q: URLSearchParams) {
         const type = q.get('type');
@@ -731,8 +719,6 @@ export class FakeFirefly {
         );
     }
 
-    // ─── Bills ──────────────────────────────────────────────────────────────
-
     private bill(id: string): Bill {
         const bill = this.bills.find(x => x.id === id);
         if (!bill) throw notFound();
@@ -886,8 +872,6 @@ export class FakeFirefly {
         };
     }
 
-    // ─── Budgets and limits ─────────────────────────────────────────────────
-
     private budget(id: string): Budget {
         const budget = this.budgets.find(x => x.id === id);
         if (!budget) throw notFound();
@@ -1029,8 +1013,6 @@ export class FakeFirefly {
         };
     }
 
-    // ─── Tags ───────────────────────────────────────────────────────────────
-
     private tag(idOrName: string): Tag {
         const t = this.tags.find(x => x.tag === idOrName) ?? this.tags.find(x => x.id === idOrName);
         if (!t) throw notFound();
@@ -1080,8 +1062,6 @@ export class FakeFirefly {
             },
         };
     }
-
-    // ─── Transactions ───────────────────────────────────────────────────────
 
     private group(id: string): Group {
         const g = this.groups.find(x => x.id === id);
@@ -1384,8 +1364,6 @@ export class FakeFirefly {
         };
     }
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {

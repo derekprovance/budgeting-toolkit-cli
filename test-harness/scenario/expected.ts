@@ -13,8 +13,6 @@
  */
 import type { AssertedMonthId, BillKey, BudgetKey, TxKey } from './types.js';
 
-// ─── Shapes ─────────────────────────────────────────────────────────────────
-
 export interface ExpectedTxBucket {
     total: number;
     /** Order-insensitive set of scenario keys */
@@ -75,8 +73,6 @@ export interface ExpectedReport {
     bills: { predicted: number; actual: number; variance: number };
     unbudgetedExpenses: ExpectedTxBucket;
 }
-
-// ─── analyze ────────────────────────────────────────────────────────────────
 
 export const ANALYZE_EXPECTED: Record<AssertedMonthId, ExpectedAnalyze> = {
     '2025-01': {
@@ -234,8 +230,6 @@ export const ANALYZE_EXPECTED: Record<AssertedMonthId, ExpectedAnalyze> = {
     },
 };
 
-// ─── report ─────────────────────────────────────────────────────────────────
-//
 // Report budget rows are the same budget bucket analyze uses (R-BUDGET-1),
 // grouped by budget, for every active budget, with one month of history:
 // previousMonthSpent is the prior month's bucket, averageSpent =
@@ -408,8 +402,6 @@ export const REPORT_EXPECTED: Record<AssertedMonthId, ExpectedReport> = {
     },
 };
 
-// ─── text smoke lines ───────────────────────────────────────────────────────
-//
 // Compared after stripAnsi, with each output line trimmed and runs of
 // whitespace collapsed to one space (see parse/text-output.ts). `section` is
 // the title of the ┌─┐ section header the line sits under, or PREAMBLE for
@@ -588,8 +580,6 @@ export const REPORT_TEXT: Record<AssertedMonthId, TextExpectation> = {
     },
 };
 
-// ─── known defects ──────────────────────────────────────────────────────────
-//
 // A field where the code disagrees with RULES.md. Its test asserts the RULES
 // value and runs as `test.failing` until the code is fixed. Empty means the
 // code implements RULES.md everywhere the scenario can see.

@@ -27,18 +27,16 @@ command -v curl >/dev/null || die 'curl is not installed'
 mkdir -p "$STATE_DIR"
 chmod 700 "$STATE_DIR"
 
-# 1. APP_KEY. Keep an existing key: a running container already holds it.
+# Keep an existing APP_KEY: a running container already holds it.
 if [[ ! -s "$STATE_DIR/app-key" ]]; then
     log 'generating APP_KEY'
     (umask 077 && openssl rand -hex 16 | tr -d '\n' > "$STATE_DIR/app-key")
 fi
 [[ "$(wc -c < "$STATE_DIR/app-key" | tr -d ' ')" == 32 ]] || die '.e2e/app-key must be exactly 32 characters'
 
-# 2. Start and wait for both healthchecks.
 log 'starting btk-e2e stack'
 "${COMPOSE[@]}" up -d --wait
 
-# 3. Resolve the ephemeral host port and insist on loopback.
 binding="$("${COMPOSE[@]}" port firefly 8080)"
 host="${binding%:*}"
 port="${binding##*:}"
@@ -65,7 +63,6 @@ if [[ -s "$STATE_DIR/env" ]]; then
     fi
 fi
 
-# 4 + 5. First user and personal access token, inside the container.
 if [[ -z "$token" ]]; then
     log 'creating user and personal access token'
     bootstrap_out="$("${COMPOSE[@]}" exec -T -e E2E_EMAIL="$E2E_EMAIL" firefly php 2>/dev/null <<'PHP'
@@ -124,7 +121,7 @@ PHP
     [[ -n "$token" ]] || die 'bootstrap produced no token'
 fi
 
-# 6. Artifacts. Write via temp file + rename so a partial file never exists.
+# Write via temp file + rename so a partial file never exists.
 (
     umask 077
     printf 'FIREFLY_API_URL=%s\nFIREFLY_API_TOKEN=%s\n' "$url" "$token" > "$STATE_DIR/env.tmp"
@@ -133,7 +130,6 @@ fi
 chmod 600 "$STATE_DIR/env"
 printf '{\n  "port": %s,\n  "url": "%s"\n}\n' "$port" "$url" > "$STATE_DIR/state.json"
 
-# 7. Smoke check.
 about="$(api "$token" /v1/about/user)" || die 'smoke check /api/v1/about/user failed'
 grep -q "\"email\":\"$E2E_EMAIL\"" <<<"$about" || die "token does not belong to $E2E_EMAIL: $about"
 log "ready: $url as $E2E_EMAIL (credentials in .e2e/env)"

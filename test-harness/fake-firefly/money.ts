@@ -7,7 +7,7 @@
 const SCALE = 12;
 const FACTOR = 10n ** BigInt(SCALE);
 
-/** Parses "12.34", 12.34 or "12.340000000000" into micro-units; throws on junk */
+/** Parses "12.34", 12.34 or "12.340000000000" into units of 1e-12; throws on junk */
 export function parseMoney(value: unknown): bigint {
     const raw = typeof value === 'number' ? value.toString() : String(value ?? '').trim();
     const match = /^(-)?(\d+)(?:\.(\d+))?$/.exec(raw);

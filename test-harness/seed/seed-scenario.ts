@@ -5,7 +5,7 @@
  * Only the SDK client is used — never raw fetch — so the in-process fake
  * server has to serve exactly the calls made here, and nothing else.
  *
- * Order (plan "Seeder"):
+ * Order:
  *   1. USD becomes the primary currency (V13: body {} or it is a 415)
  *   2. tags, asset accounts (ccAsset card fields per V6), budgets + limits, bills
  *   3. every transaction, apply_rules:false / fire_webhooks:false
@@ -106,9 +106,8 @@ export async function seedScenario(
     const log = opts.log ?? (() => undefined);
     assertLedgerIsSeedable();
 
-    // 1. Primary currency. The SDK's primaryCurrency() sends no body, which
-    //    6.6.6 rejects with 415 (V13); go through the SDK's request layer with
-    //    an explicit {} body instead.
+    // The SDK's primaryCurrency() sends no body, which 6.6.6 rejects with 415
+    // (V13); go through its request layer with an explicit {} body instead.
     log('setting USD as the primary currency');
     await client.request.request<void>({
         method: 'POST',
@@ -118,13 +117,11 @@ export async function seedScenario(
         mediaType: 'application/json',
     });
 
-    // 2a. Tags
     log(`creating ${LEDGER.tags.length} tags`);
     for (const tag of LEDGER.tags) {
         await client.tags.storeTag({ tag });
     }
 
-    // 2b. Asset accounts
     const accounts = {} as Record<AccountKey, string>;
     for (const a of LEDGER.accounts) {
         const res = await client.accounts.storeAccount({
@@ -145,7 +142,6 @@ export async function seedScenario(
     }
     log(`created ${LEDGER.accounts.length} asset accounts`);
 
-    // 2c. Budgets and their per-month limits
     const budgets = {} as Record<BudgetKey, string>;
     for (const b of LEDGER.budgets) {
         const res = await client.budgets.storeBudget({ name: b.name, active: true });
@@ -164,8 +160,8 @@ export async function seedScenario(
     }
     log(`created ${LEDGER.budgets.length} budgets`);
 
-    // 2d. Bills (all active at first; V19 lets a transaction reference an
-    //     inactive bill, but deactivating afterwards mirrors real history)
+    // All active at first: V19 lets a transaction reference an inactive bill,
+    // but deactivating afterwards mirrors real history
     const bills = {} as Record<BillKey, string>;
     for (const b of LEDGER.bills) {
         const res = await client.bills.storeBill({
@@ -181,7 +177,6 @@ export async function seedScenario(
     }
     log(`created ${LEDGER.bills.length} bills`);
 
-    // 3. Transactions
     const transactions = {} as Record<TxKey, { groupId: string; journalId: string }>;
     for (const t of LEDGER.transactions) {
         const res = await client.transactions.storeTransaction({
@@ -212,7 +207,6 @@ export async function seedScenario(
     }
     log(`created ${LEDGER.transactions.length} transactions`);
 
-    // 4. Post-seed deactivations
     for (const a of LEDGER.accounts.filter(x => x.deactivateAfterSeed)) {
         await client.accounts.updateAccount(accounts[a.key], { name: a.name, active: false });
         log(`deactivated account ${a.key}`);
@@ -224,7 +218,6 @@ export async function seedScenario(
 
     const idMap: IdMap = { accounts, bills, budgets, transactions };
 
-    // 5. Read-back
     await assertSeeded(client, idMap);
     log('read-back verified');
 
@@ -242,11 +235,10 @@ export async function assertSeeded(client: FireflyClientWithCerts, idMap: IdMap)
         }
     };
 
-    // Primary currency (V13)
     const primary = await client.currencies.getPrimaryCurrency();
     check('primary currency', primary.data.attributes.code, 'USD');
 
-    // Accounts (V6: card fields read back null)
+    // V6: card fields read back null
     for (const a of LEDGER.accounts) {
         const res = await client.accounts.getAccount(idMap.accounts[a.key]);
         const attrs = res.data.attributes;
@@ -265,7 +257,6 @@ export async function assertSeeded(client: FireflyClientWithCerts, idMap: IdMap)
         }
     }
 
-    // Budgets and limits
     for (const b of LEDGER.budgets) {
         const id = idMap.budgets[b.key];
         const res = await client.budgets.getBudget(id);
@@ -283,7 +274,6 @@ export async function assertSeeded(client: FireflyClientWithCerts, idMap: IdMap)
         check(`budget ${b.key} limits`, actual, expected);
     }
 
-    // Bills
     for (const b of LEDGER.bills) {
         const res = await client.bills.getBill(idMap.bills[b.key]);
         const attrs = res.data.attributes;
@@ -314,7 +304,6 @@ export async function assertSeeded(client: FireflyClientWithCerts, idMap: IdMap)
         }
     }
 
-    // Transactions
     const assetNames = new Map(LEDGER.accounts.map(a => [idMap.accounts[a.key], a.name]));
     for (const t of LEDGER.transactions) {
         const ids = idMap.transactions[t.key];
@@ -390,8 +379,6 @@ function checkEndpoint(
     // (withdrawal destination) accounts — never "Cash account"
     check(`${t.key} ${side}_type`, type, side === 'source' ? 'Revenue account' : 'Expense account');
 }
-
-// ─── Pre-flight and marker ──────────────────────────────────────────────────
 
 export type SeedState =
     { kind: 'empty' } | { kind: 'seeded'; marker: string } | { kind: 'foreign'; reason: string };
