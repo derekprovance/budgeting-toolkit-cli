@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { BudgetRead, TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
-import { ICategoryService } from '../../src/services/core/category.service.interface.js';
-import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
-import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-catalog.service.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
@@ -14,14 +11,11 @@ import { InteractiveTransactionUpdater } from '../../src/services/interactive-tr
 import { ReviewCancelledError } from '../../src/services/user-input.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
-import { deposit, transfer, withdrawal } from '../shared/test-data.js';
-import { partialMock } from '../shared/mocks.js';
-
-const budget = (id: string, name: string): BudgetRead =>
-    ({ id, type: 'budgets', attributes: { name } }) as BudgetRead;
+import { budgetRead, deposit, transfer, withdrawal } from '../shared/test-data.js';
+import { loadCatalog, partialMock } from '../shared/mocks.js';
 
 const CATEGORIES = ['Groceries', 'Dining'];
-const BUDGETS = [budget('1', 'Food'), budget('2', 'Fun')];
+const BUDGETS = [budgetRead('1', 'Food'), budgetRead('2', 'Fun')];
 
 /** An uncategorized, unbudgeted withdrawal */
 const incoming = (id: string, description = `Transaction ${id}`, fields = {}) =>
@@ -63,12 +57,7 @@ describe('AITransactionUpdateOrchestrator', () => {
     let assign: jest.Mock<LLMAssignmentService['assign']>;
 
     const build = async ({ past = [], force = false, historyFails = false }: BuildOptions = {}) => {
-        const catalog = await CategoryBudgetCatalog.load(
-            partialMock<ICategoryService>({
-                getCategories: async () => CATEGORIES.map(name => ({ name })),
-            }),
-            partialMock<IBudgetService>({ getBudgets: async () => BUDGETS })
-        );
+        const catalog = await loadCatalog(CATEGORIES, BUDGETS);
         const validator = new TransactionValidatorService(
             new TransactionClassificationService('Disposable Income', 'Paycheck')
         );

@@ -5,24 +5,16 @@ import {
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-catalog.service.js';
-import { ICategoryService } from '../../src/services/core/category.service.interface.js';
-import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
 import { ReviewCancelledError, UserInputService } from '../../src/services/user-input.service.js';
-import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/firefly-iii-sdk';
+import { TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 import { Result } from '../../src/types/result.type.js';
-import { withdrawal } from '../shared/test-data.js';
+import { budgetRead, withdrawal } from '../shared/test-data.js';
 import { JournaledTransaction, Suggestion } from '../../src/types/categorize.types.js';
-import { partialMock } from '../shared/mocks.js';
+import { loadCatalog, partialMock } from '../shared/mocks.js';
 
-const category = (name: string): CategoryProperties => ({ name });
-// Partial API fixture: only the fields the updater reads
-const budget = (id: string, name: string): BudgetRead =>
-    ({ id, type: 'budget', attributes: { name } }) as unknown as BudgetRead;
-
-const categories = [category('New Category'), category('Groceries')];
-const budgets = [budget('2', 'New Budget'), budget('3', 'Food')];
+const budgets = [budgetRead('2', 'New Budget'), budgetRead('3', 'Food')];
 
 /** A suggestion without its transaction, which each test fills in */
 type Names = Partial<Omit<Suggestion, 'transaction'>>;
@@ -100,10 +92,7 @@ describe('InteractiveTransactionUpdater', () => {
             printSeparator: jest.fn(),
         });
 
-        catalog = await CategoryBudgetCatalog.load(
-            partialMock<ICategoryService>({ getCategories: async () => categories }),
-            partialMock<IBudgetService>({ getBudgets: async () => budgets })
-        );
+        catalog = await loadCatalog(['New Category', 'Groceries'], budgets);
     });
 
     describe('prepareUpdate', () => {
@@ -113,7 +102,7 @@ describe('InteractiveTransactionUpdater', () => {
             expect(result).toEqual(
                 Result.ok<PreparedUpdate>({
                     transaction,
-                    category: categories[0],
+                    category: { name: 'New Category' },
                     budget: budgets[0],
                     source: { category: 'history' },
                 })

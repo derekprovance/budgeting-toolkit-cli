@@ -2,12 +2,9 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { CategoryBudgetCatalog } from '../../../src/services/core/category-budget-catalog.service.js';
 import { ICategoryService } from '../../../src/services/core/category.service.interface.js';
 import { IBudgetService } from '../../../src/services/core/budget.service.interface.js';
-import { CategoryProperties, BudgetRead } from '@derekprovance/firefly-iii-sdk';
-import { createMockTransaction } from '../../shared/test-data.js';
+import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
+import { budgetRead, createMockTransaction } from '../../shared/test-data.js';
 import { partialMock } from '../../shared/mocks.js';
-
-const budget = (id: string, name: string): BudgetRead =>
-    ({ id, type: 'budgets', attributes: { name, active: true } }) as BudgetRead;
 
 describe('CategoryBudgetCatalog', () => {
     const categories: CategoryProperties[] = [
@@ -16,7 +13,11 @@ describe('CategoryBudgetCatalog', () => {
         { name: 'Bills & Utilities' },
         { name: "Children's Expenses" },
     ];
-    const budgets = [budget('1', 'Food'), budget('2', 'Medical'), budget('3', 'Utilities')];
+    const budgets = [
+        budgetRead('1', 'Food'),
+        budgetRead('2', 'Medical'),
+        budgetRead('3', 'Utilities'),
+    ];
     const transaction = createMockTransaction({
         transaction_journal_id: '1',
         description: 'Test Transaction',

@@ -7,6 +7,10 @@ import {
 } from '../../src/services/core/account-scope.service.js';
 import { CashFlowService, MonthBuckets } from '../../src/services/cash-flow.service.js';
 import { Result } from '../../src/types/result.type.js';
+import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-catalog.service.js';
+import { ICategoryService } from '../../src/services/core/category.service.interface.js';
+import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
+import { BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 
 /**
@@ -112,3 +116,15 @@ export const createMockCashFlowService = (
         ),
     });
 };
+
+/** A catalog loaded from the given category names and budgets. */
+export const loadCatalog = (
+    categoryNames: string[],
+    budgets: BudgetRead[]
+): Promise<CategoryBudgetCatalog> =>
+    CategoryBudgetCatalog.load(
+        partialMock<ICategoryService>({
+            getCategories: async () => categoryNames.map(name => ({ name })),
+        }),
+        partialMock<IBudgetService>({ getBudgets: async () => budgets })
+    );

@@ -1,12 +1,10 @@
 import { jest } from '@jest/globals';
-import { BudgetLimitRead, BudgetRead } from '@derekprovance/firefly-iii-sdk';
+import { BudgetLimitRead } from '@derekprovance/firefly-iii-sdk';
 import { BudgetReportService } from '../../src/services/budget-report.service.js';
 import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
 import { buckets, createMockCashFlowService } from '../shared/mocks.js';
-import { deposit, withdrawal } from '../shared/test-data.js';
+import { budgetRead, deposit, withdrawal } from '../shared/test-data.js';
 
-const budget = (id: string, name: string, active = true) =>
-    ({ id, type: 'budgets', attributes: { name, active } }) as unknown as BudgetRead;
 const limit = (budgetId: string, amount: string) =>
     ({ attributes: { budget_id: budgetId, amount } }) as unknown as BudgetLimitRead;
 
@@ -17,7 +15,7 @@ describe('BudgetReportService', () => {
         budgetService = {
             getBudgets: jest
                 .fn<IBudgetService['getBudgets']>()
-                .mockResolvedValue([budget('1', 'Groceries'), budget('2', 'Dining')]),
+                .mockResolvedValue([budgetRead('1', 'Groceries'), budgetRead('2', 'Dining')]),
             getBudgetLimits: jest
                 .fn<IBudgetService['getBudgetLimits']>()
                 .mockResolvedValue([limit('1', '400')]),
@@ -64,9 +62,9 @@ describe('BudgetReportService', () => {
 
     it('[R-BUDGET-1] should give an inactive budget a row only when it has spending', async () => {
         budgetService.getBudgets.mockResolvedValue([
-            budget('1', 'Groceries'),
-            budget('3', 'Old Gym', false),
-            budget('4', 'Retired', false),
+            budgetRead('1', 'Groceries'),
+            budgetRead('3', 'Old Gym', false),
+            budgetRead('4', 'Retired', false),
         ]);
         const bucket = [withdrawal(80, { budget_id: '1' }), withdrawal(40, { budget_id: '3' })];
         const cashFlow = createMockCashFlowService(buckets({ budget: bucket }));
