@@ -1,4 +1,4 @@
-import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
+import { BudgetReportDto, BudgetStatus } from '../types/dto/budget-report.dto.js';
 import { TopExpenseDto } from '../types/dto/top-expense.dto.js';
 import {
     BudgetLimitDto,
@@ -144,7 +144,7 @@ function usage({
     };
 }
 
-function budgetStatus(percentageUsed: number, isOverBudget: boolean): BudgetReportDto['status'] {
+function budgetStatus(percentageUsed: number, isOverBudget: boolean): BudgetStatus {
     if (isOverBudget) {
         return 'over';
     }
