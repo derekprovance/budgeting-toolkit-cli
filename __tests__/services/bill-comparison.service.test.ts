@@ -115,9 +115,17 @@ describe('BillComparisonService', () => {
             return result.value;
         };
 
-        // "Upcoming" is relative to today, so these use a month that is always
-        // in the future rather than freezing a clock
-        const FY = new Date().getFullYear() + 5;
+        // "Upcoming" is relative to today: pin today to June 2025, so October
+        // of FY is still ahead and every 2024 date is past
+        const FY = 2025;
+
+        beforeEach(() => {
+            jest.useFakeTimers({ now: new Date(FY, 5, 15) });
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
 
         it('[R-BILL-1] should expect one payment per scheduled due date', async () => {
             const result = await compare(
