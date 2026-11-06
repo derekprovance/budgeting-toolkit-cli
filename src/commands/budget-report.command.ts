@@ -8,8 +8,6 @@ import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
-import { EmojiUtils } from '../utils/emoji.utils.js';
-import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
 import { BudgetReportResult } from '../types/dto/budget-report-result.dto.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
@@ -83,16 +81,6 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
                 throw new Error(bucketsResult.error.message);
             }
 
-            // The bucket that feeds the cash-flow net, same definition analyze uses
-            const categorizedUnbudgeted: CategorizedUnbudgetedDto[] =
-                bucketsResult.value.unbudgeted.map(transaction => ({
-                    transaction,
-                    categoryEmoji: EmojiUtils.getCategoryEmoji(
-                        transaction.category_name || undefined
-                    ),
-                    categoryName: transaction.category_name || undefined,
-                }));
-
             if (!billComparisonResult.ok) {
                 spinner.warn('Warning: Bill comparison data unavailable');
                 if (json) {
@@ -121,7 +109,8 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
                 budgets: budgets,
                 topExpenses,
                 billComparison,
-                unbudgeted: categorizedUnbudgeted,
+                // The bucket that feeds the cash-flow net, same definition analyze uses
+                unbudgeted: bucketsResult.value.unbudgeted,
                 insights,
                 month,
                 year,

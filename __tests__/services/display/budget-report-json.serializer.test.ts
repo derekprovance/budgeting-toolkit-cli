@@ -73,10 +73,7 @@ describe('serializeBudgetReport', () => {
     const input = {
         budgets: [groceries, dining, fun],
         billComparison: new BillComparisonDto(240, 290, 50, [], 'USD', '$'),
-        unbudgeted: [
-            { transaction: coffee, categoryEmoji: '', categoryName: undefined },
-            { transaction: refund, categoryEmoji: '', categoryName: undefined },
-        ],
+        unbudgeted: [coffee, refund],
         month: 1,
         year: 2025,
     };

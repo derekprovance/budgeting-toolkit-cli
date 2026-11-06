@@ -8,7 +8,7 @@ import {
     getRemainingBills,
     isBillUpcoming,
 } from '../../types/dto/bill-comparison.dto.js';
-import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BudgetReportResult } from '../../types/dto/budget-report-result.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
@@ -465,7 +465,7 @@ export class BudgetDisplayService {
      * Formats the unbudgeted expenses section
      */
     private formatUnbudgetedSection(
-        unbudgeted: CategorizedUnbudgetedDto[],
+        unbudgeted: TransactionSplit[],
         currencySymbol: string
     ): string {
         const lines: string[] = [];
@@ -474,26 +474,26 @@ export class BudgetDisplayService {
 
         let total = 0;
 
-        unbudgeted.forEach(item => {
+        unbudgeted.forEach(transaction => {
             // Signed: a card refund in the bucket reduces the total (R-REFUND-1)
-            const amount = TransactionCalculationUtils.calculateNetSpend([item.transaction]);
+            const amount = TransactionCalculationUtils.calculateNetSpend([transaction]);
             total += amount;
 
             // A refund keeps its minus sign so the rows visibly add up
             const amountFormatted = CurrencyUtils.formatSigned(
                 amount,
-                item.transaction.currency_symbol || currencySymbol
+                transaction.currency_symbol || currencySymbol
             );
-            const date = (item.transaction.date || new Date().toISOString()).split('T')[0];
+            const date = (transaction.date || new Date().toISOString()).split('T')[0];
 
-            const transactionId = item.transaction.transaction_journal_id;
+            const transactionId = transaction.transaction_journal_id;
             const formattedDescription = this.formatDescription(
-                item.transaction.description || 'Transaction',
+                transaction.description || 'Transaction',
                 transactionId
             );
 
             const line =
-                item.categoryEmoji +
+                EmojiUtils.getCategoryEmoji(transaction.category_name ?? undefined) +
                 ' ' +
                 formattedDescription +
                 ' ' +

@@ -22,8 +22,6 @@ export function serializeBudgetReport(
     const totalAllocated = data.budgets.reduce((sum, b) => sum + b.amount, 0);
     const totalPercentage = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
 
-    const unbudgeted = data.unbudgeted.map(item => item.transaction);
-
     return {
         schemaVersion: 2,
         month: data.month,
@@ -53,8 +51,8 @@ export function serializeBudgetReport(
         })),
         bills: toBillTotalsJson(data.billComparison),
         unbudgetedExpenses: {
-            total: toCents(TransactionCalculationUtils.calculateNetSpend(unbudgeted)),
-            transactions: unbudgeted.map(toTransactionJson),
+            total: toCents(TransactionCalculationUtils.calculateNetSpend(data.unbudgeted)),
+            transactions: data.unbudgeted.map(toTransactionJson),
         },
     };
 }

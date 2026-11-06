@@ -357,12 +357,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '📊',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -407,12 +402,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '🛒',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -446,12 +436,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '📱',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -485,12 +470,7 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '💳',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
@@ -504,15 +484,18 @@ describe('BudgetDisplayService', () => {
     });
 
     describe('formatReport - unbudgeted section', () => {
-        const item = (description: string, amount: string, type = 'withdrawal') => ({
-            transaction: {
-                description,
-                amount,
-                type,
-                transaction_journal_id: '1',
-                date: '2026-08-11',
-            },
-            categoryEmoji: '💰',
+        const item = (
+            description: string,
+            amount: string,
+            type = 'withdrawal',
+            category_name?: string
+        ) => ({
+            description,
+            amount,
+            type,
+            category_name,
+            transaction_journal_id: '1',
+            date: '2026-08-11',
         });
 
         const baseData = () => ({
@@ -539,6 +522,17 @@ describe('BudgetDisplayService', () => {
 
             expect(result).toContain('UNBUDGETED EXPENSES');
             expect(result).toContain('Coffee');
+        });
+
+        it('should mark each row with its category emoji', () => {
+            const data = {
+                ...baseData(),
+                unbudgeted: [item('Pharmacy', '12.00', 'withdrawal', 'Healthcare')],
+            };
+
+            const result = stripAnsi(service.formatReport(data as never, false));
+
+            expect(result).toContain('🏥 Pharmacy');
         });
 
         it('should omit the unbudgeted section when the bucket is empty', () => {

@@ -275,7 +275,7 @@ describe('BudgetReportCommand', () => {
 
             expect(result.budgets).toBe(mockBudgets);
             expect(result.billComparison).toBe(mockBillComparison);
-            expect(result.unbudgeted.map(u => u.transaction)).toEqual([unbudgetedTx]);
+            expect(result.unbudgeted).toEqual([unbudgetedTx]);
             expect(result).not.toHaveProperty('untracked');
             expect(result.month).toBe(5);
             expect(result.year).toBe(2024);

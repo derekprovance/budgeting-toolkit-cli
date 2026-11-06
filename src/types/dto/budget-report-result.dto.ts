@@ -1,7 +1,7 @@
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from './bill-comparison.dto.js';
 import { BudgetInsight } from './budget-insight.dto.js';
 import { BudgetReportDto } from './budget-report.dto.js';
-import { CategorizedUnbudgetedDto } from './categorized-unbudgeted.dto.js';
 import { TopExpenseDto } from './top-expense.dto.js';
 
 /**
@@ -12,7 +12,8 @@ export interface BudgetReportResult {
     budgets: BudgetReportDto[];
     topExpenses: TopExpenseDto[];
     billComparison: BillComparisonDto;
-    unbudgeted: CategorizedUnbudgetedDto[];
+    /** The month's unbudgeted bucket, as CashFlowService sorted it */
+    unbudgeted: TransactionSplit[];
     insights: BudgetInsight[];
     month: number;
     year: number;
