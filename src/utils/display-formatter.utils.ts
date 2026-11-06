@@ -21,6 +21,11 @@ export class DisplayFormatterUtils {
         return side === 'end' ? text + padding : padding + text;
     }
 
+    /** Truncates or pads plain text to exactly `width` characters, keeping a column aligned */
+    static fitWidth(text: string, width: number): string {
+        return text.substring(0, width).padEnd(width);
+    }
+
     /**
      * Formats a month/year as "January 2025".
      * Locale is pinned so reports read identically on every machine.

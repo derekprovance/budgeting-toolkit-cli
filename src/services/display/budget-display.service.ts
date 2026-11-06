@@ -298,9 +298,10 @@ export class BudgetDisplayService {
                 expense.amount,
                 expense.currencySymbol
             );
-            const truncatedDescription = expense.description
-                .substring(0, BudgetDisplayService.DESCRIPTION_MAX_LENGTH)
-                .padEnd(BudgetDisplayService.DESCRIPTION_MAX_LENGTH);
+            const truncatedDescription = DisplayFormatterUtils.fitWidth(
+                expense.description,
+                BudgetDisplayService.DESCRIPTION_MAX_LENGTH
+            );
 
             const line =
                 chalk.gray(`${index + 1}. `) +
@@ -417,11 +418,10 @@ export class BudgetDisplayService {
                 isUpcoming
             );
 
-            // Truncate as well as pad — a longer name would otherwise shove the
-            // amount column right and break alignment
-            const name = bill.name
-                .substring(0, BudgetDisplayService.NAME_COLUMN_WIDTH)
-                .padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH);
+            const name = DisplayFormatterUtils.fitWidth(
+                bill.name,
+                BudgetDisplayService.NAME_COLUMN_WIDTH
+            );
             const trailer = isUpcoming
                 ? chalk.dim(
                       `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, billComparison.currencySymbol)} of ${predictedFormatted})`
@@ -468,9 +468,10 @@ export class BudgetDisplayService {
      * Wraps with OSC 8 hyperlink if baseUrl and transactionId are available
      */
     private formatDescription(description: string, transactionId: string | undefined): string {
-        const truncated = description
-            .substring(0, BudgetDisplayService.DESCRIPTION_MAX_LENGTH)
-            .padEnd(BudgetDisplayService.DESCRIPTION_MAX_LENGTH);
+        const truncated = DisplayFormatterUtils.fitWidth(
+            description,
+            BudgetDisplayService.DESCRIPTION_MAX_LENGTH
+        );
 
         const url =
             this.baseUrl && transactionId

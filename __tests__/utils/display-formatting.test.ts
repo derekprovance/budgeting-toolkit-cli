@@ -16,6 +16,16 @@ describe('display rounding', () => {
     });
 });
 
+describe('fitWidth', () => {
+    it('pads a short text to the column width', () => {
+        expect(DisplayFormatterUtils.fitWidth('Rent', 6)).toBe('Rent  ');
+    });
+
+    it('truncates a long text to the column width', () => {
+        expect(DisplayFormatterUtils.fitWidth('Electricity', 6)).toBe('Electr');
+    });
+});
+
 describe('category emoji', () => {
     it.each([
         ['Healthcare', '🏥'],

@@ -354,7 +354,7 @@ export class AnalyzeDisplayService {
         const amount = CurrencyUtils.formatWithSymbol(parseFloat(transaction.amount), symbol);
         const date = transaction.date ? chalk.dim(transaction.date.split('T')[0]) : '';
 
-        return `    ${typeLabel} ${description.substring(0, 40).padEnd(40)} ${amount} ${date}`;
+        return `    ${typeLabel} ${DisplayFormatterUtils.fitWidth(description, 40)} ${amount} ${date}`;
     }
 
     /**
@@ -393,7 +393,7 @@ export class AnalyzeDisplayService {
         const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);
         const freqBadge = chalk.dim(`[${freq}]`);
 
-        return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)} | Actual: ${CurrencyUtils.formatWithSymbol(bill.actual, symbol)} ${trailer}`;
+        return `    ${DisplayFormatterUtils.fitWidth(bill.name, 30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)} | Actual: ${CurrencyUtils.formatWithSymbol(bill.actual, symbol)} ${trailer}`;
     }
 }
 
