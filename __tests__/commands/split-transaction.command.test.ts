@@ -3,8 +3,8 @@ import { SplitTransactionCommand } from '../../src/commands/split-transaction.co
 import { TransactionSplitService } from '../../src/services/transaction-split.service.js';
 import { SplitTransactionDisplayService } from '../../src/services/display/split-transaction-display.service.js';
 import { UserInputService } from '../../src/services/user-input.service.js';
-import { TransactionRead } from '@derekprovance/firefly-iii-sdk';
-import { withdrawal } from '../shared/test-data.js';
+import { transactionRead, withdrawal } from '../shared/test-data.js';
+import { partialMock } from '../shared/mocks.js';
 
 // Collaborators are injected as manual mocks; chalk and ora are real
 // (FORCE_COLOR=0 in __tests__/setup/env.ts keeps output plain).
@@ -21,12 +21,7 @@ describe('SplitTransactionCommand', () => {
         currency_symbol: '$',
     });
 
-    const updatedTransaction: TransactionRead = {
-        type: 'transactions',
-        id: '123',
-        links: {},
-        attributes: { transactions: [originalSplit, originalSplit] },
-    };
+    const updatedTransaction = transactionRead('123', originalSplit, originalSplit);
 
     const nonInteractive = {
         transactionId: '123',
@@ -38,27 +33,35 @@ describe('SplitTransactionCommand', () => {
     beforeEach(() => {
         jest.clearAllMocks();
 
-        splitService = {
-            getSingleSplit: jest.fn<TransactionSplitService['getSingleSplit']>(),
+        splitService = partialMock<TransactionSplitService>({
+            getSingleSplit: jest
+                .fn<TransactionSplitService['getSingleSplit']>()
+                .mockResolvedValue(originalSplit),
             splitTransaction: jest
                 .fn<TransactionSplitService['splitTransaction']>()
                 .mockResolvedValue(updatedTransaction),
-        } as unknown as jest.Mocked<TransactionSplitService>;
-        splitService.getSingleSplit.mockResolvedValue(originalSplit);
+        });
 
-        displayService = {
-            formatHeader: jest.fn().mockReturnValue('Mock Header'),
-            formatOriginalTransaction: jest.fn().mockReturnValue('Mock Original'),
-            formatRemainder: jest.fn().mockReturnValue('Mock Remainder'),
-            formatSplitPreview: jest.fn().mockReturnValue('Mock Preview'),
-            formatSuccess: jest.fn().mockReturnValue('Mock Success'),
-        } as unknown as jest.Mocked<SplitTransactionDisplayService>;
+        type Display = SplitTransactionDisplayService;
+        displayService = partialMock<Display>({
+            formatHeader: jest.fn<Display['formatHeader']>().mockReturnValue('Mock Header'),
+            formatOriginalTransaction: jest
+                .fn<Display['formatOriginalTransaction']>()
+                .mockReturnValue('Mock Original'),
+            formatRemainder: jest
+                .fn<Display['formatRemainder']>()
+                .mockReturnValue('Mock Remainder'),
+            formatSplitPreview: jest
+                .fn<Display['formatSplitPreview']>()
+                .mockReturnValue('Mock Preview'),
+            formatSuccess: jest.fn<Display['formatSuccess']>().mockReturnValue('Mock Success'),
+        });
 
-        userInputService = {
-            getSplitAmount: jest.fn(),
-            getCustomSplitText: jest.fn(),
-            confirmSplit: jest.fn(),
-        } as unknown as jest.Mocked<UserInputService>;
+        userInputService = partialMock<UserInputService>({
+            getSplitAmount: jest.fn<UserInputService['getSplitAmount']>(),
+            getCustomSplitText: jest.fn<UserInputService['getCustomSplitText']>(),
+            confirmSplit: jest.fn<UserInputService['confirmSplit']>(),
+        });
 
         command = new SplitTransactionCommand(splitService, displayService, userInputService);
 
