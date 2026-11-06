@@ -119,10 +119,13 @@ export class AITransactionUpdateOrchestrator {
             `Finding suggestions for ${count} transaction${count !== 1 ? 's' : ''}...`
         ).start();
         try {
-            return await this.suggest(transactions, updateMode);
-        } finally {
+            const suggestions = await this.suggest(transactions, updateMode);
             // Cleared without a summary: the prompts follow straight away
             spinner.stop();
+            return suggestions;
+        } catch (error) {
+            spinner.fail('AI processing failed');
+            throw error;
         }
     }
 

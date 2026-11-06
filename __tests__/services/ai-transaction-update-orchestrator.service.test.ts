@@ -307,6 +307,20 @@ describe('AITransactionUpdateOrchestrator', () => {
             expect(mockUpdater.applyUpdate).not.toHaveBeenCalled();
         });
 
+        it('marks the spinner failed when the AI layer fails', async () => {
+            tagged = [incoming('1')];
+            assign.mockRejectedValue(new Error('invalid x-api-key'));
+            const stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+            try {
+                await expect(run()).rejects.toThrow('invalid x-api-key');
+                const written = stderr.mock.calls.map(([chunk]) => String(chunk)).join('');
+                expect(written).toContain('AI processing failed');
+            } finally {
+                stderr.mockRestore();
+            }
+        });
+
         it('fails the run when the transactions cannot be fetched', async () => {
             const error = new Error('Firefly is down');
             mockTransactionService.getTransactionsByTag.mockRejectedValue(error);
