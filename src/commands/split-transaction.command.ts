@@ -5,6 +5,7 @@ import { TransactionSplitService, SplitData } from '../services/transaction-spli
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { parseSplitAmount, remainderAmount } from '../utils/split-amount.utils.js';
+import { DEFAULT_CURRENCY } from '../utils/currency.utils.js';
 
 /**
  * Parameters for split transaction command
@@ -20,9 +21,6 @@ interface SplitTransactionParams {
  * Command for splitting a transaction into two parts
  */
 export class SplitTransactionCommand implements Command<void, SplitTransactionParams> {
-    /** Default currency symbol if transaction doesn't specify one */
-    private static readonly DEFAULT_CURRENCY_SYMBOL = '$';
-
     constructor(
         private readonly splitService: TransactionSplitService,
         private readonly displayService: SplitTransactionDisplayService,
@@ -53,8 +51,7 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         // Display original transaction
         console.log(this.displayService.formatOriginalTransaction(originalSplit, transactionId));
 
-        const currencySymbol =
-            originalSplit.currency_symbol || SplitTransactionCommand.DEFAULT_CURRENCY_SYMBOL;
+        const currencySymbol = originalSplit.currency_symbol || DEFAULT_CURRENCY.symbol;
 
         // Get split amount: use CLI parameter if provided, otherwise prompt
         const firstSplitAmount = amount
