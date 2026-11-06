@@ -163,6 +163,12 @@ class HttpError extends Error {
 const notFound = () =>
     new HttpError(404, { message: 'Resource not found', exception: 'NotFoundHttpException' });
 
+const unauthenticated = () =>
+    new HttpError(401, { message: 'Unauthenticated.', exception: 'AuthenticationException' });
+
+/** V24: an unknown account, bill or transaction id answers like a bad token */
+const unknownId = unauthenticated;
+
 function validation(field: string, message: string): HttpError {
     return new HttpError(422, { message, errors: { [field]: [message] } });
 }
@@ -287,10 +293,7 @@ export class FakeFirefly {
             }
             const auth = req.headers.authorization ?? '';
             if (auth !== `Bearer ${this.token}`) {
-                throw new HttpError(401, {
-                    message: 'Unauthenticated.',
-                    exception: 'AuthenticationException',
-                });
+                throw unauthenticated();
             }
             const rawBody = await readBody(req);
             const body = this.parseBody(method, req.headers['content-type'], rawBody);
@@ -553,7 +556,7 @@ export class FakeFirefly {
 
     private account(id: string): Account {
         const a = this.accounts.find(x => x.id === id);
-        if (!a) throw notFound();
+        if (!a) throw unknownId();
         return a;
     }
 
@@ -721,7 +724,7 @@ export class FakeFirefly {
 
     private bill(id: string): Bill {
         const bill = this.bills.find(x => x.id === id);
-        if (!bill) throw notFound();
+        if (!bill) throw unknownId();
         return bill;
     }
 
@@ -1065,7 +1068,7 @@ export class FakeFirefly {
 
     private group(id: string): Group {
         const g = this.groups.find(x => x.id === id);
-        if (!g) throw notFound();
+        if (!g) throw unknownId();
         return g;
     }
 

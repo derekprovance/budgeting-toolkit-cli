@@ -23,6 +23,7 @@ import {
     TRANSACTIONS_BY_MONTH,
     UNCAPPED_PROBE_LIMIT,
     UNKNOWN_TAG,
+    UNKNOWN_TRANSACTION,
     WIRE_FORMAT,
 } from '../scenario/firefly-contract.js';
 import type { AccountKey, BillKey, IdMap, MonthId } from '../scenario/types.js';
@@ -225,6 +226,13 @@ export function defineFireflyContractSuite(getJson: GetJson, idMap: IdMap | (() 
         });
 
         // V23: getJson rejects on any non-200, naming the status
+        // V24
+        test('an unknown transaction id is a 401, like a bad token', async () => {
+            await expect(getJson(`/v1/transactions/${UNKNOWN_TRANSACTION.id}`)).rejects.toThrow(
+                new RegExp(`\\b${UNKNOWN_TRANSACTION.status}\\b`)
+            );
+        });
+
         test('an unknown tag is a 404', async () => {
             await expect(getJson(`/v1/tags/${UNKNOWN_TAG.tag}`)).rejects.toThrow(
                 new RegExp(`\\b${UNKNOWN_TAG.status}\\b`)

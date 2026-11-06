@@ -163,6 +163,13 @@ export const CC_READBACK = {
 export const UNKNOWN_TAG = { tag: 'btk-contract-no-such-tag', status: 404 } as const;
 
 /**
+ * V24 (verified): an unknown account, bill or transaction id answers 401
+ * "Unauthenticated.", exactly as a bad token does, so a caller cannot tell the
+ * two apart from the response.
+ */
+export const UNKNOWN_TRANSACTION = { id: '999999', status: 401 } as const;
+
+/**
  * Wire formats (verified): amounts are unsigned strings with 12 decimals
  * ("1000.000000000000"); dates look like "2025-01-01T00:00:00+00:00"; group
  * ids and journal ids are distinct sequences.
