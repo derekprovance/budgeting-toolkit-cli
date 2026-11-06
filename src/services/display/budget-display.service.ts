@@ -18,11 +18,18 @@ import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
 import { budgetTotals } from './budget-totals.js';
 
-/** The budget rows one section lists */
+/** The budget rows one section lists, most used first */
 interface BudgetSection {
     readonly budgets: BudgetReportDto[];
     readonly currencySymbol: string;
-    readonly verbose: boolean;
+    /** Listed below the rows; empty unless verbose */
+    readonly statistics: string[];
+}
+
+/** The bills listed one per row, and those summed into one "Others" row */
+interface BillRows {
+    readonly shown: BillDetailDto[];
+    readonly others: BillDetailDto[];
 }
 
 export class BudgetDisplayService {
@@ -39,31 +46,36 @@ export class BudgetDisplayService {
 
         sections.push(this.formatOverviewSection(data));
 
-        const overBudgets = data.budgets.filter(b => b.status === 'over');
-        const onTrackBudgets = data.budgets.filter(b => b.status !== 'over');
-
         const currencySymbol = data.billComparison.currencySymbol;
+        const byUsage = [...data.budgets].sort((a, b) => b.percentageUsed - a.percentageUsed);
+        const section = (budgets: BudgetReportDto[]): BudgetSection => ({
+            budgets,
+            currencySymbol,
+            statistics: verbose ? this.formatVerboseStatistics(budgets, currencySymbol) : [],
+        });
+
+        const overBudgets = byUsage.filter(b => b.status === 'over');
+        const onTrackBudgets = byUsage.filter(b => b.status !== 'over');
+
         if (overBudgets.length > 0) {
-            sections.push(
-                this.formatAttentionNeededSection({
-                    budgets: overBudgets,
-                    currencySymbol,
-                    verbose,
-                })
-            );
+            sections.push(this.formatAttentionNeededSection(section(overBudgets)));
         }
 
         if (onTrackBudgets.length > 0) {
-            sections.push(
-                this.formatOnTrackSection({ budgets: onTrackBudgets, currencySymbol, verbose })
-            );
+            sections.push(this.formatOnTrackSection(section(onTrackBudgets)));
         }
 
         if (data.topExpenses.length > 0) {
             sections.push(this.formatTopExpensesSection(data.topExpenses));
         }
 
-        sections.push(this.formatBillsSection(data.billComparison, verbose));
+        const billRows: BillRows = verbose
+            ? { shown: data.billComparison.bills, others: [] }
+            : {
+                  shown: getTopBills(data.billComparison),
+                  others: getRemainingBills(data.billComparison),
+              };
+        sections.push(this.formatBillsSection(data.billComparison, billRows));
 
         // The same unbudgeted bucket the analyze net charges
         if (data.unbudgeted.length > 0) {
@@ -168,7 +180,7 @@ export class BudgetDisplayService {
     }
 
     private formatBudgetSectionWithConfig(
-        { budgets, currencySymbol, verbose }: BudgetSection,
+        { budgets, currencySymbol, statistics }: BudgetSection,
         config: {
             sectionTitle: string;
             statusColor: (str: string) => string;
@@ -181,9 +193,7 @@ export class BudgetDisplayService {
         lines.push(DisplayFormatterUtils.createSectionHeader(config.sectionTitle));
         lines.push('');
 
-        const sorted = [...budgets].sort((a, b) => b.percentageUsed - a.percentageUsed);
-
-        sorted.forEach(budget => {
+        budgets.forEach(budget => {
             const spentFormatted = CurrencyUtils.formatWithSymbol(budget.spent, currencySymbol);
             const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
             const remaining = config.getRemainingAmount(budget);
@@ -208,11 +218,7 @@ export class BudgetDisplayService {
             lines.push(line);
         });
 
-        lines.push('');
-        if (verbose) {
-            lines.push(...this.formatVerboseStatistics(sorted, currencySymbol));
-        }
-        lines.push('');
+        lines.push('', ...statistics, '');
         return lines.join('\n');
     }
 
@@ -279,10 +285,11 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    private formatBillsSection(billComparison: BillComparisonDto, verbose: boolean): string {
+    private formatBillsSection(
+        billComparison: BillComparisonDto,
+        { shown: billsToShow, others: otherBills }: BillRows
+    ): string {
         const symbol = billComparison.currencySymbol;
-        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
-        const otherBills = verbose ? [] : getRemainingBills(billComparison);
 
         const lines = [
             DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'),
