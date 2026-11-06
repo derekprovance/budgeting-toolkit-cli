@@ -3,7 +3,8 @@
 import { FireflyClient, BaseHttpRequest, CancelablePromise } from '@derekprovance/firefly-iii-sdk';
 import type { OpenAPIConfig } from '@derekprovance/firefly-iii-sdk';
 import type { ApiRequestOptions } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/ApiRequestOptions.js';
-import { createCustomAxiosInstance, CertificateConfig } from '../utils/custom-fetch.js';
+import { createCustomAxiosInstance } from '../utils/custom-fetch.js';
+import { CertificateConfig } from '../config/config.types.js';
 import { request as __request } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/request.js';
 import type { AxiosInstance } from 'axios';
 

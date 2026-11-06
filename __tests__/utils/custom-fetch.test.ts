@@ -44,23 +44,8 @@ describe('createCustomAxiosInstance', () => {
         delete process.env.STRICT_TLS;
     });
 
-    describe('no certificate path provided', () => {
-        it('should return default axios instance when no clientCertPath', () => {
-            const axiosInstance = createCustomAxiosInstance({});
-            expect(mockAxiosCreate).toHaveBeenCalledWith();
-            expect(axiosInstance).toBeDefined();
-        });
-
-        it('should return default axios instance when clientCertPath is empty string', () => {
-            const axiosInstance = createCustomAxiosInstance({ clientCertPath: '' });
-            expect(mockAxiosCreate).toHaveBeenCalledWith();
-            expect(axiosInstance).toBeDefined();
-        });
-    });
-
     describe('CA-only configuration (no client cert)', () => {
         it('should create a custom agent that trusts the CA', () => {
-            mockExistsSync.mockReturnValue(true);
             mockReadFileSync.mockReturnValue(Buffer.from('ca-data'));
 
             createCustomAxiosInstance({ caCertPath: '/path/to/ca.pem' });
@@ -69,38 +54,6 @@ describe('createCustomAxiosInstance', () => {
             expect(mockAxiosCreate).toHaveBeenCalledWith(
                 expect.objectContaining({ httpsAgent: expect.any(Agent) })
             );
-        });
-    });
-
-    describe('certificate file validation', () => {
-        it('should fallback to default axios when CA cert file does not exist', () => {
-            mockExistsSync.mockImplementation(path => {
-                if (typeof path === 'string') {
-                    return path.includes('client.p12');
-                }
-                return false;
-            });
-
-            const axiosInstance = createCustomAxiosInstance({
-                caCertPath: '/path/to/nonexistent/ca.pem',
-                clientCertPath: '/path/to/client.p12',
-            });
-
-            // Error is caught and default axios is returned
-            expect(axiosInstance).toBeDefined();
-            expect(mockAxiosCreate).toHaveBeenCalled();
-        });
-
-        it('should fallback to default axios when client cert file does not exist', () => {
-            mockExistsSync.mockReturnValue(false);
-
-            const axiosInstance = createCustomAxiosInstance({
-                clientCertPath: '/path/to/nonexistent/client.p12',
-            });
-
-            // Error is caught and default axios is returned
-            expect(axiosInstance).toBeDefined();
-            expect(mockAxiosCreate).toHaveBeenCalled();
         });
     });
 
@@ -175,7 +128,6 @@ describe('createCustomAxiosInstance', () => {
                 clientCertPath: '/path/to/client.pem',
             });
 
-            expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.pem');
             expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.key');
             expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.pem');
             expect(mockReadFileSync).toHaveBeenCalledWith('/path/to/client.key');
@@ -186,7 +138,6 @@ describe('createCustomAxiosInstance', () => {
                 clientCertPath: '/path/to/client.crt',
             });
 
-            expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.crt');
             expect(mockExistsSync).toHaveBeenCalledWith('/path/to/client.key');
         });
 
@@ -271,19 +222,33 @@ describe('createCustomAxiosInstance', () => {
     });
 
     describe('error handling', () => {
-        it('should return default axios instance on file read error', () => {
-            mockExistsSync.mockReturnValue(true);
+        // Falling back to plain axios would silently drop mTLS
+        it('should throw, not fall back to plain axios, when a certificate cannot be read', () => {
             mockReadFileSync.mockImplementation(() => {
-                throw new Error('File read error');
+                throw new Error("ENOENT: no such file or directory, open '/path/to/client.p12'");
             });
 
-            const axiosInstance = createCustomAxiosInstance({
-                clientCertPath: '/path/to/client.p12',
+            expect(() =>
+                createCustomAxiosInstance({ clientCertPath: '/path/to/client.p12' })
+            ).toThrow('ENOENT');
+            expect(mockAxiosCreate).not.toHaveBeenCalled();
+        });
+
+        it('should throw when the CA certificate cannot be read', () => {
+            mockReadFileSync.mockImplementation(path => {
+                if (path === '/path/to/ca.pem') {
+                    throw new Error("ENOENT: no such file or directory, open '/path/to/ca.pem'");
+                }
+                return Buffer.from('mock-cert-data');
             });
 
-            expect(axiosInstance).toBeDefined();
-            // Should have been called twice - once for error case, once for fallback
-            expect(mockAxiosCreate).toHaveBeenCalled();
+            expect(() =>
+                createCustomAxiosInstance({
+                    caCertPath: '/path/to/ca.pem',
+                    clientCertPath: '/path/to/client.p12',
+                })
+            ).toThrow('/path/to/ca.pem');
+            expect(mockAxiosCreate).not.toHaveBeenCalled();
         });
     });
 });
