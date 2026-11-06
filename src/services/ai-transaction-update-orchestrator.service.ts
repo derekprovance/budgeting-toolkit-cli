@@ -86,39 +86,42 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             'Processing transactions'
         );
 
-        // Show spinner while history and the AI produce suggestions
+        const suggestions = await this.suggestWithSpinner(transactions, updateMode);
+        const { prepared, invalid } = this.prepare(suggestions);
+        const { updated, failed } = await this.review(prepared);
+
+        logger.debug(
+            {
+                tag,
+                updateMode,
+                totalTransactions: transactions.length,
+                updatedTransactions: updated.length,
+                invalid: invalid.length,
+                failed: failed.length,
+            },
+            'Transaction update complete'
+        );
+
+        return {
+            status: CategorizeStatus.HAS_RESULTS,
+            transactionsUpdated: updated.length,
+            errors: [...invalid, ...failed],
+        };
+    }
+
+    private async suggestWithSpinner(
+        transactions: JournaledTransaction[],
+        updateMode: CategorizeMode
+    ): Promise<Suggestion[]> {
+        const count = transactions.length;
         const spinner = ora(
-            `Finding suggestions for ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}...`
+            `Finding suggestions for ${count} transaction${count !== 1 ? 's' : ''}...`
         ).start();
-
         try {
-            const suggestions = await this.suggest(transactions, updateMode);
-
+            return await this.suggest(transactions, updateMode);
+        } finally {
             // Cleared without a summary: the prompts follow straight away
             spinner.stop();
-
-            const { updatedTransactions, errors } =
-                await this.updateTransactionsWithAIResults(suggestions);
-
-            logger.debug(
-                {
-                    tag,
-                    updateMode,
-                    totalTransactions: transactions.length,
-                    updatedTransactions: updatedTransactions.length,
-                    validationErrors: errors.length,
-                },
-                'Transaction update complete'
-            );
-
-            return {
-                status: CategorizeStatus.HAS_RESULTS,
-                transactionsUpdated: updatedTransactions.length,
-                errors,
-            };
-        } catch (aiError) {
-            spinner.fail('AI processing failed');
-            throw aiError;
         }
     }
 
@@ -233,87 +236,54 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         );
     }
 
-    private async updateTransactionsWithAIResults(
-        suggestions: Suggestion[]
-    ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionValidationError[] }> {
-        const results: TransactionRead[] = [];
-        const errors: TransactionValidationError[] = [];
-
-        try {
-            // Every suggestion is validated before the first prompt, so the
-            // `[index/total]` counter counts exactly the prompts that follow:
-            // a suggestion that fails validation or changes nothing never
-            // reaches the user and must not take a number
-            const prepared: PreparedUpdate[] = [];
-            for (const suggestion of suggestions) {
-                const prepareResult = this.interactiveTransactionUpdater.prepareUpdate(suggestion);
-                if (!prepareResult.ok) {
-                    errors.push(prepareResult.error);
-                } else if (prepareResult.value) {
-                    prepared.push(prepareResult.value);
-                }
+    /**
+     * Validates every suggestion before the first prompt, so the
+     * `[index/total]` counter counts exactly the prompts that follow: a
+     * suggestion that fails validation or changes nothing never reaches the
+     * user and must not take a number.
+     */
+    private prepare(suggestions: Suggestion[]): {
+        prepared: PreparedUpdate[];
+        invalid: TransactionValidationError[];
+    } {
+        const prepared: PreparedUpdate[] = [];
+        const invalid: TransactionValidationError[] = [];
+        for (const suggestion of suggestions) {
+            const result = this.interactiveTransactionUpdater.prepareUpdate(suggestion);
+            if (!result.ok) {
+                invalid.push(result.error);
+            } else if (result.value) {
+                prepared.push(result.value);
             }
-
-            for (const [i, update] of prepared.entries()) {
-                const updateResult = await this.interactiveTransactionUpdater.applyUpdate(update, {
-                    index: i + 1,
-                    total: prepared.length,
-                });
-
-                if (updateResult.ok) {
-                    if (updateResult.value) {
-                        results.push(updateResult.value);
-                    }
-                } else if (updateResult.error) {
-                    errors.push(updateResult.error);
-
-                    if (updateResult.error.message.includes('SIGINT')) {
-                        logger.debug(
-                            update.transaction,
-                            'Transaction update(s) terminated with SIGINT'
-                        );
-                        break;
-                    }
-                }
-            }
-
-            const totalTransactions = suggestions.length;
-            const updatedCount = results.length;
-            const errorCount = errors.length;
-            const skippedCount = totalTransactions - updatedCount - errorCount;
-
-            logger.debug(
-                {
-                    totalTransactions,
-                    updated: updatedCount,
-                    skipped: skippedCount,
-                    validationErrors: errorCount,
-                },
-                'Transaction update completed'
-            );
-
-            if (errorCount > 0) {
-                logger.warn(
-                    {
-                        errorCount,
-                        errors: errors.map(e => ({
-                            description: e.transactionDescription,
-                            field: e.field,
-                            message: e.message,
-                        })),
-                    },
-                    'Some transactions failed validation'
-                );
-            }
-
-            return { updatedTransactions: results, errors };
-        } catch (err) {
-            logger.error(
-                { error: err instanceof Error ? err.message : err },
-                'ERROR in updateTransactionsWithAIResults'
-            );
-            throw err;
         }
+        return { prepared, invalid };
+    }
+
+    /** Shows each prepared update in turn and applies the user's decision */
+    private async review(prepared: PreparedUpdate[]): Promise<{
+        updated: TransactionRead[];
+        failed: TransactionValidationError[];
+    }> {
+        const updated: TransactionRead[] = [];
+        const failed: TransactionValidationError[] = [];
+        for (const [i, update] of prepared.entries()) {
+            const result = await this.interactiveTransactionUpdater.applyUpdate(update, {
+                index: i + 1,
+                total: prepared.length,
+            });
+            if (result.ok) {
+                if (result.value) {
+                    updated.push(result.value);
+                }
+                continue;
+            }
+            failed.push(result.error);
+            if (result.error.message.includes('SIGINT')) {
+                logger.debug(update.transaction, 'Transaction update(s) terminated with SIGINT');
+                break;
+            }
+        }
+        return { updated, failed };
     }
 }
 
