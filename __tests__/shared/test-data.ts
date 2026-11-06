@@ -1,4 +1,4 @@
-import { BudgetRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { BudgetRead, TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
 /** Fixed date for builder-made transactions, inside the 2025-01 test month. */
 export const TEST_DATE = '2025-01-15';
@@ -129,3 +129,7 @@ export const transfer = (amount: number | string, overrides: BuilderOverrides = 
 /** A Firefly budget, with only the fields the code under test reads. */
 export const budgetRead = (id: string, name: string, active = true): BudgetRead =>
     ({ id, type: 'budgets', attributes: { name, active } }) as BudgetRead;
+
+/** A Firefly transaction group holding `splits`, with only the fields the code under test reads. */
+export const transactionRead = (id: string, ...splits: TransactionSplit[]): TransactionRead =>
+    ({ type: 'transactions', id, attributes: { transactions: splits } }) as TransactionRead;

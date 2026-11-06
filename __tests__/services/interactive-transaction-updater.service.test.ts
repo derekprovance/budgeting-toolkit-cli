@@ -10,7 +10,7 @@ import { TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 import { Result } from '../../src/types/result.type.js';
-import { budgetRead, withdrawal } from '../shared/test-data.js';
+import { budgetRead, transactionRead, withdrawal } from '../shared/test-data.js';
 import { JournaledTransaction, Suggestion } from '../../src/types/categorize.types.js';
 import { loadCatalog, partialMock } from '../shared/mocks.js';
 
@@ -27,7 +27,7 @@ describe('InteractiveTransactionUpdater', () => {
     let catalog: CategoryBudgetCatalog;
     let mockUserInputService: jest.Mocked<UserInputService>;
     let transaction: JournaledTransaction;
-    let transactionRead: TransactionRead;
+    let group: TransactionRead;
 
     const build = (dryRun = false) =>
         new InteractiveTransactionUpdater(
@@ -62,15 +62,15 @@ describe('InteractiveTransactionUpdater', () => {
             }),
             transaction_journal_id: '1',
         };
-        transactionRead = { id: '42', type: 'transactions' } as TransactionRead;
+        group = transactionRead('42');
 
         mockTransactionService = partialMock<TransactionService>({
             updateTransaction: jest
                 .fn<TransactionService['updateTransaction']>()
-                .mockResolvedValue(transactionRead),
+                .mockResolvedValue(group),
             getTransactionReadBySplit: jest
                 .fn<TransactionService['getTransactionReadBySplit']>()
-                .mockReturnValue(transactionRead),
+                .mockReturnValue(group),
         });
 
         mockValidator = partialMock<TransactionValidatorService>({
@@ -130,7 +130,7 @@ describe('InteractiveTransactionUpdater', () => {
         it('applies the category and budget the user accepts', async () => {
             const result = await review();
 
-            expect(result).toEqual(Result.ok(transactionRead));
+            expect(result).toEqual(Result.ok(group));
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 transaction,
                 'New Category',
@@ -248,7 +248,7 @@ describe('InteractiveTransactionUpdater', () => {
             it('returns the transaction without prompting or updating', async () => {
                 const result = await review(suggestion, build(true));
 
-                expect(result).toEqual(Result.ok(transactionRead));
+                expect(result).toEqual(Result.ok(group));
                 expect(mockUserInputService.askToUpdateTransaction).not.toHaveBeenCalled();
                 expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
             });

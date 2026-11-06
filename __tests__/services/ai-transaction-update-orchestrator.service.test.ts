@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
@@ -11,7 +11,7 @@ import { InteractiveTransactionUpdater } from '../../src/services/interactive-tr
 import { ReviewCancelledError } from '../../src/services/user-input.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
-import { budgetRead, deposit, transfer, withdrawal } from '../shared/test-data.js';
+import { budgetRead, deposit, transactionRead, transfer, withdrawal } from '../shared/test-data.js';
 import { loadCatalog, partialMock } from '../shared/mocks.js';
 
 const CATEGORIES = ['Groceries', 'Dining'];
@@ -138,7 +138,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             ),
             applyUpdate: jest.fn<InteractiveTransactionUpdater['applyUpdate']>(async () => ({
                 ok: true,
-                value: {} as TransactionRead,
+                value: transactionRead('1'),
             })),
         });
     });
@@ -330,7 +330,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('stops reviewing when the user presses Ctrl-C', async () => {
             mockUpdater.applyUpdate
-                .mockResolvedValueOnce({ ok: true, value: {} as TransactionRead })
+                .mockResolvedValueOnce({ ok: true, value: transactionRead('1') })
                 .mockRejectedValueOnce(new ReviewCancelledError());
 
             const result = await run();
