@@ -3,7 +3,7 @@ import { TransactionSplitService } from '../../src/services/transaction-split.se
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { createMockFireflyClient, createMockLogger } from '../shared/mocks.js';
-import { transactionRead, withdrawal } from '../shared/test-data.js';
+import { apiError, transactionRead, withdrawal } from '../shared/test-data.js';
 
 type UpdatePayload = Parameters<FireflyClientWithCerts['transactions']['updateTransaction']>[1];
 
@@ -104,6 +104,15 @@ describe('TransactionSplitService', () => {
 
             await expect(service.getSingleSplit('123')).rejects.toThrow(
                 'Transaction 123 already has 2 splits. Only single transactions can be split.'
+            );
+        });
+
+        // V24: Firefly answers an unknown id with the same 401 as a bad token
+        it('should name both causes when Firefly answers 401', async () => {
+            mockClient.transactions.getTransaction.mockRejectedValue(apiError(401));
+
+            await expect(service.getSingleSplit('999999')).rejects.toThrow(
+                'Transaction 999999 was not found, or Firefly rejected the API token'
             );
         });
 

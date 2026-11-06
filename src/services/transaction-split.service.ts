@@ -1,4 +1,5 @@
 import {
+    ApiError,
     TransactionRead,
     TransactionSplit,
     TransactionUpdate,
@@ -130,10 +131,7 @@ export class TransactionSplitService {
         const response = await this.client.transactions
             .getTransaction(transactionId)
             .catch((error: unknown) => {
-                throw new Error(
-                    `Failed to fetch transaction ${transactionId}: ${errorMessage(error)}`,
-                    { cause: error }
-                );
+                throw new Error(fetchFailureMessage(transactionId, error), { cause: error });
             });
         if (!response?.data) {
             throw new Error(`Transaction ${transactionId} not found`);
@@ -244,4 +242,12 @@ export class TransactionSplitService {
             },
         };
     }
+}
+
+/** V24: Firefly answers an unknown id with the same 401 as a rejected token */
+function fetchFailureMessage(transactionId: string, error: unknown): string {
+    if (error instanceof ApiError && error.status === 401) {
+        return `Transaction ${transactionId} was not found, or Firefly rejected the API token`;
+    }
+    return `Failed to fetch transaction ${transactionId}: ${errorMessage(error)}`;
 }
