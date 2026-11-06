@@ -3,7 +3,10 @@ import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
 import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
 import { BudgetReportJson } from '../../types/dto/report-json.types.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
-import { toCents, toTransactionJson } from './analyze-json.serializer.js';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
+
+const { toCents } = CurrencyUtils;
 
 /**
  * The parts of BudgetReportCommand's report data that the JSON contract
@@ -60,11 +63,7 @@ export function serializeBudgetReport(data: BudgetReportSerializerInput): Budget
                     ? toCents(budget.historicalComparison.averageSpent)
                     : null,
         })),
-        bills: {
-            predicted: toCents(data.billComparison.predictedTotal),
-            actual: toCents(data.billComparison.actualTotal),
-            variance: toCents(data.billComparison.variance),
-        },
+        bills: toBillTotalsJson(data.billComparison),
         unbudgetedExpenses: {
             total: toCents(TransactionCalculationUtils.calculateNetSpend(unbudgeted)),
             transactions: unbudgeted.map(toTransactionJson),

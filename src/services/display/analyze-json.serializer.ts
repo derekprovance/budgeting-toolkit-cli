@@ -1,32 +1,9 @@
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
-import { AnalyzeReportJson, TransactionJson } from '../../types/dto/report-json.types.js';
-import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
+import { AnalyzeReportJson } from '../../types/dto/report-json.types.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
 
-/** Rounds to cents, as every money value in the JSON contract is */
-export const toCents = CurrencyUtils.toCents;
-
-/**
- * Serializes one transaction split for the JSON contract.
- *
- * The amount stays unsigned, exactly as Firefly returns it; direction is
- * `type`. `billId` falls back to `subscription_id`, matching how
- * TransactionClassificationService.isBill recognises a bill link.
- */
-export function toTransactionJson(transaction: TransactionSplit): TransactionJson {
-    return {
-        journalId: transaction.transaction_journal_id ?? '',
-        description: transaction.description,
-        type: transaction.type,
-        amount: toCents(TransactionCalculationUtils.parseAmountSafe(transaction.amount)),
-        date: transaction.date,
-        sourceId: transaction.source_id ?? null,
-        destinationId: transaction.destination_id ?? null,
-        budgetId: transaction.budget_id ?? null,
-        billId: transaction.bill_id || transaction.subscription_id || null,
-    };
-}
+const { toCents } = CurrencyUtils;
 
 /**
  * Builds the `analyze --json` document from the report DTO.
@@ -62,9 +39,7 @@ export function serializeAnalyzeReport(report: AnalyzeReportDto): AnalyzeReportJ
             remaining: toCents(report.budgetSurplus),
         },
         bills: {
-            predicted: toCents(report.billComparison.predictedTotal),
-            actual: toCents(report.billComparison.actualTotal),
-            variance: toCents(report.billComparison.variance),
+            ...toBillTotalsJson(report.billComparison),
             bills: report.billComparison.bills.map(bill => ({
                 id: bill.id,
                 name: bill.name,

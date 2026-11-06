@@ -119,4 +119,19 @@ describe('CurrencyUtils', () => {
             expect(result).toBe('$100.00');
         });
     });
+
+    describe('toCents', () => {
+        it.each([
+            [1626, 1626],
+            [1625.9999999999998, 1626],
+            [0.1 + 0.2, 0.3],
+            [360.505, 360.51],
+            [-360.505, -360.51],
+            [-0.001, 0],
+            [-0, 0],
+            [-20, -20],
+        ])('rounds %p to %p', (input, expected) => {
+            expect(Object.is(CurrencyUtils.toCents(input), expected)).toBe(true);
+        });
+    });
 });
