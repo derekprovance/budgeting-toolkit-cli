@@ -8,7 +8,6 @@ import { AssignmentType } from './ai/utils/prompt-templates.js';
 import { CategorizeMode } from '../types/enums.js';
 import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 import { CategorizeStatus } from '../types/enums.js';
-import { IAITransactionUpdateOrchestrator } from '../types/interface/ai-transaction-update-orchestrator.service.interface.js';
 import { ITransactionValidatorService } from './core/transaction-validator.service.interface.js';
 import {
     InteractiveTransactionUpdater,
@@ -33,7 +32,7 @@ interface SuggestionPlan {
     readonly askAI: { readonly category: boolean; readonly budget: boolean };
 }
 
-export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrchestrator {
+export class AITransactionUpdateOrchestrator {
     constructor(
         private readonly transactionService: TransactionService,
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,

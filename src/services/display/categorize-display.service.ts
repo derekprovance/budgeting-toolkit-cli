@@ -9,30 +9,19 @@ const MODE_TEXT: Record<CategorizeMode, string> = {
 };
 
 export class CategorizeDisplayService {
-    /**
-     * Formats the processing header
-     */
     formatProcessingHeader(tag: string, updateMode: CategorizeMode, dryRun?: boolean): string {
-        const modeText = MODE_TEXT[updateMode];
         const dryRunText = dryRun ? ' (Dry Run)' : '';
-
-        return [
-            chalk.cyan(`Processing transactions with tag "${tag}" for ${modeText}${dryRunText}:`),
-        ].join('\n');
+        return chalk.cyan(
+            `Processing transactions with tag "${tag}" for ${MODE_TEXT[updateMode]}${dryRunText}:`
+        );
     }
 
-    /**
-     * Formats the tag not found message
-     */
     formatTagNotFound(tag: string): string {
-        return [chalk.yellow(`\n❌ Tag "${tag}" not found`)].join('\n');
+        return chalk.yellow(`\n❌ Tag "${tag}" not found`);
     }
 
-    /**
-     * Formats the empty tag message
-     */
     formatEmptyTag(tag: string): string {
-        return [chalk.yellow(`\nNo processable transactions found with tag "${tag}"`)].join('\n');
+        return chalk.yellow(`\nNo processable transactions found with tag "${tag}"`);
     }
 
     /** Lists the transactions that failed validation or could not be updated */
