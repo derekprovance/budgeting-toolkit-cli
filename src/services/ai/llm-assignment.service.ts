@@ -15,16 +15,12 @@ import { mapTransactionForLLM, LLMTransactionData } from './utils/transaction-ma
 import { ILogger } from '../../types/interface/logger.interface.js';
 import { errorMessage } from '../../utils/error-detection.utils.js';
 
-/** One chunk's assignments, plus whether they are real or a degraded fallback */
 interface ChunkResult {
     values: string[];
     /** True when the chunk failed and was filled with the no-match sentinel */
     degraded: boolean;
 }
 
-/**
- * Batching options for LLM assignment requests
- */
 export interface LLMBatchOptions {
     /** Transactions per request — keeps responses well under maxTokens */
     batchSize: number;
@@ -33,12 +29,8 @@ export interface LLMBatchOptions {
 }
 
 /**
- * Unified service for LLM-powered transaction assignments.
- * Handles both category and budget assignments using the same underlying logic.
- *
- * Batching: transactions are chunked by batchSize and processed by a bounded
- * worker pool. A recoverable failure degrades only its own chunk to the
- * no-match sentinel; critical errors (auth, bad request) abort the whole run.
+ * A recoverable failure degrades only its own chunk to the no-match sentinel;
+ * critical errors (see isCriticalError) abort the whole run.
  */
 export class LLMAssignmentService {
     constructor(
@@ -48,12 +40,8 @@ export class LLMAssignmentService {
     ) {}
 
     /**
-     * Assigns categories or budgets to transactions using Claude AI.
-     *
-     * @param type - The assignment type: 'category' or 'budget'
-     * @param transactions - Array of transactions to process
-     * @param validOptions - Array of valid categories or budgets (the no-match
-     * sentinel is handled internally — callers should not append it)
+     * @param validOptions - the no-match sentinel is added internally; callers
+     *   should not append it
      * @returns One value per transaction, in order; `undefined` where no
      *   option fits or the chunk degraded
      * @throws on a critical error (see isCriticalError) or when `validOptions` is empty
@@ -63,7 +51,6 @@ export class LLMAssignmentService {
         transactions: TransactionSplit[],
         validOptions: string[]
     ): Promise<(string | undefined)[]> {
-        // Validation
         if (!transactions || transactions.length === 0) {
             this.logger.warn(`No transactions provided for ${type} assignment`);
             return [];
@@ -84,15 +71,13 @@ export class LLMAssignmentService {
             `Starting ${type} assignment`
         );
 
-        // Map transactions to LLM format and chunk them
         const transactionData = transactions.map(mapTransactionForLLM);
         const chunks = LLMAssignmentService.chunk(transactionData, this.batchOptions.batchSize);
 
-        // Built once — identical across chunks (stable prompt prefix)
+        // Identical across chunks, for a stable prompt prefix
         const systemPrompt = getSystemPrompt(type);
         const functionSchema = getFunctionSchema(type, validOptions);
 
-        // Bounded worker pool with order-preserving results
         const results: ChunkResult[] = new Array(chunks.length);
         let nextChunk = 0;
         const workerCount = Math.min(this.batchOptions.maxConcurrent, chunks.length);
@@ -118,10 +103,8 @@ export class LLMAssignmentService {
 
         const assignments = results.flatMap(result => result.values);
 
-        // A degraded chunk yields sentinels indistinguishable from a genuine
-        // "no match", so the count has to be carried out rather than inferred.
-        // Without this the run reports success while some transactions were
-        // never actually looked at.
+        // A degraded chunk's sentinels look like a genuine "no match", so the
+        // count must be carried out rather than inferred
         const degradedTransactionCount = results
             .filter(result => result.degraded)
             .reduce((sum, result) => sum + result.values.length, 0);
@@ -139,7 +122,6 @@ export class LLMAssignmentService {
             );
         }
 
-        // Log each transaction's AI assignment for debugging
         assignments.forEach((assignment, index) => {
             this.logger.trace(
                 {
@@ -166,10 +148,6 @@ export class LLMAssignmentService {
         );
     }
 
-    /**
-     * Processes one chunk. Recoverable failures fill only this chunk with the
-     * sentinel; critical errors propagate and abort the run.
-     */
     private async processChunk(
         type: AssignmentType,
         chunk: LLMTransactionData[],
@@ -223,17 +201,13 @@ export class LLMAssignmentService {
     }
 
     /**
-     * Critical errors abort the whole run rather than degrading a chunk to the
-     * sentinel. Degrading is only ever the right call for a failure the *next*
-     * chunk might survive; for everything below, carrying on would quietly
-     * sentinel-fill the rest of the run and still report success.
+     * Failures the next chunk cannot survive, so degrading would quietly
+     * sentinel-fill the rest of the run and still report success:
      *
      * - auth / permission: will not heal on retry
      * - bad request: a config bug that silent degradation would hide
-     * - circuit open: the breaker has already given up, so every remaining
-     *   chunk would be rejected without even reaching the API
-     * - truncated: the response outgrew `llm.maxTokens`, which is a
-     *   configuration problem that every subsequent chunk will hit too
+     * - circuit open: every remaining chunk would be rejected anyway
+     * - truncated: the response outgrew `llm.maxTokens`, as every later chunk will
      */
     private isCriticalError(error: unknown): boolean {
         if (error instanceof ClaudeResponseError) {
@@ -256,9 +230,6 @@ export class LLMAssignmentService {
         return chunks;
     }
 
-    /**
-     * Calculates the success rate of assignments (non-default values)
-     */
     private calculateSuccessRate(assignments: string[], type: AssignmentType): string {
         if (assignments.length === 0) {
             return '0.0%';

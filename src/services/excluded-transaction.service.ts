@@ -14,12 +14,8 @@ interface ExclusionRule {
 }
 
 /**
- * Service for managing excluded transactions.
- *
- * Excluded transactions are configured in the YAML file and injected via constructor.
- * A rule matches on description, optionally narrowed to a single amount; see
- * `ExcludedTransaction` for the full contract. `ConfigValidator` rejects a rule
- * without a description or with an unparseable amount before it reaches here.
+ * See `ExcludedTransaction` for how a rule matches. `ConfigValidator` rejects a
+ * rule without a description or with an unparseable amount before it gets here.
  */
 export class ExcludedTransactionService implements IExcludedTransactionService {
     private readonly rules: readonly ExclusionRule[];

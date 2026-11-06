@@ -7,13 +7,8 @@ export class BillService {
     constructor(private readonly client: FireflyClientWithCerts) {}
 
     /**
-     * Get all bills with pay_dates populated for the specified month.
-     * When date range is provided, Firefly III populates the pay_dates array
-     * with expected payment dates within that range.
+     * Firefly fills each bill's `pay_dates` only when a date range is given.
      *
-     * @param month - Month number (1-12)
-     * @param year - Four-digit year
-     * @returns Promise resolving to array of BillRead with populated pay_dates
      * @throws Error if month/year is invalid or the API fails
      */
     async getBillsForMonth(month: number, year: number): Promise<BillRead[]> {

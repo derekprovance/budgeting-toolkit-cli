@@ -6,26 +6,19 @@ import { errorMessage } from '../../../utils/error-detection.utils.js';
 export type AssignmentType = 'category' | 'budget';
 
 /**
- * The "no match" sentinel the LLM returns when no option fits.
- * Single source of truth — the schema, prompts, and response validation all
- * derive from this record, so callers never need to append it themselves.
+ * What the LLM returns when no option fits. The schema, prompts and response
+ * validation all add it, so callers never append it themselves.
  */
 export const NO_MATCH_SENTINEL: Record<AssignmentType, string> = {
     category: '(no category)',
     budget: '(no budget)',
 };
 
-/**
- * Gets the no-match sentinel value for an assignment type
- */
 export function getNoMatchValue(type: AssignmentType): string {
     return NO_MATCH_SENTINEL[type];
 }
 
-/**
- * Checks whether a value is the no-match sentinel (or empty), compared the way
- * the catalog compares names
- */
+/** True for the sentinel or an empty value, compared the way the catalog compares names */
 export function isNoMatch(type: AssignmentType, value: string | undefined): boolean {
     return (
         !value ||
@@ -34,18 +27,12 @@ export function isNoMatch(type: AssignmentType, value: string | undefined): bool
     );
 }
 
-/**
- * Returns the options list with the no-match sentinel appended (if absent)
- */
 export function withSentinel(type: AssignmentType, validOptions: string[]): string[] {
     const sentinel = NO_MATCH_SENTINEL[type];
     return validOptions.includes(sentinel) ? validOptions : [...validOptions, sentinel];
 }
 
-/**
- * Generates the tool schema for Claude's tool-use API.
- * The sentinel is always included in the enum so the model can decline a match.
- */
+/** The sentinel is always in the enum so the model can decline a match */
 export function getFunctionSchema(type: AssignmentType, validOptions: string[]): Anthropic.Tool {
     const fieldName = `${type === 'category' ? 'categories' : 'budgets'}`;
     const functionName = `assign_${fieldName}`;
@@ -70,16 +57,10 @@ export function getFunctionSchema(type: AssignmentType, validOptions: string[]):
     };
 }
 
-/**
- * Generates the system prompt for the assignment task
- */
 export function getSystemPrompt(type: AssignmentType): string {
     return `You are a financial transaction ${type} assignment assistant. Analyze transactions and assign the most appropriate ${type} from the provided list. Be consistent and precise.`;
 }
 
-/**
- * Generates the user prompt with transaction data and valid options
- */
 export function getUserPrompt(
     type: AssignmentType,
     transactions: LLMTransactionData[],
@@ -109,9 +90,8 @@ Return the ${fieldName} in the exact same order as the transactions listed above
 }
 
 /**
- * Parses the forced tool call's input into one answer per transaction, in
- * order. Answers are returned as given: matching them to a category or budget
- * is the catalog's job.
+ * One answer per transaction, in order, returned as given: matching them to a
+ * category or budget is the catalog's job.
  *
  * @throws Error when the payload is not JSON, lacks the array, has the wrong
  *   count or holds a non-string answer

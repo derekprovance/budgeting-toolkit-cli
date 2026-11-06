@@ -33,9 +33,8 @@ export class BudgetService implements IBudgetService {
             );
         }
 
-        // The SDK's listBudgetLimit exposes no page parameter, so a month with
-        // more budget limits than one page holds cannot be drained here. Say so
-        // loudly rather than silently reporting a short allocation total.
+        // The SDK's listBudgetLimit has no page parameter, so further pages
+        // cannot be fetched; warn rather than silently under-report
         const totalPages = results.meta?.pagination?.total_pages;
         if (totalPages !== undefined && totalPages > 1) {
             logger.warn(

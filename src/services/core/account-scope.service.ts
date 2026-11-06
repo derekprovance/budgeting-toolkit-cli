@@ -16,10 +16,9 @@ export interface AccountScope {
 }
 
 /**
- * Derives the envelope from Firefly's own account metadata, so it cannot drift
- * out of date as accounts are added or closed. `untrackedAccounts` is the one
- * judgement Firefly cannot make — savings, a brokerage and the disposable pool
- * all look like ordinary asset accounts — and is the only input.
+ * Derives the envelope from Firefly's account metadata, so it cannot drift as
+ * accounts are added or closed. `untrackedAccounts` is the only input: savings,
+ * a brokerage and the disposable pool look like ordinary asset accounts.
  */
 export class AccountScopeService {
     private readonly logger: ILogger;
@@ -35,11 +34,8 @@ export class AccountScopeService {
     }
 
     /**
-     * Resolves the scope once per process.
-     *
-     * Caches the in-flight promise rather than the resolved value so that
-     * concurrent callers share a single API call. A rejection is evicted so the
-     * next caller retries rather than inheriting a cached failure.
+     * Resolved once per process. Concurrent callers share one API call; a
+     * rejection is evicted so the next caller retries.
      */
     getScope(): Promise<AccountScope> {
         if (this.inflight) {
@@ -59,9 +55,8 @@ export class AccountScopeService {
         const accounts = await this.fetchAssetAccounts();
         const untracked = new Set(this.untrackedAccounts);
 
-        // The asset filter is also applied client-side, not only asked for in
-        // the query: getting listAccount's positional parameters wrong would
-        // quietly make every merchant part of the envelope.
+        // Also filtered client-side: a wrong positional parameter to
+        // listAccount would quietly put every merchant in the envelope.
         // Inactive accounts stay in: closing a card must not rewrite the
         // months it was used (R-SCOPE-1)
         const envelope = accounts.filter(

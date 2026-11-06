@@ -9,9 +9,6 @@ import { DisplayFormatterUtils } from '../utils/display-formatter.utils.js';
 import { SuggestionSource } from '../types/categorize.types.js';
 import { validateSplitAmount } from '../utils/split-amount.utils.js';
 
-/**
- * Interface for transaction update options
- */
 interface TransactionUpdateOptions {
     /**
      * Whether the transaction may be given a budget (the validator's
@@ -49,9 +46,6 @@ async function reviewPrompt<T>(prompt: Promise<T>): Promise<T> {
     }
 }
 
-/**
- * Service for handling user input interactions
- */
 export class UserInputService {
     private readonly MAX_DESCRIPTION_LENGTH = 50;
     private readonly DESCRIPTION_TRUNCATE_LENGTH = 47;
@@ -59,8 +53,7 @@ export class UserInputService {
     constructor(private baseUrl: string) {}
 
     /**
-     * Asks the user whether to update a transaction with new category and/or budget
-     * @param transactionId The Firefly transaction id, for the link; none when undefined
+     * @param transactionId for the link; no link when undefined
      * @throws ReviewCancelledError when the user presses Ctrl-C
      */
     async askToUpdateTransaction(
@@ -78,9 +71,6 @@ export class UserInputService {
         return this.promptUser(message, options.canSetBudget);
     }
 
-    /**
-     * Prints a blank line that separates one transaction's review from the previous one
-     */
     printSeparator(): void {
         console.log();
     }
@@ -157,7 +147,6 @@ export class UserInputService {
                     if (!input) {
                         const choices = values.map(toChoice);
 
-                        // Sort: current first, then AI suggestion, then alphabetical
                         choices.sort((a, b) => {
                             if (a.value === currentValue) return -1;
                             if (b.value === currentValue) return 1;
@@ -169,7 +158,6 @@ export class UserInputService {
                         return choices;
                     }
 
-                    // Filter based on user input (case-insensitive)
                     const searchLower = input.toLowerCase();
                     return values
                         .filter(name => name.toLowerCase().includes(searchLower))
@@ -217,9 +205,6 @@ export class UserInputService {
         return this.formatChange(field, current ?? undefined, suggested, source);
     }
 
-    /**
-     * Formats a single change for display (old value → new value)
-     */
     private formatChange(
         field: string,
         oldValue: string | undefined,
@@ -230,23 +215,14 @@ export class UserInputService {
         return `${chalk.bold(field)}: ${chalk.redBright(oldValue || 'None')} → ${chalk.cyan(newValue)}${label}`;
     }
 
-    /**
-     * Formats a current value for display (no change indicator)
-     */
     private formatCurrentValue(field: string, currentValue: string | undefined): string {
         return `${chalk.bold(field)}: ${chalk.dim(currentValue || 'None')}`;
     }
 
-    /**
-     * Formats a suggestion that matches the current value
-     */
     private formatUnchanged(field: string, value: string): string {
         return `${this.formatCurrentValue(field, value)} ${chalk.dim('(unchanged)')}`;
     }
 
-    /**
-     * Formats the transaction description, truncating if necessary
-     */
     private formatDescription(description: string, transactionId: string | undefined): string {
         const truncatedDescription =
             description.length > this.MAX_DESCRIPTION_LENGTH
@@ -256,9 +232,6 @@ export class UserInputService {
         return DisplayFormatterUtils.linkedText(truncatedDescription, this.baseUrl, transactionId);
     }
 
-    /**
-     * Formats the complete update message
-     */
     private formatUpdateMessage(
         transaction: TransactionSplit,
         transactionId: string | undefined,
@@ -292,9 +265,6 @@ export class UserInputService {
         ].join('\n');
     }
 
-    /**
-     * Prompts the user for confirmation
-     */
     private async promptUser(message: string, canSetBudget: boolean): Promise<ReviewAction> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
@@ -339,9 +309,6 @@ export class UserInputService {
         return reviewPrompt(expand({ message, default: 'a', choices }));
     }
 
-    /**
-     * Prompts for the first split's amount until validateSplitAmount accepts it
-     */
     async getSplitAmount(originalAmount: number, currencySymbol: string): Promise<number> {
         const answer = await input({
             message: `Enter amount for first split (original: ${currencySymbol}${originalAmount}):`,
@@ -351,11 +318,7 @@ export class UserInputService {
         return parseFloat(answer);
     }
 
-    /**
-     * Prompts user to optionally add custom text to a split description
-     * @param splitNumber The split number (1 or 2) for display purposes
-     * @returns Promise<string> The custom text to append (empty string if none)
-     */
+    /** @returns the trimmed text, or an empty string when the user skips */
     async getCustomSplitText(splitNumber: number): Promise<string> {
         const customText = await input({
             message: `Custom text for split ${splitNumber} (press Enter to skip):`,
@@ -365,10 +328,6 @@ export class UserInputService {
         return customText.trim();
     }
 
-    /**
-     * Confirms the split operation with the user
-     * @returns Promise<boolean> Whether the user confirmed
-     */
     async confirmSplit(): Promise<boolean> {
         return await confirm({
             message: chalk.bold('Proceed with split?'),

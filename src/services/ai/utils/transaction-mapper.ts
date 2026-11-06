@@ -1,9 +1,5 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 
-/**
- * Maps a TransactionSplit to the format expected by LLM services.
- * Extracts only the relevant fields needed for AI categorization and budgeting.
- */
 export interface LLMTransactionData {
     description: string;
     amount: string;
@@ -14,9 +10,6 @@ export interface LLMTransactionData {
     notes?: string | null | undefined;
 }
 
-/**
- * Transforms a TransactionSplit into LLM-friendly format
- */
 export function mapTransactionForLLM(tx: TransactionSplit): LLMTransactionData {
     return {
         description: tx.description,

@@ -63,9 +63,8 @@ export class BudgetAnalyticsService {
      *   buckets cannot be read
      */
     async getTopExpenses(month: number, year: number, limit: number): Promise<TopExpenseDto[]> {
-        // What the envelope paid for (RULES.md): the buckets in the net,
-        // less refunds. Disposable purchases are the pool's (R-DISP-1), and
-        // outside accounts never appear.
+        // The buckets in the net, less refunds; disposable purchases are the
+        // pool's (R-DISP-1)
         const buckets = await this.getBuckets(month, year);
         const expenses = [...buckets.bill, ...buckets.budget, ...buckets.unbudgeted].filter(
             t => t.type !== 'deposit'
@@ -80,9 +79,8 @@ export class BudgetAnalyticsService {
         return sorted.slice(0, limit).map((t, index) => ({
             description: t.description || `Transaction ${index + 1}`,
             amount: TransactionCalculationUtils.parseAmountSafe(t.amount),
-            // Not "Unbudgeted": the report has a section by that name with a
-            // narrower meaning, and rent (a bill) would carry this label
-            // while never appearing there.
+            // Not "Unbudgeted": the report's section by that name excludes
+            // bills, which would carry this label too
             budgetName: t.budget_name || 'no budget',
             date: (t.date || new Date().toISOString()).split('T')[0],
             transactionId: t.transaction_journal_id || '',
@@ -125,10 +123,8 @@ export class BudgetAnalyticsService {
 }
 
 /**
- * How much of its limit a budget used. A budget with no limit for the month
- * has amount 0: there is no limit to divide by, and none to exceed either.
- * Without that guard any spend at all made it over budget, rendered as an
- * empty bar and announced as "your biggest issue - 0% of its limit".
+ * A budget with no limit for the month has amount 0: nothing to divide by and
+ * nothing to exceed, so it is never over budget.
  */
 function usage({
     amount,
@@ -189,12 +185,7 @@ function statistics(transactions: TransactionSplit[]): TransactionStats {
     };
 }
 
-/**
- * The most visited merchant (by description), ties broken on spend. Without
- * the tie-break, a category where every merchant was visited once reports
- * whichever happened to be first: a $5.00 corner-shop run standing in for a
- * category dominated by a $400.00 charge.
- */
+/** The most visited merchant (by description), ties broken on spend */
 function topMerchant(transactions: TransactionSplit[]): MerchantInsight | undefined {
     const byMerchant = Map.groupBy(transactions, t => t.description || 'Unknown');
 

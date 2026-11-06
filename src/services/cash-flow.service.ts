@@ -15,12 +15,9 @@ import { MonthError, monthFailure } from '../types/error/month.error.js';
 export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
 
 /**
- * Sorts a month's transactions into buckets. Every figure `analyze` and
- * `report` print is a total over these buckets, so the two commands cannot
- * disagree about what a transaction is.
- *
- * Transactions no bucket claims — anything outside the envelope, and transfers
- * inside or into it — are dropped here and appear nowhere (RULES.md).
+ * Every figure `analyze` and `report` print is a total over these buckets, so
+ * the two commands cannot disagree. A transaction no bucket claims appears
+ * nowhere.
  */
 export class CashFlowService {
     constructor(

@@ -138,11 +138,7 @@ export class AITransactionUpdateOrchestrator {
         return true;
     }
 
-    /**
-     * Builds the history index for `transactions`. History is an optimisation
-     * over the AI, so a failed fetch only costs its suggestions: it is logged
-     * and the index stays empty. Never rejects.
-     */
+    /** Never rejects: a failed fetch is logged and the index stays empty */
     private async loadHistory(transactions: JournaledTransaction[]): Promise<void> {
         const own = new Set(transactions.map(t => t.transaction_journal_id));
         try {
@@ -239,9 +235,7 @@ export class AITransactionUpdateOrchestrator {
 
     /**
      * Validates every suggestion before the first prompt, so the
-     * `[index/total]` counter counts exactly the prompts that follow: a
-     * suggestion that fails validation or changes nothing never reaches the
-     * user and must not take a number.
+     * `[index/total]` counter counts only the prompts actually shown.
      */
     private prepare(suggestions: Suggestion[]): {
         prepared: PreparedUpdate[];

@@ -38,9 +38,6 @@ export class TransactionService implements ITransactionService {
         this.logger = logger;
     }
 
-    /**
-     * Retrieves transactions for a specific month, using cache when available
-     */
     async getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]> {
         try {
             const cacheKey = `month-${month}-year-${year}`;
@@ -54,10 +51,7 @@ export class TransactionService implements ITransactionService {
         }
     }
 
-    /**
-     * Retrieves transactions between two inclusive `YYYY-MM-DD` dates, using
-     * cache when available
-     */
+    /** Both `YYYY-MM-DD` dates are inclusive */
     async getTransactionsInRange(start: string, end: string): Promise<TransactionSplit[]> {
         try {
             const cacheKey = `range-${start}-${end}`;
@@ -74,14 +68,8 @@ export class TransactionService implements ITransactionService {
     }
 
     /**
-     * The date of the most recent transaction, for reporting how current the
-     * data is.
-     *
-     * Deliberately the transaction's own `date`, not the record's `created_at`.
-     * Firefly lists newest-by-date first, so `created_at` would answer "when
-     * was this imported" — importing a backdated batch today would report data
-     * current as of today, which is the false reassurance this exists to
-     * prevent.
+     * The transaction's own `date`, not `created_at`: importing a backdated
+     * batch today must not report the data as current.
      *
      * @returns undefined when the ledger has no dated transaction
      */
@@ -94,9 +82,6 @@ export class TransactionService implements ITransactionService {
         return date ? new Date(date) : undefined;
     }
 
-    /**
-     * Retrieves transactions by tag
-     */
     async getTransactionsByTag(tag: string): Promise<TransactionSplit[]> {
         try {
             const cacheKey = `tag-${tag}`;
@@ -156,10 +141,9 @@ export class TransactionService implements ITransactionService {
             ...(category && { category_name: category }),
             ...(budgetId && { budget_id: budgetId }),
         };
-        // Firefly deletes every split of the group that the PUT does not list,
-        // so the payload names all of them, in the order Firefly returned
-        // them. Only the target split carries the change. A multi-split PUT is
-        // rejected without the group title, so it is sent back unchanged.
+        // Firefly deletes every split the PUT does not list, so all are named,
+        // in Firefly's order. A multi-split PUT is rejected without the group
+        // title, so it is sent back unchanged.
         const groupTitle = transactionRead.attributes.group_title;
         const updatePayload: TransactionUpdate = {
             apply_rules: true,
@@ -172,8 +156,7 @@ export class TransactionService implements ITransactionService {
             ),
         };
 
-        // A failed write propagates, so the caller reports it as a failure
-        // rather than counting it as a skipped transaction.
+        // Propagates, so the caller reports a failure rather than a skip
         const updatedTransaction = await this.client.transactions.updateTransaction(
             transactionRead.id,
             updatePayload
@@ -198,17 +181,14 @@ export class TransactionService implements ITransactionService {
         key: string,
         fetchFn: () => Promise<TransactionRead[]>
     ): Promise<TransactionSplit[]> {
-        // Cache the in-flight promise, not the resolved value: concurrent callers
-        // with the same key (e.g. the analyze command's parallel services) share
-        // one API fetch instead of stampeding.
+        // The in-flight promise is cached so concurrent callers share one fetch
         const inflight = this.cache.get(key);
         if (inflight) {
             return inflight;
         }
 
-        // RULES.md, R-EXCL-1: the one place exclusions are applied. Everything
-        // downstream reads from here, so an excluded transaction is gone from
-        // every bucket in every command.
+        // R-EXCL-1: the one place exclusions are applied, so an excluded
+        // transaction is gone from every bucket in every command
         const promise = (async () => {
             const included = (await fetchFn()).flatMap(group =>
                 (group.attributes?.transactions ?? [])
@@ -220,7 +200,7 @@ export class TransactionService implements ITransactionService {
         })();
 
         this.cache.set(key, promise);
-        // Don't cache failures — let the next caller retry
+        // A failure is not cached, so the next caller retries
         promise.catch(() => {
             this.cache.delete(key);
         });

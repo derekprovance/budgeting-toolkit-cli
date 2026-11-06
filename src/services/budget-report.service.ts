@@ -44,10 +44,8 @@ export class BudgetReportService {
             return Result.err(buckets.error);
         }
 
-        // The budget bucket and allocations analyze totals, split by
-        // budget (R-BUDGET-1). An inactive budget still gets a row when it
-        // has spending or a limit this month, or the rows would not sum to
-        // analyze's totals.
+        // R-BUDGET-1: an inactive budget still gets a row when it has spending
+        // or a limit this month, or the rows would not sum to analyze's totals
         const spendingByBudget = Map.groupBy(buckets.value.budget, t => t.budget_id);
         const allocations = allocationsByBudget(budgetLimits);
         const budgets = allBudgets.filter(

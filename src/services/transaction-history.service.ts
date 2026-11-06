@@ -33,11 +33,8 @@ interface HistoryEntry {
 }
 
 /**
- * Suggests a category and budget for `categorize` from the most recent earlier
- * transaction with the same normalized description, so repeat merchants don't
- * need the AI.
- *
- * The lookback window is fetched once per run and indexed in memory.
+ * Suggests a category and budget from the most recent earlier transaction with
+ * the same normalized description. The lookback window is fetched once per run.
  */
 export class TransactionHistoryService {
     private index = new Map<string, HistoryEntry>();

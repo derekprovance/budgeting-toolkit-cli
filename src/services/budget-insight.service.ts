@@ -4,34 +4,22 @@ import { BudgetInsight } from '../types/dto/budget-insight.dto.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
 import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 
-/**
- * Service for generating rule-based insights about spending patterns
- * Analyzes budget data to produce actionable recommendations
- */
 export class BudgetInsightService {
-    /**
-     * Generates spending insights from budget, bill, and transaction data
-     * Applies simple rules to identify patterns and issues
-     * @param budgets Budget report data
-     * @param billComparison Bill comparison data
-     * @returns Array of insights sorted by priority
-     */
+    /** @returns insights sorted by priority, lowest number first */
     generateInsights(
         budgets: BudgetReportDto[],
         billComparison: BillComparisonDto
     ): BudgetInsight[] {
         const insights: BudgetInsight[] = [];
 
-        // Rule 1: Biggest overspend - identify worst over-budget category
         const overBudgets = budgets
             .filter(b => b.status === 'over')
             .sort((a, b) => b.percentageUsed - a.percentageUsed);
 
         if (overBudgets.length > 0) {
             const worst = overBudgets[0];
-            // Report the same figure the category row shows. "% over" and
-            // "% used" differ by exactly 100 and reading "1284% over" directly
-            // beneath "1384%" looks like one of them is wrong.
+            // "% used", as the budget row shows: "1284% over" beneath "1384%"
+            // reads as a contradiction
             insights.push({
                 type: 'warning',
                 message: `${worst.name} is your biggest issue - ${worst.percentageUsed.toFixed(0)}% of its limit`,
@@ -40,7 +28,6 @@ export class BudgetInsightService {
             });
         }
 
-        // Rule 2: High transaction frequency
         budgets.forEach(budget => {
             if (
                 budget.transactionStats.count >=
@@ -61,7 +48,6 @@ export class BudgetInsightService {
             }
         });
 
-        // Rule 3: Good performance - budgets well under budget
         const underBudgets = budgets
             .filter(
                 b =>
@@ -81,7 +67,7 @@ export class BudgetInsightService {
             });
         }
 
-        // Rule 4: Significant bill variance (predictedTotal of 0 would yield Infinity%)
+        // A predictedTotal of 0 would yield Infinity%
         if (billComparison.predictedTotal > 0 && billComparison.variance > 0) {
             const percentageOver = (billComparison.variance / billComparison.predictedTotal) * 100;
             if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.CRITICAL_VARIANCE_PERCENT) {
@@ -93,7 +79,6 @@ export class BudgetInsightService {
             }
         }
 
-        // Return sorted by priority (lower number = higher priority)
         return insights.sort((a, b) => a.priority - b.priority);
     }
 }

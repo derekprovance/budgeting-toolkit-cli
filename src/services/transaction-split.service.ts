@@ -9,9 +9,6 @@ import { logger as defaultLogger } from '../logger.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { errorMessage } from '../utils/error-detection.utils.js';
 
-/**
- * Data for a single split portion
- */
 export interface SplitData {
     amount: string;
     description: string;
@@ -20,9 +17,6 @@ export interface SplitData {
 /** The two parts a transaction is split into: the first keeps the original journal */
 export type SplitParts = readonly [SplitData, SplitData];
 
-/**
- * Service for splitting transactions into multiple parts
- */
 export class TransactionSplitService {
     private readonly logger: ILogger;
 
@@ -53,8 +47,6 @@ export class TransactionSplitService {
     }
 
     /**
-     * Splits a transaction into two parts
-     * @param transactionId The ID of the transaction to split
      * @param originalSplit Its only split, from getSingleSplit
      * @param parts The first part keeps the original's category, budget and
      *   tags; the second is left for manual assignment. Their amounts must sum
@@ -125,43 +117,35 @@ export class TransactionSplitService {
         }
     }
 
-    /**
-     * Creates the TransactionUpdate payload for splitting
-     */
     private createSplitPayload(
         originalSplit: TransactionSplit,
         [firstData, secondData]: SplitParts
     ): TransactionUpdate {
         const foreign = this.splitForeignAmount(originalSplit, firstData.amount);
 
-        // First split: Update original transaction (preserves journal ID)
+        // The journal id makes this an update of the original split
         const firstSplitUpdate: TransactionSplitUpdate = {
             transaction_journal_id: originalSplit.transaction_journal_id,
             amount: firstData.amount,
             description: firstData.description,
-            // Copy tags from original transaction
             ...(originalSplit.tags && { tags: originalSplit.tags }),
-            // Preserve category from original
             ...(originalSplit.category_name && { category_name: originalSplit.category_name }),
-            // Preserve budget from original
             ...(originalSplit.budget_id && { budget_id: originalSplit.budget_id }),
             ...(foreign && { ...foreign.currency, foreign_amount: foreign.amounts[0] }),
         };
 
-        // Second split: Create new transaction (no journal ID)
+        // No journal id: Firefly creates this split
         const secondSplitUpdate: TransactionSplitUpdate = {
             type: originalSplit.type,
             date: originalSplit.date,
             amount: secondData.amount,
             description: secondData.description,
 
-            // Copy account information from original
             source_id: originalSplit.source_id,
             source_name: originalSplit.source_name,
             destination_id: originalSplit.destination_id,
             destination_name: originalSplit.destination_name,
 
-            // Copy currency information
             ...(originalSplit.currency_id && { currency_id: originalSplit.currency_id }),
             ...(originalSplit.currency_code && { currency_code: originalSplit.currency_code }),
             ...(foreign && { ...foreign.currency, foreign_amount: foreign.amounts[1] }),
