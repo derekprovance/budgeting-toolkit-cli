@@ -15,8 +15,8 @@
  * - A transfer without a valid destination is a 422 (V7).
  * - Inactive accounts and bills stay listed with `active: false` (V11, V15).
  * - Date ranges are inclusive at both ends (V16).
- * - `limit` is honored with no cap and defaults to 50; `total_pages` is exact
- *   (V14).
+ * - `limit` is honored with no cap and defaults to
+ *   `PAGINATION_BEHAVIOR.defaultLimit`; `total_pages` is exact (V14).
  * - Bills with start/end compute pay_dates; a bill paid in the window reports
  *   its next occurrence (V11). Without a range, pay_dates is [].
  * - Group ids and journal ids come from distinct sequences.
@@ -30,6 +30,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { addDays, inRange, occurrence, toDay, toWireDate } from './dates.js';
 import { formatMoney, parseMoney } from './money.js';
+import { PAGINATION_BEHAVIOR } from '../scenario/firefly-contract.js';
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -468,10 +469,13 @@ export class FakeFirefly {
 
     // ─── Pagination ─────────────────────────────────────────────────────────
 
-    /** Laravel-style pagination: limit honored with no cap (V14), default 50 */
+    /** Laravel-style pagination: limit honored with no cap (V14) */
     private page<T>(q: URLSearchParams, items: readonly T[], toRes: (item: T) => unknown) {
         const limitRaw = Number(q.get('limit'));
-        const perPage = Number.isInteger(limitRaw) && limitRaw > 0 ? limitRaw : 50;
+        const perPage =
+            Number.isInteger(limitRaw) && limitRaw > 0
+                ? limitRaw
+                : PAGINATION_BEHAVIOR.defaultLimit;
         const pageRaw = Number(q.get('page'));
         const current = Number.isInteger(pageRaw) && pageRaw > 0 ? pageRaw : 1;
         const total = items.length;
