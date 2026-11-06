@@ -3,7 +3,13 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as os from 'os';
 import dotenv from 'dotenv';
-import { AppConfig, CategorizeConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
+import {
+    AppConfig,
+    CategorizeConfig,
+    ExcludedTransaction,
+    LLMConfig,
+    TagsConfig,
+} from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidationError, ConfigValidator } from './config.validator.js';
 import { errorMessage } from '../utils/error-detection.utils.js';
@@ -15,15 +21,22 @@ interface YamlConfig {
     untrackedAccounts?: string[];
     expectedMonthlyPaycheck?: number;
     excludedTransactions?: ExcludedTransaction[];
-
-    tags?: {
-        disposableIncome?: string;
-        paycheck?: string;
-    };
-
+    tags?: Partial<TagsConfig>;
     llm?: DeepPartial<LLMConfig>;
     categorize?: Partial<CategorizeConfig>;
 }
+
+/** Every key this loader understands. Anything else in the YAML is ignored. */
+const KNOWN_YAML_KEYS: ReadonlySet<string> = new Set(
+    Object.keys({
+        untrackedAccounts: true,
+        expectedMonthlyPaycheck: true,
+        excludedTransactions: true,
+        tags: true,
+        llm: true,
+        categorize: true,
+    } satisfies Record<keyof YamlConfig, true>)
+);
 
 /**
  * Utility type for recursive partial objects used in config merging.
@@ -307,24 +320,12 @@ export class ConfigManager {
     }
 
     /**
-     * Every key this loader understands. Anything else in the YAML is ignored.
-     */
-    private static readonly KNOWN_YAML_KEYS: ReadonlySet<string> = new Set([
-        'untrackedAccounts',
-        'expectedMonthlyPaycheck',
-        'excludedTransactions',
-        'tags',
-        'llm',
-        'categorize',
-    ]);
-
-    /**
      * Warns about YAML keys this loader does not read, so a typo is never
      * silently taken as applied.
      */
     private warnOnUnknownYamlKeys(yamlConfig: YamlConfig): void {
         for (const key of Object.keys(yamlConfig)) {
-            if (!ConfigManager.KNOWN_YAML_KEYS.has(key)) {
+            if (!KNOWN_YAML_KEYS.has(key)) {
                 console.warn(`⚠️  config.yaml: unknown setting '${key}' is being ignored.`);
             }
         }
@@ -367,17 +368,9 @@ export class ConfigManager {
                 : yamlConfig.excludedTransactions;
         }
 
-        // Tags Configuration
         if (yamlConfig.tags) {
-            if (yamlConfig.tags.disposableIncome != null) {
-                config.transactions.tags.disposableIncome = yamlConfig.tags.disposableIncome;
-            }
-            if (yamlConfig.tags.paycheck != null) {
-                config.transactions.tags.paycheck = yamlConfig.tags.paycheck;
-            }
+            this.deepMerge(config.transactions.tags, yamlConfig.tags);
         }
-
-        // LLM Configuration - Use deep merge for nested structures
         if (yamlConfig.llm) {
             this.deepMerge(config.llm, yamlConfig.llm);
         }
@@ -398,7 +391,7 @@ export class ConfigManager {
                 continue;
             }
 
-            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            if (typeof value === 'object' && !Array.isArray(value)) {
                 // Recursively merge nested objects
                 if (target[key as keyof T] && typeof target[key as keyof T] === 'object') {
                     this.deepMerge(
