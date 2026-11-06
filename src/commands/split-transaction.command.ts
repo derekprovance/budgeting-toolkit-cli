@@ -8,9 +8,6 @@ import { UserInputService } from '../services/user-input.service.js';
 import { parseSplitAmount, remainderAmount } from '../utils/split-amount.utils.js';
 import { DEFAULT_CURRENCY } from '../utils/currency.utils.js';
 
-/**
- * Parameters for split transaction command
- */
 interface SplitTransactionParams {
     transactionId: string;
     amount?: string;
@@ -18,9 +15,6 @@ interface SplitTransactionParams {
     yes?: boolean;
 }
 
-/**
- * Command for splitting a transaction into two parts
- */
 export class SplitTransactionCommand implements Command<void, SplitTransactionParams> {
     constructor(
         private readonly splitService: TransactionSplitService,
@@ -68,7 +62,7 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         return originalSplit;
     }
 
-    /** Takes each value from the CLI parameters when given, otherwise prompts for it */
+    /** Prompts for each value the CLI parameters did not give */
     private async resolveParts(
         originalSplit: TransactionSplit,
         { amount, descriptions }: SplitTransactionParams
@@ -135,10 +129,7 @@ function currencySymbolOf(split: TransactionSplit): string {
     return split.currency_symbol || DEFAULT_CURRENCY.symbol;
 }
 
-/**
- * Runs `work`, marking the spinner failed if it throws. The error itself is
- * rethrown for the CLI to print once.
- */
+/** Rethrows for the CLI to print once. */
 async function failSpinnerOnError<T>(
     spinner: Ora,
     failureText: string,

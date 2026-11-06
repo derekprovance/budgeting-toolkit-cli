@@ -1,7 +1,3 @@
-/**
- * Consolidated enums for the application
- */
-
 export enum EditTransactionAttribute {
     Category = 'Category',
     Budget = 'Budget',

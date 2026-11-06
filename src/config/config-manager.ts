@@ -14,9 +14,6 @@ import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidationError, ConfigValidator } from './config.validator.js';
 import { errorMessage } from '../utils/error-detection.utils.js';
 
-/**
- * YAML configuration file structure (maps to AppConfig)
- */
 interface YamlConfig {
     untrackedAccounts?: string[];
     expectedMonthlyPaycheck?: number;
@@ -38,35 +35,19 @@ const KNOWN_YAML_KEYS: ReadonlySet<string> = new Set(
     } satisfies Record<keyof YamlConfig, true>)
 );
 
-/**
- * Utility type for recursive partial objects used in config merging.
- */
 type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
 
-/**
- * Centralized Configuration Manager (Singleton)
- *
- * Provides a unified interface for all application configuration.
- *
- * Configuration loading priority (high to low):
- * 1. YAML configuration file (config.yaml)
- * 2. Environment variables (.env)
- * 3. Default values (config.defaults.ts)
- *
- * All configuration is loaded at startup and validated immediately.
- * Services receive configuration via dependency injection.
- */
+/** Precedence, high to low: config.yaml, environment (.env), config.defaults.ts. */
 export class ConfigManager {
     private static instance: ConfigManager | undefined;
     private static configFilePath: string | null = null;
-    /** The configPath argument passed on first initialization (for mismatch detection) */
+    /** The configPath passed on first initialization, for mismatch detection */
     private static initConfigPathArg: string | undefined;
     /** Resolved .env path, captured statically so it survives a validation throw */
     private static resolvedEnvPath: string | null = null;
     private config: AppConfig;
 
     private constructor(configPath?: string) {
-        // Resolve config file path (searches multiple locations based on priority)
         ConfigManager.configFilePath = ConfigManager.resolveConfigPath(configPath);
 
         ConfigManager.resolvedEnvPath = ConfigManager.findEnvFile();
@@ -74,18 +55,13 @@ export class ConfigManager {
             dotenv.config({ path: ConfigManager.resolvedEnvPath, quiet: true });
         }
 
-        // Build configuration with proper precedence
         this.config = this.loadConfiguration();
-
-        // Validate configuration
         this.validateConfiguration();
     }
 
     /**
-     * Gets the singleton ConfigManager instance
-     * @param configPath Optional path to config file (only honored on first initialization).
-     * Passing a different path after initialization throws — silently using the
-     * wrong config for financial data would be far worse than a loud error.
+     * @param configPath Only honored on first initialization; a different path afterwards
+     * throws, since silently using the wrong config for financial data is worse than an error.
      */
     static getInstance(configPath?: string): ConfigManager {
         if (ConfigManager.instance) {
@@ -103,11 +79,7 @@ export class ConfigManager {
         return ConfigManager.instance;
     }
 
-    /**
-     * Gets the config/env paths resolved during initialization — populated even
-     * when the constructor later throws on validation, so error reporting can
-     * show which files were loaded.
-     */
+    /** Populated even when the constructor throws on validation, so errors can name the files loaded. */
     static getResolvedPaths(): { configPath: string | null; envPath: string | null } {
         return {
             configPath: ConfigManager.configFilePath,
@@ -115,16 +87,11 @@ export class ConfigManager {
         };
     }
 
-    /**
-     * Gets the complete application configuration
-     */
     getConfig(): AppConfig {
         return this.config;
     }
 
-    /**
-     * Resets the singleton instance (for testing only)
-     */
+    /** For tests only. */
     static resetInstance(): void {
         ConfigManager.instance = undefined;
         ConfigManager.configFilePath = null;
@@ -132,57 +99,30 @@ export class ConfigManager {
         ConfigManager.resolvedEnvPath = null;
     }
 
-    /**
-     * Gets the default config directory path (~/.budget)
-     * @returns Absolute path to ~/.budget directory
-     */
     static getDefaultConfigDir(): string {
         return path.join(os.homedir(), '.budget');
     }
 
-    /**
-     * Gets the default config file path (~/.budget/config.yaml)
-     * @returns Absolute path to default config.yaml
-     */
     static getDefaultConfigPath(): string {
         return path.join(ConfigManager.getDefaultConfigDir(), 'config.yaml');
     }
 
-    /**
-     * Gets the default .env file path (~/.budget/.env)
-     * @returns Absolute path to default .env
-     */
     static getDefaultEnvPath(): string {
         return path.join(ConfigManager.getDefaultConfigDir(), '.env');
     }
 
     /**
-     * Whether `BTK_STRICT_CONFIG` is on.
-     *
-     * Strict mode exists so that tests and the e2e harness can never fall back
-     * to the developer's real `./.env`, `~/.budget/.env`, `./config.yaml` or
-     * `~/.budget/config.yaml` — which point at a live Firefly instance. Every
-     * file must be named explicitly (`ENV_FILE` and `--config`), and a missing
-     * one is an error rather than a silent fallback.
+     * `BTK_STRICT_CONFIG`: tests and e2e must never fall back to the developer's real
+     * `./.env`, `~/.budget/.env`, `./config.yaml` or `~/.budget/config.yaml`, which point at a
+     * live Firefly. Every file must be named explicitly, and a missing one is an error.
      */
     static isStrictMode(): boolean {
         const value = process.env.BTK_STRICT_CONFIG?.trim().toLowerCase();
         return value === '1' || value === 'true';
     }
 
-    /**
-     * Resolves the config file path by searching multiple locations in priority order:
-     * 1. CLI flag --config path (if provided) — the only source in strict mode
-     *    (BTK_STRICT_CONFIG), which throws instead of falling back
-     * 2. Current working directory: ./config.yaml
-     * 3. User home directory: ~/.budget/config.yaml
-     * 4. null (use defaults if no config file found)
-     *
-     * @param customPath Optional custom path from CLI flag
-     * @returns Path to config file or null if none found
-     */
+    /** --config, then ./config.yaml, then ~/.budget/config.yaml; null means use defaults. */
     private static resolveConfigPath(customPath?: string): string | null {
-        // Priority 1: CLI flag --config path (highest priority)
         if (customPath) {
             const resolved = path.resolve(process.cwd(), customPath);
 
@@ -200,19 +140,16 @@ export class ConfigManager {
             );
         }
 
-        // Priority 2: Current working directory
         const cwdPath = path.join(process.cwd(), 'config.yaml');
         if (fs.existsSync(cwdPath)) {
             return cwdPath;
         }
 
-        // Priority 3: User home directory ~/.budget/config.yaml
         const homePath = ConfigManager.getDefaultConfigPath();
         if (fs.existsSync(homePath)) {
             return homePath;
         }
 
-        // Priority 4: No config file found (use defaults)
         console.warn(
             'No config.yaml found. Using defaults. Copy config.yaml.example to ~/.budget/config.yaml to create configuration.'
         );
@@ -220,15 +157,8 @@ export class ConfigManager {
     }
 
     /**
-     * Finds the .env file to load, in priority order:
-     * 1. ENV_FILE environment variable (if set; loaded even if it does not exist)
-     * 2. Current working directory: ./.env
-     * 3. User home directory: ~/.budget/.env
-     *
-     * In strict mode (BTK_STRICT_CONFIG) only ENV_FILE is consulted, and it
-     * must be set and exist.
-     *
-     * @returns The path to load, or null when there is none
+     * ENV_FILE (returned even if it does not exist), then ./.env, then ~/.budget/.env.
+     * In strict mode only ENV_FILE is consulted, and it must exist.
      */
     private static findEnvFile(): string | null {
         const envFile = process.env.ENV_FILE;
@@ -255,30 +185,17 @@ export class ConfigManager {
         return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
     }
 
-    /**
-     * Loads configuration with proper precedence:
-     * Defaults → Environment Variables → YAML
-     */
     private loadConfiguration(): AppConfig {
-        // Start with defaults (deep clone to avoid mutation)
         const config = structuredClone<AppConfig>(DEFAULT_CONFIG);
-
-        // Apply environment variables (overrides defaults)
         this.applyEnvironmentVariables(config);
-
-        // Apply YAML configuration (overrides environment)
         this.applyYamlConfiguration(config);
 
         return config;
     }
 
-    /**
-     * Applies environment variables to configuration
-     */
     private applyEnvironmentVariables(config: AppConfig): void {
-        // Firefly API Configuration
         if (process.env.FIREFLY_API_URL) {
-            // Remove trailing slashes to prevent double-slash issues when appending paths
+            // A trailing slash would double up when paths are appended
             config.api.firefly.url = process.env.FIREFLY_API_URL.replace(/\/+$/, '');
         }
 
@@ -286,7 +203,6 @@ export class ConfigManager {
             config.api.firefly.token = process.env.FIREFLY_API_TOKEN;
         }
 
-        // Firefly Certificate Configuration
         if (process.env.CLIENT_CERT_PATH) {
             config.api.firefly.certificates = config.api.firefly.certificates || {};
             config.api.firefly.certificates.clientCertPath = path.resolve(
@@ -308,21 +224,16 @@ export class ConfigManager {
             config.api.firefly.certificates.clientCertPassword = process.env.CLIENT_CERT_PASSWORD;
         }
 
-        // Claude API Configuration
         if (process.env.ANTHROPIC_API_KEY) {
             config.api.claude.apiKey = process.env.ANTHROPIC_API_KEY;
         }
 
-        // Logging Configuration
         if (process.env.LOG_LEVEL) {
             config.logging.level = process.env.LOG_LEVEL as AppConfig['logging']['level'];
         }
     }
 
-    /**
-     * Warns about YAML keys this loader does not read, so a typo is never
-     * silently taken as applied.
-     */
+    /** So a typo is never silently taken as applied. */
     private warnOnUnknownYamlKeys(yamlConfig: YamlConfig): void {
         for (const key of Object.keys(yamlConfig)) {
             if (!KNOWN_YAML_KEYS.has(key)) {
@@ -331,19 +242,15 @@ export class ConfigManager {
         }
     }
 
-    /**
-     * Applies YAML configuration to the config object
-     */
     private applyYamlConfiguration(config: AppConfig): void {
         const yamlConfig = this.loadYamlFile();
 
         if (!yamlConfig) {
-            return; // No YAML file or empty file
+            return;
         }
 
         this.warnOnUnknownYamlKeys(yamlConfig);
 
-        // Accounts Configuration
         if (yamlConfig.untrackedAccounts) {
             // Firefly ids are strings; an unquoted `- 27` parses as a number and
             // would silently match nothing, putting savings back in the envelope
@@ -352,7 +259,6 @@ export class ConfigManager {
                 .map(String);
         }
 
-        // Transaction Configuration
         if (yamlConfig.expectedMonthlyPaycheck != null) {
             config.transactions.expectedMonthlyPaycheck = yamlConfig.expectedMonthlyPaycheck;
         }
@@ -375,15 +281,11 @@ export class ConfigManager {
             this.deepMerge(config.llm, yamlConfig.llm);
         }
 
-        // Categorize Configuration
         if (yamlConfig.categorize) {
             this.deepMerge(config.categorize, yamlConfig.categorize);
         }
     }
 
-    /**
-     * Deep merges source object into target, only overwriting defined values
-     */
     private deepMerge<T extends object>(target: T, source: DeepPartial<T>): void {
         for (const [key, value] of Object.entries(source)) {
             // Empty YAML scalars parse to null — never let them clobber defaults
@@ -392,7 +294,6 @@ export class ConfigManager {
             }
 
             if (typeof value === 'object' && !Array.isArray(value)) {
-                // Recursively merge nested objects
                 if (target[key as keyof T] && typeof target[key as keyof T] === 'object') {
                     this.deepMerge(
                         target[key as keyof T] as Record<string, unknown>,
@@ -402,21 +303,15 @@ export class ConfigManager {
                     (target as Record<string, unknown>)[key] = value;
                 }
             } else {
-                // Direct assignment for primitives and arrays
                 (target as Record<string, unknown>)[key] = value;
             }
         }
     }
 
-    /**
-     * Loads and parses the YAML configuration file
-     */
     private loadYamlFile(): YamlConfig | null {
-        // Use the resolved config path (may be null if no config file found)
         const configPath = ConfigManager.configFilePath;
 
         if (!configPath) {
-            // No config file found - use defaults
             return null;
         }
 
@@ -431,10 +326,7 @@ export class ConfigManager {
         }
     }
 
-    /**
-     * Prints any warnings, then throws a ConfigValidationError if the
-     * configuration has problems.
-     */
+    /** Prints any warnings, then throws a ConfigValidationError on problems. */
     private validateConfiguration(): void {
         const report = new ConfigValidator().validate(this.config);
 

@@ -25,19 +25,7 @@ export class ConfigValidationError extends Error {
     }
 }
 
-/**
- * Validates application configuration format at startup.
- *
- * Performs format and type validation:
- * - Valid URL formats
- * - Numeric ranges (positive LLM batch/rate-limit values)
- * - Enum values (log levels)
- * - File path existence (for certificates)
- * - Well-formed exclusion rules (see checkExcludedTransactions)
- *
- * Command-specific requirements (e.g. the Claude API key the categorize command
- * needs) are validated by the commands themselves.
- */
+/** Command-specific requirements, such as the Claude API key, are validated by the commands. */
 export class ConfigValidator {
     validate(config: AppConfig): ConfigValidationReport {
         const missingEnvVars = this.findMissingEnvVars(config);
@@ -48,10 +36,8 @@ export class ConfigValidator {
                 ...missingEnvVars.map(name => `${name} is required`),
                 ...this.checkFireflyUrl(config),
                 ...this.checkLoggingConfig(config),
-                // Zero/negative values cause hangs
                 ...this.checkLlmConfig(config),
                 ...this.checkCategorizeConfig(config),
-                // A malformed rule would silently match nothing
                 ...this.checkExcludedTransactions(config),
                 ...certificates.errors,
             ],
@@ -73,11 +59,7 @@ export class ConfigValidator {
         return url && !this.isValidUrl(url) ? ['FIREFLY_API_URL must be a valid URL'] : [];
     }
 
-    /**
-     * Validates LLM numeric configuration. Zero or negative values for batch
-     * size, concurrency, or rate limiting cause infinite loops at runtime, so
-     * they must be rejected at startup.
-     */
+    /** Zero or negative batch size, concurrency or rate limits loop forever at runtime. */
     private checkLlmConfig(config: AppConfig): string[] {
         const errors: string[] = [];
         const positiveIntegers: Array<[string, number]> = [
@@ -117,13 +99,8 @@ export class ConfigValidator {
     }
 
     /**
-     * Validates the global exclusion rules.
-     *
-     * A rule matches at fetch time and removes the transaction from every bucket
-     * in every command, so a malformed one must not be allowed to sit in the
-     * config quietly matching nothing — or, worse, matching the wrong thing.
-     * `description` is required: an amount-only rule would drop every
-     * transaction of that amount on every account, in either direction.
+     * R-EXCL-1: a malformed rule would sit in the config matching nothing, or the wrong thing.
+     * An amount-only rule would drop every transaction of that amount on every account.
      */
     private checkExcludedTransactions(config: AppConfig): string[] {
         if (!Array.isArray(config.transactions.excludedTransactions)) {
@@ -161,7 +138,6 @@ export class ConfigValidator {
     private checkCertificates(config: AppConfig): { errors: string[]; warnings: string[] } {
         const certs = config.api.firefly.certificates;
 
-        // Certificates are optional — validate whichever (client and/or CA) is configured
         const results = [
             certs?.clientCertPath &&
                 validateCertificate(certs.clientCertPath, 'client', certs.clientCertPassword),

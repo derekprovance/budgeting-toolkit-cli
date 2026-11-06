@@ -40,10 +40,7 @@ const MESSAGES: Record<MonthErrorKind, (month: number) => { failed: string; user
         }),
     };
 
-/**
- * Logs why a month's figures could not be produced and returns that as a
- * failed Result, for services whose callers branch on the outcome.
- */
+/** Logs the failure and returns it as a failed Result. */
 export function monthFailure<T>(
     kind: MonthErrorKind,
     { month, year }: { month: number; year: number },

@@ -4,7 +4,6 @@ import { TransactionCalculationUtils } from '../../utils/transaction-calculation
 import { MonthBuckets } from '../../services/cash-flow.service.js';
 import { DEFAULT_CURRENCY } from '../../utils/currency.utils.js';
 
-/** What {@link AnalyzeReportDto.create} is built from */
 export interface AnalyzeReportInput {
     buckets: MonthBuckets;
     billComparison: BillComparisonDto;
@@ -14,52 +13,29 @@ export interface AnalyzeReportInput {
     year: number;
 }
 
-/**
- * Data Transfer Object for analyze command report.
- * Encapsulates all data needed for budget finalization analysis display.
- */
 export class AnalyzeReportDto {
     constructor(
-        // Income
         public additionalIncome: TransactionSplit[],
         public additionalIncomeTotal: number,
-
-        // Expenses
         public unbudgetedExpenses: TransactionSplit[],
         public unbudgetedExpenseTotal: number,
-
-        // Budget
-        public budgetAllocated: number, // total budget allocated
-        public budgetSpent: number, // total budget spent
-        public budgetSurplus: number, // positive = under budget, negative = over budget
-
-        // Bills
+        public budgetAllocated: number,
+        public budgetSpent: number,
+        public budgetSurplus: number, // positive = under budget
         public billComparison: BillComparisonDto,
-
-        // Paycheck
-        public expectedMonthlyPaycheck: number, // expected paycheck from config
-        public actualPaycheck: number, // actual paycheck received
-        public paycheckSurplus: number, // variance: positive = surplus (earned more), negative = deficit (earned less)
-
-        // Disposable Income
+        public expectedMonthlyPaycheck: number,
+        public actualPaycheck: number,
+        public paycheckSurplus: number, // positive = earned more than expected
         public disposableIncomeTransactions: TransactionSplit[],
         public disposableIncome: number,
-
-        // Calculations
-        public netImpact: number, // Total surplus/deficit from all sources
-
-        // Metadata
+        public netImpact: number,
         public month: number,
         public year: number,
         public currencySymbol: string,
         public currencyCode: string
     ) {}
 
-    /**
-     * Totals each bucket and computes the net. Every bucket is disjoint by
-     * construction (CashFlowService), so the net is plain arithmetic with no
-     * corrections.
-     */
+    /** The buckets are disjoint by construction, so the net needs no corrections. */
     static create({
         buckets,
         billComparison,

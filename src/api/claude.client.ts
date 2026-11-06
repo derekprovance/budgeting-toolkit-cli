@@ -3,8 +3,7 @@ import { logger } from '../logger.js';
 import { ClaudeApiConfig, LLMConfig } from '../config/config.types.js';
 
 export interface ClaudeClientConfig {
-    /** Transport settings; `maxRetries` is owned entirely by the SDK, which
-     * honors retry-after and only retries retryable failures */
+    /** `maxRetries` is owned entirely by the SDK, which honors retry-after */
     api: ClaudeApiConfig;
     llm: LLMConfig;
 }
@@ -17,15 +16,9 @@ export interface ToolCall {
 }
 
 /**
- * Current models run adaptive thinking whenever `thinking` is omitted, and
- * thinking tokens are drawn from `max_tokens`. Every request this client makes
- * is a forced-tool classification against a fixed enum — the schema does the
- * structuring, so deep reasoning buys nothing and can consume the whole budget
- * before a single answer is emitted.
- *
- * `effort` is the model-agnostic lever for that: `thinking: { type: 'disabled' }`
- * is rejected outright on some current models, whereas every one of them accepts
- * a low effort level.
+ * Current models think adaptively when `thinking` is omitted, drawing from `max_tokens`; on a
+ * forced-tool classification that buys nothing and can exhaust the budget before any answer.
+ * `thinking: { type: 'disabled' }` is rejected by some current models, a low effort by none.
  */
 const EFFORT: NonNullable<Anthropic.OutputConfig['effort']> = 'low';
 
@@ -37,8 +30,7 @@ export class CircuitOpenError extends Error {
     }
 }
 
-/** Thrown when a transport-successful response is unusable (truncated,
- * refused, or missing the forced tool call) */
+/** Thrown when a transport-successful response is truncated, refused or lacks the tool call */
 export class ClaudeResponseError extends Error {
     constructor(
         public readonly reason: 'truncated' | 'refusal' | 'missing_tool_use',
@@ -95,13 +87,11 @@ export class ClaudeClient {
     }
 
     /**
-     * Sends one request that forces `call.tool` and returns that tool call's
-     * input as JSON. Any preamble text is ignored, so mixed content can never
-     * corrupt the structured payload. Transport retries are handled by the
-     * SDK; the circuit breaker sees one failure per exhausted logical request.
+     * Returns the forced tool call's input as JSON; preamble text is ignored. The circuit
+     * breaker sees one failure per logical request, after the SDK's retries.
      *
-     * @throws ClaudeResponseError when the response is truncated, refused or
-     *   lacks the tool call; CircuitOpenError when the breaker is open
+     * @throws ClaudeResponseError when the response is truncated, refused or lacks the tool
+     *   call; CircuitOpenError when the breaker is open
      */
     async callTool(call: ToolCall): Promise<string> {
         this.assertCircuitAllows();
@@ -122,12 +112,8 @@ export class ClaudeClient {
                 this.effortUnsupported ? request : { ...request, output_config: { effort: EFFORT } }
             );
         } catch (error) {
-            // `llm.model` is user-configurable and validated only as a non-empty
-            // string, and `output_config.effort` is rejected outright by models
-            // older than this client assumes. Since a bad request now aborts the
-            // whole run, an unrecognised parameter would take a working
-            // configuration down with it — so drop it and try once more before
-            // giving up. Any other bad request fails again immediately.
+            // Older models reject `output_config.effort`, and a bad request aborts the whole
+            // run, so retry once without it. Any other bad request fails again immediately.
             if (error instanceof Anthropic.BadRequestError && !this.effortUnsupported) {
                 this.effortUnsupported = true;
                 logger.warn(
@@ -147,8 +133,7 @@ export class ClaudeClient {
             }
         }
 
-        // Transport succeeded — the breaker only tracks transport health.
-        // Extraction failures below are semantic and must not open it.
+        // The breaker tracks transport health only; extraction failures must not open it
         this.onRequestSuccess();
 
         return this.extractToolInput(response, call.tool.name);

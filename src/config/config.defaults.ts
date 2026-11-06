@@ -1,15 +1,6 @@
 import { AppConfig } from './config.types.js';
 
-/**
- * Default configuration values for the application.
- *
- * This is the single source of truth for all default values.
- *
- * Precedence order:
- * 1. YAML configuration (config.yaml)
- * 2. Environment variables (.env)
- * 3. These defaults (lowest priority)
- */
+/** Lowest precedence, below environment variables and config.yaml. */
 export const DEFAULT_CONFIG: AppConfig = {
     api: {
         firefly: {

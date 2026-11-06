@@ -27,18 +27,10 @@ import { BudgetDisplayService } from '../services/display/budget-display.service
 import { AppConfig } from '../config/config.types.js';
 import { CategorizeOptions } from '../types/categorize.types.js';
 
-/** Every service the CLI wires, as returned by {@link ServiceFactory.createServices}. */
 export type AppServices = ReturnType<typeof ServiceFactory.createServices>;
 
 export class ServiceFactory {
-    /**
-     * Wires every service from one configuration.
-     *
-     * @param apiClient Firefly III client every API-backed service shares
-     * @param config Application configuration. Defaults to the ConfigManager
-     *   singleton; tests and the in-process harness pass their own so that no
-     *   config file or `.env` is ever read.
-     */
+    /** @param config Tests and the in-process harness pass their own, so no config file is read. */
     static createServices(
         apiClient: FireflyClientWithCerts,
         config: AppConfig = ConfigManager.getInstance().getConfig()
@@ -118,7 +110,6 @@ export class ServiceFactory {
             services.budgetService
         );
 
-        // Create interactive transaction updater with service dependencies
         const interactiveTransactionUpdater = new InteractiveTransactionUpdater(
             services.transactionService,
             services.transactionValidatorService,

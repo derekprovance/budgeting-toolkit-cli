@@ -49,9 +49,6 @@ const validateYear = (value: string): number => {
     return year;
 };
 
-/**
- * Adds the shared month/year options to a command
- */
 const withDateOptions = (command: Command): Command =>
     command
         .addOption(
@@ -104,19 +101,13 @@ const toReportParams = (opts: ReportCommandOptions, program: Command): BudgetDat
     format: opts.json ? 'json' : 'text',
 });
 
-/**
- * Adds the `--json` flag to a report command
- */
 const withJsonOption = (command: Command): Command =>
     command.option(
         '--json',
         'print only a machine-readable JSON document to stdout (spinner and text report suppressed)'
     );
 
-/**
- * Exits with usage guidance when a required positional argument is blank.
- * (Commander already rejects a missing argument; this catches whitespace.)
- */
+/** Commander already rejects a missing argument; this catches a blank one. */
 const requireArg = (value: string, name: string, usage: string, example: string): void => {
     if (!value || value.trim() === '') {
         console.error(`❌ Error: ${name} is required and cannot be empty`);
@@ -128,17 +119,14 @@ const requireArg = (value: string, name: string, usage: string, example: string)
 
 const handleError = (error: unknown, operation: string): never => {
     logger.error({ err: error }, `Error ${operation}:`);
-    // The structured log is silenced at LOG_LEVEL=silent; the user still needs
-    // to see why the command failed.
+    // The structured log is silent by default; the user still needs to see why it failed
     console.error(`Error ${operation}: ${errorMessage(error)}`);
     process.exit(1);
 };
 
 /**
- * Explains why configuration could not be loaded. Never re-enters
- * ConfigManager.getInstance: when the constructor threw, a second call would
- * throw the identical error. The resolved paths are captured statically before
- * validation runs.
+ * Never re-enters ConfigManager.getInstance: after the constructor threw, a second call would
+ * throw the identical error.
  */
 const printConfigFailure = (error: unknown): void => {
     if (error instanceof ConfigValidationError) {
@@ -159,13 +147,9 @@ const printValidationFailure = (error: ConfigValidationError): void => {
     console.error(`  config.yaml: ${configPath ?? '(none found)'}`);
     console.error(`  .env:        ${envPath ?? '(none found)'}`);
 
-    // Every problem, not a bare "validation failed": that leaves no way to
-    // tell which setting is wrong
     console.error('\nProblems found:');
     error.problems.forEach(problem => console.error(`  - ${problem}`));
 
-    // Missing credentials come from .env rather than config.yaml, so point at
-    // the right file when that is what is wrong
     if (error.missingEnvVars.length > 0) {
         console.error(`\nSet the missing environment variables in ${envPath || '.env'}:`);
         error.missingEnvVars.forEach(name => console.error(`  - ${name}`));
@@ -187,16 +171,10 @@ const printValidationFailure = (error: ConfigValidationError): void => {
     console.error('\nSee example file: .env.example\n');
 };
 
-/**
- * Loads configuration and wires the services every command uses; on failure
- * explains why and exits 1.
- */
+/** Exits 1 after explaining why, when configuration cannot be loaded. */
 const loadServices = (configPath?: string): { config: AppConfig; services: AppServices } => {
     try {
         const config = ConfigManager.getInstance(configPath).getConfig();
-
-        // Apply the configured log level now that configuration is loaded
-        // (the logger initializes from LOG_LEVEL/'info' at import time)
         logger.level = config.logging.level;
 
         const apiClient = new FireflyClientWithCerts({
@@ -293,7 +271,6 @@ Examples:
             );
 
             try {
-                // Validate command-specific configuration (including ANTHROPIC_API_KEY)
                 const config = ConfigManager.getInstance().getConfig();
                 CommandConfigValidator.validateCategorizeCommand(config);
 

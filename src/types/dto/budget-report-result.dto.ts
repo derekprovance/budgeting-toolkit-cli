@@ -4,10 +4,7 @@ import { BudgetInsight } from './budget-insight.dto.js';
 import { BudgetReportDto } from './budget-report.dto.js';
 import { TopExpenseDto } from './top-expense.dto.js';
 
-/**
- * Everything BudgetReportCommand computed for one month: what the text
- * report and the JSON document are both built from.
- */
+/** What both the text report and the JSON document are built from. */
 export interface BudgetReportResult {
     budgets: BudgetReportDto[];
     topExpenses: TopExpenseDto[];
@@ -20,7 +17,7 @@ export interface BudgetReportResult {
     /** Set only when the report is for the current month */
     daysInfo?: {
         daysLeft: number;
-        /** Date of the most recent imported transaction, if known */
+        /** Date of the most recent imported transaction */
         dataThrough?: Date;
     };
 }

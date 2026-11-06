@@ -9,10 +9,6 @@ import { AnalyzeReportDto } from '../types/dto/analyze-report.dto.js';
 import { serializeAnalyzeReport } from '../services/display/analyze-json.serializer.js';
 import { ReportProgress } from './report-progress.js';
 
-/**
- * Command for analyzing budget variance
- */
-
 export class AnalyzeCommand implements Command<AnalyzeReportDto, BudgetDateParams> {
     constructor(
         private readonly cashFlowService: CashFlowService,
@@ -22,12 +18,7 @@ export class AnalyzeCommand implements Command<AnalyzeReportDto, BudgetDateParam
         private readonly expectedMonthlyPaycheck: number
     ) {}
 
-    /**
-     * Prints the month's analysis as text or, in `json` format, as the JSON
-     * document alone (see ReportProgress).
-     *
-     * @returns The report DTO the output was built from
-     */
+    /** @returns The report DTO the output was built from */
     async execute({
         month,
         year,
@@ -54,8 +45,7 @@ export class AnalyzeCommand implements Command<AnalyzeReportDto, BudgetDateParam
         year: number,
         progress: ReportProgress
     ): Promise<AnalyzeReportDto> {
-        // BillComparisonService reads the same buckets; TransactionService
-        // and AccountScopeService share one in-flight fetch between them
+        // TransactionService and AccountScopeService share one in-flight fetch between these
         const [bucketsResult, billComparisonResult, budgetLimits] = await Promise.all([
             this.cashFlowService.getBuckets(month, year),
             this.billComparisonService.calculateBillComparison(month, year),

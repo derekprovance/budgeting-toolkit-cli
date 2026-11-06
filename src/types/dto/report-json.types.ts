@@ -1,11 +1,7 @@
 /**
- * Machine-readable output of `analyze --json` and `report --json`.
- *
- * This is a contract: the test harness asserts against these shapes, so a
- * breaking change must bump `schemaVersion`. Version 2 removed `budgetRollup`
- * (analyze) and `untrackedSpending` (report). Money values are numbers rounded
- * to cents. Transaction amounts are unsigned, exactly as Firefly returns them —
- * direction comes from `type`.
+ * Output of `analyze --json` and `report --json`. A breaking change must bump `schemaVersion`.
+ * Money is rounded to cents; transaction amounts are unsigned as Firefly returns them, with
+ * direction in `type`.
  */
 
 export interface TransactionJson {

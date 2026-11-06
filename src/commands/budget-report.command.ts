@@ -13,9 +13,6 @@ import { daysLeftInMonth } from '../utils/days-left.utils.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
 import { ReportProgress } from './report-progress.js';
 
-/**
- * Command for displaying budget report with insights and categorized sections
- */
 export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDateParams> {
     constructor(
         private readonly budgetAnalyticsService: BudgetAnalyticsService,
@@ -26,12 +23,7 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
         private readonly cashFlowService: CashFlowService
     ) {}
 
-    /**
-     * Prints the month's budget report as text or, in `json` format, as the
-     * JSON document alone (see ReportProgress).
-     *
-     * @returns The report data the output was built from
-     */
+    /** @returns The report data the output was built from */
     async execute({
         month,
         year,
@@ -92,7 +84,6 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
             budgets,
             topExpenses,
             billComparison,
-            // The bucket that feeds the cash-flow net, same definition analyze uses
             unbudgeted: buckets.unbudgeted,
             insights,
             month,
@@ -112,9 +103,7 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
         }
         return {
             daysLeft: daysLeftInMonth(month, year, today),
-            // Kept as its own signal rather than folded into daysLeft: a month
-            // can look cheap simply because the last few days have not been
-            // imported yet.
+            // A month can look cheap simply because its last days are not imported yet
             dataThrough: await this.transactionService.getMostRecentTransactionDate(),
         };
     }

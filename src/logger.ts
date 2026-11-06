@@ -1,15 +1,10 @@
 import pino from 'pino';
 
 /**
- * Application logger.
+ * Initialized from LOG_LEVEL so importing this module never constructs ConfigManager, which
+ * needs --config; the CLI applies the configured level once config is loaded.
  *
- * Initialized from LOG_LEVEL (default 'info') so importing this module never
- * constructs the ConfigManager singleton — config isn't resolved until the CLI
- * parses --config. Once configuration is loaded, `createCli` applies the
- * configured level via `logger.level = config.logging.level`.
- *
- * Writes to stderr, not stdout: stdout carries the command's output, which
- * `--json` makes machine-readable, and a diagnostic line there would corrupt it.
+ * Writes to stderr: a diagnostic line on stdout would corrupt `--json` output.
  */
 export const logger = pino(
     {

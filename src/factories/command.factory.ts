@@ -3,12 +3,7 @@ import { BudgetReportCommand } from '../commands/budget-report.command.js';
 import { AppServices } from './service.factory.js';
 import { AppConfig } from '../config/config.types.js';
 
-/**
- * Builds report commands from a wired service set.
- *
- * The CLI and the in-process test harness both go through here, so the
- * harness drives exactly the commands a user runs, wired the same way.
- */
+/** Shared by the CLI and the in-process harness, so the harness runs the commands a user runs. */
 export function createAnalyzeCommand(services: AppServices, config: AppConfig): AnalyzeCommand {
     return new AnalyzeCommand(
         services.cashFlowService,
