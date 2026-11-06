@@ -12,8 +12,7 @@ import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
 import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
-import { AIResult } from './ai/llm-transaction-processing.service.js';
-import { JournaledTransaction } from '../types/categorize.types.js';
+import { JournaledTransaction, Suggestion } from '../types/categorize.types.js';
 
 /** Position of a transaction in the review, shown to the user as `[index/total]` */
 export interface ReviewProgress {
@@ -27,7 +26,7 @@ export interface PreparedUpdate {
     journalId: string;
     category?: CategoryProperties;
     budget?: BudgetRead;
-    source?: AIResult['source'];
+    source?: Suggestion['source'];
 }
 
 /**
@@ -50,7 +49,7 @@ export class InteractiveTransactionUpdater {
      */
     async prepareUpdate(
         transaction: JournaledTransaction,
-        aiResults: Record<string, AIResult>
+        aiResults: Record<string, Suggestion>
     ): Promise<Result<PreparedUpdate | undefined, TransactionValidationError>> {
         const journalId = transaction.transaction_journal_id;
 
@@ -135,7 +134,7 @@ export class InteractiveTransactionUpdater {
      */
     private validateAndPrepareUpdate(
         transaction: TransactionSplit,
-        aiResult?: AIResult
+        aiResult?: Suggestion
     ): Result<
         { category?: CategoryProperties; budget?: BudgetRead; hasChanges: boolean },
         TransactionValidationError
@@ -191,7 +190,7 @@ export class InteractiveTransactionUpdater {
         transaction: TransactionSplit,
         category?: CategoryProperties,
         budget?: BudgetRead,
-        source?: AIResult['source'],
+        source?: Suggestion['source'],
         progress?: ReviewProgress
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
         const transactionRead = this.transactionService.getTransactionReadBySplit(transaction);
@@ -229,7 +228,7 @@ export class InteractiveTransactionUpdater {
         transactionRead: TransactionRead,
         category?: CategoryProperties,
         budget?: BudgetRead,
-        source?: AIResult['source'],
+        source?: Suggestion['source'],
         progress?: ReviewProgress
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
         // Once per transaction: an Edit re-prompts below without a new separator

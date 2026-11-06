@@ -6,3 +6,12 @@ export type JournaledTransaction = TransactionSplit & { transaction_journal_id: 
 export function hasJournalId(transaction: TransactionSplit): transaction is JournaledTransaction {
     return !!transaction.transaction_journal_id;
 }
+
+export type SuggestionSource = 'history' | 'ai';
+
+/** Names suggested for one transaction, and where each came from */
+export interface Suggestion {
+    category?: string;
+    budget?: string;
+    source?: { category?: SuggestionSource; budget?: SuggestionSource };
+}

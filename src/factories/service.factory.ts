@@ -10,7 +10,6 @@ import { CashFlowService } from '../services/cash-flow.service.js';
 import { TransactionValidatorService } from '../services/core/transaction-validator.service.js';
 import { CategoryBudgetCatalog } from '../services/core/category-budget-catalog.service.js';
 import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
-import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service.js';
 import { TransactionHistoryService } from '../services/transaction-history.service.js';
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
 import { createClaudeClient } from '../config/llm.config.js';
@@ -119,7 +118,6 @@ export class ServiceFactory {
             batchSize: config.llm.batchSize,
             maxConcurrent: config.llm.maxConcurrent,
         });
-        const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 
         const catalog = await CategoryBudgetCatalog.load(
             services.categoryService,
@@ -139,7 +137,7 @@ export class ServiceFactory {
             services.transactionService,
             interactiveTransactionUpdater,
             catalog,
-            llmProcessingService,
+            llmAssignmentService,
             services.transactionValidatorService,
             force,
             dryRun,

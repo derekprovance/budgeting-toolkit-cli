@@ -6,7 +6,7 @@ import { EditTransactionAttribute } from '../types/enums.js';
 import { CurrencyUtils } from '../utils/currency.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { DisplayFormatterUtils } from '../utils/display-formatter.utils.js';
-import { SuggestionSource } from './ai/llm-transaction-processing.service.js';
+import { SuggestionSource } from '../types/categorize.types.js';
 
 /**
  * Interface for transaction update options

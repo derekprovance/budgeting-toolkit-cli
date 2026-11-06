@@ -3,10 +3,8 @@ import ora from 'ora';
 import { logger } from '../logger.js';
 import { TransactionService } from './core/transaction.service.js';
 import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
-import {
-    AIResponse,
-    LLMTransactionProcessingService,
-} from './ai/llm-transaction-processing.service.js';
+import { LLMAssignmentService } from './ai/llm-assignment.service.js';
+import { AssignmentType } from './ai/utils/prompt-templates.js';
 import { CategorizeMode } from '../types/enums.js';
 import { CategorizeStatusDto } from '../types/dto/categorize-status.dto.js';
 import { CategorizeStatus } from '../types/enums.js';
@@ -19,7 +17,7 @@ import {
 import { TransactionValidationError } from '../types/result.type.js';
 import { isCertificateError } from '../utils/error-detection.utils.js';
 import { TransactionHistoryService } from './transaction-history.service.js';
-import { JournaledTransaction, hasJournalId } from '../types/categorize.types.js';
+import { JournaledTransaction, Suggestion, hasJournalId } from '../types/categorize.types.js';
 
 interface SuggestionCounts {
     category: { history: number; ai: number };
@@ -36,7 +34,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         private readonly transactionService: TransactionService,
         private readonly interactiveTransactionUpdater: InteractiveTransactionUpdater,
         private readonly catalog: CategoryBudgetCatalog,
-        private readonly llmService: LLMTransactionProcessingService,
+        private readonly llm: LLMAssignmentService,
         private readonly validator: ITransactionValidatorService,
         private readonly force: boolean = false,
         private readonly dryRun: boolean = false,
@@ -201,7 +199,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     private async getAIResultsForTransactions(
         transactions: JournaledTransaction[],
         updateMode: CategorizeMode
-    ): Promise<AIResponse> {
+    ): Promise<Record<string, Suggestion>> {
         const categoryNames =
             updateMode !== CategorizeMode.Budget ? this.catalog.categoryNames() : undefined;
         const budgetNames =
@@ -224,12 +222,11 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
         await this.loadHistory(transactions);
 
-        const results: AIResponse = {};
+        const results: Record<string, Suggestion> = {};
         const counts: SuggestionCounts = {
             category: { history: 0, ai: 0 },
             budget: { history: 0, ai: 0 },
         };
-        const needsBoth: JournaledTransaction[] = [];
         const needsCategory: JournaledTransaction[] = [];
         const needsBudget: JournaledTransaction[] = [];
 
@@ -278,60 +275,21 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 },
             };
 
-            if (missingCategory && missingBudget) needsBoth.push(t);
-            else if (missingCategory) needsCategory.push(t);
-            else if (missingBudget) needsBudget.push(t);
+            if (missingCategory) needsCategory.push(t);
+            if (missingBudget) needsBudget.push(t);
         }
 
-        const aiCalls: Array<[JournaledTransaction[], string[] | undefined, string[] | undefined]> =
-            [
-                [needsBoth, categoryNames, budgetNames],
-                [needsCategory, categoryNames, undefined],
-                [needsBudget, undefined, budgetNames],
-            ];
-
-        for (const [batch, categoryOptions, budgetOptions] of aiCalls) {
-            if (batch.length === 0) {
-                continue;
-            }
-
-            const aiResults = await this.llmService.processTransactions(
-                batch,
-                categoryOptions,
-                budgetOptions
-            );
-
-            if (Object.keys(aiResults).length !== batch.length) {
-                const error = new Error(
-                    `LLM categorization result count (${
-                        Object.keys(aiResults).length
-                    }) doesn't match transaction count (${batch.length})`
-                );
-                logger.error(
-                    {
-                        expectedCount: batch.length,
-                        actualCount: Object.keys(aiResults).length,
-                    },
-                    'AI result count mismatch'
-                );
-                throw error;
-            }
-
-            for (const t of batch) {
-                const ai = aiResults[t.transaction_journal_id] ?? {};
-                const entry = results[t.transaction_journal_id];
-                if (!entry) {
-                    continue;
-                }
-                if (categoryOptions && ai.category) {
-                    entry.category = ai.category;
-                    entry.source = { ...entry.source, category: 'ai' };
-                }
-                if (budgetOptions && ai.budget) {
-                    entry.budget = ai.budget;
-                    entry.source = { ...entry.source, budget: 'ai' };
-                }
-            }
+        const aiCategories = await this.askAI('category', needsCategory, categoryNames);
+        for (const [t, category] of aiCategories) {
+            const entry = results[t.transaction_journal_id];
+            entry.category = category;
+            entry.source = { ...entry.source, category: 'ai' };
+        }
+        const aiBudgets = await this.askAI('budget', needsBudget, budgetNames);
+        for (const [t, budget] of aiBudgets) {
+            const entry = results[t.transaction_journal_id];
+            entry.budget = budget;
+            entry.source = { ...entry.source, budget: 'ai' };
         }
 
         logger.debug(counts, 'Suggestions resolved');
@@ -339,9 +297,27 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         return results;
     }
 
+    /** The AI's answer for each of `transactions` it found a match for */
+    private async askAI(
+        type: AssignmentType,
+        transactions: JournaledTransaction[],
+        options: string[] | undefined
+    ): Promise<Map<JournaledTransaction, string>> {
+        if (!transactions.length || !options?.length) {
+            return new Map();
+        }
+        const answers = await this.llm.assign(type, transactions, options);
+        return new Map(
+            transactions.flatMap((t, i) => {
+                const answer = answers[i];
+                return answer ? [[t, answer] as const] : [];
+            })
+        );
+    }
+
     private async updateTransactionsWithAIResults(
         transactions: JournaledTransaction[],
-        aiResults: AIResponse
+        aiResults: Record<string, Suggestion>
     ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
         logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
         const results: TransactionRead[] = [];

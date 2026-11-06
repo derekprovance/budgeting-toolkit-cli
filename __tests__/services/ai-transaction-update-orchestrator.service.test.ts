@@ -9,11 +9,8 @@ import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-c
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
-import {
-    AIResponse,
-    AIResult,
-    LLMTransactionProcessingService,
-} from '../../src/services/ai/llm-transaction-processing.service.js';
+import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
+import { Suggestion } from '../../src/types/categorize.types.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
@@ -53,10 +50,10 @@ interface BuildOptions {
 
 describe('AITransactionUpdateOrchestrator', () => {
     let tagged: TransactionSplit[];
-    let aiAnswers: Record<string, AIResult>;
+    let aiAnswers: Record<string, Suggestion>;
     let mockTransactionService: jest.Mocked<TransactionService>;
     let mockUpdater: jest.Mocked<InteractiveTransactionUpdater>;
-    let processTransactions: jest.Mock<LLMTransactionProcessingService['processTransactions']>;
+    let assign: jest.Mock<LLMAssignmentService['assign']>;
 
     const build = async ({ past = [], force = false, historyFails = false }: BuildOptions = {}) => {
         const catalog = await CategoryBudgetCatalog.load(
@@ -76,7 +73,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             mockTransactionService,
             mockUpdater,
             catalog,
-            { processTransactions } as unknown as LLMTransactionProcessingService,
+            { assign } as unknown as LLMAssignmentService,
             validator,
             force,
             false,
@@ -90,21 +87,19 @@ describe('AITransactionUpdateOrchestrator', () => {
         (await build(options)).updateTransactionsByTag('tag', mode);
 
     /** The AI's answers, by journal id; a field left out is "no match" */
-    const givenAI = (answers: Record<string, AIResult>) => {
+    const givenAI = (answers: Record<string, Suggestion>) => {
         aiAnswers = answers;
     };
 
     /** Journal ids sent to the AI for `field` */
     const askedAI = (field: 'category' | 'budget') =>
-        processTransactions.mock.calls
-            .filter(([, categories, budgets]) => (field === 'category' ? categories : budgets))
-            .flatMap(([transactions]) => transactions.map(t => t.transaction_journal_id));
+        assign.mock.calls
+            .filter(([type]) => type === field)
+            .flatMap(([, transactions]) => transactions.map(t => t.transaction_journal_id));
 
     /** The options the AI was offered for `field` */
     const offeredAI = (field: 'category' | 'budget') =>
-        processTransactions.mock.calls
-            .map(([, categories, budgets]) => (field === 'category' ? categories : budgets))
-            .find(Boolean);
+        assign.mock.calls.find(([type]) => type === field)?.[2];
 
     /** The suggestion handed to the updater for `journalId` */
     const suggestionFor = (journalId: string) => {
@@ -127,20 +122,8 @@ describe('AITransactionUpdateOrchestrator', () => {
                 .mockImplementation(async () => tagged),
         } as unknown as jest.Mocked<TransactionService>;
 
-        processTransactions = jest.fn<LLMTransactionProcessingService['processTransactions']>(
-            async (transactions, categories, budgets) =>
-                Object.fromEntries(
-                    transactions.map(t => {
-                        const answer = aiAnswers[t.transaction_journal_id ?? ''] ?? {};
-                        return [
-                            t.transaction_journal_id,
-                            {
-                                ...(categories && answer.category && { category: answer.category }),
-                                ...(budgets && answer.budget && { budget: answer.budget }),
-                            },
-                        ];
-                    })
-                ) as AIResponse
+        assign = jest.fn<LLMAssignmentService['assign']>(async (type, transactions) =>
+            transactions.map(t => aiAnswers[t.transaction_journal_id ?? '']?.[type])
         );
 
         // By default every suggestion that names something validates and the
@@ -249,7 +232,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
             const result = await run(CategorizeMode.Category);
 
-            expect(processTransactions).not.toHaveBeenCalled();
+            expect(assign).not.toHaveBeenCalled();
             expect(mockUpdater.applyUpdate).not.toHaveBeenCalled();
             expect(result.transactionsUpdated).toBe(0);
         });
@@ -269,7 +252,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             await run();
 
             expect(askedAI('category')).toEqual(['2']);
-            expect([...askedAI('budget')].sort()).toEqual(['1', '2']);
+            expect(askedAI('budget')).toEqual(['1', '2']);
         });
 
         it('lets --force replace an existing category', async () => {
@@ -300,7 +283,7 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('fails the run when the AI layer hits a critical error', async () => {
             tagged = [incoming('1')];
-            processTransactions.mockRejectedValue(new Error('invalid x-api-key'));
+            assign.mockRejectedValue(new Error('invalid x-api-key'));
 
             const result = await run();
 
@@ -383,7 +366,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 ],
             });
 
-            expect(processTransactions).not.toHaveBeenCalled();
+            expect(assign).not.toHaveBeenCalled();
             expect(suggestionFor('10')).toEqual({
                 category: 'Groceries',
                 budget: 'Food',
@@ -398,7 +381,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 past: [past('Coffee Bar', { category_name: 'Dining', budget_name: null })],
             });
 
-            expect(processTransactions).not.toHaveBeenCalled();
+            expect(assign).not.toHaveBeenCalled();
             expect(suggestionFor('10')).toEqual({
                 category: 'Dining',
                 source: { category: 'history' },
@@ -430,7 +413,7 @@ describe('AITransactionUpdateOrchestrator', () => {
                 past: [past('Trader Joes', { category_name: 'Groceries', budget_name: 'Food' })],
             });
 
-            expect(processTransactions).not.toHaveBeenCalled();
+            expect(assign).not.toHaveBeenCalled();
             expect(suggestionFor('10')).toEqual({
                 budget: 'Food',
                 source: { budget: 'history' },

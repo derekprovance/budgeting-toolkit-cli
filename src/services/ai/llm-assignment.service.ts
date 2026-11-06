@@ -6,6 +6,7 @@ import {
     AssignmentType,
     getFunctionSchema,
     getNoMatchValue,
+    isNoMatch,
     getSystemPrompt,
     getUserPrompt,
     parseAssignmentResponse,
@@ -52,13 +53,15 @@ export class LLMAssignmentService {
      * @param transactions - Array of transactions to process
      * @param validOptions - Array of valid categories or budgets (the no-match
      * sentinel is handled internally — callers should not append it)
-     * @returns Array of assigned values in the same order as transactions
+     * @returns One value per transaction, in order; `undefined` where no
+     *   option fits or the chunk degraded
+     * @throws on a critical error (see isCriticalError) or when `validOptions` is empty
      */
     async assign(
         type: AssignmentType,
         transactions: TransactionSplit[],
         validOptions: string[]
-    ): Promise<string[]> {
+    ): Promise<(string | undefined)[]> {
         // Validation
         if (!transactions || transactions.length === 0) {
             this.logger.warn(`No transactions provided for ${type} assignment`);
@@ -157,7 +160,9 @@ export class LLMAssignmentService {
             `${type} assignment completed`
         );
 
-        return assignments;
+        return assignments.map(assignment =>
+            isNoMatch(type, assignment) ? undefined : assignment
+        );
     }
 
     /**
@@ -240,28 +245,6 @@ export class LLMAssignmentService {
             error instanceof Anthropic.BadRequestError ||
             error instanceof CircuitOpenError
         );
-    }
-
-    /**
-     * Assigns categories to transactions.
-     * Convenience method that wraps assign() with type='category'.
-     */
-    async assignCategories(
-        transactions: TransactionSplit[],
-        validCategories: string[]
-    ): Promise<string[]> {
-        return this.assign('category', transactions, validCategories);
-    }
-
-    /**
-     * Assigns budgets to transactions.
-     * Convenience method that wraps assign() with type='budget'.
-     */
-    async assignBudgets(
-        transactions: TransactionSplit[],
-        validBudgets: string[]
-    ): Promise<string[]> {
-        return this.assign('budget', transactions, validBudgets);
     }
 
     private static chunk<T>(array: T[], size: number): T[][] {

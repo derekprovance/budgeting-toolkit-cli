@@ -144,6 +144,16 @@ describe('LLMAssignmentService', () => {
                 expect(sentCall().tool.name).toBe('assign_budgets');
             });
 
+            it('should return undefined where no option fits', async () => {
+                callTool.mockResolvedValue(
+                    categoriesResponse('Groceries', '(no category)', 'Groceries')
+                );
+
+                const result = await service.assign('category', mockTransactions, validCategories);
+
+                expect(result).toEqual(['Groceries', undefined, 'Groceries']);
+            });
+
             it('should calculate success rate correctly for partial assignments', async () => {
                 callTool.mockResolvedValue(
                     categoriesResponse('Groceries', '(no category)', 'Groceries')
@@ -164,7 +174,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
-                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
                 expect(mockLogger.warn).toHaveBeenCalledWith(
                     expect.objectContaining({ error: 'API Error', type: 'category' }),
                     'category assignment chunk failed, using defaults for this chunk'
@@ -176,7 +186,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('budget', mockTransactions, validBudgets);
 
-                expect(result).toEqual(['(no budget)', '(no budget)', '(no budget)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
             });
 
             it('should abort the run when the circuit breaker is open', async () => {
@@ -207,7 +217,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
-                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
             });
 
             it('should report how many transactions went unassigned after degrading', async () => {
@@ -243,7 +253,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
-                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
             });
 
             it('should degrade a chunk whose response has the wrong count', async () => {
@@ -251,7 +261,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
-                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
             });
 
             it('should handle non-Error objects thrown', async () => {
@@ -259,7 +269,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
-                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
             });
 
             it('should throw on authentication error (critical error)', async () => {
@@ -302,7 +312,7 @@ describe('LLMAssignmentService', () => {
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
-                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+                expect(result).toEqual([undefined, undefined, undefined]);
             });
         });
     });
@@ -342,7 +352,7 @@ describe('LLMAssignmentService', () => {
             const result = await service.assign('category', transactions, validCategories);
 
             expect(result.slice(0, 10)).toEqual(Array(10).fill('Groceries'));
-            expect(result.slice(10, 20)).toEqual(Array(10).fill('(no category)'));
+            expect(result.slice(10, 20)).toEqual(Array(10).fill(undefined));
             expect(result.slice(20)).toEqual(Array(5).fill('Groceries'));
         });
 

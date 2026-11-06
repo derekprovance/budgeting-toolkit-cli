@@ -8,13 +8,12 @@ import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-c
 import { ICategoryService } from '../../src/services/core/category.service.interface.js';
 import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
 import { UserInputService } from '../../src/services/user-input.service.js';
-import { AIResult } from '../../src/services/ai/llm-transaction-processing.service.js';
 import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 import { Result } from '../../src/types/result.type.js';
 import { withdrawal } from '../shared/test-data.js';
-import { JournaledTransaction } from '../../src/types/categorize.types.js';
+import { JournaledTransaction, Suggestion } from '../../src/types/categorize.types.js';
 
 const category = (name: string): CategoryProperties => ({ name });
 // Partial API fixture: only the fields the updater reads
@@ -24,7 +23,7 @@ const budget = (id: string, name: string): BudgetRead =>
 const categories = [category('New Category'), category('Groceries')];
 const budgets = [budget('2', 'New Budget'), budget('3', 'Food')];
 
-const suggestion: AIResult = { category: 'New Category', budget: 'New Budget' };
+const suggestion: Suggestion = { category: 'New Category', budget: 'New Budget' };
 
 describe('InteractiveTransactionUpdater', () => {
     let mockTransactionService: jest.Mocked<TransactionService>;
@@ -43,10 +42,10 @@ describe('InteractiveTransactionUpdater', () => {
             dryRun
         );
 
-    const prepare = (ai: AIResult = suggestion, updater = build()) =>
+    const prepare = (ai: Suggestion = suggestion, updater = build()) =>
         updater.prepareUpdate(transaction, { '1': ai });
 
-    const prepared = async (ai: AIResult = suggestion, updater = build()) => {
+    const prepared = async (ai: Suggestion = suggestion, updater = build()) => {
         const result = await prepare(ai, updater);
         if (!result.ok || !result.value) {
             throw new Error('expected a prepared update');
@@ -54,7 +53,7 @@ describe('InteractiveTransactionUpdater', () => {
         return result.value;
     };
 
-    const review = async (ai: AIResult = suggestion, updater = build()) =>
+    const review = async (ai: Suggestion = suggestion, updater = build()) =>
         updater.applyUpdate(await prepared(ai, updater), { index: 3, total: 26 });
 
     beforeEach(async () => {
