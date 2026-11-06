@@ -9,7 +9,7 @@ import {
     isBillUpcoming,
 } from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
-import { DisposablePoolDirection, disposablePoolAction } from './disposable-pool-action.js';
+import { DisposablePoolDirection, disposablePoolAction } from './disposable-pool-action.utils.js';
 
 /** A summary line: a bucket's total and how many transactions it holds */
 interface SummaryItem {

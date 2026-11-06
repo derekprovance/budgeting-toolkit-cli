@@ -2,7 +2,7 @@ import { BudgetReportResult } from '../../types/dto/budget-report-result.dto.js'
 import { BudgetReportJson } from '../../types/dto/report-json.types.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
-import { budgetTotals } from './budget-totals.js';
+import { budgetTotals } from './budget-totals.utils.js';
 import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
 
 const { toCents } = CurrencyUtils;

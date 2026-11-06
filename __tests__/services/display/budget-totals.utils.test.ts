@@ -1,4 +1,4 @@
-import { budgetTotals } from '../../../src/services/display/budget-totals.js';
+import { budgetTotals } from '../../../src/services/display/budget-totals.utils.js';
 import { BudgetReportDto } from '../../../src/types/dto/budget-report.dto.js';
 
 const row = (amount: number, spent: number) => ({ amount, spent }) as BudgetReportDto;

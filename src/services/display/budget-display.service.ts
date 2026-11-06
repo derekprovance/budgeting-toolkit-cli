@@ -16,7 +16,7 @@ import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
-import { budgetTotals } from './budget-totals.js';
+import { budgetTotals } from './budget-totals.utils.js';
 
 /** The budget rows one section lists, most used first */
 interface BudgetSection {

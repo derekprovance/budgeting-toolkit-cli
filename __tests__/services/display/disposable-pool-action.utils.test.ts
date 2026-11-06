@@ -1,4 +1,4 @@
-import { disposablePoolAction } from '../../../src/services/display/disposable-pool-action.js';
+import { disposablePoolAction } from '../../../src/services/display/disposable-pool-action.utils.js';
 
 describe('disposablePoolAction', () => {
     it('[R-DISP-1] asks for a transfer from the pool when tagged spending is positive', () => {

@@ -1,7 +1,7 @@
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
 import { AnalyzeReportJson } from '../../types/dto/report-json.types.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
-import { disposablePoolAction } from './disposable-pool-action.js';
+import { disposablePoolAction } from './disposable-pool-action.utils.js';
 import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
 
 const { toCents } = CurrencyUtils;
