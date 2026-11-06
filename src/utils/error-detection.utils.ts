@@ -38,9 +38,19 @@ export function isCertificateError(error: unknown): boolean {
         if (certKeywordRegex.test(current.message)) return true;
 
         // Traverse cause chain
-        current = (current as Error & { cause?: unknown }).cause;
+        current = current.cause;
         depth++;
     }
 
     return false;
+}
+
+/** A thrown value as an Error: an Error is returned as is, anything else is wrapped. */
+export function toError(thrown: unknown): Error {
+    return thrown instanceof Error ? thrown : new Error(String(thrown));
+}
+
+/** The message of a thrown value, whatever was thrown. */
+export function errorMessage(thrown: unknown): string {
+    return toError(thrown).message;
 }

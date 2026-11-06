@@ -47,6 +47,7 @@ jest.unstable_mockModule('../src/factories/command.factory.js', () => ({
 }));
 
 const { createCli } = await import('../src/cli.js');
+const { ConfigValidationError } = await import('../src/config/config.validator.js');
 
 describe('CLI', () => {
     let consoleLogSpy: jest.Spied<typeof console.log>;
@@ -239,6 +240,32 @@ describe('CLI', () => {
                 expect.stringContaining('BTK_STRICT_CONFIG')
             );
         });
+
+        it('should list every validation problem and the missing variables', () => {
+            mockGetInstance.mockImplementationOnce(() => {
+                throw new ConfigValidationError({
+                    problems: [
+                        'FIREFLY_API_TOKEN is required',
+                        'CA certificate not found: /ca.pem\n  Suggestion: Verify the path',
+                    ],
+                    missingEnvVars: ['FIREFLY_API_TOKEN'],
+                    warnings: [],
+                });
+            });
+
+            expect(() => createCli()).toThrow('process.exit called');
+            const printed = consoleErrorSpy.mock.calls.map(call => call.join(' ')).join('\n');
+
+            expect(processExitSpy).toHaveBeenCalledWith(1);
+            expect(printed).toContain('[!] Configuration validation failed');
+            expect(printed).toContain('  config.yaml: (none found)');
+            expect(printed).toContain(
+                '  - CA certificate not found: /ca.pem\n  Suggestion: Verify the path'
+            );
+            expect(printed).toContain(
+                'Set the missing environment variables in .env:\n  - FIREFLY_API_TOKEN'
+            );
+        });
     });
 
     describe('--json', () => {
@@ -284,6 +311,26 @@ describe('CLI', () => {
                 verbose: false,
                 format: 'json',
             });
+        });
+
+        it('should exit 1 with the guidance when analyze has no expectedMonthlyPaycheck', async () => {
+            testConfig.transactions.expectedMonthlyPaycheck = undefined;
+            const cli = createCli();
+
+            try {
+                await expect(
+                    cli.parseAsync(argv('analyze', '-m', '1', '-y', '2025'))
+                ).rejects.toThrow('process.exit called');
+            } finally {
+                testConfig.transactions.expectedMonthlyPaycheck = 2000;
+            }
+            expect(processExitSpy).toHaveBeenCalledWith(1);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining(
+                    'Error analyzing budget: expectedMonthlyPaycheck is required for analyze command'
+                )
+            );
+            expect(mockAnalyzeExecute).not.toHaveBeenCalled();
         });
 
         it('should still exit 1 when a json-mode command fails', async () => {

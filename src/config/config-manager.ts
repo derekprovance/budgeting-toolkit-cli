@@ -3,9 +3,16 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as os from 'os';
 import dotenv from 'dotenv';
-import { AppConfig, CategorizeConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
+import {
+    AppConfig,
+    CategorizeConfig,
+    ExcludedTransaction,
+    LLMConfig,
+    TagsConfig,
+} from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
-import { ConfigValidator } from './config.validator.js';
+import { ConfigValidationError, ConfigValidator } from './config.validator.js';
+import { errorMessage } from '../utils/error-detection.utils.js';
 
 /**
  * YAML configuration file structure (maps to AppConfig)
@@ -14,15 +21,22 @@ interface YamlConfig {
     untrackedAccounts?: string[];
     expectedMonthlyPaycheck?: number;
     excludedTransactions?: ExcludedTransaction[];
-
-    tags?: {
-        disposableIncome?: string;
-        paycheck?: string;
-    };
-
+    tags?: Partial<TagsConfig>;
     llm?: DeepPartial<LLMConfig>;
     categorize?: Partial<CategorizeConfig>;
 }
+
+/** Every key this loader understands. Anything else in the YAML is ignored. */
+const KNOWN_YAML_KEYS: ReadonlySet<string> = new Set(
+    Object.keys({
+        untrackedAccounts: true,
+        expectedMonthlyPaycheck: true,
+        excludedTransactions: true,
+        tags: true,
+        llm: true,
+        categorize: true,
+    } satisfies Record<keyof YamlConfig, true>)
+);
 
 /**
  * Utility type for recursive partial objects used in config merging.
@@ -50,14 +64,15 @@ export class ConfigManager {
     /** Resolved .env path, captured statically so it survives a validation throw */
     private static resolvedEnvPath: string | null = null;
     private config: AppConfig;
-    private loadedEnvPath: string | null = null;
 
     private constructor(configPath?: string) {
         // Resolve config file path (searches multiple locations based on priority)
         ConfigManager.configFilePath = ConfigManager.resolveConfigPath(configPath);
 
-        // Load .env file
-        this.loadEnvironmentFile();
+        ConfigManager.resolvedEnvPath = ConfigManager.findEnvFile();
+        if (ConfigManager.resolvedEnvPath) {
+            dotenv.config({ path: ConfigManager.resolvedEnvPath, quiet: true });
+        }
 
         // Build configuration with proper precedence
         this.config = this.loadConfiguration();
@@ -105,22 +120,6 @@ export class ConfigManager {
      */
     getConfig(): AppConfig {
         return this.config;
-    }
-
-    /**
-     * Gets the path to the loaded config.yaml file
-     * @returns Absolute path to loaded config file or null if none was loaded
-     */
-    getLoadedConfigPath(): string | null {
-        return ConfigManager.configFilePath;
-    }
-
-    /**
-     * Gets the path to the loaded .env file
-     * @returns Absolute path to loaded .env file or null if none was loaded
-     */
-    getLoadedEnvPath(): string | null {
-        return this.loadedEnvPath;
     }
 
     /**
@@ -185,9 +184,7 @@ export class ConfigManager {
     private static resolveConfigPath(customPath?: string): string | null {
         // Priority 1: CLI flag --config path (highest priority)
         if (customPath) {
-            const resolved = path.isAbsolute(customPath)
-                ? customPath
-                : path.resolve(process.cwd(), customPath);
+            const resolved = path.resolve(process.cwd(), customPath);
 
             if (fs.existsSync(resolved)) {
                 return resolved;
@@ -223,81 +220,39 @@ export class ConfigManager {
     }
 
     /**
-     * Loads the .env file into process.env from multiple possible locations:
-     * 1. ENV_FILE environment variable (if set)
+     * Finds the .env file to load, in priority order:
+     * 1. ENV_FILE environment variable (if set; loaded even if it does not exist)
      * 2. Current working directory: ./.env
      * 3. User home directory: ~/.budget/.env
      *
      * In strict mode (BTK_STRICT_CONFIG) only ENV_FILE is consulted, and it
      * must be set and exist.
      *
-     * Uses dotenv.config which silently ignores missing files (quiet: true)
-     * Tracks which .env file was loaded in this.loadedEnvPath
+     * @returns The path to load, or null when there is none
      */
-    private loadEnvironmentFile(): void {
-        // Strict mode: ENV_FILE is the only source, and it must exist
+    private static findEnvFile(): string | null {
+        const envFile = process.env.ENV_FILE;
+
         if (ConfigManager.isStrictMode()) {
-            const envFile = process.env.ENV_FILE;
             if (!envFile) {
                 throw new Error(
                     'BTK_STRICT_CONFIG is set: ENV_FILE must name the .env file to load. ' +
                         'The ./.env and ~/.budget/.env fallbacks are disabled.'
                 );
             }
-            const resolved = path.isAbsolute(envFile)
-                ? envFile
-                : path.resolve(process.cwd(), envFile);
+            const resolved = path.resolve(process.cwd(), envFile);
             if (!fs.existsSync(resolved)) {
                 throw new Error(`BTK_STRICT_CONFIG is set: ENV_FILE not found: ${resolved}`);
             }
-            dotenv.config({ path: resolved, quiet: true });
-            this.loadedEnvPath = resolved;
-            ConfigManager.resolvedEnvPath = resolved;
-            return;
+            return resolved;
         }
 
-        // Priority 1: ENV_FILE environment variable
-        if (process.env.ENV_FILE) {
-            dotenv.config({
-                path: process.env.ENV_FILE,
-                quiet: true,
-            });
-            this.loadedEnvPath = process.env.ENV_FILE;
-            ConfigManager.resolvedEnvPath = process.env.ENV_FILE;
-            return;
+        if (envFile) {
+            return envFile;
         }
 
-        // Priority 2: Current working directory
-        const cwdEnv = path.join(process.cwd(), '.env');
-        const cwdEnvExists = fs.existsSync(cwdEnv);
-        if (cwdEnvExists) {
-            dotenv.config({
-                path: cwdEnv,
-                quiet: true,
-            });
-            this.loadedEnvPath = cwdEnv;
-            ConfigManager.resolvedEnvPath = cwdEnv;
-            return;
-        }
-
-        // Priority 3: User home directory ~/.budget/.env
-        const homeEnv = ConfigManager.getDefaultEnvPath();
-        if (fs.existsSync(homeEnv)) {
-            dotenv.config({
-                path: homeEnv,
-                quiet: true,
-            });
-            this.loadedEnvPath = homeEnv;
-            ConfigManager.resolvedEnvPath = homeEnv;
-            return;
-        }
-
-        // Priority 4: Fallback to .env in current directory (will be silently ignored if not found)
-        dotenv.config({
-            path: '.env',
-            quiet: true,
-        });
-        // loadedEnvPath remains null since this is a fallback that will be ignored anyway
+        const candidates = [path.join(process.cwd(), '.env'), ConfigManager.getDefaultEnvPath()];
+        return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
     }
 
     /**
@@ -334,14 +289,16 @@ export class ConfigManager {
         // Firefly Certificate Configuration
         if (process.env.CLIENT_CERT_PATH) {
             config.api.firefly.certificates = config.api.firefly.certificates || {};
-            config.api.firefly.certificates.clientCertPath = this.resolveCertPath(
+            config.api.firefly.certificates.clientCertPath = path.resolve(
+                process.cwd(),
                 process.env.CLIENT_CERT_PATH
             );
         }
 
         if (process.env.CLIENT_CERT_CA_PATH) {
             config.api.firefly.certificates = config.api.firefly.certificates || {};
-            config.api.firefly.certificates.caCertPath = this.resolveCertPath(
+            config.api.firefly.certificates.caCertPath = path.resolve(
+                process.cwd(),
                 process.env.CLIENT_CERT_CA_PATH
             );
         }
@@ -363,24 +320,12 @@ export class ConfigManager {
     }
 
     /**
-     * Every key this loader understands. Anything else in the YAML is ignored.
-     */
-    private static readonly KNOWN_YAML_KEYS: ReadonlySet<string> = new Set([
-        'untrackedAccounts',
-        'expectedMonthlyPaycheck',
-        'excludedTransactions',
-        'tags',
-        'llm',
-        'categorize',
-    ]);
-
-    /**
      * Warns about YAML keys this loader does not read, so a typo is never
      * silently taken as applied.
      */
     private warnOnUnknownYamlKeys(yamlConfig: YamlConfig): void {
         for (const key of Object.keys(yamlConfig)) {
-            if (!ConfigManager.KNOWN_YAML_KEYS.has(key)) {
+            if (!KNOWN_YAML_KEYS.has(key)) {
                 console.warn(`⚠️  config.yaml: unknown setting '${key}' is being ignored.`);
             }
         }
@@ -423,17 +368,9 @@ export class ConfigManager {
                 : yamlConfig.excludedTransactions;
         }
 
-        // Tags Configuration
         if (yamlConfig.tags) {
-            if (yamlConfig.tags.disposableIncome != null) {
-                config.transactions.tags.disposableIncome = yamlConfig.tags.disposableIncome;
-            }
-            if (yamlConfig.tags.paycheck != null) {
-                config.transactions.tags.paycheck = yamlConfig.tags.paycheck;
-            }
+            this.deepMerge(config.transactions.tags, yamlConfig.tags);
         }
-
-        // LLM Configuration - Use deep merge for nested structures
         if (yamlConfig.llm) {
             this.deepMerge(config.llm, yamlConfig.llm);
         }
@@ -454,7 +391,7 @@ export class ConfigManager {
                 continue;
             }
 
-            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            if (typeof value === 'object' && !Array.isArray(value)) {
                 // Recursively merge nested objects
                 if (target[key as keyof T] && typeof target[key as keyof T] === 'object') {
                     this.deepMerge(
@@ -488,38 +425,26 @@ export class ConfigManager {
             return (yaml.load(fileContents) as YamlConfig) || null;
         } catch (error) {
             throw new Error(
-                `Failed to parse YAML configuration at ${configPath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                `Failed to parse YAML configuration at ${configPath}: ${errorMessage(error)}`,
                 { cause: error }
             );
         }
     }
 
     /**
-     * Resolves certificate paths correctly for both development and production
-     */
-    private resolveCertPath(envPath: string): string {
-        if (path.isAbsolute(envPath)) {
-            return envPath;
-        }
-
-        // Resolve relative paths from project root
-        const projectRoot = process.cwd();
-        return path.resolve(projectRoot, envPath);
-    }
-
-    /**
-     * Validates the configuration and throws if invalid
+     * Prints any warnings, then throws a ConfigValidationError if the
+     * configuration has problems.
      */
     private validateConfiguration(): void {
-        const validator = new ConfigValidator();
-        const result = validator.validate(this.config);
+        const report = new ConfigValidator().validate(this.config);
 
-        if (!result.ok) {
-            const errors = (result.error.details?.errors as string[]) || [
-                'Unknown validation error',
-            ];
-            const errorList = errors.join('\n  - ');
-            throw new Error(`Configuration validation failed:\n  - ${errorList}`);
+        if (report.warnings.length > 0) {
+            console.warn('\n⚠️  Certificate Warnings:');
+            report.warnings.forEach(warning => console.warn(`  ${warning}\n`));
+        }
+
+        if (report.problems.length > 0) {
+            throw new ConfigValidationError(report);
         }
     }
 }

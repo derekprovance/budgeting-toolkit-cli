@@ -3,18 +3,19 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
 import { ConfigManager } from './config/config-manager.js';
+import { ConfigValidationError } from './config/config.validator.js';
 import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
 import { AppServices, ServiceFactory } from './factories/service.factory.js';
 import { createAnalyzeCommand, createBudgetReportCommand } from './factories/command.factory.js';
-import {
-    BudgetDateOptions,
-    CategorizeCliOptions,
-} from './types/interface/command-options.interface.js';
+import { CategorizeCliOptions } from './types/interface/command-options.interface.js';
 import { CategorizeOptions } from './types/categorize.types.js';
+import { BudgetDateParams } from './types/common.types.js';
+import { AppConfig } from './config/config.types.js';
 import { CategorizeMode } from './types/enums.js';
-import { CommandConfigValidator } from './utils/command-config-validator.js';
+import { CommandConfigValidator, requireCommandConfig } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
+import { errorMessage } from './utils/error-detection.utils.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -64,8 +65,44 @@ const withDateOptions = (command: Command): Command =>
                 .default(getCurrentYear(), 'current year')
         );
 
-/** Options shared by the report commands (`analyze`, `report`) */
-type ReportCommandOptions = BudgetDateOptions & { json?: boolean };
+/** What commander passes a report command; month and year always have defaults */
+interface ReportCommandOptions {
+    month: number;
+    year: number;
+    json?: boolean;
+}
+
+interface ReportCommandSpec {
+    name: string;
+    alias: string;
+    description: string;
+    examples: string;
+    /** For the failure line: "Error <operation>: …" */
+    operation: string;
+    run: (params: BudgetDateParams) => Promise<unknown>;
+}
+
+/** Registers a report command (`analyze`, `report`) with the shared date and --json options */
+const addReportCommand = (program: Command, spec: ReportCommandSpec): void => {
+    withJsonOption(
+        withDateOptions(program.command(spec.name).alias(spec.alias).description(spec.description))
+    )
+        .addHelpText('after', spec.examples)
+        .action(async (opts: ReportCommandOptions) => {
+            try {
+                await spec.run(toReportParams(opts, program));
+            } catch (error) {
+                handleError(error, spec.operation);
+            }
+        });
+};
+
+const toReportParams = (opts: ReportCommandOptions, program: Command): BudgetDateParams => ({
+    month: opts.month,
+    year: opts.year,
+    verbose: program.opts<{ verbose?: boolean }>().verbose ?? false,
+    format: opts.json ? 'json' : 'text',
+});
 
 /**
  * Adds the `--json` flag to a report command
@@ -93,8 +130,86 @@ const handleError = (error: unknown, operation: string): never => {
     logger.error({ err: error }, `Error ${operation}:`);
     // The structured log is silenced at LOG_LEVEL=silent; the user still needs
     // to see why the command failed.
-    console.error(`Error ${operation}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Error ${operation}: ${errorMessage(error)}`);
     process.exit(1);
+};
+
+/**
+ * Explains why configuration could not be loaded. Never re-enters
+ * ConfigManager.getInstance: when the constructor threw, a second call would
+ * throw the identical error. The resolved paths are captured statically before
+ * validation runs.
+ */
+const printConfigFailure = (error: unknown): void => {
+    if (error instanceof ConfigValidationError) {
+        printValidationFailure(error);
+        return;
+    }
+    console.error('Failed to initialize API client:', errorMessage(error));
+    console.error(
+        '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
+    );
+};
+
+const printValidationFailure = (error: ConfigValidationError): void => {
+    const { configPath, envPath } = ConfigManager.getResolvedPaths();
+
+    console.error('\n[!] Configuration validation failed\n');
+    console.error('Loaded files:');
+    console.error(`  config.yaml: ${configPath ?? '(none found)'}`);
+    console.error(`  .env:        ${envPath ?? '(none found)'}`);
+
+    // Every problem, not a bare "validation failed": that leaves no way to
+    // tell which setting is wrong
+    console.error('\nProblems found:');
+    error.problems.forEach(problem => console.error(`  - ${problem}`));
+
+    // Missing credentials come from .env rather than config.yaml, so point at
+    // the right file when that is what is wrong
+    if (error.missingEnvVars.length > 0) {
+        console.error(`\nSet the missing environment variables in ${envPath || '.env'}:`);
+        error.missingEnvVars.forEach(name => console.error(`  - ${name}`));
+    }
+
+    const isUsingCwdFiles = [configPath, envPath].some(file => file?.startsWith(process.cwd()));
+    if (isUsingCwdFiles) {
+        console.error('\nNote: Files in the current directory take priority over ~/.budget/');
+        console.error('      You can:');
+        console.error('      - Move/delete local config files to use ~/.budget/ instead');
+        console.error('      - Or update values in the current directory files');
+        console.error(
+            '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
+        );
+    } else {
+        console.error('\nCopy config.yaml.example and .env.example to ~/.budget/ to get started.');
+    }
+
+    console.error('\nSee example file: .env.example\n');
+};
+
+/**
+ * Loads configuration and wires the services every command uses; on failure
+ * explains why and exits 1.
+ */
+const loadServices = (configPath?: string): { config: AppConfig; services: AppServices } => {
+    try {
+        const config = ConfigManager.getInstance(configPath).getConfig();
+
+        // Apply the configured log level now that configuration is loaded
+        // (the logger initializes from LOG_LEVEL/'info' at import time)
+        logger.level = config.logging.level;
+
+        const apiClient = new FireflyClientWithCerts({
+            BASE: config.api.firefly.url + '/api',
+            TOKEN: config.api.firefly.token,
+            certificates: config.api.firefly.certificates,
+        });
+
+        return { config, services: ServiceFactory.createServices(apiClient, config) };
+    } catch (error) {
+        printConfigFailure(error);
+        process.exit(1);
+    }
 };
 
 export const createCli = (configPath?: string): Command => {
@@ -107,177 +222,39 @@ export const createCli = (configPath?: string): Command => {
         .option('-v, --verbose', 'show detailed transaction breakdowns in reports')
         .option('-c, --config <path>', 'path to config.yaml file');
 
-    // Try to initialize API client and services for other commands
-    let apiClient: FireflyClientWithCerts;
-    let services: AppServices;
+    const { config, services } = loadServices(configPath);
 
-    try {
-        const configManager = ConfigManager.getInstance(configPath);
-        const config = configManager.getConfig();
-
-        // Apply the configured log level now that configuration is loaded
-        // (the logger initializes from LOG_LEVEL/'info' at import time)
-        logger.level = config.logging.level;
-
-        // Create Firefly client with properly formatted config
-        apiClient = new FireflyClientWithCerts({
-            BASE: config.api.firefly.url + '/api',
-            TOKEN: config.api.firefly.token,
-            caCertPath: config.api.firefly.certificates?.caCertPath,
-            clientCertPath: config.api.firefly.certificates?.clientCertPath,
-            clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
-        });
-
-        services = ServiceFactory.createServices(apiClient, config);
-    } catch (error) {
-        const isValidationError =
-            error instanceof Error && error.message.includes('Configuration validation failed');
-        // Never re-enter getInstance here: when the constructor threw, a second
-        // call would throw the identical error and skip this friendly output.
-        // The resolved paths are captured statically before validation runs.
-        const { configPath: loadedConfigPath, envPath: loadedEnvPath } =
-            ConfigManager.getResolvedPaths();
-
-        if (isValidationError) {
-            // Show detailed validation error with file paths
-            console.error('\n[!] Configuration validation failed\n');
-
-            console.error('Loaded files:');
-            console.error(`  config.yaml: ${loadedConfigPath ? loadedConfigPath : '(none found)'}`);
-            console.error(`  .env:        ${loadedEnvPath ? loadedEnvPath : '(none found)'}`);
-
-            // ConfigManager formats the message as a bulleted list, one entry
-            // per validation error. Print all of them — a bare "validation
-            // failed" leaves no way to tell which setting is wrong.
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            const problems = errorMsg
-                .split('\n')
-                .map((line: string) => line.trim())
-                .filter((line: string) => line.startsWith('- '))
-                .map((line: string) => line.slice(2));
-
-            if (problems.length > 0) {
-                console.error('\nProblems found:');
-                problems.forEach((problem: string) => console.error(`  - ${problem}`));
-            }
-
-            // Missing credentials come from .env rather than config.yaml, so
-            // point at the right file when that is what is wrong
-            const missingVars = problems
-                .map((problem: string) => problem.match(/^([A-Z][A-Z0-9_]*) is required$/))
-                .filter((match): match is RegExpMatchArray => match !== null)
-                .map((match: RegExpMatchArray) => match[1]);
-
-            if (missingVars.length > 0) {
-                console.error(
-                    `\nSet the missing environment variables in ${loadedEnvPath || '.env'}:`
-                );
-                missingVars.forEach((varName: string) => {
-                    console.error(`  - ${varName}`);
-                });
-            }
-
-            // Check if current directory files are being used
-            const usingCwdFiles =
-                (loadedConfigPath && loadedConfigPath.startsWith(process.cwd())) ||
-                (loadedEnvPath && loadedEnvPath.startsWith(process.cwd()));
-
-            if (usingCwdFiles) {
-                console.error(
-                    '\nNote: Files in the current directory take priority over ~/.budget/'
-                );
-                console.error('      You can:');
-                console.error('      - Move/delete local config files to use ~/.budget/ instead');
-                console.error('      - Or update values in the current directory files');
-                console.error(
-                    '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
-                );
-            } else {
-                console.error(
-                    '\nCopy config.yaml.example and .env.example to ~/.budget/ to get started.'
-                );
-            }
-
-            console.error('\nSee example file: .env.example\n');
-        } else {
-            console.error(
-                'Failed to initialize API client:',
-                error instanceof Error ? error.message : String(error)
-            );
-            console.error(
-                '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
-            );
-        }
-
-        process.exit(1);
-    }
-
-    withJsonOption(
-        withDateOptions(
-            program
-                .command('analyze')
-                .alias('an')
-                .description('Budget analysis with surplus/deficit variance')
-        )
-    )
-        .addHelpText(
-            'after',
-            `
+    addReportCommand(program, {
+        name: 'analyze',
+        alias: 'an',
+        description: 'Budget analysis with surplus/deficit variance',
+        examples: `
 Examples:
   $ budgeting-toolkit analyze                   # current month
   $ budgeting-toolkit analyze -m 6              # June, current year
   $ budgeting-toolkit analyze -m 12 -y 2024     # December 2024
   $ budgeting-toolkit an -m 3                   # March (using alias)
-  $ budgeting-toolkit analyze -m 6 --json       # machine-readable output`
-        )
-        .action(async (opts: ReportCommandOptions) => {
-            try {
-                const configManager = ConfigManager.getInstance(configPath);
-                const config = configManager.getConfig();
-                CommandConfigValidator.validateAnalyzeCommand(config);
+  $ budgeting-toolkit analyze -m 6 --json       # machine-readable output`,
+        operation: 'analyzing budget',
+        run: params => {
+            requireCommandConfig(config, 'analyze');
+            return createAnalyzeCommand(services, config).execute(params);
+        },
+    });
 
-                const command = createAnalyzeCommand(services, config);
-                await command.execute({
-                    month: opts.month!,
-                    year: opts.year!,
-                    verbose: program?.opts().verbose || false,
-                    format: opts.json ? 'json' : 'text',
-                });
-            } catch (error) {
-                handleError(error, 'analyzing budget');
-            }
-        });
-
-    withJsonOption(
-        withDateOptions(
-            program
-                .command('report')
-                .alias('st')
-                .description('Display current budget report and spending analysis')
-        )
-    )
-        .addHelpText(
-            'after',
-            `
+    addReportCommand(program, {
+        name: 'report',
+        alias: 'st',
+        description: 'Display current budget report and spending analysis',
+        examples: `
 Examples:
   $ budgeting-toolkit report                      # current month report
   $ budgeting-toolkit report -m 8                 # August report
   $ budgeting-toolkit st                          # current month (using alias)
-  $ budgeting-toolkit report -m 8 --json          # machine-readable output`
-        )
-        .action(async (opts: ReportCommandOptions) => {
-            try {
-                const command = createBudgetReportCommand(services);
-                await command.execute({
-                    month: opts.month!,
-                    year: opts.year!,
-                    verbose: program?.opts().verbose || false,
-                    format: opts.json ? 'json' : 'text',
-                });
-            } catch (error) {
-                handleError(error, 'getting budget report');
-            }
-        });
+  $ budgeting-toolkit report -m 8 --json          # machine-readable output`,
+        operation: 'getting budget report',
+        run: params => createBudgetReportCommand(services).execute(params),
+    });
 
     program
         .command('categorize <tag>')

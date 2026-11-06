@@ -14,6 +14,10 @@ const sentSplits = (payload: UpdatePayload) => {
     return payload.transactions;
 };
 
+/** The one split of a single-split transaction */
+const onlySplit = (transaction: TransactionRead): TransactionSplit =>
+    transaction.attributes.transactions[0];
+
 describe('TransactionSplitService', () => {
     let service: TransactionSplitService;
     let mockClient: jest.Mocked<FireflyClientWithCerts>;
@@ -66,179 +70,108 @@ describe('TransactionSplitService', () => {
         service = new TransactionSplitService(mockClient, mockLogger);
     });
 
-    describe('getTransaction', () => {
-        it('should fetch transaction by ID', async () => {
+    describe('getSingleSplit', () => {
+        it('should return the only split of the transaction', async () => {
             const mockTransaction = createMockTransaction();
             mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
 
-            const result = await service.getTransaction('123');
+            const split = await service.getSingleSplit('123');
 
-            expect(result).toEqual(mockTransaction);
+            expect(split).toEqual(onlySplit(mockTransaction));
             expect(mockClient.transactions.getTransaction).toHaveBeenCalledWith('123');
         });
 
-        it('should return undefined when transaction not found', async () => {
+        it('should throw when the transaction is not found', async () => {
             mockClient.transactions.getTransaction.mockResolvedValue({
                 data: undefined as unknown as TransactionRead,
             });
 
-            const result = await service.getTransaction('999');
-
-            expect(result).toBeUndefined();
+            await expect(service.getSingleSplit('999')).rejects.toThrow(
+                'Transaction 999 not found'
+            );
         });
 
-        it('should handle API errors gracefully', async () => {
-            mockClient.transactions.getTransaction.mockRejectedValue(new Error('API Error'));
+        it('should throw when the transaction has no splits', async () => {
+            mockClient.transactions.getTransaction.mockResolvedValue({
+                data: { ...createMockTransaction(), attributes: { transactions: [] } },
+            });
 
-            const result = await service.getTransaction('123');
-
-            expect(result).toBeUndefined();
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
-    });
-
-    describe('validateSplitAmounts', () => {
-        it('should validate exact match', () => {
-            const result = service.validateSplitAmounts(100, [60, 40]);
-            expect(result).toBe(true);
+            await expect(service.getSingleSplit('123')).rejects.toThrow(
+                'Transaction 123 has no splits'
+            );
         });
 
-        it('should accept amounts within EPSILON tolerance (0.01)', () => {
-            const result = service.validateSplitAmounts(100, [60.005, 39.995]);
-            expect(result).toBe(true);
+        it('should throw when the transaction is already split', async () => {
+            const split = onlySplit(createMockTransaction());
+            mockClient.transactions.getTransaction.mockResolvedValue({
+                data: {
+                    ...createMockTransaction(),
+                    attributes: {
+                        transactions: [split, { ...split, transaction_journal_id: 'journal-456' }],
+                    },
+                },
+            });
+
+            await expect(service.getSingleSplit('123')).rejects.toThrow(
+                'Transaction 123 already has 2 splits. Only single transactions can be split.'
+            );
         });
 
-        it('should reject amounts exceeding EPSILON tolerance', () => {
-            const result = service.validateSplitAmounts(100, [60, 41]);
-            expect(result).toBe(false);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
+        // A 401, certificate or network failure must not read as "not found"
+        it('should report a Firefly failure as itself, keeping it as cause', async () => {
+            const fireflyError = new Error('Unauthenticated');
+            mockClient.transactions.getTransaction.mockRejectedValue(fireflyError);
 
-        it('should reject negative amounts', () => {
-            const result = service.validateSplitAmounts(100, [60, -60]);
-            expect(result).toBe(false);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
+            const failure = service.getSingleSplit('123');
 
-        it('should reject zero amounts', () => {
-            const result = service.validateSplitAmounts(100, [100, 0]);
-            expect(result).toBe(false);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
-
-        it('should handle floating-point precision correctly', () => {
-            // Classic floating-point issue: 0.1 + 0.2 !== 0.3
-            const result = service.validateSplitAmounts(10.1, [3.37, 6.73]);
-            expect(result).toBe(true);
+            await expect(failure).rejects.toThrow(
+                'Failed to fetch transaction 123: Unauthenticated'
+            );
+            await expect(failure).rejects.toMatchObject({ cause: fireflyError });
         });
     });
 
     describe('splitTransaction', () => {
         it('should split transaction successfully', async () => {
             const mockTransaction = createMockTransaction();
-            mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
             mockClient.transactions.updateTransaction.mockResolvedValue({ data: mockTransaction });
 
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
+            const result = await service.splitTransaction('123', onlySplit(mockTransaction), [
                 { amount: '60.00', description: 'Test Transaction - Part 1' },
-                { amount: '40.00', description: 'Test Transaction - Part 2' }
-            );
+                { amount: '40.00', description: 'Test Transaction - Part 2' },
+            ]);
 
-            expect(result.success).toBe(true);
-            expect(result.transaction).toEqual(mockTransaction);
+            expect(result).toEqual(mockTransaction);
             expect(mockClient.transactions.updateTransaction).toHaveBeenCalled();
         });
 
-        it('should throw error when transaction not found', async () => {
-            mockClient.transactions.getTransaction.mockResolvedValue({
-                data: undefined as unknown as TransactionRead,
-            });
-
-            const result = await service.splitTransaction(
-                '999',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '40.00' }
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('not found');
-        });
-
-        it('should throw error when transaction has no splits', async () => {
-            const mockTransaction = {
-                ...createMockTransaction(),
-                attributes: { transactions: [] },
-            };
-            mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
-
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '40.00' }
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error?.message).toContain('no splits');
-        });
-
-        it('should throw error when transaction already split (>1 splits)', async () => {
-            const mockSplit = createMockTransaction().attributes.transactions[0];
-            const mockTransaction = {
-                ...createMockTransaction(),
-                attributes: {
-                    transactions: [
-                        mockSplit,
-                        { ...mockSplit, transaction_journal_id: 'journal-456' },
-                    ],
-                },
-            };
-            mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
-
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '40.00' }
-            );
-
-            expect(result.success).toBe(false);
-            expect(result.error?.message).toContain('already has');
-        });
-
-        it('should throw error when split amounts do not sum to original', async () => {
+        it('should throw with the transaction id, keeping the Firefly error as cause, when the update fails', async () => {
             const mockTransaction = createMockTransaction();
-            mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
+            const fireflyError = new Error('Unauthenticated');
+            mockClient.transactions.updateTransaction.mockRejectedValue(fireflyError);
 
-            const result = await service.splitTransaction(
-                '123',
-                '60.00',
-                { amount: '60.00' },
-                { amount: '50.00' } // Sum is 110, not 100
+            const failure = service.splitTransaction('123', onlySplit(mockTransaction), [
+                { amount: '60.00', description: 'Part 1' },
+                { amount: '40.00', description: 'Part 2' },
+            ]);
+
+            await expect(failure).rejects.toThrow(
+                'Failed to split transaction 123: Unauthenticated'
             );
-
-            expect(result.success).toBe(false);
-            expect(result.error?.message).toContain('do not equal');
+            await expect(failure).rejects.toMatchObject({ cause: fireflyError });
         });
 
         describe('metadata handling', () => {
             it('should copy category from original to split 1 when not customized', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' }, // No categoryName
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -247,17 +180,14 @@ describe('TransactionSplitService', () => {
 
             it('should copy budget from original to split 1 when not customized', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' }, // No budgetId
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -266,17 +196,14 @@ describe('TransactionSplitService', () => {
 
             it('should copy tags from original to split 1', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -285,17 +212,14 @@ describe('TransactionSplitService', () => {
 
             it('should leave category undefined for split 2 by default', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' } // No categoryName
-                );
+                    { amount: '40.00', description: 'Part 2' }, // No categoryName
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -304,17 +228,14 @@ describe('TransactionSplitService', () => {
 
             it('should leave budget undefined for split 2 by default', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' } // No budgetId
-                );
+                    { amount: '40.00', description: 'Part 2' }, // No budgetId
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -323,17 +244,14 @@ describe('TransactionSplitService', () => {
 
             it('should not copy tags to split 2', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -344,17 +262,14 @@ describe('TransactionSplitService', () => {
         describe('currency handling', () => {
             it('should copy currency_id to split 2', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -363,17 +278,14 @@ describe('TransactionSplitService', () => {
 
             it('should copy currency_code to split 2', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -385,17 +297,14 @@ describe('TransactionSplitService', () => {
                     currency_id: undefined,
                     currency_code: undefined,
                 });
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -410,17 +319,14 @@ describe('TransactionSplitService', () => {
                     foreign_currency_id: 'curr-2',
                     foreign_currency_code: 'EUR',
                 });
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '66.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '66.00', description: 'Part 1' },
-                    { amount: '44.00', description: 'Part 2' }
-                );
+                    { amount: '44.00', description: 'Part 2' },
+                ]);
 
                 const [first, second] = sentSplits(
                     mockClient.transactions.updateTransaction.mock.calls[0][1]
@@ -443,17 +349,14 @@ describe('TransactionSplitService', () => {
                     foreign_amount: '10.00',
                     foreign_currency_code: 'EUR',
                 });
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '33.33',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '33.33', description: 'Part 1' },
-                    { amount: '66.67', description: 'Part 2' }
-                );
+                    { amount: '66.67', description: 'Part 2' },
+                ]);
 
                 const [first, second] = sentSplits(
                     mockClient.transactions.updateTransaction.mock.calls[0][1]
@@ -470,17 +373,14 @@ describe('TransactionSplitService', () => {
                     foreign_currency_code: 'JPY',
                     foreign_currency_decimal_places: 0,
                 });
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '3.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '3.00', description: 'Part 1' },
-                    { amount: '6.00', description: 'Part 2' }
-                );
+                    { amount: '6.00', description: 'Part 2' },
+                ]);
 
                 const [first, second] = sentSplits(
                     mockClient.transactions.updateTransaction.mock.calls[0][1]
@@ -491,17 +391,14 @@ describe('TransactionSplitService', () => {
 
             it('should send no foreign amount when the original has none', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Part 1' },
-                    { amount: '40.00', description: 'Part 2' }
-                );
+                    { amount: '40.00', description: 'Part 2' },
+                ]);
 
                 for (const split of sentSplits(
                     mockClient.transactions.updateTransaction.mock.calls[0][1]
@@ -515,17 +412,14 @@ describe('TransactionSplitService', () => {
         describe('description handling', () => {
             it('should use original description when no custom text', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' }, // No description
-                    { amount: '40.00' } // No description
-                );
+                    { amount: '40.00' }, // No description
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -535,17 +429,14 @@ describe('TransactionSplitService', () => {
 
             it('should use custom description when provided', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00', description: 'Custom Part 1' },
-                    { amount: '40.00', description: 'Custom Part 2' }
-                );
+                    { amount: '40.00', description: 'Custom Part 2' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -555,17 +446,14 @@ describe('TransactionSplitService', () => {
 
             it('should set group_title to original description', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' },
-                    { amount: '40.00' }
-                );
+                    { amount: '40.00' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -576,17 +464,14 @@ describe('TransactionSplitService', () => {
         describe('payload structure', () => {
             it('should include transaction_journal_id for split 1', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' },
-                    { amount: '40.00' }
-                );
+                    { amount: '40.00' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -595,17 +480,14 @@ describe('TransactionSplitService', () => {
 
             it('should not include transaction_journal_id for split 2', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' },
-                    { amount: '40.00' }
-                );
+                    { amount: '40.00' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -614,17 +496,14 @@ describe('TransactionSplitService', () => {
 
             it('should set apply_rules: true', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' },
-                    { amount: '40.00' }
-                );
+                    { amount: '40.00' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -633,17 +512,14 @@ describe('TransactionSplitService', () => {
 
             it('should set fire_webhooks: true', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' },
-                    { amount: '40.00' }
-                );
+                    { amount: '40.00' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const payload = updateCall[1];
@@ -652,17 +528,14 @@ describe('TransactionSplitService', () => {
 
             it('should include all required fields for split 2', async () => {
                 const mockTransaction = createMockTransaction();
-                mockClient.transactions.getTransaction.mockResolvedValue({ data: mockTransaction });
                 mockClient.transactions.updateTransaction.mockResolvedValue({
                     data: mockTransaction,
                 });
 
-                await service.splitTransaction(
-                    '123',
-                    '60.00',
+                await service.splitTransaction('123', onlySplit(mockTransaction), [
                     { amount: '60.00' },
-                    { amount: '40.00' }
-                );
+                    { amount: '40.00' },
+                ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
                 const split2 = sentSplits(updateCall[1])[1];

@@ -15,7 +15,7 @@ export function createAnalyzeCommand(services: AppServices, config: AppConfig): 
         services.billComparisonService,
         services.budgetService,
         services.analyzeDisplayService,
-        // CommandConfigValidator requires it before analyze runs
+        // requireCommandConfig requires it before analyze runs
         config.transactions.expectedMonthlyPaycheck ?? 0
     );
 }

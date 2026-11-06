@@ -25,10 +25,6 @@ jest.unstable_mockModule('fs', () => ({
 // Import ConfigValidator after mock is set up
 const { ConfigValidator } = await import('../../src/config/config.validator.js');
 
-/** The validator reports its individual messages under `details.errors`. */
-const validationErrors = (error: { details?: Record<string, unknown> }): string[] =>
-    (error.details?.errors as string[] | undefined) ?? [];
-
 describe('ConfigValidator', () => {
     let validator: InstanceType<typeof ConfigValidator>;
     let validConfig: AppConfig;
@@ -91,7 +87,7 @@ describe('ConfigValidator', () => {
         it('should pass with valid Firefly API configuration', () => {
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
         });
 
         it('should fail when FIREFLY_API_URL is missing', () => {
@@ -99,10 +95,8 @@ describe('ConfigValidator', () => {
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(validationErrors(result.error)).toContain('FIREFLY_API_URL is required');
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems).toContain('FIREFLY_API_URL is required');
         });
 
         it('should fail when FIREFLY_API_URL is invalid', () => {
@@ -110,12 +104,8 @@ describe('ConfigValidator', () => {
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(validationErrors(result.error)).toContain(
-                    'FIREFLY_API_URL must be a valid URL'
-                );
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems).toContain('FIREFLY_API_URL must be a valid URL');
         });
 
         it('should fail when FIREFLY_API_TOKEN is missing', () => {
@@ -123,10 +113,8 @@ describe('ConfigValidator', () => {
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(validationErrors(result.error)).toContain('FIREFLY_API_TOKEN is required');
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems).toContain('FIREFLY_API_TOKEN is required');
         });
 
         it('should accept valid URL formats', () => {
@@ -140,7 +128,7 @@ describe('ConfigValidator', () => {
             urls.forEach(url => {
                 validConfig.api.firefly.url = url;
                 const result = validator.validate(validConfig);
-                expect(result.ok).toBe(true);
+                expect(result.problems).toEqual([]);
             });
         });
     });
@@ -149,7 +137,7 @@ describe('ConfigValidator', () => {
         it('should pass with valid Claude API configuration', () => {
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
         });
 
         it('should pass when Claude API key is missing (validated by command)', () => {
@@ -157,7 +145,7 @@ describe('ConfigValidator', () => {
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
         });
     });
 
@@ -168,7 +156,7 @@ describe('ConfigValidator', () => {
             validLevels.forEach(level => {
                 validConfig.logging.level = level as any;
                 const result = validator.validate(validConfig);
-                expect(result.ok).toBe(true);
+                expect(result.problems).toEqual([]);
             });
         });
 
@@ -177,12 +165,10 @@ describe('ConfigValidator', () => {
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(validationErrors(result.error)).toContain(
-                    'logging.level must be one of: trace, debug, info, warn, error, silent'
-                );
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems).toContain(
+                'logging.level must be one of: trace, debug, info, warn, error, silent'
+            );
         });
     });
 
@@ -192,7 +178,7 @@ describe('ConfigValidator', () => {
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
         });
 
         it('should pass when clientCertPath exists', () => {
@@ -225,7 +211,7 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
             expect(mockExistsSync).toHaveBeenCalledWith('/path/to/cert.pem');
         });
 
@@ -238,12 +224,10 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(validationErrors(result.error)[0]).toContain(
-                    'Client certificate not found: /path/to/missing/cert.pem'
-                );
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems[0]).toContain(
+                'Client certificate not found: /path/to/missing/cert.pem'
+            );
         });
 
         it('should fail when caCertPath does not exist', () => {
@@ -279,14 +263,12 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                // The error message now includes a multi-line string with suggestions
-                const errorMessage = validationErrors(result.error).find(e =>
-                    e.includes('CA certificate not found: /path/to/missing/ca.pem')
-                );
-                expect(errorMessage).toBeDefined();
-            }
+            expect(result.problems).not.toEqual([]);
+            // The error message now includes a multi-line string with suggestions
+            const errorMessage = result.problems.find(e =>
+                e.includes('CA certificate not found: /path/to/missing/ca.pem')
+            );
+            expect(errorMessage).toBeDefined();
         });
 
         it('should pass when both certificates exist', () => {
@@ -321,7 +303,7 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
         });
     });
 
@@ -331,18 +313,13 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect((result.error.details as { errors: string[] }).errors.join('\n')).toContain(
-                    'categorize.historyMonths'
-                );
-            }
+            expect(result.problems.join('\n')).toContain('categorize.historyMonths');
         });
 
         it.each([0, 12, 120])('should accept categorize.historyMonths of %s', months => {
             validConfig.categorize.historyMonths = months;
 
-            expect(validator.validate(validConfig).ok).toBe(true);
+            expect(validator.validate(validConfig).problems).toEqual([]);
         });
     });
 
@@ -364,12 +341,8 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect((result.error.details as { errors: string[] }).errors.join('\n')).toContain(
-                    key
-                );
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems.join('\n')).toContain(key);
         });
 
         it('should reject non-integer batch size', () => {
@@ -377,7 +350,7 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
+            expect(result.problems).not.toEqual([]);
         });
 
         it('should reject negative refill interval', () => {
@@ -385,7 +358,7 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
+            expect(result.problems).not.toEqual([]);
         });
 
         it('should reject an empty model string', () => {
@@ -393,23 +366,20 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
+            expect(result.problems).not.toEqual([]);
         });
 
         it('should accept the default LLM configuration', () => {
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(true);
+            expect(result.problems).toEqual([]);
         });
     });
 
     describe('excludedTransactions validation', () => {
         /** Flattens a failed validation into one searchable string */
         const errorsOf = (config: AppConfig): string => {
-            const result = validator.validate(config);
-            return result.ok
-                ? ''
-                : (result.error.details as { errors: string[] }).errors.join('\n');
+            return validator.validate(config).problems.join('\n');
         };
 
         it('should accept a description-only rule', () => {
@@ -417,7 +387,7 @@ qZXQ
                 { description: 'STOCK INVESTMENT', reason: 'Investment purchase' },
             ];
 
-            expect(validator.validate(validConfig).ok).toBe(true);
+            expect(validator.validate(validConfig).problems).toEqual([]);
         });
 
         it('should accept a rule narrowed by amount', () => {
@@ -425,7 +395,7 @@ qZXQ
                 { description: 'Monthly Rent', amount: '1200.00' },
             ];
 
-            expect(validator.validate(validConfig).ok).toBe(true);
+            expect(validator.validate(validConfig).problems).toEqual([]);
         });
 
         it('should accept a currency-formatted amount', () => {
@@ -434,7 +404,7 @@ qZXQ
                 { description: 'Refunded Charge', amount: '(45.00)' },
             ];
 
-            expect(validator.validate(validConfig).ok).toBe(true);
+            expect(validator.validate(validConfig).problems).toEqual([]);
         });
 
         it('should reject an amount-only rule', () => {
@@ -442,7 +412,7 @@ qZXQ
                 { amount: '999.99', reason: 'Specific amount' } as unknown as ExcludedTransaction,
             ];
 
-            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(validator.validate(validConfig).problems).not.toEqual([]);
             expect(errorsOf(validConfig)).toContain(
                 "transactions.excludedTransactions[0]: 'description' is required"
             );
@@ -451,7 +421,7 @@ qZXQ
         it('should reject a whitespace-only description', () => {
             validConfig.transactions.excludedTransactions = [{ description: '   ' }];
 
-            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(validator.validate(validConfig).problems).not.toEqual([]);
             expect(errorsOf(validConfig)).toContain("'description' is required");
         });
 
@@ -460,7 +430,7 @@ qZXQ
                 { description: 'Monthly Rent', amount: 'twelve hundred' },
             ];
 
-            expect(validator.validate(validConfig).ok).toBe(false);
+            expect(validator.validate(validConfig).problems).not.toEqual([]);
             expect(errorsOf(validConfig)).toContain(
                 'transactions.excludedTransactions[0].amount must be a valid amount'
             );
@@ -489,30 +459,23 @@ qZXQ
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(validationErrors(result.error)).toHaveLength(3);
-                expect(validationErrors(result.error)).toContain('FIREFLY_API_URL is required');
-                expect(validationErrors(result.error)).toContain('FIREFLY_API_TOKEN is required');
-                expect(validationErrors(result.error)).toContain(
-                    'logging.level must be one of: trace, debug, info, warn, error, silent'
-                );
-            }
+            expect(result.problems).not.toEqual([]);
+            expect(result.problems).toHaveLength(3);
+            expect(result.problems).toContain('FIREFLY_API_URL is required');
+            expect(result.problems).toContain('FIREFLY_API_TOKEN is required');
+            expect(result.problems).toContain(
+                'logging.level must be one of: trace, debug, info, warn, error, silent'
+            );
         });
 
-        it('should return user-friendly error message', () => {
+        it('should name the missing environment variables', () => {
             validConfig.api.firefly.url = '';
+            validConfig.api.firefly.token = '';
+            validConfig.logging.level = 'invalid' as any;
 
             const result = validator.validate(validConfig);
 
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(result.error.field).toBe('configuration');
-                expect(result.error.message).toBe('Configuration validation failed');
-                expect(result.error.userMessage).toContain(
-                    'Invalid configuration detected. Please check your .env and YAML config files.'
-                );
-            }
+            expect(result.missingEnvVars).toEqual(['FIREFLY_API_URL', 'FIREFLY_API_TOKEN']);
         });
     });
 });

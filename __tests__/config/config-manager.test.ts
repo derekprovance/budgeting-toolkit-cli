@@ -44,6 +44,7 @@ jest.unstable_mockModule('dotenv', () => ({
 
 // Import ConfigManager after mocks are set up
 const { ConfigManager } = await import('../../src/config/config-manager.js');
+const { ConfigValidationError } = await import('../../src/config/config.validator.js');
 
 describe('ConfigManager', () => {
     let originalEnv: NodeJS.ProcessEnv;
@@ -508,6 +509,25 @@ qZXQ
 
             expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
         });
+
+        it('should carry each problem and missing variable on the thrown error', () => {
+            delete process.env.FIREFLY_API_URL;
+            delete process.env.FIREFLY_API_TOKEN;
+
+            const thrown = (() => {
+                try {
+                    ConfigManager.getInstance();
+                } catch (error) {
+                    return error;
+                }
+            })();
+
+            expect(thrown).toBeInstanceOf(ConfigValidationError);
+            expect(thrown).toMatchObject({
+                problems: ['FIREFLY_API_URL is required', 'FIREFLY_API_TOKEN is required'],
+                missingEnvVars: ['FIREFLY_API_URL', 'FIREFLY_API_TOKEN'],
+            });
+        });
     });
 
     describe('Config file path resolution', () => {
@@ -673,10 +693,12 @@ qZXQ
             process.env.ENV_FILE = envFile;
             mockExistsSync.mockImplementation(existing(customPath, envFile));
 
-            const manager = ConfigManager.getInstance(customPath);
+            ConfigManager.getInstance(customPath);
 
-            expect(manager.getLoadedConfigPath()).toBe(customPath);
-            expect(manager.getLoadedEnvPath()).toBe(envFile);
+            expect(ConfigManager.getResolvedPaths()).toEqual({
+                configPath: customPath,
+                envPath: envFile,
+            });
             expect(mockConfigSync).toHaveBeenCalledTimes(1);
             expect(mockConfigSync).toHaveBeenCalledWith({ path: envFile, quiet: true });
         });
@@ -685,9 +707,9 @@ qZXQ
             process.env.ENV_FILE = 'rel/.env';
             mockExistsSync.mockImplementation(existing(customPath, '/test/path/rel/.env'));
 
-            const manager = ConfigManager.getInstance(customPath);
+            ConfigManager.getInstance(customPath);
 
-            expect(manager.getLoadedEnvPath()).toBe('/test/path/rel/.env');
+            expect(ConfigManager.getResolvedPaths().envPath).toBe('/test/path/rel/.env');
         });
 
         it('throws when no --config path is given, even if ./config.yaml and ~/.budget/config.yaml exist', () => {
