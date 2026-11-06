@@ -3,7 +3,11 @@ import chalk from 'chalk';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { ITransactionClassificationService } from '../core/transaction-classification.service.interface.js';
 import { AnalyzeReportDto } from '../../types/dto/analyze-report.dto.js';
-import { BillDetailDto, isBillUpcoming } from '../../types/dto/bill-comparison.dto.js';
+import {
+    BillDetailDto,
+    billVariance,
+    isBillUpcoming,
+} from '../../types/dto/bill-comparison.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { DisposablePoolDirection, disposablePoolAction } from './disposable-pool-action.js';
 
@@ -239,7 +243,7 @@ export class AnalyzeDisplayService {
 
         if (data.billComparison.variance > 100) {
             const overBudgetBills = data.billComparison.bills.filter(
-                b => b.actual > b.predicted
+                b => billVariance(b) > 0
             ).length;
             if (overBudgetBills > 0) {
                 lines.push(
@@ -313,7 +317,7 @@ export class AnalyzeDisplayService {
 
     private formatBillDetail(bill: BillDetailDto, symbol: string): string {
         const isUpcoming = isBillUpcoming(bill);
-        const variance = bill.actual - bill.predicted;
+        const variance = billVariance(bill);
 
         // An unpaid bill's "variance" is just its whole amount, which reads as
         // a saving. Say when it is due instead.

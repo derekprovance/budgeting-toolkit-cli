@@ -5,6 +5,7 @@ import { BudgetInsight } from '../../types/dto/budget-insight.dto.js';
 import {
     BillComparisonDto,
     BillDetailDto,
+    billVariance,
     getTopBills,
     getRemainingBills,
     isBillUpcoming,
@@ -383,10 +384,7 @@ export class BudgetDisplayService {
     ): string {
         return this.billRow(
             {
-                emoji: EmojiUtils.getBillVarianceEmoji(
-                    bill.actual - bill.predicted,
-                    bill.predicted
-                ),
+                emoji: EmojiUtils.getBillVarianceEmoji(billVariance(bill), bill.predicted),
                 name: bill.name,
                 actual: bill.actual,
                 trailer: `(expected ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)})`,

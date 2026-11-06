@@ -69,6 +69,11 @@ export function isBillUpcoming(
     return !!bill.dueDate && localDay(bill.dueDate) >= localDay(now);
 }
 
+/** Positive means the bill cost more than predicted */
+export function billVariance(bill: Pick<BillDetailDto, 'actual' | 'predicted'>): number {
+    return bill.actual - bill.predicted;
+}
+
 export function getTopBills(comparison: BillComparisonDto, limit: number = 4): BillDetailDto[] {
     return [...comparison.bills].sort((a, b) => b.actual - a.actual).slice(0, limit);
 }
