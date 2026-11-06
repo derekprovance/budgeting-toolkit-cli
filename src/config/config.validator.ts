@@ -33,8 +33,8 @@ export class ConfigValidator {
 
         return {
             problems: [
-                ...missingEnvVars.map(name => `${name} is required`),
                 ...this.checkFireflyUrl(config),
+                ...this.checkFireflyToken(config),
                 ...this.checkLoggingConfig(config),
                 ...this.checkLlmConfig(config),
                 ...this.checkCategorizeConfig(config),
@@ -56,7 +56,14 @@ export class ConfigValidator {
 
     private checkFireflyUrl(config: AppConfig): string[] {
         const { url } = config.api.firefly;
-        return url && !this.isValidUrl(url) ? ['FIREFLY_API_URL must be a valid URL'] : [];
+        if (!url) {
+            return ['FIREFLY_API_URL is required'];
+        }
+        return this.isValidUrl(url) ? [] : ['FIREFLY_API_URL must be a valid URL'];
+    }
+
+    private checkFireflyToken(config: AppConfig): string[] {
+        return config.api.firefly.token ? [] : ['FIREFLY_API_TOKEN is required'];
     }
 
     /** Zero or negative batch size, concurrency or rate limits loop forever at runtime. */

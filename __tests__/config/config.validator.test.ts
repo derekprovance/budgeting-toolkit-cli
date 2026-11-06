@@ -116,6 +116,18 @@ describe('ConfigValidator', () => {
             expect(result.problems).toContain('FIREFLY_API_TOKEN is required');
         });
 
+        it('should list the Firefly URL problem before the token problem', () => {
+            validConfig.api.firefly.url = 'not-a-valid-url';
+            validConfig.api.firefly.token = '';
+
+            const result = validator.validate(validConfig);
+
+            expect(result.problems.slice(0, 2)).toEqual([
+                'FIREFLY_API_URL must be a valid URL',
+                'FIREFLY_API_TOKEN is required',
+            ]);
+        });
+
         it('should accept valid URL formats', () => {
             const urls = [
                 'http://localhost:8080',
