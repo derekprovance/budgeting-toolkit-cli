@@ -59,9 +59,6 @@ describe('FireflyClientWithCerts', () => {
         });
 
         it('should call createCertificateAxios with certificate config when clientCertPath provided', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
@@ -83,9 +80,6 @@ describe('FireflyClientWithCerts', () => {
         });
 
         it('should create custom axios instance when certificates are provided', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
@@ -101,9 +95,6 @@ describe('FireflyClientWithCerts', () => {
         });
 
         it('should work with only clientCertPath (no CA cert)', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
@@ -123,9 +114,6 @@ describe('FireflyClientWithCerts', () => {
         });
 
         it('should work with only clientCertPath and password (no CA cert)', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
@@ -246,9 +234,6 @@ describe('FireflyClientWithCerts', () => {
 
     describe('certificate configuration combinations', () => {
         it('should handle full certificate config', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
@@ -270,9 +255,6 @@ describe('FireflyClientWithCerts', () => {
         });
 
         it('should handle certificate config without password', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
@@ -293,9 +275,6 @@ describe('FireflyClientWithCerts', () => {
         });
 
         it('should handle certificate config without CA cert', () => {
-            const mockAxiosInstance = {} as AxiosInstance;
-            mockCertificateAxiosFactory.mockReturnValue(mockAxiosInstance);
-
             new FireflyClientWithCerts(
                 {
                     BASE: 'https://firefly.example.com/api',
