@@ -42,31 +42,9 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         console.log(this.displayService.formatHeader(transactionId));
 
         const spinner = ora('Fetching transaction...').start();
-        const transaction = await failSpinnerOnError(
-            spinner,
-            'Failed to fetch transaction',
-            async () => {
-                const fetched = await this.splitService.getTransaction(transactionId);
-                if (!fetched) {
-                    throw new Error(`Transaction ${transactionId} not found`);
-                }
-                return fetched;
-            }
+        const originalSplit = await failSpinnerOnError(spinner, 'Failed to fetch transaction', () =>
+            this.splitService.getSingleSplit(transactionId)
         );
-        const splits = transaction.attributes.transactions;
-
-        if (!splits || splits.length === 0) {
-            spinner.fail('Transaction has no splits');
-            throw new Error('Transaction has no splits');
-        }
-
-        if (splits.length > 1) {
-            const message = `Transaction already has ${splits.length} splits. Only single transactions can be split.`;
-            spinner.fail(message);
-            throw new Error(message);
-        }
-
-        const originalSplit = splits[0];
         const originalAmount = parseFloat(originalSplit.amount);
 
         spinner.succeed('Transaction fetched');
@@ -141,12 +119,10 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
 
         spinner.start('Splitting transaction...');
         const updated = await failSpinnerOnError(spinner, 'Failed to split transaction', () =>
-            this.splitService.splitTransaction(
-                transactionId,
-                firstSplitData.amount,
+            this.splitService.splitTransaction(transactionId, originalSplit, [
                 firstSplitData,
-                secondSplitData
-            )
+                secondSplitData,
+            ])
         );
         spinner.succeed('Transaction split successfully');
         console.log(
