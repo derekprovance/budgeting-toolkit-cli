@@ -11,6 +11,7 @@ import { ILogger } from '../../types/interface/logger.interface.js';
 import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 import { monthRange } from '../../utils/date.utils.js';
+import { errorMessage } from '../../utils/error-detection.utils.js';
 
 class TransactionError extends Error {
     constructor(message: string, options?: ErrorOptions) {
@@ -303,7 +304,7 @@ export class TransactionService implements ITransactionService {
             {
                 action,
                 identifier,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: errorMessage(error),
             },
             message
         );

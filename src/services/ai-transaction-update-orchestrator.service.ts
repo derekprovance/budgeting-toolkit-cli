@@ -1,6 +1,7 @@
 import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import ora from 'ora';
 import { logger } from '../logger.js';
+import { errorMessage } from '../utils/error-detection.utils.js';
 import { TransactionService } from './core/transaction.service.js';
 import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js';
 import { LLMAssignmentService } from './ai/llm-assignment.service.js';
@@ -148,7 +149,7 @@ export class AITransactionUpdateOrchestrator {
             await this.history.load(own);
         } catch (error) {
             logger.warn(
-                { error: error instanceof Error ? error.message : String(error) },
+                { error: errorMessage(error) },
                 'Transaction history unavailable; every suggestion will come from the AI'
             );
         }

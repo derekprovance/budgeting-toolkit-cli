@@ -4,6 +4,7 @@ import { monthRange } from '../../utils/date.utils.js';
 import { IBudgetService } from './budget.service.interface.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 import { logger } from '../../logger.js';
+import { errorMessage } from '../../utils/error-detection.utils.js';
 
 export class BudgetService implements IBudgetService {
     constructor(private readonly client: FireflyClientWithCerts) {}
@@ -21,7 +22,7 @@ export class BudgetService implements IBudgetService {
             results = await this.client.budgets.listBudgetLimit(start, end);
         } catch (error) {
             throw new Error(
-                `Failed to get budget limits for month ${month}: ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to get budget limits for month ${month}: ${errorMessage(error)}`,
                 { cause: error }
             );
         }

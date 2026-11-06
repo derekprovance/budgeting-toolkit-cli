@@ -5,6 +5,7 @@ import { CategoryBudgetCatalog } from './core/category-budget-catalog.service.js
 import { ReviewCancelledError, UserInputService } from './user-input.service.js';
 import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
+import { toError } from '../utils/error-detection.utils.js';
 import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
 import {
@@ -216,7 +217,7 @@ export class InteractiveTransactionUpdater {
         transaction: JournaledTransaction,
         error: unknown
     ): TransactionValidationError {
-        const err = error instanceof Error ? error : new Error(String(error));
+        const err = toError(error);
         logger.error(
             { description: transaction.description, error: err.message },
             'Error processing transaction'

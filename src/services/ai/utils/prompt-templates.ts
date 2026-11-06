@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { LLMTransactionData } from './transaction-mapper.js';
 import { StringUtils } from '../../../utils/string.utils.js';
+import { errorMessage } from '../../../utils/error-detection.utils.js';
 
 export type AssignmentType = 'category' | 'budget';
 
@@ -132,10 +133,9 @@ export function parseAssignmentResponse(
         }
         parsed = rawParsed as Record<string, unknown>;
     } catch (error) {
-        throw new Error(
-            `Failed to parse ${type} assignment response: ${error instanceof Error ? error.message : String(error)}`,
-            { cause: error }
-        );
+        throw new Error(`Failed to parse ${type} assignment response: ${errorMessage(error)}`, {
+            cause: error,
+        });
     }
 
     const results = parsed[fieldName];

@@ -13,6 +13,7 @@ import {
 } from './utils/prompt-templates.js';
 import { mapTransactionForLLM, LLMTransactionData } from './utils/transaction-mapper.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
+import { errorMessage } from '../../utils/error-detection.utils.js';
 
 /** One chunk's assignments, plus whether they are real or a degraded fallback */
 interface ChunkResult {
@@ -194,7 +195,7 @@ export class LLMAssignmentService {
             if (this.isCriticalError(error)) {
                 this.logger.error(
                     {
-                        error: error instanceof Error ? error.message : String(error),
+                        error: errorMessage(error),
                         type,
                         chunkIndex,
                         chunkSize: chunk.length,
@@ -206,7 +207,7 @@ export class LLMAssignmentService {
 
             this.logger.warn(
                 {
-                    error: error instanceof Error ? error.message : String(error),
+                    error: errorMessage(error),
                     type,
                     chunkIndex,
                     chunkSize: chunk.length,

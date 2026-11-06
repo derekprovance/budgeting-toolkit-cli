@@ -1,5 +1,6 @@
 import { logger } from '../../logger.js';
 import { Result } from '../result.type.js';
+import { toError } from '../../utils/error-detection.utils.js';
 
 /** What could not be produced for a month */
 export type MonthErrorKind =
@@ -48,7 +49,7 @@ export function monthFailure<T>(
     { month, year }: { month: number; year: number },
     error: unknown
 ): Result<T, MonthError> {
-    const cause = error instanceof Error ? error : new Error(String(error));
+    const cause = toError(error);
     const { failed, userMessage } = MESSAGES[kind](month);
     const monthError: MonthError = {
         kind,
