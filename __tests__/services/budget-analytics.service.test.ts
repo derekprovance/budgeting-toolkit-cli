@@ -115,7 +115,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn<GetTransactions>()
                 .mockRejectedValue(new Error('Firefly down'));
 
-            await expect(service.getTopExpenses(1, 2024)).rejects.toMatchObject({
+            await expect(service.getTopExpenses(1, 2024, 5)).rejects.toMatchObject({
                 message: expect.stringContaining('Firefly down'),
                 cause: expect.objectContaining({ month: 1, year: 2024 }),
             });
@@ -430,7 +430,7 @@ describe('BudgetAnalyticsService', () => {
                 .fn<GetTransactions>()
                 .mockResolvedValue(transactions);
 
-            const result = await service.getTopExpenses(1, 2024);
+            const result = await service.getTopExpenses(1, 2024, 5);
 
             expect(result).toHaveLength(5);
         });

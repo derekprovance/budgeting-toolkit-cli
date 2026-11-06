@@ -1,4 +1,4 @@
-import { localDay, monthRange, toDay } from '../../src/utils/date.utils.js';
+import { localDay, monthRange, shiftMonth, toDay } from '../../src/utils/date.utils.js';
 
 describe('monthRange', () => {
     it('[R-TIME-1] should bound a month by its first and last day', () => {
@@ -40,5 +40,13 @@ describe('toDay', () => {
 describe('localDay', () => {
     it('should format the local calendar day', () => {
         expect(localDay(new Date(2025, 0, 5, 23, 30))).toBe('2025-01-05');
+    });
+});
+
+describe('shiftMonth', () => {
+    it('should move across year boundaries in either direction', () => {
+        expect(shiftMonth(1, 2024, -1)).toEqual({ month: 12, year: 2023 });
+        expect(shiftMonth(11, 2024, 3)).toEqual({ month: 2, year: 2025 });
+        expect(shiftMonth(3, 2024, -14)).toEqual({ month: 1, year: 2023 });
     });
 });

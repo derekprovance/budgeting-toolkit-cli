@@ -38,6 +38,16 @@ export function monthRange(month: number, year: number): { start: Day; end: Day 
     };
 }
 
+/** The month `by` months after month/year; a negative `by` goes back */
+export function shiftMonth(
+    month: number,
+    year: number,
+    by: number
+): { month: number; year: number } {
+    const total = year * 12 + (month - 1) + by;
+    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
+}
+
 export function formatDay(year: number, month: number, day: number): Day {
     const pad = (n: number, width = 2) => String(n).padStart(width, '0');
     return `${pad(year, 4)}-${pad(month)}-${pad(day)}`;

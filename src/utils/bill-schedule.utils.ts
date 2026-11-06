@@ -1,5 +1,5 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
-import { Day, daysInMonth, formatDay, monthRange, toDay } from './date.utils.js';
+import { Day, daysInMonth, formatDay, monthRange, shiftMonth, toDay } from './date.utils.js';
 import { logger } from '../logger.js';
 
 /**
@@ -91,9 +91,7 @@ const PERIODS: Record<string, (start: Day, steps: number) => Day> = {
 
 function addMonths(day: Day, months: number): Day {
     const [y, m, d] = day.split('-').map(Number);
-    const total = y * 12 + (m - 1) + months;
-    const year = Math.floor(total / 12);
-    const month = (total % 12) + 1;
+    const { month, year } = shiftMonth(m, y, months);
     return formatDay(year, month, Math.min(d, daysInMonth(year, month)));
 }
 
