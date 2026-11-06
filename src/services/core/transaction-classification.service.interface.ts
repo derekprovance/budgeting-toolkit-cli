@@ -2,17 +2,16 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { AccountScope } from './account-scope.service.js';
 
 /** Where a transaction is charged. See RULES.md. */
-export type Bucket =
-    'paycheck' | 'additionalIncome' | 'bill' | 'disposable' | 'budget' | 'unbudgeted';
-
-export const BUCKETS: readonly Bucket[] = [
+export const BUCKETS = [
     'paycheck',
     'additionalIncome',
     'bill',
     'disposable',
     'budget',
     'unbudgeted',
-];
+] as const;
+
+export type Bucket = (typeof BUCKETS)[number];
 
 /**
  * Interface for TransactionClassificationService

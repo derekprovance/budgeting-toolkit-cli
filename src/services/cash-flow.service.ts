@@ -47,14 +47,13 @@ export class CashFlowService {
 
     private async sort(transactions: TransactionSplit[]): Promise<MonthBuckets> {
         const scope = await this.accountScope.getScope();
-        const buckets = Object.fromEntries(BUCKETS.map(b => [b, []])) as unknown as MonthBuckets;
-
-        for (const transaction of transactions) {
-            const bucket = this.transactionClassificationService.classify(transaction, scope);
-            if (bucket) {
-                buckets[bucket].push(transaction);
-            }
-        }
+        const sorted = Map.groupBy(transactions, transaction =>
+            this.transactionClassificationService.classify(transaction, scope)
+        );
+        // Object.fromEntries types its keys as plain strings; BUCKETS supplies every key
+        const buckets = Object.fromEntries(
+            BUCKETS.map(bucket => [bucket, sorted.get(bucket) ?? []])
+        ) as MonthBuckets;
 
         this.logger.debug(
             Object.fromEntries(BUCKETS.map(b => [b, buckets[b].length])),
