@@ -134,8 +134,7 @@ export class ServiceFactory {
             services.transactionValidatorService,
             aiValidator,
             services.userInputService,
-            dryRun,
-            force
+            dryRun
         );
 
         return new AITransactionUpdateOrchestrator(

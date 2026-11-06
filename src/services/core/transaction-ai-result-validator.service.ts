@@ -84,14 +84,12 @@ export class TransactionAIResultValidator {
      * @param transaction The transaction being validated
      * @param aiCategory AI-suggested category name
      * @param aiBudget AI-suggested budget name
-     * @param force When true, AI suggestions replace an existing category (--force re-run)
      * @returns Result containing validated category/budget or error details
      */
     async validateAIResults(
         transaction: TransactionSplit,
         aiCategory?: string,
-        aiBudget?: string,
-        force: boolean = false
+        aiBudget?: string
     ): Promise<Result<AIValidationResult, TransactionValidationError>> {
         const transactionId = transaction.transaction_journal_id || 'unknown';
         const description = transaction.description || 'No description';
@@ -99,58 +97,51 @@ export class TransactionAIResultValidator {
         // Validate category if provided
         let category: CategoryProperties | undefined;
         if (aiCategory && aiCategory !== '') {
-            if (transaction.category_id && !force) {
-                logger.debug(
-                    { transactionId, description, aiCategory },
-                    'Skipping AI category - transaction already has category_id'
-                );
-            } else {
-                // Normalize for case-insensitive lookup
-                const normalizedKey = StringUtils.normalizeForMatching(aiCategory);
-                category = this.categoryLookup.get(normalizedKey);
+            // Normalize for case-insensitive lookup
+            const normalizedKey = StringUtils.normalizeForMatching(aiCategory);
+            category = this.categoryLookup.get(normalizedKey);
 
-                // Log validation result for debugging
-                logger.trace(
+            // Log validation result for debugging
+            logger.trace(
+                {
+                    transactionId,
+                    description,
+                    aiCategory,
+                    normalizedKey,
+                    foundInMap: !!category,
+                    categoryName: category?.name,
+                    mapSize: this.categoryLookup.size,
+                },
+                'Category validation and lookup'
+            );
+
+            if (!category) {
+                const error: TransactionValidationError = {
+                    field: 'category',
+                    message: `Invalid or unrecognized category from AI: "${aiCategory}"`,
+                    userMessage: `The suggested category "${aiCategory}" doesn't exist. Please choose a valid category or create it first.`,
+                    transactionId,
+                    transactionDescription: description,
+                    details: {
+                        suggestedCategory: aiCategory,
+                        availableCategories: Array.from(this.categoryLookup.values())
+                            .map(c => c.name)
+                            .slice(0, 10),
+                    },
+                };
+
+                logger.warn(
                     {
                         transactionId,
                         description,
                         aiCategory,
                         normalizedKey,
-                        foundInMap: !!category,
-                        categoryName: category?.name,
-                        mapSize: this.categoryLookup.size,
+                        availableCount: this.categoryLookup.size,
                     },
-                    'Category validation and lookup'
+                    error.message
                 );
 
-                if (!category) {
-                    const error: TransactionValidationError = {
-                        field: 'category',
-                        message: `Invalid or unrecognized category from AI: "${aiCategory}"`,
-                        userMessage: `The suggested category "${aiCategory}" doesn't exist. Please choose a valid category or create it first.`,
-                        transactionId,
-                        transactionDescription: description,
-                        details: {
-                            suggestedCategory: aiCategory,
-                            availableCategories: Array.from(this.categoryLookup.values())
-                                .map(c => c.name)
-                                .slice(0, 10),
-                        },
-                    };
-
-                    logger.warn(
-                        {
-                            transactionId,
-                            description,
-                            aiCategory,
-                            normalizedKey,
-                            availableCount: this.categoryLookup.size,
-                        },
-                        error.message
-                    );
-
-                    return Result.err(error);
-                }
+                return Result.err(error);
             }
         }
 

@@ -39,8 +39,7 @@ export class InteractiveTransactionUpdater {
         private readonly validator: ITransactionValidatorService,
         private readonly aiValidator: TransactionAIResultValidator,
         private readonly userInputService: UserInputService,
-        private readonly dryRun: boolean = false,
-        private readonly force: boolean = false
+        private readonly dryRun: boolean = false
     ) {}
 
     /**
@@ -172,8 +171,7 @@ export class InteractiveTransactionUpdater {
         const validationResult = await this.aiValidator.validateAIResults(
             transaction,
             aiResult?.category,
-            aiResult?.budget,
-            this.force
+            aiResult?.budget
         );
 
         if (!validationResult.ok) {
