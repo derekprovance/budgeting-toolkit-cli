@@ -750,6 +750,17 @@ describe('UserInputService', () => {
         });
     });
 
+    describe('getNewCategory and getNewBudget', () => {
+        it('return the chosen name', async () => {
+            mockSearch.mockResolvedValueOnce('Groceries').mockResolvedValueOnce('Food');
+
+            expect(await service.getNewCategory(['Groceries'], undefined, 'Groceries')).toBe(
+                'Groceries'
+            );
+            expect(await service.getNewBudget(['Food'], 'Food')).toBe('Food');
+        });
+    });
+
     describe('shouldEditCategoryBudget', () => {
         it('should include Modify Budget for non-deposit transactions', async () => {
             mockCheckbox.mockResolvedValueOnce([EditTransactionAttribute.Category]);

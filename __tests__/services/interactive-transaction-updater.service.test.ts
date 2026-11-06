@@ -256,8 +256,8 @@ describe('InteractiveTransactionUpdater', () => {
                     EditTransactionAttribute.Category,
                     EditTransactionAttribute.Budget,
                 ]);
-                mockUserInputService.getNewCategory.mockResolvedValue(category('Groceries'));
-                mockUserInputService.getNewBudget.mockResolvedValue(budget('', 'Food'));
+                mockUserInputService.getNewCategory.mockResolvedValue('Groceries');
+                mockUserInputService.getNewBudget.mockResolvedValue('Food');
 
                 await review();
 
@@ -282,7 +282,7 @@ describe('InteractiveTransactionUpdater', () => {
                 mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                     EditTransactionAttribute.Budget,
                 ]);
-                mockUserInputService.getNewBudget.mockResolvedValue(budget('', 'Food'));
+                mockUserInputService.getNewBudget.mockResolvedValue('Food');
 
                 await review();
 
@@ -298,7 +298,7 @@ describe('InteractiveTransactionUpdater', () => {
                 mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                     EditTransactionAttribute.Category,
                 ]);
-                mockUserInputService.getNewCategory.mockResolvedValue(category('Groceries'));
+                mockUserInputService.getNewCategory.mockResolvedValue('Groceries');
 
                 await review({ ...suggestion, source: { category: 'ai', budget: 'history' } });
 
@@ -321,7 +321,7 @@ describe('InteractiveTransactionUpdater', () => {
                 mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([
                     EditTransactionAttribute.Category,
                 ]);
-                mockUserInputService.getNewCategory.mockResolvedValue(category('Groceries'));
+                mockUserInputService.getNewCategory.mockResolvedValue('Groceries');
 
                 await review();
 
@@ -344,8 +344,8 @@ describe('InteractiveTransactionUpdater', () => {
                     EditTransactionAttribute.Category,
                 ]);
                 mockUserInputService.getNewCategory
-                    .mockResolvedValueOnce(category('Groceries'))
-                    .mockResolvedValueOnce(category('New Category'));
+                    .mockResolvedValueOnce('Groceries')
+                    .mockResolvedValueOnce('New Category');
 
                 await review();
 

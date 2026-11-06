@@ -319,36 +319,29 @@ export class InteractiveTransactionUpdater {
         let newBudget: BudgetRead | undefined = currentBudget;
 
         for (const answer of answers) {
-            if (answer === EditTransactionAttribute.Category) {
-                const categoryNames = this.catalog.categoryNames();
-                newCategory = await this.userInputService.getNewCategory(
-                    categoryNames,
-                    currentCategory?.name,
-                    aiSuggestion?.category?.name
-                );
-            } else if (answer === EditTransactionAttribute.Budget) {
-                const budgetNames = this.catalog.budgetNames();
-                newBudget = await this.userInputService.getNewBudget(
-                    budgetNames,
-                    currentBudget?.attributes.name,
-                    aiSuggestion?.budget?.attributes.name
-                );
-            }
-        }
-
-        if (newBudget && (!newBudget.id || newBudget.id === '')) {
-            const resolvedBudget = this.catalog.findBudget(newBudget.attributes.name);
-            if (resolvedBudget) {
-                newBudget = resolvedBudget;
-                logger.debug(
-                    { budgetName: newBudget.attributes.name, budgetId: resolvedBudget.id },
-                    'Resolved user-selected budget to full object'
-                );
-            } else {
-                logger.warn(
-                    { budgetName: newBudget.attributes.name },
-                    'Failed to resolve user-selected budget - budget may not exist'
-                );
+            switch (answer) {
+                case EditTransactionAttribute.Category:
+                    newCategory = this.catalog.findCategory(
+                        await this.userInputService.getNewCategory(
+                            this.catalog.categoryNames(),
+                            currentCategory?.name,
+                            aiSuggestion?.category?.name
+                        )
+                    );
+                    break;
+                case EditTransactionAttribute.Budget:
+                    newBudget = this.catalog.findBudget(
+                        await this.userInputService.getNewBudget(
+                            this.catalog.budgetNames(),
+                            currentBudget?.attributes.name,
+                            aiSuggestion?.budget?.attributes.name
+                        )
+                    );
+                    break;
+                default: {
+                    const unhandled: never = answer;
+                    throw new Error(`Unhandled edit attribute: ${String(unhandled)}`);
+                }
             }
         }
 

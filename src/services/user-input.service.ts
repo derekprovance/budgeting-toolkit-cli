@@ -1,4 +1,4 @@
-import { BudgetRead, CategoryProperties, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { expand, checkbox, search, input, confirm } from '@inquirer/prompts';
 import { ReviewAction } from '../types/enums.js';
@@ -78,8 +78,10 @@ export class UserInputService {
         console.log();
     }
 
-    async shouldEditCategoryBudget(isDeposit: boolean = false): Promise<string[]> {
-        const choices = [
+    async shouldEditCategoryBudget(
+        isDeposit: boolean = false
+    ): Promise<EditTransactionAttribute[]> {
+        const choices: { name: string; value: EditTransactionAttribute; description: string }[] = [
             {
                 name: 'Modify Category',
                 value: EditTransactionAttribute.Category,
@@ -104,49 +106,32 @@ export class UserInputService {
         return answer;
     }
 
+    /** @returns The chosen name, one of `categoryNames` */
     async getNewCategory(
         categoryNames: string[],
         suggestedCategory?: string,
         aiSuggestion?: string
-    ): Promise<CategoryProperties | undefined> {
-        const answer = await this.createSearchableDropdown(
+    ): Promise<string> {
+        return this.createSearchableDropdown(
             categoryNames,
             'Select a new Category (type to search)',
             suggestedCategory,
             aiSuggestion
         );
-
-        if (!answer) {
-            return undefined;
-        }
-
-        // Return a minimal object with just the name
-        // Will be resolved to full object in processEditCommand()
-        return { name: answer } as CategoryProperties;
     }
 
+    /** @returns The chosen name, one of `budgetNames` */
     async getNewBudget(
         budgetNames: string[],
         suggestedBudget?: string,
         aiSuggestion?: string
-    ): Promise<BudgetRead | undefined> {
-        const answer = await this.createSearchableDropdown(
+    ): Promise<string> {
+        return this.createSearchableDropdown(
             budgetNames,
             'Select a new Budget (type to search)',
             suggestedBudget,
             aiSuggestion
         );
-
-        if (!answer) {
-            return undefined;
-        }
-
-        // Return a minimal object with just the name
-        // Will be resolved to full object in processEditCommand()
-        return {
-            id: '',
-            attributes: { name: answer },
-        } as BudgetRead;
     }
 
     private async createSearchableDropdown(
@@ -154,7 +139,7 @@ export class UserInputService {
         message: string,
         currentValue?: string,
         aiSuggestion?: string
-    ): Promise<string | undefined> {
+    ): Promise<string> {
         // AI suggestion takes precedence when a value is both current and suggested
         const toChoice = (name: string) => {
             let label = name;
