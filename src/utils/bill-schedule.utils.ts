@@ -1,5 +1,6 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { Day, daysInMonth, formatDay, monthRange, toDay } from './date.utils.js';
+import { logger } from '../logger.js';
 
 /**
  * Every date a bill falls due in a month, from its own schedule.
@@ -31,6 +32,53 @@ export function dueDatesInMonth(bill: BillRead, month: number, year: number): Da
             dates.push(date);
         }
     }
+}
+
+/**
+ * The unpaid due dates Firefly reports for this month, in order.
+ *
+ * `pay_dates` is payment-aware: it lists only the occurrences after the
+ * latest payment in the window, and falls back to the next one outside it
+ * (V11). So it says what is still owed, not what fell due; the month's
+ * schedule comes from {@link dueDatesInMonth} instead.
+ */
+export function unpaidDatesInMonth(bill: BillRead, month: number, year: number): Day[] {
+    const { start, end } = monthRange(month, year);
+    return (bill.attributes.pay_dates ?? [])
+        .map(toDay)
+        .filter((day): day is Day => day !== null && day >= start && day <= end)
+        .sort();
+}
+
+/**
+ * What one payment of a bill is expected to cost: `amount_avg`, else the
+ * midpoint of `amount_min` and `amount_max`. Display-only (R-BILL-1). An
+ * unreadable or negative amount expects nothing.
+ */
+export function expectedBillAmount(bill: BillRead): number {
+    const amount = parseExpectedAmount(bill.attributes);
+    if (isNaN(amount) || amount < 0) {
+        const { amount_avg, amount_min, amount_max } = bill.attributes;
+        logger.debug(
+            { billId: bill.id, billName: bill.attributes.name, amount_avg, amount_min, amount_max },
+            'Invalid bill amount, defaulting to 0'
+        );
+        return 0;
+    }
+    return amount;
+}
+
+function parseExpectedAmount({
+    amount_avg,
+    amount_min,
+    amount_max,
+}: BillRead['attributes']): number {
+    if (amount_avg) {
+        return parseFloat(amount_avg);
+    }
+    const min = parseFloat(amount_min ?? '0');
+    const max = amount_max == null ? min : parseFloat(amount_max);
+    return (min + max) / 2;
 }
 
 const PERIODS: Record<string, (start: Day, steps: number) => Day> = {
