@@ -32,6 +32,25 @@ describe('CategorizeDisplayService', () => {
         });
     });
 
+    describe('formatTransactionErrors', () => {
+        it('lists each failed transaction with its message', () => {
+            const result = service.formatTransactionErrors([
+                {
+                    field: 'category',
+                    message: 'Invalid category',
+                    userMessage: 'The suggested category "Nope" doesn\'t exist.',
+                    transactionId: '1',
+                    transactionDescription: 'Coffee Bar',
+                },
+            ]);
+
+            expect(result).toContain('1 transaction(s) failed validation');
+            expect(result).toContain('  • Coffee Bar');
+            expect(result).toContain('    The suggested category "Nope" doesn\'t exist.');
+            expect(result).toContain('Please check your categories and budgets in Firefly III.');
+        });
+    });
+
     describe('formatError', () => {
         it('should format error messages correctly', () => {
             const error = new Error('Test error message');

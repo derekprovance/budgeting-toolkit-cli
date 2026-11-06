@@ -91,7 +91,6 @@ export class CategoryBudgetCatalog {
             userMessage: `The suggested ${field} "${name}" doesn't exist. Please choose a valid ${field} or create it first.`,
             transactionId: transaction.transaction_journal_id || 'unknown',
             transactionDescription: transaction.description || 'No description',
-            details: field === 'category' ? { suggestedCategory: name } : { suggestedBudget: name },
         };
         logger.warn({ transactionId: error.transactionId, name }, error.message);
         return error;

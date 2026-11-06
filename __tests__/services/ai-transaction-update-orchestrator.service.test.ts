@@ -303,7 +303,6 @@ describe('AITransactionUpdateOrchestrator', () => {
                 '2': { category: 'Dining' },
                 '3': { category: 'Dining' },
             });
-            jest.spyOn(console, 'error').mockImplementation(() => {});
         });
 
         it('numbers only the prompts that survive validation', async () => {
@@ -317,10 +316,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             // one prompt shown is numbered 1 of 1, not 3 of 3
             expect(appliedJournalIds()).toEqual(['3']);
             expect(mockUpdater.applyUpdate.mock.calls[0][1]).toEqual({ index: 1, total: 1 });
-            expect(result.transactionErrors).toBe(1);
+            expect(result.errors).toEqual([validationError('2')]);
         });
 
-        it('counts and shows the transactions that failed', async () => {
+        it('returns the transactions that failed', async () => {
             mockUpdater.applyUpdate
                 .mockResolvedValueOnce({ ok: false, error: validationError('1') })
                 .mockResolvedValueOnce({ ok: false, error: validationError('2') });
@@ -328,13 +327,7 @@ describe('AITransactionUpdateOrchestrator', () => {
             const result = await run();
 
             expect(result.transactionsUpdated).toBe(1);
-            expect(result.transactionErrors).toBe(2);
-            expect(console.error).toHaveBeenCalledWith(
-                expect.stringContaining('2 transaction(s) failed validation')
-            );
-            expect(console.error).toHaveBeenCalledWith(
-                expect.stringContaining('Invalid category for 2')
-            );
+            expect(result.errors).toEqual([validationError('1'), validationError('2')]);
         });
 
         it('stops reviewing when the user presses Ctrl-C', async () => {

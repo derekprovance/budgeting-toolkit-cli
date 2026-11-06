@@ -33,11 +33,6 @@ interface SuggestionPlan {
     readonly askAI: { readonly category: boolean; readonly budget: boolean };
 }
 
-interface TransactionError {
-    transaction: TransactionSplit;
-    error: TransactionValidationError;
-}
-
 export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrchestrator {
     constructor(
         private readonly transactionService: TransactionService,
@@ -62,10 +57,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     },
                     'Tag does not exist'
                 );
-                return {
-                    status: CategorizeStatus.NO_TAG,
-                    transactionsUpdated: 0,
-                };
+                return { status: CategorizeStatus.NO_TAG, transactionsUpdated: 0, errors: [] };
             }
 
             const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
@@ -84,10 +76,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     },
                     'No valid transactions found for tag'
                 );
-                return {
-                    status: CategorizeStatus.EMPTY_TAG,
-                    transactionsUpdated: 0,
-                };
+                return { status: CategorizeStatus.EMPTY_TAG, transactionsUpdated: 0, errors: [] };
             }
 
             logger.debug(
@@ -113,11 +102,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 const { updatedTransactions, errors } =
                     await this.updateTransactionsWithAIResults(suggestions);
 
-                // Display validation errors to user
-                if (errors.length > 0) {
-                    this.displayValidationErrors(errors);
-                }
-
                 logger.debug(
                     {
                         tag,
@@ -132,7 +116,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 return {
                     status: CategorizeStatus.HAS_RESULTS,
                     transactionsUpdated: updatedTransactions.length,
-                    transactionErrors: errors.length,
+                    errors,
                 };
             } catch (aiError) {
                 spinner.fail('AI processing failed');
@@ -157,6 +141,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             return {
                 status: CategorizeStatus.PROCESSING_FAILED,
                 transactionsUpdated: 0,
+                errors: [],
                 error:
                     ex instanceof Error
                         ? ex.message
@@ -278,9 +263,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
     private async updateTransactionsWithAIResults(
         suggestions: Suggestion[]
-    ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
+    ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionValidationError[] }> {
         const results: TransactionRead[] = [];
-        const errors: TransactionError[] = [];
+        const errors: TransactionValidationError[] = [];
 
         try {
             // Every suggestion is validated before the first prompt, so the
@@ -291,10 +276,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             for (const suggestion of suggestions) {
                 const prepareResult = this.interactiveTransactionUpdater.prepareUpdate(suggestion);
                 if (!prepareResult.ok) {
-                    errors.push({
-                        transaction: suggestion.transaction,
-                        error: prepareResult.error,
-                    });
+                    errors.push(prepareResult.error);
                 } else if (prepareResult.value) {
                     prepared.push(prepareResult.value);
                 }
@@ -311,10 +293,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                         results.push(updateResult.value);
                     }
                 } else if (updateResult.error) {
-                    errors.push({
-                        transaction: update.transaction,
-                        error: updateResult.error,
-                    });
+                    errors.push(updateResult.error);
 
                     if (updateResult.error.message.includes('SIGINT')) {
                         logger.debug(
@@ -346,9 +325,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         errorCount,
                         errors: errors.map(e => ({
-                            description: e.transaction.description,
-                            field: e.error?.field,
-                            message: e.error?.message,
+                            description: e.transactionDescription,
+                            field: e.field,
+                            message: e.message,
                         })),
                     },
                     'Some transactions failed validation'
@@ -363,27 +342,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             );
             throw err;
         }
-    }
-
-    /**
-     * Displays user-friendly validation error messages
-     */
-    private displayValidationErrors(errors: TransactionError[]): void {
-        if (errors.length === 0) return;
-
-        console.error(`\n⚠️  ${errors.length} transaction(s) failed validation:\n`);
-
-        for (const { transaction, error } of errors) {
-            console.error(`  • ${transaction.description || 'Unknown transaction'}`);
-            console.error(`    ${error.userMessage}`);
-            if (error.details?.suggestedCategory || error.details?.suggestedBudget) {
-                const suggested = error.details.suggestedCategory || error.details.suggestedBudget;
-                console.error(`    Suggested: "${suggested}"`);
-            }
-            console.error('');
-        }
-
-        console.error('Please check your categories and budgets in Firefly III.');
     }
 }
 

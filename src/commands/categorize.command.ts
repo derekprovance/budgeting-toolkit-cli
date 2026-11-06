@@ -48,10 +48,8 @@ export class CategorizeCommand implements Command<void, UpdateTransactionsParams
             const prefix = dryRun ? '[DRYRUN] ' : '';
             console.log(`\n${prefix}Updated ${results.transactionsUpdated} Transaction(s)!`);
 
-            if (results.transactionErrors && results.transactionErrors > 0) {
-                console.log(
-                    `\n⚠️  Warning: ${results.transactionErrors} transaction(s) failed to update. Check logs for details.`
-                );
+            if (results.errors.length > 0) {
+                console.error(this.displayService.formatTransactionErrors(results.errors));
             }
         } catch (error) {
             console.log(this.displayService.formatError(error));

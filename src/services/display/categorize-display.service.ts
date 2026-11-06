@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { CategorizeMode } from '../../types/enums.js';
 import { isCertificateError } from '../../utils/error-detection.utils.js';
+import { TransactionValidationError } from '../../types/result.type.js';
 
 const MODE_TEXT: Record<CategorizeMode, string> = {
     [CategorizeMode.Both]: 'categories and budgets',
@@ -33,6 +34,19 @@ export class CategorizeDisplayService {
      */
     formatEmptyTag(tag: string): string {
         return [chalk.yellow(`\nNo processable transactions found with tag "${tag}"`)].join('\n');
+    }
+
+    /** Lists the transactions that failed validation or could not be updated */
+    formatTransactionErrors(errors: TransactionValidationError[]): string {
+        return [
+            `\n⚠️  ${errors.length} transaction(s) failed validation:\n`,
+            ...errors.flatMap(error => [
+                `  • ${error.transactionDescription}`,
+                `    ${error.userMessage}`,
+                '',
+            ]),
+            'Please check your categories and budgets in Firefly III.',
+        ].join('\n');
     }
 
     /**

@@ -3,6 +3,15 @@ import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transacti
 import { CategorizeDisplayService } from '../../src/services/display/categorize-display.service.js';
 import { jest } from '@jest/globals';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
+import { TransactionValidationError } from '../../src/types/result.type.js';
+
+const transactionError = (description: string): TransactionValidationError => ({
+    field: 'category',
+    message: 'Invalid category',
+    userMessage: 'Invalid category',
+    transactionId: '1',
+    transactionDescription: description,
+});
 
 describe('CategorizeCommand', () => {
     let command: CategorizeCommand;
@@ -51,6 +60,7 @@ describe('CategorizeCommand', () => {
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
                 status: CategorizeStatus.NO_TAG,
                 transactionsUpdated: 0,
+                errors: [],
             });
 
             await command.execute(params);
@@ -76,6 +86,7 @@ describe('CategorizeCommand', () => {
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
                 status: CategorizeStatus.EMPTY_TAG,
                 transactionsUpdated: 0,
+                errors: [],
             });
 
             await command.execute(params);
@@ -101,6 +112,7 @@ describe('CategorizeCommand', () => {
             const results = {
                 status: CategorizeStatus.HAS_RESULTS,
                 transactionsUpdated: 5,
+                errors: [],
             };
 
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
@@ -134,6 +146,7 @@ describe('CategorizeCommand', () => {
             const results = {
                 status: CategorizeStatus.HAS_RESULTS,
                 transactionsUpdated: 3,
+                errors: [],
             };
 
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
@@ -184,26 +197,24 @@ describe('CategorizeCommand', () => {
             const results = {
                 status: CategorizeStatus.HAS_RESULTS,
                 transactionsUpdated: 8,
-                transactionErrors: 2,
+                errors: [transactionError('a'), transactionError('b')],
             };
 
             mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
 
-            // Mock console.log to verify output
             const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
             await command.execute(params);
 
-            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode
-            );
             expect(consoleSpy).toHaveBeenCalledWith('\nUpdated 8 Transaction(s)!');
-            expect(consoleSpy).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Warning: 2 transaction(s) failed to update')
+            expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('2 transaction(s) failed validation')
             );
 
             consoleSpy.mockRestore();
+            consoleErrorSpy.mockRestore();
         });
     });
 });
