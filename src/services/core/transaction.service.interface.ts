@@ -10,10 +10,8 @@ export interface ITransactionService {
      */
     getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]>;
 
-    /**
-     * Gets the most recent transaction date
-     */
-    getMostRecentTransactionDate(): Promise<Date | null>;
+    /** The most recent transaction's date; undefined when the ledger has none */
+    getMostRecentTransactionDate(): Promise<Date | undefined>;
 
     /**
      * Retrieves transactions by tag

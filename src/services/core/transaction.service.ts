@@ -62,14 +62,16 @@ export class TransactionService implements ITransactionService {
      * was this imported" — importing a backdated batch today would report data
      * current as of today, which is the false reassurance this exists to
      * prevent.
+     *
+     * @returns undefined when the ledger has no dated transaction
      */
-    async getMostRecentTransactionDate(): Promise<Date | null> {
+    async getMostRecentTransactionDate(): Promise<Date | undefined> {
         const response = await this.client.transactions.listTransaction(undefined, 1);
-        if (!response || !response.data || response.data.length === 0) {
-            throw new Error(`Failed to fetch transactions`);
+        if (!response?.data) {
+            throw new Error('Failed to fetch transactions: API returned empty response');
         }
         const date = response.data[0]?.attributes?.transactions?.[0]?.date;
-        return date ? new Date(date) : null;
+        return date ? new Date(date) : undefined;
     }
 
     /**

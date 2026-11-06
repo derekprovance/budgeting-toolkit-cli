@@ -466,7 +466,7 @@ describe('TransactionService', () => {
             expect(result).toEqual(new Date('2024-01-15T10:30:00Z'));
         });
 
-        it('should return null when the group carries no splits', async () => {
+        it('should return undefined when the group carries no splits', async () => {
             const mockTransaction = {
                 id: '1',
                 attributes: { created_at: '2024-01-15T10:30:00Z', transactions: [] },
@@ -478,10 +478,10 @@ describe('TransactionService', () => {
 
             const result = await service.getMostRecentTransactionDate();
 
-            expect(result).toBeNull();
+            expect(result).toBeUndefined();
         });
 
-        it('should return null when created_at is null', async () => {
+        it('should return undefined when created_at is null', async () => {
             const mockTransaction: TransactionRead = {
                 id: '1',
                 attributes: {
@@ -496,17 +496,17 @@ describe('TransactionService', () => {
 
             const result = await service.getMostRecentTransactionDate();
 
-            expect(result).toBeNull();
+            expect(result).toBeUndefined();
         });
 
-        it('should throw error when API returns empty data array', async () => {
+        it('should return undefined for a ledger with no transactions', async () => {
             mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [],
             } as unknown as TransactionArray);
 
-            await expect(service.getMostRecentTransactionDate()).rejects.toThrow(
-                'Failed to fetch transactions'
-            );
+            const result = await service.getMostRecentTransactionDate();
+
+            expect(result).toBeUndefined();
         });
 
         it('should throw error when response is undefined', async () => {
