@@ -9,7 +9,8 @@ import {
     ClaudeResponseError,
     ToolCall,
 } from '../../../src/api/claude.client.js';
-import { createMockTransaction } from '../../shared/test-data.js';
+import { withdrawal } from '../../shared/test-data.js';
+import { createMockLogger, partialMock } from '../../shared/mocks.js';
 
 type CallToolFn = ClaudeClient['callTool'];
 
@@ -21,7 +22,7 @@ const sdkError = (errorClass: { prototype: object }, message: string): Error =>
 
 const makeTransactions = (count: number) =>
     Array.from({ length: count }, (_, i) =>
-        createMockTransaction({
+        withdrawal(10, {
             transaction_journal_id: String(i),
             description: `Transaction ${i}`,
         })
@@ -36,40 +37,31 @@ describe('LLMAssignmentService', () => {
     const validBudgets = ['Food', 'Medical', 'Shopping'];
 
     beforeEach(() => {
-        mockLogger = {
-            info: jest.fn<(obj: unknown, msg: string) => void>(),
-            warn: jest.fn<(obj: unknown, msg: string) => void>(),
-            error: jest.fn<(obj: unknown, msg: string) => void>(),
-            debug: jest.fn<(obj: unknown, msg: string) => void>(),
-            trace: jest.fn<(obj: unknown, msg: string) => void>(),
-        } as jest.Mocked<ILogger>;
+        mockLogger = createMockLogger();
 
         callTool = jest.fn<CallToolFn>();
         service = new LLMAssignmentService(
-            { callTool } as unknown as ClaudeClient,
+            partialMock<ClaudeClient>({ callTool }),
             { batchSize: 10, maxConcurrent: 3 },
             mockLogger
         );
 
         mockTransactions = [
-            createMockTransaction({
+            withdrawal('150.00', {
                 transaction_journal_id: '1',
                 description: 'Walmart Supercenter',
-                amount: '150.00',
                 source_name: 'Checking Account',
                 destination_name: 'Walmart',
             }),
-            createMockTransaction({
+            withdrawal('25.00', {
                 transaction_journal_id: '2',
                 description: 'Walmart Pharmacy',
-                amount: '25.00',
                 source_name: 'Checking Account',
                 destination_name: 'Walmart Pharmacy',
             }),
-            createMockTransaction({
+            withdrawal('75.00', {
                 transaction_journal_id: '3',
                 description: 'Amazon Fresh',
-                amount: '75.00',
                 source_name: 'Checking Account',
                 destination_name: 'Amazon',
             }),

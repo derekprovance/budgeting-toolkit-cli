@@ -17,6 +17,7 @@ import {
     INACTIVE_BILLS,
     MONTH_RANGES,
     NO_NAME_REVENUE,
+    PAGINATION_BEHAVIOR,
     PRIMARY_CURRENCY,
     TRANSACTION_PAGINATION,
     TRANSACTIONS_BY_MONTH,
@@ -148,6 +149,15 @@ export function defineFireflyContractSuite(getJson: GetJson, idMap: IdMap | (() 
             )) as Paginated<GroupRead> & { meta: { pagination: { per_page?: number } } };
             expect(body.meta.pagination.per_page).toBe(UNCAPPED_PROBE_LIMIT);
             expect(body.data).toHaveLength(TRANSACTION_PAGINATION['2025-01'].total);
+        });
+
+        test('transactions: per_page defaults when limit is omitted (V14)', async () => {
+            const body = (await getJson(
+                `/v1/transactions?${range('2025-01')}`
+            )) as Paginated<GroupRead> & {
+                meta: { pagination: { per_page?: number } };
+            };
+            expect(body.meta.pagination.per_page).toBe(PAGINATION_BEHAVIOR.defaultLimit);
         });
 
         test('transactions: wire format and no budget on non-withdrawals (V8)', async () => {

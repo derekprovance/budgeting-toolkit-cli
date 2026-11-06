@@ -2,11 +2,9 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { CategoryBudgetCatalog } from '../../../src/services/core/category-budget-catalog.service.js';
 import { ICategoryService } from '../../../src/services/core/category.service.interface.js';
 import { IBudgetService } from '../../../src/services/core/budget.service.interface.js';
-import { CategoryProperties, BudgetRead } from '@derekprovance/firefly-iii-sdk';
-import { createMockTransaction } from '../../shared/test-data.js';
-
-const budget = (id: string, name: string): BudgetRead =>
-    ({ id, type: 'budgets', attributes: { name, active: true } }) as BudgetRead;
+import { CategoryProperties } from '@derekprovance/firefly-iii-sdk';
+import { budgetRead, withdrawal } from '../../shared/test-data.js';
+import { partialMock } from '../../shared/mocks.js';
 
 describe('CategoryBudgetCatalog', () => {
     const categories: CategoryProperties[] = [
@@ -15,8 +13,12 @@ describe('CategoryBudgetCatalog', () => {
         { name: 'Bills & Utilities' },
         { name: "Children's Expenses" },
     ];
-    const budgets = [budget('1', 'Food'), budget('2', 'Medical'), budget('3', 'Utilities')];
-    const transaction = createMockTransaction({
+    const budgets = [
+        budgetRead('1', 'Food'),
+        budgetRead('2', 'Medical'),
+        budgetRead('3', 'Utilities'),
+    ];
+    const transaction = withdrawal('150.00', {
         transaction_journal_id: '1',
         description: 'Test Transaction',
     });
@@ -29,8 +31,8 @@ describe('CategoryBudgetCatalog', () => {
         getCategories = jest.fn<ICategoryService['getCategories']>(async () => categories);
         getBudgets = jest.fn<IBudgetService['getBudgets']>(async () => budgets);
         catalog = await CategoryBudgetCatalog.load(
-            { getCategories } as unknown as ICategoryService,
-            { getBudgets } as unknown as IBudgetService
+            partialMock<ICategoryService>({ getCategories }),
+            partialMock<IBudgetService>({ getBudgets })
         );
     });
 
@@ -59,8 +61,8 @@ describe('CategoryBudgetCatalog', () => {
         it('leaves out a category without a name', async () => {
             getCategories.mockResolvedValue([{ name: 'Groceries' }, {} as CategoryProperties]);
             const loaded = await CategoryBudgetCatalog.load(
-                { getCategories } as unknown as ICategoryService,
-                { getBudgets } as unknown as IBudgetService
+                partialMock<ICategoryService>({ getCategories }),
+                partialMock<IBudgetService>({ getBudgets })
             );
 
             expect(loaded.categoryNames()).toEqual(['Groceries']);

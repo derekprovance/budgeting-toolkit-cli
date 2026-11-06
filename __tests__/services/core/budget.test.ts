@@ -2,18 +2,14 @@ import { BudgetService, allocationsByBudget } from '../../../src/services/core/b
 import { BudgetArray, BudgetLimitArray, BudgetLimitRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 import { jest } from '@jest/globals';
+import { createMockFireflyClient } from '../../shared/mocks.js';
 
 describe('BudgetService', () => {
     let budgetService: BudgetService;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
-        mockApiClient = {
-            budgets: {
-                listBudget: jest.fn(),
-                listBudgetLimit: jest.fn(),
-            },
-        } as unknown as jest.Mocked<FireflyClientWithCerts>;
+        mockApiClient = createMockFireflyClient();
         budgetService = new BudgetService(mockApiClient);
     });
 

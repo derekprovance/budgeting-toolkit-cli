@@ -1,12 +1,29 @@
 import stripAnsi from 'strip-ansi';
 import { BudgetDisplayService } from '../../../src/services/display/budget-display.service.js';
 import { BudgetReportDto } from '../../../src/types/dto/budget-report.dto.js';
-import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
+import { BillComparisonDto, BillDetailDto } from '../../../src/types/dto/bill-comparison.dto.js';
+import { BudgetReportResult } from '../../../src/types/dto/budget-report-result.dto.js';
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { withdrawal } from '../../shared/test-data.js';
+import { deposit, withdrawal } from '../../shared/test-data.js';
 
 // Output is plain text: FORCE_COLOR=0 (see __tests__/setup/env.ts) disables
 // chalk. OSC 8 hyperlinks are emitted regardless of color support.
+
+/** A report with nothing in it but `fields` */
+const report = (fields: Partial<BudgetReportResult> = {}): BudgetReportResult => ({
+    budgets: [],
+    topExpenses: [],
+    billComparison: BillComparisonDto.empty(),
+    unbudgeted: [],
+    insights: [],
+    month: 1,
+    year: 2025,
+    ...fields,
+});
+
+/** A monthly bill with nothing still to come */
+const bill = (name: string, actual: number, predicted: number) =>
+    new BillDetailDto(name.replace(/\s/g, '_'), name, predicted, actual, 'monthly');
 
 describe('BudgetDisplayService', () => {
     let service: BudgetDisplayService;
@@ -19,33 +36,24 @@ describe('BudgetDisplayService', () => {
         it('should mark an upcoming bill rather than judging its variance', () => {
             // Rendering it green puts it beside genuinely cheap bills and
             // invites the reader to bank money they still owe
-            const billComparison: BillComparisonDto = {
-                predictedTotal: 50,
-                actualTotal: 0,
-                variance: -50,
-                bills: [
-                    {
-                        id: 'starry',
-                        name: 'Starry Internet',
-                        actual: 0,
-                        predicted: 50,
-                        frequency: 'monthly',
-                        dueDate: new Date('2099-08-27T00:00:00Z'),
-                        upcomingAmount: 50,
-                    },
+            const billComparison = BillComparisonDto.create(
+                50,
+                0,
+                [
+                    new BillDetailDto(
+                        'starry',
+                        'Starry Internet',
+                        50,
+                        0,
+                        'monthly',
+                        new Date('2099-08-27T00:00:00Z'),
+                        50
+                    ),
                 ],
-                currencySymbol: '$',
-                currencyCode: 'USD',
-            };
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison,
-                unbudgeted: [],
-                insights: [],
-                month: 8,
-                year: 2099,
-            };
+                'USD',
+                '$'
+            );
+            const reportData = report({ billComparison, month: 8, year: 2099 });
 
             const billLine = stripAnsi(service.formatReport(reportData, false))
                 .split('\n')
@@ -55,40 +63,23 @@ describe('BudgetDisplayService', () => {
         });
 
         it('should show top 4 bills when verbose=false', () => {
-            const mockBill = (name: string, actual: number, predicted: number) => ({
-                id: name.replace(/\s/g, '_'),
-                name,
-                actual,
-                predicted,
-                frequency: 'monthly' as const,
-                upcomingAmount: 0,
-            });
-
-            const billComparison: BillComparisonDto = {
-                predictedTotal: 2000,
-                actualTotal: 1950,
-                variance: -50,
-                bills: [
-                    mockBill('Electric', 120, 115),
-                    mockBill('Internet', 89.99, 89.99),
-                    mockBill('Water', 45, 40),
-                    mockBill('Phone', 75, 75),
-                    mockBill('Gym', 50, 50),
-                    mockBill('Streaming', 45, 50),
+            const billComparison = new BillComparisonDto(
+                2000,
+                1950,
+                -50,
+                [
+                    bill('Electric', 120, 115),
+                    bill('Internet', 89.99, 89.99),
+                    bill('Water', 45, 40),
+                    bill('Phone', 75, 75),
+                    bill('Gym', 50, 50),
+                    bill('Streaming', 45, 50),
                 ],
-                currencySymbol: '$',
-                currencyCode: 'USD',
-            };
+                'USD',
+                '$'
+            );
 
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison,
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ billComparison });
 
             const result = service.formatReport(reportData, false);
 
@@ -104,40 +95,23 @@ describe('BudgetDisplayService', () => {
         });
 
         it('should show all bills when verbose=true', () => {
-            const mockBill = (name: string, actual: number, predicted: number) => ({
-                id: name.replace(/\s/g, '_'),
-                name,
-                actual,
-                predicted,
-                frequency: 'monthly' as const,
-                upcomingAmount: 0,
-            });
-
-            const billComparison: BillComparisonDto = {
-                predictedTotal: 2000,
-                actualTotal: 1950,
-                variance: -50,
-                bills: [
-                    mockBill('Electric', 120, 115),
-                    mockBill('Internet', 89.99, 89.99),
-                    mockBill('Water', 45, 40),
-                    mockBill('Phone', 75, 75),
-                    mockBill('Gym', 50, 50),
-                    mockBill('Streaming', 45, 50),
+            const billComparison = new BillComparisonDto(
+                2000,
+                1950,
+                -50,
+                [
+                    bill('Electric', 120, 115),
+                    bill('Internet', 89.99, 89.99),
+                    bill('Water', 45, 40),
+                    bill('Phone', 75, 75),
+                    bill('Gym', 50, 50),
+                    bill('Streaming', 45, 50),
                 ],
-                currencySymbol: '$',
-                currencyCode: 'USD',
-            };
+                'USD',
+                '$'
+            );
 
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison,
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ billComparison });
 
             const result = service.formatReport(reportData, true);
 
@@ -154,37 +128,16 @@ describe('BudgetDisplayService', () => {
         });
 
         it('should not show Others grouping when fewer than 5 bills', () => {
-            const mockBill = (name: string, actual: number, predicted: number) => ({
-                id: name.replace(/\s/g, '_'),
-                name,
-                actual,
-                predicted,
-                frequency: 'monthly' as const,
-                upcomingAmount: 0,
-            });
+            const billComparison = new BillComparisonDto(
+                300,
+                290,
+                -10,
+                [bill('Electric', 120, 115), bill('Internet', 89.99, 89.99), bill('Water', 45, 40)],
+                'USD',
+                '$'
+            );
 
-            const billComparison: BillComparisonDto = {
-                predictedTotal: 300,
-                actualTotal: 290,
-                variance: -10,
-                bills: [
-                    mockBill('Electric', 120, 115),
-                    mockBill('Internet', 89.99, 89.99),
-                    mockBill('Water', 45, 40),
-                ],
-                currencySymbol: '$',
-                currencyCode: 'USD',
-            };
-
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison,
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ billComparison });
 
             const result = service.formatReport(reportData, false);
 
@@ -223,22 +176,7 @@ describe('BudgetDisplayService', () => {
                 },
             };
 
-            const reportData = {
-                budgets: [budget],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ budgets: [budget] });
 
             const result = service.formatReport(reportData, true);
 
@@ -272,22 +210,7 @@ describe('BudgetDisplayService', () => {
                 },
             };
 
-            const reportData = {
-                budgets: [budget],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ budgets: [budget] });
 
             const result = service.formatReport(reportData, false);
 
@@ -316,22 +239,7 @@ describe('BudgetDisplayService', () => {
                 },
             };
 
-            const reportData = {
-                budgets: [budget],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ budgets: [budget] });
 
             const result = service.formatReport(reportData, true);
 
@@ -347,22 +255,7 @@ describe('BudgetDisplayService', () => {
 
     describe('formatReport - Footer Tip', () => {
         it('should mention verbose flag in footer', () => {
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report();
 
             const result = service.formatReport(reportData, false);
 
@@ -384,22 +277,7 @@ describe('BudgetDisplayService', () => {
                 currency_symbol: '$',
             });
 
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [mockTransaction],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ unbudgeted: [mockTransaction] });
 
             const result = serviceWithUrl.formatReport(reportData, false);
 
@@ -429,22 +307,7 @@ describe('BudgetDisplayService', () => {
                 currency_symbol: '$',
             });
 
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [mockTransaction],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ unbudgeted: [mockTransaction] });
 
             const result = serviceWithUrl.formatReport(reportData, false);
 
@@ -463,22 +326,7 @@ describe('BudgetDisplayService', () => {
                 currency_symbol: '$',
             });
 
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [mockTransaction],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ unbudgeted: [mockTransaction] });
 
             const result = serviceNoUrl.formatReport(reportData, false);
 
@@ -497,22 +345,7 @@ describe('BudgetDisplayService', () => {
                 currency_symbol: '$',
             });
 
-            const reportData = {
-                budgets: [],
-                topExpenses: [],
-                billComparison: {
-                    predictedTotal: 0,
-                    actualTotal: 0,
-                    variance: 0,
-                    bills: [],
-                    currencySymbol: '$',
-                    currencyCode: 'USD',
-                },
-                unbudgeted: [mockTransaction],
-                insights: [],
-                month: 1,
-                year: 2025,
-            };
+            const reportData = report({ unbudgeted: [mockTransaction] });
 
             const result = serviceWithUrl.formatReport(reportData, false);
 
@@ -522,41 +355,20 @@ describe('BudgetDisplayService', () => {
     });
 
     describe('formatReport - unbudgeted section', () => {
+        const builders = { withdrawal, deposit };
         const item = (
             description: string,
             amount: string,
-            type = 'withdrawal',
+            type: keyof typeof builders = 'withdrawal',
             category_name?: string
-        ) => ({
-            description,
-            amount,
-            type,
-            category_name,
-            transaction_journal_id: '1',
-            date: '2026-08-11',
-        });
+        ) => builders[type](amount, { description, category_name, date: '2026-08-11' });
 
-        const baseData = () => ({
-            budgets: [],
-            topExpenses: [],
-            billComparison: {
-                predictedTotal: 0,
-                actualTotal: 0,
-                variance: 0,
-                bills: [],
-                currencySymbol: '$',
-                currencyCode: 'USD',
-            },
-            unbudgeted: [],
-            insights: [],
-            month: 8,
-            year: 2026,
-        });
+        const baseData = () => report({ month: 8, year: 2026 });
 
         it('should render the unbudgeted bucket under its header', () => {
             const data = { ...baseData(), unbudgeted: [item('Coffee', '4.50')] };
 
-            const result = service.formatReport(data as never, false);
+            const result = service.formatReport(data, false);
 
             expect(result).toContain('UNBUDGETED EXPENSES');
             expect(result).toContain('Coffee');
@@ -568,13 +380,13 @@ describe('BudgetDisplayService', () => {
                 unbudgeted: [item('Pharmacy', '12.00', 'withdrawal', 'Healthcare')],
             };
 
-            const result = stripAnsi(service.formatReport(data as never, false));
+            const result = stripAnsi(service.formatReport(data, false));
 
             expect(result).toContain('🏥 Pharmacy');
         });
 
         it('should omit the unbudgeted section when the bucket is empty', () => {
-            const result = service.formatReport(baseData() as never, false);
+            const result = service.formatReport(baseData(), false);
 
             expect(result).not.toContain('UNBUDGETED EXPENSES');
         });
@@ -585,15 +397,16 @@ describe('BudgetDisplayService', () => {
                 unbudgeted: [item('Hardware', '100.00'), item('Grocer Refund', '25.00', 'deposit')],
             };
 
-            const result = stripAnsi(service.formatReport(data as never, false));
+            const result = stripAnsi(service.formatReport(data, false));
 
             expect(result).toContain('-$25.00');
             expect(result).toContain('Total: $75.00');
         });
 
         it('should say "no limit" rather than count spending as money left', () => {
-            const data = {
-                ...baseData(),
+            const data = report({
+                month: 8,
+                year: 2026,
                 budgets: [
                     {
                         budgetId: '1',
@@ -603,11 +416,13 @@ describe('BudgetDisplayService', () => {
                         remaining: -50,
                         percentageUsed: 0,
                         status: 'under',
+                        historicalComparison: { previousMonthSpent: 0, averageSpent: 0 },
+                        transactionStats: { count: 0, average: 0 },
                     },
                 ],
-            };
+            });
 
-            const result = stripAnsi(service.formatReport(data as never, false));
+            const result = stripAnsi(service.formatReport(data, false));
 
             expect(result).toContain('no limit');
             expect(result).not.toContain('$50.00 left');
@@ -617,7 +432,7 @@ describe('BudgetDisplayService', () => {
             // RULES.md: activity in outside accounts is not shown
             const data = { ...baseData(), unbudgeted: [item('Coffee', '4.50')] };
 
-            const result = service.formatReport(data as never, false);
+            const result = service.formatReport(data, false);
 
             expect(result).not.toContain('UNTRACKED SPENDING');
         });

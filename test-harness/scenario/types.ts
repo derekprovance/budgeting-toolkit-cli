@@ -126,6 +126,3 @@ export interface IdMap {
     budgets: Record<BudgetKey, string>;
     transactions: Record<TxKey, { groupId: string; journalId: string }>;
 }
-
-/** Exactly-once sets of transactions, compared order-insensitively */
-export type TxSet = TxKey[];

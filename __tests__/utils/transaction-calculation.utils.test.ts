@@ -1,9 +1,7 @@
 import { describe, it, expect, jest } from '@jest/globals';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionCalculationUtils } from '../../src/utils/transaction-calculation.utils.js';
 import { logger } from '../../src/logger.js';
-
-const txn = (amount: string): TransactionSplit => ({ amount }) as TransactionSplit;
+import { withdrawal } from '../shared/test-data.js';
 
 describe('TransactionCalculationUtils', () => {
     describe('parseAmountSafe', () => {
@@ -54,11 +52,10 @@ describe('TransactionCalculationUtils', () => {
     describe('calculateNetSpend with bad data', () => {
         it('should skip unparseable amounts and warn instead of poisoning the total', () => {
             const warn = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
-            const spend = (amount: string) => ({ ...txn(amount), type: 'withdrawal' as const });
             const total = TransactionCalculationUtils.calculateNetSpend([
-                spend('100'),
-                spend('not-a-number'),
-                spend('50'),
+                withdrawal('100'),
+                withdrawal('not-a-number'),
+                withdrawal('50'),
             ]);
             expect(total).toBe(150);
             expect(warn).toHaveBeenCalledTimes(1);

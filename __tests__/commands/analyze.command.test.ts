@@ -6,7 +6,7 @@ import { IBudgetService } from '../../src/services/core/budget.service.interface
 import { AnalyzeDisplayService } from '../../src/services/display/analyze-display.service.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { Result } from '../../src/types/result.type.js';
-import { buckets, createMockCashFlowService } from '../setup/mock-services.js';
+import { buckets, createMockCashFlowService, partialMock } from '../shared/mocks.js';
 import { deposit, withdrawal } from '../shared/test-data.js';
 
 const limit = (amount: string) => ({ attributes: { amount } }) as unknown as BudgetLimitRead;
@@ -36,22 +36,23 @@ describe('AnalyzeCommand', () => {
         );
 
     beforeEach(() => {
-        billComparisonService = {
+        billComparisonService = partialMock<BillComparisonService>({
             calculateBillComparison: jest
                 .fn<BillComparisonService['calculateBillComparison']>()
                 .mockResolvedValue(Result.ok(BillComparisonDto.create(1200, 1250, [], 'USD', '$'))),
-        } as unknown as jest.Mocked<BillComparisonService>;
+        });
 
-        budgetService = {
-            getBudgets: jest.fn(),
+        budgetService = partialMock<IBudgetService>({
             getBudgetLimits: jest
                 .fn<IBudgetService['getBudgetLimits']>()
                 .mockResolvedValue([limit('1000'), limit('840'), limit('not a number')]),
-        } as unknown as jest.Mocked<IBudgetService>;
+        });
 
-        analyzeDisplayService = {
-            formatAnalysisReport: jest.fn().mockReturnValue('Mock Analysis Report'),
-        } as unknown as jest.Mocked<AnalyzeDisplayService>;
+        analyzeDisplayService = partialMock<AnalyzeDisplayService>({
+            formatAnalysisReport: jest
+                .fn<AnalyzeDisplayService['formatAnalysisReport']>()
+                .mockReturnValue('Mock Analysis Report'),
+        });
 
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
         consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

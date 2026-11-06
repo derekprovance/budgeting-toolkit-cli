@@ -5,23 +5,16 @@ import {
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { TransactionValidatorService } from '../../src/services/core/transaction-validator.service.js';
 import { CategoryBudgetCatalog } from '../../src/services/core/category-budget-catalog.service.js';
-import { ICategoryService } from '../../src/services/core/category.service.interface.js';
-import { IBudgetService } from '../../src/services/core/budget.service.interface.js';
 import { ReviewCancelledError, UserInputService } from '../../src/services/user-input.service.js';
-import { CategoryProperties, BudgetRead, TransactionRead } from '@derekprovance/firefly-iii-sdk';
+import { TransactionRead } from '@derekprovance/firefly-iii-sdk';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
 import { Result } from '../../src/types/result.type.js';
-import { withdrawal } from '../shared/test-data.js';
+import { budgetRead, transactionRead, withdrawal } from '../shared/test-data.js';
 import { JournaledTransaction, Suggestion } from '../../src/types/categorize.types.js';
+import { loadCatalog, partialMock } from '../shared/mocks.js';
 
-const category = (name: string): CategoryProperties => ({ name });
-// Partial API fixture: only the fields the updater reads
-const budget = (id: string, name: string): BudgetRead =>
-    ({ id, type: 'budget', attributes: { name } }) as unknown as BudgetRead;
-
-const categories = [category('New Category'), category('Groceries')];
-const budgets = [budget('2', 'New Budget'), budget('3', 'Food')];
+const budgets = [budgetRead('2', 'New Budget'), budgetRead('3', 'Food')];
 
 /** A suggestion without its transaction, which each test fills in */
 type Names = Partial<Omit<Suggestion, 'transaction'>>;
@@ -34,7 +27,7 @@ describe('InteractiveTransactionUpdater', () => {
     let catalog: CategoryBudgetCatalog;
     let mockUserInputService: jest.Mocked<UserInputService>;
     let transaction: JournaledTransaction;
-    let transactionRead: TransactionRead;
+    let group: TransactionRead;
 
     const build = (dryRun = false) =>
         new InteractiveTransactionUpdater(
@@ -69,23 +62,27 @@ describe('InteractiveTransactionUpdater', () => {
             }),
             transaction_journal_id: '1',
         };
-        transactionRead = { id: '42', type: 'transactions' } as TransactionRead;
+        group = transactionRead('42');
 
-        mockTransactionService = {
+        mockTransactionService = partialMock<TransactionService>({
             updateTransaction: jest
                 .fn<TransactionService['updateTransaction']>()
-                .mockResolvedValue(transactionRead),
+                .mockResolvedValue(group),
             getTransactionReadBySplit: jest
                 .fn<TransactionService['getTransactionReadBySplit']>()
-                .mockReturnValue(transactionRead),
-        } as unknown as jest.Mocked<TransactionService>;
+                .mockReturnValue(group),
+        });
 
-        mockValidator = {
-            categoryOrBudgetChanged: jest.fn().mockReturnValue(true),
-            shouldSetBudget: jest.fn().mockReturnValue(true),
-        } as unknown as jest.Mocked<TransactionValidatorService>;
+        mockValidator = partialMock<TransactionValidatorService>({
+            categoryOrBudgetChanged: jest
+                .fn<TransactionValidatorService['categoryOrBudgetChanged']>()
+                .mockReturnValue(true),
+            shouldSetBudget: jest
+                .fn<TransactionValidatorService['shouldSetBudget']>()
+                .mockReturnValue(true),
+        });
 
-        mockUserInputService = {
+        mockUserInputService = partialMock<UserInputService>({
             askToUpdateTransaction: jest
                 .fn<UserInputService['askToUpdateTransaction']>()
                 .mockResolvedValue(ReviewAction.UpdateAll),
@@ -93,12 +90,9 @@ describe('InteractiveTransactionUpdater', () => {
             getNewCategory: jest.fn<UserInputService['getNewCategory']>(),
             getNewBudget: jest.fn<UserInputService['getNewBudget']>(),
             printSeparator: jest.fn(),
-        } as unknown as jest.Mocked<UserInputService>;
+        });
 
-        catalog = await CategoryBudgetCatalog.load(
-            { getCategories: async () => categories } as ICategoryService,
-            { getBudgets: async () => budgets } as unknown as IBudgetService
-        );
+        catalog = await loadCatalog(['New Category', 'Groceries'], budgets);
     });
 
     describe('prepareUpdate', () => {
@@ -108,7 +102,7 @@ describe('InteractiveTransactionUpdater', () => {
             expect(result).toEqual(
                 Result.ok<PreparedUpdate>({
                     transaction,
-                    category: categories[0],
+                    category: { name: 'New Category' },
                     budget: budgets[0],
                     source: { category: 'history' },
                 })
@@ -136,7 +130,7 @@ describe('InteractiveTransactionUpdater', () => {
         it('applies the category and budget the user accepts', async () => {
             const result = await review();
 
-            expect(result).toEqual(Result.ok(transactionRead));
+            expect(result).toEqual(Result.ok(group));
             expect(mockTransactionService.updateTransaction).toHaveBeenCalledWith(
                 transaction,
                 'New Category',
@@ -254,7 +248,7 @@ describe('InteractiveTransactionUpdater', () => {
             it('returns the transaction without prompting or updating', async () => {
                 const result = await review(suggestion, build(true));
 
-                expect(result).toEqual(Result.ok(transactionRead));
+                expect(result).toEqual(Result.ok(group));
                 expect(mockUserInputService.askToUpdateTransaction).not.toHaveBeenCalled();
                 expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
             });

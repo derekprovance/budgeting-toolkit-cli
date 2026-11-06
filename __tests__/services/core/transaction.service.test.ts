@@ -1,5 +1,4 @@
 import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
-import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
 import { TransactionService } from '../../../src/services/core/transaction.service.js';
 import {
@@ -14,8 +13,10 @@ import { ExcludedTransactionService } from '../../../src/services/excluded-trans
 import {
     createMockExcludedTransactionService,
     createMockFireflyClient,
-} from '../../setup/mock-services.js';
-import { withdrawal } from '../../shared/test-data.js';
+    createMockLogger,
+} from '../../shared/mocks.js';
+import { deposit, transactionRead, withdrawal } from '../../shared/test-data.js';
+import { ILogger } from '../../../src/types/interface/logger.interface.js';
 
 /** What the Firefly SDK throws for an HTTP error status */
 const apiError = (status: number) =>
@@ -28,13 +29,17 @@ const apiError = (status: number) =>
 // Partial Firefly responses: only the fields the service reads.
 type TagSingleResponse = Awaited<ReturnType<FireflyClientWithCerts['tags']['getTag']>>;
 
+/** A single-page list response; without pagination metadata it is the only page. */
+const page = (...groups: TransactionRead[]) => ({ data: groups }) as TransactionArray;
+
 describe('TransactionService', () => {
     let service: TransactionService;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
+    let mockLogger: jest.Mocked<ILogger>;
 
     beforeEach(() => {
-        resetMockLogger();
+        mockLogger = createMockLogger();
         mockExcludedTransactionService = createMockExcludedTransactionService();
         mockApiClient = createMockFireflyClient();
         service = new TransactionService(
@@ -45,43 +50,31 @@ describe('TransactionService', () => {
         );
     });
 
-    afterEach(() => {
-        jest.clearAllMocks();
-    });
+    /** Fetches `groups` by tag, which fills the split index `updateTransaction` reads */
+    const indexByTag = async (...groups: TransactionRead[]) => {
+        mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(page(...groups));
+        await service.getTransactionsByTag('test-tag');
+    };
+
+    /** Excludes exactly the transactions with this description and amount */
+    const excludeWhen = (description: string, amount?: string) =>
+        mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
+            (desc, amt) => desc === description && (amount === undefined || amt === amount)
+        );
 
     describe('getTransactionsByTag', () => {
         it('should return transactions for a given tag', async () => {
-            const mockTransactions: TransactionRead[] = [
-                {
-                    id: '1',
-                    attributes: {
-                        transactions: [
-                            {
-                                transaction_journal_id: '1',
-                                description: 'Test Transaction 1',
-                                date: '2024-01-01',
-                                type: 'withdrawal',
-                            },
-                        ],
-                    },
-                },
-            ] as TransactionRead[];
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: mockTransactions,
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            const split = withdrawal(10, {
+                transaction_journal_id: '1',
+                description: 'Test Transaction 1',
+            });
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(
+                page(transactionRead('1', split))
+            );
 
             const result = await service.getTransactionsByTag('test-tag');
 
-            expect(result).toHaveLength(1);
-            expect(result[0]).toEqual({
-                transaction_journal_id: '1',
-                description: 'Test Transaction 1',
-                date: '2024-01-01',
-                type: 'withdrawal',
-            });
+            expect(result).toEqual([split]);
             expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledWith(
                 'test-tag',
                 undefined,
@@ -100,37 +93,18 @@ describe('TransactionService', () => {
     });
 
     describe('updateTransaction', () => {
-        const mockTransaction: TransactionSplit = {
+        const mockTransaction = withdrawal(10, {
             transaction_journal_id: '1',
             description: 'Test Transaction',
-            type: 'withdrawal' as TransactionTypeProperty,
-            date: '2024-01-01',
-        } as TransactionSplit;
+        });
+        const mockTransactionRead = transactionRead('1', mockTransaction);
 
         it('should update transaction with category and budget', async () => {
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            // First, populate the transaction index by fetching transactions
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            // Call getTransactionsByTag to populate the index
-            await service.getTransactionsByTag('test-tag');
-
-            // Mock the updateTransaction response
+            await indexByTag(mockTransactionRead);
             mockApiClient.transactions.updateTransaction.mockResolvedValueOnce({
                 data: mockTransactionRead,
             });
 
-            // Now call updateTransaction
             await service.updateTransaction(mockTransaction, 'New Category', '2');
 
             expect(mockApiClient.transactions.updateTransaction).toHaveBeenCalledWith(
@@ -168,21 +142,7 @@ describe('TransactionService', () => {
         });
 
         it('should throw TransactionError when API update fails', async () => {
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            await service.getTransactionsByTag('test-tag');
-
+            await indexByTag(mockTransactionRead);
             mockApiClient.transactions.updateTransaction.mockRejectedValueOnce(
                 new Error('API Error')
             );
@@ -197,17 +157,10 @@ describe('TransactionService', () => {
             const first = withdrawal(60, { transaction_journal_id: '10', description: 'Part A' });
             const target = withdrawal(40, { transaction_journal_id: '11', description: 'Part B' });
             const third = withdrawal(5, { transaction_journal_id: '12', description: 'Part C' });
-            const group = {
-                id: '7',
-                attributes: { group_title: 'Costco', transactions: [first, target, third] },
-            } as TransactionRead;
+            const group = transactionRead('7', first, target, third);
+            group.attributes.group_title = 'Costco';
 
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [group],
-            } as TransactionArray);
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-            await service.getTransactionsByTag('test-tag');
-
+            await indexByTag(group);
             mockApiClient.transactions.updateTransaction.mockResolvedValueOnce({ data: group });
 
             await service.updateTransaction(target, 'Groceries', '3');
@@ -228,68 +181,29 @@ describe('TransactionService', () => {
 
     describe('getTransactionsForMonth', () => {
         it('should fetch and return transactions for a given month', async () => {
-            const mockTransaction: TransactionSplit = {
+            const mockTransaction = withdrawal(100, {
                 transaction_journal_id: '1',
                 description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '100.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    created_at: '2024-01-15T10:00:00Z',
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            });
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                page(transactionRead('1', mockTransaction))
+            );
 
             const result = await service.getTransactionsForMonth(1, 2024);
 
-            expect(result).toHaveLength(1);
-            expect(result[0]).toEqual({
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal',
-                amount: '100.00',
-            });
+            expect(result).toEqual([mockTransaction]);
         });
 
         it('should flatten nested transaction splits', async () => {
-            const mockTransactions: TransactionSplit[] = [
-                {
-                    transaction_journal_id: '1',
-                    description: 'Transaction 1',
-                    date: '2024-01-15',
-                    type: 'withdrawal' as TransactionTypeProperty,
-                } as TransactionSplit,
-                {
-                    transaction_journal_id: '2',
-                    description: 'Transaction 2',
-                    date: '2024-01-16',
-                    type: 'deposit' as TransactionTypeProperty,
-                } as TransactionSplit,
-            ];
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: mockTransactions,
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                page(
+                    transactionRead(
+                        '1',
+                        withdrawal(10, { transaction_journal_id: '1' }),
+                        deposit(10, { transaction_journal_id: '2' })
+                    )
+                )
+            );
 
             const result = await service.getTransactionsForMonth(1, 2024);
 
@@ -299,25 +213,11 @@ describe('TransactionService', () => {
         });
 
         it('should populate split transaction index', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: 'read-1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            const mockTransaction = withdrawal(10, { transaction_journal_id: '1' });
+            const mockTransactionRead = transactionRead('read-1', mockTransaction);
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                page(mockTransactionRead)
+            );
 
             await service.getTransactionsForMonth(1, 2024);
 
@@ -326,38 +226,22 @@ describe('TransactionService', () => {
         });
 
         it('should filter excluded transactions via ExcludedTransactionService', async () => {
-            const excludedTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'BROKERAGE BUY INVESTMENT',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '2000.00',
-            } as TransactionSplit;
-
-            const includedTransaction: TransactionSplit = {
-                transaction_journal_id: '2',
-                description: 'Regular Expense',
-                date: '2024-01-16',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '50.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [excludedTransaction, includedTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
-                (desc, amount) => {
-                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
-                }
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                page(
+                    transactionRead(
+                        '1',
+                        withdrawal(2000, {
+                            transaction_journal_id: '1',
+                            description: 'BROKERAGE BUY INVESTMENT',
+                        }),
+                        withdrawal(50, {
+                            transaction_journal_id: '2',
+                            description: 'Regular Expense',
+                        })
+                    )
+                )
             );
+            excludeWhen('BROKERAGE BUY INVESTMENT', '2000.00');
 
             const result = await service.getTransactionsForMonth(1, 2024);
 
@@ -366,25 +250,9 @@ describe('TransactionService', () => {
         });
 
         it('should use cache on subsequent calls with same month/year', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                page(transactionRead('1', withdrawal(10, { transaction_journal_id: '1' })))
+            );
 
             // First call should fetch from API
             await service.getTransactionsForMonth(1, 2024);
@@ -396,25 +264,13 @@ describe('TransactionService', () => {
         });
 
         it('should not add excluded transactions to split index', async () => {
-            const excludedTransaction: TransactionSplit = {
+            const excludedTransaction = withdrawal(2000, {
                 transaction_journal_id: '1',
                 description: 'BROKERAGE BUY INVESTMENT',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '2000.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: 'read-1',
-                attributes: {
-                    transactions: [excludedTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
+            });
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(
+                page(transactionRead('read-1', excludedTransaction))
+            );
             mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(true);
 
             await service.getTransactionsForMonth(1, 2024);
@@ -446,30 +302,14 @@ describe('TransactionService', () => {
 
     describe('getTransactionsInRange', () => {
         it('requests the given inclusive range and follows pagination', async () => {
-            const page = (id: string, totalPages: number) =>
+            const pageOfTwo = (id: string) =>
                 ({
-                    data: [
-                        {
-                            id,
-                            attributes: {
-                                transactions: [
-                                    {
-                                        transaction_journal_id: id,
-                                        description: `Tx ${id}`,
-                                        date: '2024-02-01',
-                                        type: 'withdrawal' as TransactionTypeProperty,
-                                        amount: '1.00',
-                                    } as TransactionSplit,
-                                ],
-                            },
-                        } as TransactionRead,
-                    ],
-                    meta: { pagination: { total_pages: totalPages } },
+                    data: [transactionRead(id, withdrawal(1, { transaction_journal_id: id }))],
+                    meta: { pagination: { total_pages: 2 } },
                 }) as TransactionArray;
             mockApiClient.transactions.listTransaction
-                .mockResolvedValueOnce(page('1', 2))
-                .mockResolvedValueOnce(page('2', 2));
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+                .mockResolvedValueOnce(pageOfTwo('1'))
+                .mockResolvedValueOnce(pageOfTwo('2'));
 
             const result = await service.getTransactionsInRange('2023-09-25', '2024-09-25');
 
@@ -494,21 +334,21 @@ describe('TransactionService', () => {
     });
 
     describe('getMostRecentTransactionDate', () => {
+        const importedAt = (createdAt: string | null, group: TransactionRead) =>
+            ({
+                ...group,
+                attributes: { ...group.attributes, created_at: createdAt },
+            }) as TransactionRead;
+
         it('should return the transaction date, not the import timestamp', async () => {
             // The two differ whenever a backdated batch is imported, and
             // created_at would report the data as current as of the import --
             // the false reassurance this figure exists to prevent.
-            const mockTransaction = {
-                id: '1',
-                attributes: {
-                    created_at: '2024-03-02T09:00:00Z', // imported in March
-                    transactions: [{ date: '2024-01-15T10:30:00Z' }],
-                },
-            } as unknown as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransaction],
-            } as TransactionArray);
+            const group = importedAt(
+                '2024-03-02T09:00:00Z', // imported in March
+                transactionRead('1', withdrawal(10, { date: '2024-01-15T10:30:00Z' }))
+            );
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(page(group));
 
             const result = await service.getMostRecentTransactionDate();
 
@@ -516,14 +356,8 @@ describe('TransactionService', () => {
         });
 
         it('should return undefined when the group carries no splits', async () => {
-            const mockTransaction = {
-                id: '1',
-                attributes: { created_at: '2024-01-15T10:30:00Z', transactions: [] },
-            } as unknown as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransaction],
-            } as TransactionArray);
+            const group = importedAt('2024-01-15T10:30:00Z', transactionRead('1'));
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(page(group));
 
             const result = await service.getMostRecentTransactionDate();
 
@@ -531,17 +365,8 @@ describe('TransactionService', () => {
         });
 
         it('should return undefined when created_at is null', async () => {
-            const mockTransaction: TransactionRead = {
-                id: '1',
-                attributes: {
-                    created_at: null,
-                    transactions: [],
-                },
-            } as unknown as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransaction],
-            } as TransactionArray);
+            const group = importedAt(null, transactionRead('1'));
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(page(group));
 
             const result = await service.getMostRecentTransactionDate();
 
@@ -549,9 +374,7 @@ describe('TransactionService', () => {
         });
 
         it('should return undefined for a ledger with no transactions', async () => {
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [],
-            } as unknown as TransactionArray);
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(page());
 
             const result = await service.getMostRecentTransactionDate();
 
@@ -631,28 +454,9 @@ describe('TransactionService', () => {
 
     describe('getTransactionReadBySplit', () => {
         it('should return TransactionRead when split exists in index', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: 'read-1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            // Populate index via getTransactionsByTag
-            await service.getTransactionsByTag('test-tag');
+            const mockTransaction = withdrawal(10, { transaction_journal_id: '1' });
+            const mockTransactionRead = transactionRead('read-1', mockTransaction);
+            await indexByTag(mockTransactionRead);
 
             const result = service.getTransactionReadBySplit(mockTransaction);
 
@@ -660,12 +464,10 @@ describe('TransactionService', () => {
         });
 
         it('should return undefined when split not in index', async () => {
-            const mockTransaction: TransactionSplit = {
+            const mockTransaction = withdrawal(10, {
                 transaction_journal_id: '999',
                 description: 'Nonexistent Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
+            });
 
             const result = service.getTransactionReadBySplit(mockTransaction);
 
@@ -673,12 +475,7 @@ describe('TransactionService', () => {
         });
 
         it('should handle undefined transaction_journal_id', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: undefined,
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
+            const mockTransaction = withdrawal(10, { transaction_journal_id: undefined });
 
             const result = service.getTransactionReadBySplit(mockTransaction);
 
@@ -686,27 +483,13 @@ describe('TransactionService', () => {
         });
 
         it('should use correct key format for lookup', async () => {
-            const mockTransaction: TransactionSplit = {
+            const mockTransaction = withdrawal(10, {
                 transaction_journal_id: '123',
                 description: 'Description with spaces',
                 date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: 'read-1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            await service.getTransactionsByTag('test-tag');
+            });
+            const mockTransactionRead = transactionRead('read-1', mockTransaction);
+            await indexByTag(mockTransactionRead);
 
             // Lookup with exact same transaction
             const result = service.getTransactionReadBySplit(mockTransaction);
@@ -723,247 +506,88 @@ describe('TransactionService', () => {
     });
 
     describe('ExcludedTransactionService Integration', () => {
-        it('should exclude transactions matching description and amount', async () => {
-            const excludedTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'BROKERAGE BUY INVESTMENT',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '2000.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [excludedTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
-                (desc, amount) => {
-                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
-                }
+        /** Fetches one group of `splits` by tag */
+        const fetchByTag = (...splits: TransactionSplit[]) => {
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(
+                page(transactionRead('1', ...splits))
             );
+            return service.getTransactionsByTag('test-tag');
+        };
 
-            const result = await service.getTransactionsByTag('test-tag');
+        it('should exclude transactions matching description and amount', async () => {
+            excludeWhen('BROKERAGE BUY INVESTMENT', '2000.00');
+
+            const result = await fetchByTag(
+                withdrawal(2000, { description: 'BROKERAGE BUY INVESTMENT' })
+            );
 
             expect(result).toHaveLength(0);
         });
 
         it('should exclude transactions matching description only', async () => {
-            const excludedTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Excluded Description',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '100.00',
-            } as TransactionSplit;
+            excludeWhen('Excluded Description');
 
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [excludedTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(desc => {
-                return desc === 'Excluded Description';
-            });
-
-            const result = await service.getTransactionsByTag('test-tag');
+            const result = await fetchByTag(
+                withdrawal(100, { description: 'Excluded Description' })
+            );
 
             expect(result).toHaveLength(0);
         });
 
         it('should exclude a transaction the service matches on description and amount', async () => {
-            const excludedTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Monthly Rent',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '999.99',
-            } as TransactionSplit;
+            excludeWhen('Monthly Rent', '999.99');
 
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [excludedTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
-                (description, amount) => description === 'Monthly Rent' && amount === '999.99'
-            );
-
-            const result = await service.getTransactionsByTag('test-tag');
+            const result = await fetchByTag(withdrawal(999.99, { description: 'Monthly Rent' }));
 
             expect(result).toHaveLength(0);
         });
 
         it('should include transactions not matching any exclusion criteria', async () => {
-            const includedTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Regular Expense',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '50.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [includedTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            const result = await service.getTransactionsByTag('test-tag');
+            const result = await fetchByTag(withdrawal(50, { description: 'Regular Expense' }));
 
             expect(result).toHaveLength(1);
             expect(result[0].description).toBe('Regular Expense');
         });
 
         it('should handle mixed excluded and included transactions', async () => {
-            const excludedTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'BROKERAGE BUY INVESTMENT',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '2000.00',
-            } as TransactionSplit;
+            excludeWhen('BROKERAGE BUY INVESTMENT', '2000.00');
 
-            const includedTransaction1: TransactionSplit = {
-                transaction_journal_id: '2',
-                description: 'Groceries',
-                date: '2024-01-16',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '75.50',
-            } as TransactionSplit;
-
-            const includedTransaction2: TransactionSplit = {
-                transaction_journal_id: '3',
-                description: 'Salary Deposit',
-                date: '2024-01-17',
-                type: 'deposit' as TransactionTypeProperty,
-                amount: '3000.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [excludedTransaction, includedTransaction1, includedTransaction2],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
-                (desc, amount) => {
-                    return desc === 'BROKERAGE BUY INVESTMENT' && amount === '2000.00';
-                }
+            const result = await fetchByTag(
+                withdrawal(2000, {
+                    transaction_journal_id: '1',
+                    description: 'BROKERAGE BUY INVESTMENT',
+                }),
+                withdrawal(75.5, { transaction_journal_id: '2', description: 'Groceries' }),
+                deposit(3000, { transaction_journal_id: '3', description: 'Salary Deposit' })
             );
-
-            const result = await service.getTransactionsByTag('test-tag');
 
             expect(result).toHaveLength(2);
             expect(result.map(t => t.description)).toEqual(['Groceries', 'Salary Deposit']);
         });
 
         it('should handle null/undefined amounts in exclusion check', async () => {
-            const transactionWithNullAmount: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
+            const result = await fetchByTag({
+                ...withdrawal(0),
                 amount: null as unknown as string,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [transactionWithNullAmount],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            const result = await service.getTransactionsByTag('test-tag');
+            });
 
             expect(result).toHaveLength(1);
         });
 
         it('should handle empty descriptions in exclusion check', async () => {
-            const transactionWithEmptyDesc: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: '',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-                amount: '50.00',
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [transactionWithEmptyDesc],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
-            const result = await service.getTransactionsByTag('test-tag');
+            const result = await fetchByTag(withdrawal(50, { description: '' }));
 
             expect(result).toHaveLength(1);
         });
     });
 
     describe('Cache Management', () => {
+        const mockTransaction = withdrawal(10, { transaction_journal_id: '1' });
+
         it('should return cached data on subsequent calls (cache hit)', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(
+                page(transactionRead('1', mockTransaction))
+            );
 
             // First call
             const result1 = await service.getTransactionsByTag('test-tag');
@@ -976,25 +600,9 @@ describe('TransactionService', () => {
         });
 
         it('should not call API when cache hit occurs', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(
+                page(transactionRead('1', mockTransaction))
+            );
 
             // First call
             await service.getTransactionsByTag('test-tag');
@@ -1006,25 +614,9 @@ describe('TransactionService', () => {
         });
 
         it('should share one API fetch across concurrent callers (no stampede)', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction.mockResolvedValue({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            mockApiClient.transactions.listTransaction.mockResolvedValue(
+                page(transactionRead('1', mockTransaction))
+            );
 
             // Fire concurrent requests before any has resolved (analyze command pattern)
             const results = await Promise.all([
@@ -1041,7 +633,7 @@ describe('TransactionService', () => {
         it('should not cache failed fetches', async () => {
             mockApiClient.transactions.listTransaction
                 .mockRejectedValueOnce(new Error('network down'))
-                .mockResolvedValueOnce({ data: [] } as unknown as TransactionArray);
+                .mockResolvedValueOnce(page());
 
             await expect(service.getTransactionsForMonth(1, 2024)).rejects.toThrow();
 
@@ -1051,29 +643,9 @@ describe('TransactionService', () => {
         });
 
         it('should use different cache keys for different months', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.transactions.listTransaction
-                .mockResolvedValueOnce({
-                    data: [mockTransactionRead],
-                } as TransactionArray)
-                .mockResolvedValueOnce({
-                    data: [mockTransactionRead],
-                } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            mockApiClient.transactions.listTransaction.mockResolvedValue(
+                page(transactionRead('1', mockTransaction))
+            );
 
             // Fetch for January
             await service.getTransactionsForMonth(1, 2024);
@@ -1085,29 +657,9 @@ describe('TransactionService', () => {
         });
 
         it('should use different cache keys for tags vs months', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
+            const group = transactionRead('1', mockTransaction);
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(page(group));
+            mockApiClient.transactions.listTransaction.mockResolvedValueOnce(page(group));
 
             // Fetch by tag
             const tagResult = await service.getTransactionsByTag('test-tag');
@@ -1123,26 +675,9 @@ describe('TransactionService', () => {
         });
 
         it('should populate cache after successful API fetch', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: '1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(
+                page(transactionRead('1', mockTransaction))
+            );
             const mockCache = new Map();
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
@@ -1157,26 +692,10 @@ describe('TransactionService', () => {
         });
 
         it('should populate split index alongside cache', async () => {
-            const mockTransaction: TransactionSplit = {
-                transaction_journal_id: '1',
-                description: 'Test Transaction',
-                date: '2024-01-15',
-                type: 'withdrawal' as TransactionTypeProperty,
-            } as TransactionSplit;
-
-            const mockTransactionRead: TransactionRead = {
-                id: 'read-1',
-                attributes: {
-                    transactions: [mockTransaction],
-                },
-            } as TransactionRead;
-
-            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce({
-                data: [mockTransactionRead],
-            } as TransactionArray);
-
-            mockExcludedTransactionService.isExcludedTransaction.mockReturnValue(false);
-
+            const mockTransactionRead = transactionRead('read-1', mockTransaction);
+            mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(
+                page(mockTransactionRead)
+            );
             const mockCache = new Map();
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
@@ -1196,32 +715,24 @@ describe('TransactionService', () => {
     });
 
     describe('pagination and exclusions', () => {
-        const split = (id: string, amount: string, budgetId?: string) =>
-            ({
+        const split = (id: string, amount: number, budgetId?: string) =>
+            withdrawal(amount, {
                 transaction_journal_id: id,
                 description: `txn-${id}`,
-                amount,
-                date: '2024-01-15',
-                type: 'withdrawal',
                 budget_id: budgetId,
-            }) as unknown as TransactionSplit;
-
-        const group = (splits: TransactionSplit[]) =>
-            ({
-                id: splits[0].transaction_journal_id,
-                attributes: { transactions: splits },
-            }) as unknown as TransactionRead;
+            });
 
         it('should fetch every page, not just the first', async () => {
             // Firefly defaults to 50 items per page; reading only response.data
             // silently truncates any busy month
+            // The SDK returns a CancelablePromise, which a plain async function is not
             mockApiClient.transactions.listTransaction.mockImplementation((async (
                 _trace: unknown,
                 _limit: number,
-                page: number
+                pageNumber: number
             ) => ({
-                data: [group([split(`p${page}`, '10.00')])],
-                meta: { pagination: { current_page: page, total_pages: 3 } },
+                data: [transactionRead(`p${pageNumber}`, split(`p${pageNumber}`, 10))],
+                meta: { pagination: { current_page: pageNumber, total_pages: 3 } },
             })) as never);
 
             const result = await service.getTransactionsForMonth(1, 2024);
@@ -1232,10 +743,7 @@ describe('TransactionService', () => {
         });
 
         it('should request a page size instead of relying on the API default', async () => {
-            mockApiClient.transactions.listTransaction.mockResolvedValue({
-                data: [],
-                meta: { pagination: { current_page: 1, total_pages: 1 } },
-            } as never);
+            mockApiClient.transactions.listTransaction.mockResolvedValue(page());
 
             await service.getTransactionsForMonth(1, 2024);
 
@@ -1249,16 +757,10 @@ describe('TransactionService', () => {
         });
 
         it('[R-EXCL-1] should drop an excluded transaction once, at fetch', async () => {
-            const kept = split('1', '10.00');
-            const dropped = split('2', '99.00', 'budget-7');
-
-            mockApiClient.transactions.listTransaction.mockResolvedValue({
-                data: [group([kept, dropped])],
-                meta: { pagination: { current_page: 1, total_pages: 1 } },
-            } as never);
-            mockExcludedTransactionService.isExcludedTransaction.mockImplementation(
-                (description: string) => description === 'txn-2'
+            mockApiClient.transactions.listTransaction.mockResolvedValue(
+                page(transactionRead('1', split('1', 10), split('2', 99, 'budget-7')))
             );
+            excludeWhen('txn-2');
 
             const included = await service.getTransactionsForMonth(1, 2024);
 

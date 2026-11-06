@@ -5,11 +5,11 @@ import { BudgetDisplayService } from '../../src/services/display/budget-display.
 import { BillComparisonService } from '../../src/services/bill-comparison.service.js';
 import { TransactionService } from '../../src/services/core/transaction.service.js';
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
-import { buckets, createMockCashFlowService } from '../setup/mock-services.js';
+import { buckets, createMockCashFlowService, partialMock } from '../shared/mocks.js';
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { withdrawal } from '../shared/test-data.js';
 
 describe('BudgetReportCommand', () => {
     let command: BudgetReportCommand;
@@ -53,44 +53,38 @@ describe('BudgetReportCommand', () => {
         jest.clearAllMocks();
 
         // Setup service mocks
-        budgetAnalyticsService = {
+        budgetAnalyticsService = partialMock<BudgetAnalyticsService>({
             getBudgetReport: jest
-                .fn<
-                    (
-                        month: number,
-                        year: number,
-                        historyMonths: number
-                    ) => Promise<BudgetReportDto[]>
-                >()
+                .fn<BudgetAnalyticsService['getBudgetReport']>()
                 .mockResolvedValue(mockBudgets),
             getTopExpenses: jest
-                .fn<(month: number, year: number, limit: number) => Promise<any>>()
+                .fn<BudgetAnalyticsService['getTopExpenses']>()
                 .mockResolvedValue([]),
-        } as unknown as jest.Mocked<BudgetAnalyticsService>;
+        });
 
-        budgetInsightService = {
+        budgetInsightService = partialMock<BudgetInsightService>({
             generateInsights: jest
-                .fn<(budgets: BudgetReportDto[], billComparison: BillComparisonDto) => any[]>()
+                .fn<BudgetInsightService['generateInsights']>()
                 .mockReturnValue([]),
-        } as unknown as jest.Mocked<BudgetInsightService>;
+        });
 
-        budgetDisplayService = {
+        budgetDisplayService = partialMock<BudgetDisplayService>({
             formatReport: jest
-                .fn<(reportData: any, verbose?: boolean) => string>()
+                .fn<BudgetDisplayService['formatReport']>()
                 .mockReturnValue('Formatted Enhanced Report'),
-        } as unknown as jest.Mocked<BudgetDisplayService>;
+        });
 
-        billComparisonService = {
+        billComparisonService = partialMock<BillComparisonService>({
             calculateBillComparison: jest
-                .fn<(month: number, year: number) => Promise<any>>()
+                .fn<BillComparisonService['calculateBillComparison']>()
                 .mockResolvedValue({ ok: true, value: mockBillComparison }),
-        } as unknown as jest.Mocked<BillComparisonService>;
+        });
 
-        transactionService = {
+        transactionService = partialMock<TransactionService>({
             getMostRecentTransactionDate: jest
-                .fn<() => Promise<Date | null>>()
+                .fn<TransactionService['getMostRecentTransactionDate']>()
                 .mockResolvedValue(new Date('2024-05-15')),
-        } as unknown as jest.Mocked<TransactionService>;
+        });
 
         cashFlowService = createMockCashFlowService();
 
@@ -113,21 +107,31 @@ describe('BudgetReportCommand', () => {
     });
 
     describe('execute', () => {
+        // The report adds days-left and data freshness only for the current
+        // month, which the command reads from the clock: pin it to May 2024.
+        const CURRENT = { month: 5, year: 2024 };
+
+        beforeEach(() => {
+            jest.useFakeTimers({ now: new Date(2024, 4, 15, 12) });
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
         it('should display enhanced budget report for current month', async () => {
-            const currentDate = new Date();
             await command.execute({
-                month: currentDate.getMonth() + 1,
-                year: currentDate.getFullYear(),
+                ...CURRENT,
             });
 
             expect(budgetAnalyticsService.getBudgetReport).toHaveBeenCalledWith(
-                currentDate.getMonth() + 1,
-                currentDate.getFullYear(),
+                CURRENT.month,
+                CURRENT.year,
                 1
             );
             expect(budgetAnalyticsService.getTopExpenses).toHaveBeenCalledWith(
-                currentDate.getMonth() + 1,
-                currentDate.getFullYear(),
+                CURRENT.month,
+                CURRENT.year,
                 5
             );
             expect(budgetInsightService.generateInsights).toHaveBeenCalled();
@@ -138,30 +142,22 @@ describe('BudgetReportCommand', () => {
         });
 
         it('should display enhanced budget report for non-current month', async () => {
-            const currentDate = new Date();
-            const prevMonth = currentDate.getMonth() === 0 ? 12 : currentDate.getMonth();
-            const prevYear =
-                currentDate.getMonth() === 0
-                    ? currentDate.getFullYear() - 1
-                    : currentDate.getFullYear();
-
             await command.execute({
-                month: prevMonth,
-                year: prevYear,
+                month: 4,
+                year: 2024,
             });
 
             expect(budgetAnalyticsService.getBudgetReport).toHaveBeenCalled();
             expect(budgetAnalyticsService.getTopExpenses).toHaveBeenCalled();
             expect(budgetDisplayService.formatReport).toHaveBeenCalled();
             expect(billComparisonService.calculateBillComparison).toHaveBeenCalled();
+            expect(transactionService.getMostRecentTransactionDate).not.toHaveBeenCalled();
             expect(consoleLogSpy).toHaveBeenCalled();
         });
 
         it('should generate insights from budget data', async () => {
-            const currentDate = new Date();
             await command.execute({
-                month: currentDate.getMonth() + 1,
-                year: currentDate.getFullYear(),
+                ...CURRENT,
             });
 
             expect(budgetInsightService.generateInsights).toHaveBeenCalledWith(
@@ -171,10 +167,8 @@ describe('BudgetReportCommand', () => {
         });
 
         it('should pass verbose flag to display service when provided', async () => {
-            const currentDate = new Date();
             await command.execute({
-                month: currentDate.getMonth() + 1,
-                year: currentDate.getFullYear(),
+                ...CURRENT,
                 verbose: true,
             });
 
@@ -185,10 +179,8 @@ describe('BudgetReportCommand', () => {
         });
 
         it('should default verbose to false when not provided', async () => {
-            const currentDate = new Date();
             await command.execute({
-                month: currentDate.getMonth() + 1,
-                year: currentDate.getFullYear(),
+                ...CURRENT,
             });
 
             expect(budgetDisplayService.formatReport).toHaveBeenCalledWith(
@@ -198,10 +190,8 @@ describe('BudgetReportCommand', () => {
         });
 
         it('should pass verbose flag false when explicitly set to false', async () => {
-            const currentDate = new Date();
             await command.execute({
-                month: currentDate.getMonth() + 1,
-                year: currentDate.getFullYear(),
+                ...CURRENT,
                 verbose: false,
             });
 
@@ -215,17 +205,13 @@ describe('BudgetReportCommand', () => {
         let consoleErrorSpy: jest.Spied<typeof console.error>;
         let stderrSpy: jest.Spied<typeof process.stderr.write>;
 
-        const unbudgetedTx = {
+        const unbudgetedTx = withdrawal(4.5, {
             transaction_journal_id: 'j1',
             description: 'Coffee',
-            type: 'withdrawal',
-            amount: '4.50',
             date: '2024-05-03T00:00:00+00:00',
             source_id: 'cc',
             destination_id: 'shop',
-            budget_id: null,
-            bill_id: null,
-        } as TransactionSplit;
+        });
         beforeEach(() => {
             consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
             stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);

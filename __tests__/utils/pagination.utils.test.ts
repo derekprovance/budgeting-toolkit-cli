@@ -1,4 +1,3 @@
-import '../setup/mock-logger.js'; // Must be first to mock logger module
 import { jest } from '@jest/globals';
 import { fetchAllPages, PaginatedResponse } from '../../src/utils/pagination.utils.js';
 

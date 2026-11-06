@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeStatusDto } from '../../src/types/dto/categorize-status.dto.js';
+import { partialMock } from '../shared/mocks.js';
 
 // chalk is not mocked: FORCE_COLOR=0 (__tests__/setup/env.ts) keeps output plain.
 
@@ -32,9 +33,11 @@ describe('CategorizeCommand', () => {
     beforeEach(() => {
         updateTransactionsByTag =
             jest.fn<AITransactionUpdateOrchestrator['updateTransactionsByTag']>();
-        command = new CategorizeCommand({
-            updateTransactionsByTag,
-        } as unknown as AITransactionUpdateOrchestrator);
+        command = new CategorizeCommand(
+            partialMock<AITransactionUpdateOrchestrator>({
+                updateTransactionsByTag,
+            })
+        );
         stdout = jest.spyOn(console, 'log').mockImplementation(() => {});
         stderr = jest.spyOn(console, 'error').mockImplementation(() => {});
     });

@@ -16,151 +16,144 @@ describe('TransactionClassificationService', () => {
 
     describe('isTransfer', () => {
         it('should return true for transfer transactions', () => {
-            const transaction = { type: 'transfer' } as TransactionSplit;
+            const transaction = transfer(1);
             expect(service.isTransfer(transaction)).toBe(true);
         });
 
         it('should return false for non-transfer transactions', () => {
-            const transaction = { type: 'deposit' } as TransactionSplit;
+            const transaction = deposit(1);
             expect(service.isTransfer(transaction)).toBe(false);
         });
     });
 
     describe('isBill', () => {
         it('should return true when transaction has bill_id', () => {
-            const transaction = { bill_id: '123' } as TransactionSplit;
+            const transaction = withdrawal(1, { bill_id: '123' });
             expect(service.isBill(transaction)).toBe(true);
         });
 
         it('should return true when transaction has subscription_id', () => {
-            const transaction = { subscription_id: '456' } as TransactionSplit;
+            const transaction = withdrawal(1, { subscription_id: '456' });
             expect(service.isBill(transaction)).toBe(true);
         });
 
         it('should return true when transaction has both bill_id and subscription_id', () => {
-            const transaction = { bill_id: '123', subscription_id: '456' } as TransactionSplit;
+            const transaction = withdrawal(1, { bill_id: '123', subscription_id: '456' });
             expect(service.isBill(transaction)).toBe(true);
         });
 
         it('should return false when transaction has no bill_id or subscription_id', () => {
-            const transaction = {} as TransactionSplit;
+            const transaction = withdrawal(1, { bill_id: undefined });
             expect(service.isBill(transaction)).toBe(false);
         });
 
         it('should return false when bill_id and subscription_id are null', () => {
-            const transaction = { bill_id: null, subscription_id: null } as TransactionSplit;
+            const transaction = withdrawal(1, { bill_id: null, subscription_id: null });
             expect(service.isBill(transaction)).toBe(false);
         });
 
         it('should return false when bill_id and subscription_id are undefined', () => {
-            const transaction = {
-                bill_id: undefined,
-                subscription_id: undefined,
-            } as TransactionSplit;
+            const transaction = withdrawal(1, { bill_id: undefined, subscription_id: undefined });
             expect(service.isBill(transaction)).toBe(false);
         });
     });
 
     describe('isDisposableIncome', () => {
         it('should return true when transaction has Disposable Income tag', () => {
-            const transaction = {
-                tags: [DISPOSABLE_INCOME_TAG],
-            } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: [DISPOSABLE_INCOME_TAG] });
             expect(service.isDisposableIncome(transaction)).toBe(true);
         });
 
         it('should return false when transaction has no Disposable Income tag', () => {
-            const transaction = { tags: ['other'] } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: ['other'] });
             expect(service.isDisposableIncome(transaction)).toBe(false);
         });
 
         it('should return false when transaction has no tags', () => {
-            const transaction = {} as TransactionSplit;
+            const transaction = withdrawal(1, { tags: undefined });
             expect(service.isDisposableIncome(transaction)).toBe(false);
         });
     });
 
     describe('isDeposit', () => {
         it('should return true for deposit transactions', () => {
-            const transaction = { type: 'deposit' } as TransactionSplit;
+            const transaction = deposit(1);
             expect(service.isDeposit(transaction)).toBe(true);
         });
 
         it('should return false for non-deposit transactions', () => {
-            const transaction = { type: 'withdrawal' } as TransactionSplit;
+            const transaction = withdrawal(1);
             expect(service.isDeposit(transaction)).toBe(false);
         });
     });
 
     describe('hasCategory', () => {
         it('should return true when transaction has category_id', () => {
-            const transaction = { category_id: '123' } as TransactionSplit;
+            const transaction = withdrawal(1, { category_id: '123' });
             expect(service.hasCategory(transaction)).toBe(true);
         });
 
         it('should return false when category_id is undefined', () => {
-            const transaction = { category_id: undefined } as TransactionSplit;
+            const transaction = withdrawal(1, { category_id: undefined });
             expect(service.hasCategory(transaction)).toBe(false);
         });
 
         it('should return false when category_id is null', () => {
-            const transaction = { category_id: null } as TransactionSplit;
+            const transaction = withdrawal(1, { category_id: null });
             expect(service.hasCategory(transaction)).toBe(false);
         });
     });
 
     describe('hasBudget', () => {
         it('should return true when transaction has budget_id', () => {
-            const transaction = { budget_id: '123' } as TransactionSplit;
+            const transaction = withdrawal(1, { budget_id: '123' });
             expect(service.hasBudget(transaction)).toBe(true);
         });
 
         it('should return false when budget_id is undefined', () => {
-            const transaction = { budget_id: undefined } as TransactionSplit;
+            const transaction = withdrawal(1, { budget_id: undefined });
             expect(service.hasBudget(transaction)).toBe(false);
         });
 
         it('should return false when budget_id is null', () => {
-            const transaction = { budget_id: null } as TransactionSplit;
+            const transaction = withdrawal(1, { budget_id: null });
             expect(service.hasBudget(transaction)).toBe(false);
         });
 
         it('should return false when budget_id is empty', () => {
-            const transaction = { budget_id: '' } as TransactionSplit;
+            const transaction = withdrawal(1, { budget_id: '' });
             expect(service.hasBudget(transaction)).toBe(false);
         });
     });
 
     describe('isPaycheck', () => {
         it('should return true when transaction has paycheck tag', () => {
-            const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: [PAYCHECK_TAG] });
             expect(service.isPaycheck(transaction)).toBe(true);
         });
 
         it('should return true when transaction has paycheck tag with other tags', () => {
-            const transaction = {
-                tags: ['Work', PAYCHECK_TAG, 'Income'],
-            } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: ['Work', PAYCHECK_TAG, 'Income'] });
             expect(service.isPaycheck(transaction)).toBe(true);
         });
 
         it('should return false when transaction does not have paycheck tag', () => {
-            const transaction = { tags: ['Other', 'Tags'] } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: ['Other', 'Tags'] });
             expect(service.isPaycheck(transaction)).toBe(false);
         });
 
         it('should return false when transaction has no tags', () => {
-            const transaction = {} as TransactionSplit;
+            const transaction = withdrawal(1, { tags: undefined });
             expect(service.isPaycheck(transaction)).toBe(false);
         });
 
         it('should return false when tags is null', () => {
-            const transaction = { tags: null } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: null });
             expect(service.isPaycheck(transaction)).toBe(false);
         });
 
         it('should return false when tags is empty array', () => {
-            const transaction = { tags: [] as string[] } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: [] });
             expect(service.isPaycheck(transaction)).toBe(false);
         });
 
@@ -171,7 +164,7 @@ describe('TransactionClassificationService', () => {
                 customPaycheckTag
             );
 
-            const transaction = { tags: [customPaycheckTag] } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: [customPaycheckTag] });
             expect(customService.isPaycheck(transaction)).toBe(true);
         });
 
@@ -182,7 +175,7 @@ describe('TransactionClassificationService', () => {
                 customPaycheckTag
             );
 
-            const transaction = { tags: [PAYCHECK_TAG] } as TransactionSplit;
+            const transaction = withdrawal(1, { tags: [PAYCHECK_TAG] });
             expect(customService.isPaycheck(transaction)).toBe(false);
         });
     });

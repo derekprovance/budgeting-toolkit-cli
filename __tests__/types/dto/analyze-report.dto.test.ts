@@ -1,6 +1,6 @@
 import { AnalyzeReportDto, AnalyzeReportInput } from '../../../src/types/dto/analyze-report.dto.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
-import { buckets } from '../../setup/mock-services.js';
+import { buckets } from '../../shared/mocks.js';
 import { deposit, transfer, withdrawal } from '../../shared/test-data.js';
 
 const bills = (actualTotal: number, predictedTotal = actualTotal) =>

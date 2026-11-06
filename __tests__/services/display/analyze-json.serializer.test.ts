@@ -1,44 +1,32 @@
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TEST_DATE, deposit, withdrawal } from '../../shared/test-data.js';
 import { serializeAnalyzeReport } from '../../../src/services/display/analyze-json.serializer.js';
 import { AnalyzeReportDto } from '../../../src/types/dto/analyze-report.dto.js';
 import { BillComparisonDto, BillDetailDto } from '../../../src/types/dto/bill-comparison.dto.js';
 import { AnalyzeReportJson } from '../../../src/types/dto/report-json.types.js';
 
-const tx = (overrides: Partial<TransactionSplit>): TransactionSplit =>
-    ({
-        transaction_journal_id: 'j0',
-        description: 'Transaction',
-        type: 'withdrawal',
-        amount: '0.00',
-        date: '2025-01-15T00:00:00+00:00',
-        source_id: 'cc',
-        destination_id: 'shop',
-        budget_id: null,
-        bill_id: null,
-        ...overrides,
-    }) as TransactionSplit;
-
 describe('serializeAnalyzeReport', () => {
-    const freelance = tx({
+    const freelance = deposit(300, {
         transaction_journal_id: 'a1',
         description: 'Freelance',
-        type: 'deposit',
-        amount: '300.00',
         source_id: 'noname',
         destination_id: 'chk',
     });
-    const coffee = tx({ transaction_journal_id: 'u1', description: 'Coffee', amount: '35.00' });
-    const tagged = tx({
+    const coffee = withdrawal(35, {
+        transaction_journal_id: 'u1',
+        description: 'Coffee',
+        source_id: 'cc',
+        destination_id: 'shop',
+    });
+    const tagged = withdrawal(40, {
         transaction_journal_id: 'd1',
         description: 'Concert',
-        amount: '40.00',
+        source_id: 'cc',
+        destination_id: 'shop',
         budget_id: 'fun',
     });
-    const refund = tx({
+    const refund = deposit(20, {
         transaction_journal_id: 'd2',
         description: 'Concert refund',
-        type: 'deposit',
-        amount: '20.00',
         source_id: 'venue',
         destination_id: 'cc',
     });
@@ -97,7 +85,7 @@ describe('serializeAnalyzeReport', () => {
                         description: 'Freelance',
                         type: 'deposit',
                         amount: 300,
-                        date: '2025-01-15T00:00:00+00:00',
+                        date: TEST_DATE,
                         sourceId: 'noname',
                         destinationId: 'chk',
                         budgetId: null,
@@ -113,7 +101,7 @@ describe('serializeAnalyzeReport', () => {
                         description: 'Coffee',
                         type: 'withdrawal',
                         amount: 35,
-                        date: '2025-01-15T00:00:00+00:00',
+                        date: TEST_DATE,
                         sourceId: 'cc',
                         destinationId: 'shop',
                         budgetId: null,
@@ -151,7 +139,7 @@ describe('serializeAnalyzeReport', () => {
                         description: 'Concert',
                         type: 'withdrawal',
                         amount: 40,
-                        date: '2025-01-15T00:00:00+00:00',
+                        date: TEST_DATE,
                         sourceId: 'cc',
                         destinationId: 'shop',
                         budgetId: 'fun',
@@ -162,7 +150,7 @@ describe('serializeAnalyzeReport', () => {
                         description: 'Concert refund',
                         type: 'deposit',
                         amount: 20,
-                        date: '2025-01-15T00:00:00+00:00',
+                        date: TEST_DATE,
                         sourceId: 'venue',
                         destinationId: 'cc',
                         budgetId: null,

@@ -2,17 +2,11 @@ import { jest } from '@jest/globals';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
 import { ITransactionService } from '../../src/services/core/transaction.service.interface.js';
-import { ILogger } from '../../src/types/interface/logger.interface.js';
 import { deposit, transfer, withdrawal } from '../shared/test-data.js';
+import { createMockLogger, partialMock } from '../shared/mocks.js';
 
 describe('TransactionHistoryService', () => {
-    const logger = {
-        trace: jest.fn(),
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-    } as unknown as ILogger;
+    const logger = createMockLogger();
     const now = () => new Date(2026, 8, 25);
 
     let getTransactionsInRange: jest.Mock<ITransactionService['getTransactionsInRange']>;
@@ -22,7 +16,7 @@ describe('TransactionHistoryService', () => {
             async () => past
         );
         return new TransactionHistoryService(
-            { getTransactionsInRange } as unknown as ITransactionService,
+            partialMock<ITransactionService>({ getTransactionsInRange }),
             months,
             { logger, now: at, canCarryBudget: tx => tx.type === 'withdrawal' }
         );
@@ -140,7 +134,7 @@ describe('TransactionHistoryService', () => {
             ]
         );
         const history = new TransactionHistoryService(
-            { getTransactionsInRange } as unknown as ITransactionService,
+            partialMock<ITransactionService>({ getTransactionsInRange }),
             12,
             { logger, now, canCarryBudget: tx => !tx.bill_id }
         );

@@ -2,6 +2,8 @@ import { jest } from '@jest/globals';
 import type { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { DEFAULT_CONFIG } from '../../src/config/config.defaults.js';
 import type { AppConfig } from '../../src/config/config.types.js';
+import type { BudgetArray, CategoryArray } from '@derekprovance/firefly-iii-sdk';
+import { createMockFireflyClient } from '../shared/mocks.js';
 
 /*
  * Native ESM: `jest.mock` is inert (see __tests__/meta/esm-mocking.test.ts), so
@@ -21,21 +23,16 @@ jest.unstable_mockModule('../../src/config/config-manager.js', () => ({
 const { ServiceFactory } = await import('../../src/factories/service.factory.js');
 const { AITransactionUpdateOrchestrator } =
     await import('../../src/services/ai-transaction-update-orchestrator.service.js');
-const { BudgetService } = await import('../../src/services/core/budget.service.js');
-const { CategoryService } = await import('../../src/services/core/category.service.js');
-
-// CategoryBudgetCatalog.load fetches the available budgets and
-// categories; stub them on the real prototypes so no API call is made.
-jest.spyOn(BudgetService.prototype, 'getBudgets').mockResolvedValue([]);
-jest.spyOn(CategoryService.prototype, 'getCategories').mockResolvedValue([]);
 
 describe('ServiceFactory', () => {
-    let mockApiClient: FireflyClientWithCerts;
+    let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
-        mockApiClient = {
-            // Mock only the properties we need for tests
-        } as unknown as FireflyClientWithCerts;
+        // The orchestrator loads the category and budget catalog on creation
+        const emptyPage = { data: [], meta: { pagination: { total_pages: 1 } } };
+        mockApiClient = createMockFireflyClient();
+        mockApiClient.categories.listCategory.mockResolvedValue(emptyPage as CategoryArray);
+        mockApiClient.budgets.listBudget.mockResolvedValue(emptyPage as BudgetArray);
     });
 
     afterEach(() => {
@@ -87,17 +84,6 @@ describe('ServiceFactory', () => {
                 services,
                 testConfig,
                 { force: false, dryRun: false }
-            );
-
-            expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);
-        });
-
-        it('should reuse the provided services instead of rebuilding them', async () => {
-            const services = ServiceFactory.createServices(mockApiClient, testConfig);
-            const service = await ServiceFactory.createAITransactionUpdateOrchestrator(
-                services,
-                testConfig,
-                { force: true, dryRun: true }
             );
 
             expect(service).toBeInstanceOf(AITransactionUpdateOrchestrator);

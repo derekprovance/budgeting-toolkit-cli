@@ -8,7 +8,7 @@ import { BudgetReportCommand } from '../../src/commands/budget-report.command.js
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import type { AppServices } from '../../src/factories/service.factory.js';
 import { DEFAULT_CONFIG } from '../../src/config/config.defaults.js';
-import { buckets, createMockCashFlowService } from '../setup/mock-services.js';
+import { buckets, createMockCashFlowService } from '../shared/mocks.js';
 import { deposit, withdrawal } from '../shared/test-data.js';
 
 const ok = <T>(value: T) => ({ ok: true as const, value });

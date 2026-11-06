@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ReviewAction, EditTransactionAttribute } from '../../src/types/enums.js';
+import { deposit, transfer, withdrawal } from '../shared/test-data.js';
 
 // The subset of an @inquirer/prompts config these tests read back
 type PromptConfig = {
@@ -76,14 +76,12 @@ describe('UserInputService', () => {
     });
 
     describe('askToUpdateTransaction', () => {
-        const mockTransaction: Partial<TransactionSplit> = {
+        const mockTransaction = withdrawal('34.99', {
             description: 'Test Transaction',
             category_name: 'Old Category',
             budget_name: 'Old Budget',
-            amount: '34.99',
-            type: 'withdrawal',
             currency_symbol: '$',
-        };
+        });
 
         const mockTransactionId = '5';
 
@@ -91,7 +89,7 @@ describe('UserInputService', () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             const result = await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
+                mockTransaction,
                 mockTransactionId,
                 {
                     canSetBudget: true,
@@ -108,16 +106,12 @@ describe('UserInputService', () => {
         it('labels each suggestion with where it came from', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                mockTransactionId,
-                {
-                    canSetBudget: true,
-                    category: 'Groceries',
-                    budget: 'Food',
-                    source: { category: 'history', budget: 'ai' },
-                }
-            );
+            await service.askToUpdateTransaction(mockTransaction, mockTransactionId, {
+                canSetBudget: true,
+                category: 'Groceries',
+                budget: 'Food',
+                source: { category: 'history', budget: 'ai' },
+            });
 
             const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
             expect(message).toMatch(/Category.*Groceries \(history\)/);
@@ -127,16 +121,12 @@ describe('UserInputService', () => {
         it('marks a suggestion equal to the current value as unchanged', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                mockTransactionId,
-                {
-                    canSetBudget: true,
-                    category: 'Groceries',
-                    budget: 'Old Budget',
-                    source: { category: 'history', budget: 'history' },
-                }
-            );
+            await service.askToUpdateTransaction(mockTransaction, mockTransactionId, {
+                canSetBudget: true,
+                category: 'Groceries',
+                budget: 'Old Budget',
+                source: { category: 'history', budget: 'history' },
+            });
 
             const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
             expect(message).toMatch(/Budget: Old Budget \(unchanged\)/);
@@ -147,11 +137,11 @@ describe('UserInputService', () => {
         it('starts the prompt on the transaction line with its position', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                mockTransactionId,
-                { canSetBudget: true, category: 'Groceries', progress: { index: 3, total: 26 } }
-            );
+            await service.askToUpdateTransaction(mockTransaction, mockTransactionId, {
+                canSetBudget: true,
+                category: 'Groceries',
+                progress: { index: 3, total: 26 },
+            });
 
             const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
             // A leading newline would leave the prompt prefix alone on a line
@@ -161,11 +151,10 @@ describe('UserInputService', () => {
         it('shows no position when progress is not given', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                mockTransactionId,
-                { canSetBudget: true, category: 'Groceries' }
-            );
+            await service.askToUpdateTransaction(mockTransaction, mockTransactionId, {
+                canSetBudget: true,
+                category: 'Groceries',
+            });
 
             const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
             expect(message.startsWith('Transaction:')).toBe(true);
@@ -174,11 +163,10 @@ describe('UserInputService', () => {
         it('shows no label when the source is unknown', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                mockTransactionId,
-                { canSetBudget: true, category: 'Groceries' }
-            );
+            await service.askToUpdateTransaction(mockTransaction, mockTransactionId, {
+                canSetBudget: true,
+                category: 'Groceries',
+            });
 
             const message = (mockExpand.mock.calls[0][0] as { message: string }).message;
             expect(message).not.toMatch(/\((history|AI)\)/);
@@ -189,7 +177,7 @@ describe('UserInputService', () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateCategory);
 
             const result = await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
+                mockTransaction,
                 mockTransactionId,
                 { canSetBudget: true, category: newCategory }
             );
@@ -225,7 +213,7 @@ describe('UserInputService', () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateBudget);
 
             const result = await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
+                mockTransaction,
                 mockTransactionId,
                 { canSetBudget: true, budget: newBudget }
             );
@@ -262,7 +250,7 @@ describe('UserInputService', () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             const result = await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
+                mockTransaction,
                 mockTransactionId,
                 { canSetBudget: true, category: newCategory, budget: newBudget }
             );
@@ -299,19 +287,17 @@ describe('UserInputService', () => {
         });
 
         it('should handle undefined current values', async () => {
-            const mockTransactionWithoutValues: Partial<TransactionSplit> = {
+            const mockTransactionWithoutValues = withdrawal('50.00', {
                 description: 'Test Transaction',
-                amount: '50.00',
-                type: 'withdrawal',
                 currency_symbol: '$',
-            };
+            });
 
             const newCategory = 'New Category';
             const newBudget = 'New Budget';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             const result = await service.askToUpdateTransaction(
-                mockTransactionWithoutValues as TransactionSplit,
+                mockTransactionWithoutValues,
                 mockTransactionId,
                 { canSetBudget: true, category: newCategory, budget: newBudget }
             );
@@ -327,19 +313,17 @@ describe('UserInputService', () => {
 
         it('should truncate long transaction descriptions', async () => {
             const longDescription = 'A'.repeat(100);
-            const mockTransactionWithLongDesc: Partial<TransactionSplit> = {
+            const mockTransactionWithLongDesc = withdrawal('25.00', {
                 description: longDescription,
                 category_name: 'Old Category',
                 budget_name: 'Old Budget',
-                amount: '25.00',
-                type: 'withdrawal',
                 currency_symbol: '$',
-            };
+            });
 
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
             const result = await service.askToUpdateTransaction(
-                mockTransactionWithLongDesc as TransactionSplit,
+                mockTransactionWithLongDesc,
                 mockTransactionId,
                 { canSetBudget: true, category: 'New Category', budget: 'New Budget' }
             );
@@ -361,7 +345,7 @@ describe('UserInputService', () => {
             );
 
             await expect(
-                service.askToUpdateTransaction(mockTransaction as TransactionSplit, '1', {
+                service.askToUpdateTransaction(mockTransaction, '1', {
                     canSetBudget: true,
                     category: 'New Category',
                 })
@@ -373,7 +357,7 @@ describe('UserInputService', () => {
             mockExpand.mockRejectedValueOnce(failure);
 
             await expect(
-                service.askToUpdateTransaction(mockTransaction as TransactionSplit, '1', {
+                service.askToUpdateTransaction(mockTransaction, '1', {
                     canSetBudget: true,
                     category: 'New Category',
                 })
@@ -385,7 +369,7 @@ describe('UserInputService', () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
             const result = await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
+                mockTransaction,
                 mockTransactionId,
                 { canSetBudget: true, category: newCategory }
             );
@@ -394,22 +378,19 @@ describe('UserInputService', () => {
         });
 
         it('should show all update options including individual category and budget', async () => {
-            const mockTransactionNoBudget: Partial<TransactionSplit> = {
+            const mockTransactionNoBudget = withdrawal('34.99', {
                 description: 'Test Transaction',
                 category_name: 'Old Category',
                 budget_name: undefined,
-                amount: '34.99',
-                type: 'withdrawal',
                 currency_symbol: '$',
-            };
+            });
 
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(
-                mockTransactionNoBudget as TransactionSplit,
-                mockTransactionId,
-                { canSetBudget: true, category: 'New Category' }
-            );
+            await service.askToUpdateTransaction(mockTransactionNoBudget, mockTransactionId, {
+                canSetBudget: true,
+                category: 'New Category',
+            });
 
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -442,16 +423,14 @@ describe('UserInputService', () => {
 
     describe('Amount display in update prompt', () => {
         it('should display withdrawal amount with negative sign', async () => {
-            const withdrawal: Partial<TransactionSplit> = {
+            const coffee = withdrawal('4.50', {
                 description: 'Coffee Shop',
-                type: 'withdrawal',
-                amount: '4.50',
                 currency_symbol: '$',
                 category_name: 'Food',
-            };
+            });
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(withdrawal as TransactionSplit, '1', {
+            await service.askToUpdateTransaction(coffee, '1', {
                 canSetBudget: true,
                 category: 'Dining',
             });
@@ -464,16 +443,14 @@ describe('UserInputService', () => {
         });
 
         it('should display deposit amount with positive sign', async () => {
-            const deposit: Partial<TransactionSplit> = {
+            const salary = deposit('3000.00', {
                 description: 'Salary',
-                type: 'deposit',
-                amount: '3000.00',
                 currency_symbol: '$',
                 category_name: 'Income',
-            };
+            });
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(deposit as TransactionSplit, '2', {
+            await service.askToUpdateTransaction(salary, '2', {
                 canSetBudget: true,
                 category: 'Salary',
             });
@@ -486,16 +463,14 @@ describe('UserInputService', () => {
         });
 
         it('should display transfer amount without sign', async () => {
-            const transfer: Partial<TransactionSplit> = {
+            const savingsTransfer = transfer('500.00', {
                 description: 'Savings Transfer',
-                type: 'transfer',
-                amount: '500.00',
                 currency_symbol: '$',
                 category_name: 'Transfer',
-            };
+            });
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(transfer as TransactionSplit, '3', {
+            await service.askToUpdateTransaction(savingsTransfer, '3', {
                 canSetBudget: true,
                 category: 'Transfer',
             });
@@ -507,15 +482,13 @@ describe('UserInputService', () => {
         });
 
         it('should handle missing currency_symbol gracefully', async () => {
-            const transaction: Partial<TransactionSplit> = {
+            const transaction = withdrawal('10.00', {
                 description: 'No Currency',
-                type: 'withdrawal',
-                amount: '10.00',
                 category_name: 'Misc',
-            };
+            });
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(transaction as TransactionSplit, '4', {
+            await service.askToUpdateTransaction(transaction, '4', {
                 canSetBudget: true,
                 category: 'Other',
             });
@@ -529,25 +502,22 @@ describe('UserInputService', () => {
     });
 
     describe('Base URL and Transaction Link Functionality', () => {
-        const mockTransaction: Partial<TransactionSplit> = {
+        const mockTransaction = withdrawal('34.99', {
             description: 'Test Transaction',
             category_name: 'Old Category',
             budget_name: 'Old Budget',
-            amount: '34.99',
-            type: 'withdrawal',
             currency_symbol: '$',
-        };
+        });
 
         it('should include hyperlink in description when transaction ID is provided', async () => {
             const transactionId = '123';
             const newCategory = 'New Category';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                transactionId,
-                { canSetBudget: true, category: newCategory }
-            );
+            await service.askToUpdateTransaction(mockTransaction, transactionId, {
+                canSetBudget: true,
+                category: newCategory,
+            });
 
             const expectedLink = `${mockBaseUrl}/transactions/show/${transactionId}`;
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${mockTransaction.description}\x1B]8;;\x1B\\`;
@@ -563,7 +533,7 @@ describe('UserInputService', () => {
             const newCategory = 'New Category';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(mockTransaction as TransactionSplit, undefined, {
+            await service.askToUpdateTransaction(mockTransaction, undefined, {
                 canSetBudget: true,
                 category: newCategory,
             });
@@ -585,22 +555,19 @@ describe('UserInputService', () => {
 
         it('should include hyperlink with truncated description for long descriptions', async () => {
             const longDescription = 'A'.repeat(100);
-            const mockTransactionWithLongDesc: Partial<TransactionSplit> = {
+            const mockTransactionWithLongDesc = withdrawal('25.00', {
                 description: longDescription,
                 category_name: 'Old Category',
-                amount: '25.00',
-                type: 'withdrawal',
                 currency_symbol: '$',
-            };
+            });
             const transactionId = '456';
             const newCategory = 'New Category';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(
-                mockTransactionWithLongDesc as TransactionSplit,
-                transactionId,
-                { canSetBudget: true, category: newCategory }
-            );
+            await service.askToUpdateTransaction(mockTransactionWithLongDesc, transactionId, {
+                canSetBudget: true,
+                category: newCategory,
+            });
 
             const expectedLink = `${mockBaseUrl}/transactions/show/${transactionId}`;
             const truncatedDescription = longDescription.substring(0, 47) + '...';
@@ -620,11 +587,10 @@ describe('UserInputService', () => {
             const newBudget = 'New Budget';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await customService.askToUpdateTransaction(
-                mockTransaction as TransactionSplit,
-                transactionId,
-                { canSetBudget: true, budget: newBudget }
-            );
+            await customService.askToUpdateTransaction(mockTransaction, transactionId, {
+                canSetBudget: true,
+                budget: newBudget,
+            });
 
             const expectedLink = `${customBaseUrl}/transactions/show/${transactionId}`;
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${mockTransaction.description}\x1B]8;;\x1B\\`;
@@ -640,7 +606,7 @@ describe('UserInputService', () => {
             const newCategory = 'New Category';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(mockTransaction as TransactionSplit, '', {
+            await service.askToUpdateTransaction(mockTransaction, '', {
                 canSetBudget: true,
                 category: newCategory,
             });
@@ -661,22 +627,19 @@ describe('UserInputService', () => {
         });
 
         it('should properly format hyperlink with special characters in description', async () => {
-            const specialDescTransaction: Partial<TransactionSplit> = {
+            const specialDescTransaction = withdrawal('15.00', {
                 description: 'Transaction with & < > " \' special chars',
                 category_name: 'Old Category',
-                amount: '15.00',
-                type: 'withdrawal',
                 currency_symbol: '$',
-            };
+            });
             const transactionId = '999';
             const newCategory = 'New Category';
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(
-                specialDescTransaction as TransactionSplit,
-                transactionId,
-                { canSetBudget: true, category: newCategory }
-            );
+            await service.askToUpdateTransaction(specialDescTransaction, transactionId, {
+                canSetBudget: true,
+                category: newCategory,
+            });
 
             const expectedLink = `${mockBaseUrl}/transactions/show/${transactionId}`;
             const expectedHyperlink = `\x1B]8;;${expectedLink}\x1B\\${specialDescTransaction.description}\x1B]8;;\x1B\\`;
@@ -690,19 +653,17 @@ describe('UserInputService', () => {
     });
 
     describe('Deposit-specific behavior', () => {
-        const mockDeposit: Partial<TransactionSplit> = {
-            type: 'deposit',
+        const mockDeposit = deposit('2500.00', {
             description: 'Paycheck Deposit',
             category_name: 'Salary',
             budget_name: undefined,
-            amount: '2500.00',
             currency_symbol: '$',
-        };
+        });
 
         it('should show Budget: N/A for deposits instead of None', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 
-            await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
+            await service.askToUpdateTransaction(mockDeposit, '5', {
                 canSetBudget: false,
                 category: 'Salary',
             });
@@ -717,7 +678,7 @@ describe('UserInputService', () => {
         it('should not show "Update only the budget" option for deposits', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(mockDeposit as TransactionSplit, '5', {
+            await service.askToUpdateTransaction(mockDeposit, '5', {
                 canSetBudget: false,
                 category: 'Salary',
             });
@@ -751,16 +712,14 @@ describe('UserInputService', () => {
         });
 
         it('offers no budget on a withdrawal that cannot carry one (bill-linked)', async () => {
-            const billPayment: Partial<TransactionSplit> = {
-                type: 'withdrawal',
+            const billPayment = withdrawal('1500.00', {
                 description: 'Rent',
                 bill_id: '7',
-                amount: '1500.00',
                 currency_symbol: '$',
-            };
+            });
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(billPayment as TransactionSplit, '5', {
+            await service.askToUpdateTransaction(billPayment, '5', {
                 canSetBudget: false,
                 category: 'Housing',
             });
@@ -773,18 +732,16 @@ describe('UserInputService', () => {
         });
 
         it('should allow all budget options for non-deposit transactions', async () => {
-            const mockBill: Partial<TransactionSplit> = {
-                type: 'withdrawal',
+            const mockBill = withdrawal('87.50', {
                 description: 'Grocery Store',
                 category_name: 'Food',
                 budget_name: 'Groceries',
-                amount: '87.50',
                 currency_symbol: '$',
-            };
+            });
 
             mockExpand.mockResolvedValueOnce(ReviewAction.UpdateAll);
 
-            await service.askToUpdateTransaction(mockBill as TransactionSplit, '5', {
+            await service.askToUpdateTransaction(mockBill, '5', {
                 canSetBudget: true,
                 category: 'Food',
                 budget: 'Groceries',

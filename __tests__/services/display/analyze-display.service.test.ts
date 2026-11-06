@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { AnalyzeDisplayService } from '../../../src/services/display/analyze-display.service.js';
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
 import { AnalyzeReportDto } from '../../../src/types/dto/analyze-report.dto.js';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import stripAnsi from 'strip-ansi';
-import { deposit, transfer, withdrawal } from '../../shared/test-data.js';
+import { deposit, withdrawal } from '../../shared/test-data.js';
 
 // Output is plain text: FORCE_COLOR=0 (see __tests__/setup/env.ts) disables
 // chalk, and stripAnsi removes any remaining escapes such as hyperlinks.
@@ -17,20 +16,6 @@ describe('AnalyzeDisplayService', () => {
             new TransactionClassificationService('Disposable Income', 'Paycheck')
         );
     });
-
-    const builders = { deposit, withdrawal, transfer };
-    const createMockTransaction = (
-        description: string,
-        amount: number,
-        type: 'deposit' | 'withdrawal' | 'transfer' = 'deposit'
-    ): TransactionSplit =>
-        builders[type](amount.toString(), {
-            description,
-            date: '2025-11-15T00:00:00Z',
-            source_name: 'Test Source',
-            destination_name: 'Test Destination',
-            currency_code: 'USD',
-        });
 
     const createBasicReportData = (): AnalyzeReportDto =>
         ({
@@ -82,9 +67,9 @@ describe('AnalyzeDisplayService', () => {
         it('should include transaction details in verbose mode', () => {
             const data = {
                 ...createBasicReportData(),
-                additionalIncome: [createMockTransaction('Bonus Payment', 500)],
+                additionalIncome: [deposit(500, { description: 'Bonus Payment' })],
                 additionalIncomeTotal: 500,
-                unbudgetedExpenses: [createMockTransaction('Emergency Repair', 200, 'withdrawal')],
+                unbudgetedExpenses: [withdrawal(200, { description: 'Emergency Repair' })],
                 unbudgetedExpenseTotal: 200,
             };
             const result = service.formatAnalysisReport(data, true);
@@ -96,7 +81,7 @@ describe('AnalyzeDisplayService', () => {
         it('should not include transaction details in non-verbose mode', () => {
             const data = {
                 ...createBasicReportData(),
-                additionalIncome: [createMockTransaction('Bonus Payment', 500)],
+                additionalIncome: [deposit(500, { description: 'Bonus Payment' })],
                 additionalIncomeTotal: 500,
             };
             const result = service.formatAnalysisReport(data, false);
@@ -151,7 +136,7 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('Disposable expense', 500, 'withdrawal'),
+                    withdrawal(500, { description: 'Disposable expense' }),
                 ],
                 disposableIncome: 500,
             };
@@ -168,8 +153,8 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 additionalIncome: [
-                    createMockTransaction('Income 1', 100),
-                    createMockTransaction('Income 2', 200),
+                    deposit(100, { description: 'Income 1' }),
+                    deposit(200, { description: 'Income 2' }),
                 ],
                 additionalIncomeTotal: 300,
             };
@@ -183,7 +168,7 @@ describe('AnalyzeDisplayService', () => {
         it('should format income section with single transaction', () => {
             const data = {
                 ...createBasicReportData(),
-                additionalIncome: [createMockTransaction('Bonus', 500)],
+                additionalIncome: [deposit(500, { description: 'Bonus' })],
                 additionalIncomeTotal: 500,
             };
             const result = service.formatAnalysisReport(data, false);
@@ -197,8 +182,8 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 unbudgetedExpenses: [
-                    createMockTransaction('Expense 1', 100, 'withdrawal'),
-                    createMockTransaction('Expense 2', 150, 'withdrawal'),
+                    withdrawal(100, { description: 'Expense 1' }),
+                    withdrawal(150, { description: 'Expense 2' }),
                 ],
                 unbudgetedExpenseTotal: 250,
             };
@@ -244,7 +229,7 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('Disposable expense', 300, 'withdrawal'),
+                    withdrawal(300, { description: 'Disposable expense' }),
                 ],
                 disposableIncome: 300,
             };
@@ -268,7 +253,7 @@ describe('AnalyzeDisplayService', () => {
             // it produced "-$300.00 ⚠ ⚠" on every expense line.
             const data = {
                 ...createBasicReportData(),
-                unbudgetedExpenses: [createMockTransaction('Spend', 300.0, 'withdrawal')],
+                unbudgetedExpenses: [withdrawal(300, { description: 'Spend' })],
                 unbudgetedExpenseTotal: 300.0,
             };
             const line = stripAnsi(service.formatAnalysisReport(data, false))
@@ -285,9 +270,7 @@ describe('AnalyzeDisplayService', () => {
             // do — the itemized column has to keep summing to the total.
             const data = {
                 ...createBasicReportData(),
-                disposableIncomeTransactions: [
-                    createMockTransaction('Tagged', 250.0, 'withdrawal'),
-                ],
+                disposableIncomeTransactions: [withdrawal(250, { description: 'Tagged' })],
                 disposableIncome: 250.0,
             };
             const lines = stripAnsi(service.formatAnalysisReport(data, false)).split('\n');
@@ -322,8 +305,8 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('Tagged expense 1', 1940.33, 'withdrawal'),
-                    createMockTransaction('Tagged expense 2', 1000.0, 'withdrawal'),
+                    withdrawal(1940.33, { description: 'Tagged expense 1' }),
+                    withdrawal(1000, { description: 'Tagged expense 2' }),
                 ],
                 disposableIncome: 2940.33,
             };
@@ -338,7 +321,7 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('Tagged expense', 440.33, 'withdrawal'),
+                    withdrawal(440.33, { description: 'Tagged expense' }),
                 ],
                 disposableIncome: 440.33,
             };
@@ -363,7 +346,7 @@ describe('AnalyzeDisplayService', () => {
         it('should show a net-negative month rather than clamping it', () => {
             const data = {
                 ...createBasicReportData(),
-                disposableIncomeTransactions: [createMockTransaction('Refund', 250.0, 'deposit')],
+                disposableIncomeTransactions: [deposit(250, { description: 'Refund' })],
                 disposableIncome: -250,
             };
             const result = service.formatAnalysisReport(data, false);
@@ -375,7 +358,7 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('Tagged expense', 2940.33, 'withdrawal'),
+                    withdrawal(2940.33, { description: 'Tagged expense' }),
                 ],
                 disposableIncome: 2940.33,
             };
@@ -701,8 +684,8 @@ describe('AnalyzeDisplayService', () => {
             const data = {
                 ...createBasicReportData(),
                 disposableIncomeTransactions: [
-                    createMockTransaction('TRAVEL BOOKING', 400.0, 'withdrawal'),
-                    createMockTransaction('Montauk', 589.03, 'withdrawal'),
+                    withdrawal(400, { description: 'TRAVEL BOOKING' }),
+                    withdrawal(589.03, { description: 'Montauk' }),
                 ],
                 disposableIncome: 250.0,
             };
@@ -721,7 +704,7 @@ describe('AnalyzeDisplayService', () => {
             // negative transfer instruction.
             const data = {
                 ...createBasicReportData(),
-                disposableIncomeTransactions: [createMockTransaction('Refund', 250, 'deposit')],
+                disposableIncomeTransactions: [deposit(250, { description: 'Refund' })],
                 disposableIncome: -250,
             };
 

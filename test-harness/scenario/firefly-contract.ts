@@ -157,12 +157,6 @@ export const CC_READBACK = {
 };
 
 /**
- * V8 (verified): budget_id on a deposit or transfer is silently dropped (200,
- * null on read-back). The ledger therefore budgets withdrawals only.
- */
-export const BUDGET_ONLY_ON_WITHDRAWALS = true;
-
-/**
  * V23 (verified): GET /v1/tags/{tag} for a tag that does not exist answers
  * 404. `tagExists` relies on it: only this status means "no such tag".
  */

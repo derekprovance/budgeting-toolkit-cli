@@ -4,20 +4,11 @@ import {
     MAX_PAGE_SIZE,
     resolvePageSize,
 } from '../../src/utils/pagination.utils.js';
-import { ILogger } from '../../src/types/interface/logger.interface.js';
-
-const makeLogger = () =>
-    ({
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        trace: jest.fn(),
-    }) as unknown as ILogger & { warn: jest.Mock };
+import { createMockLogger } from '../shared/mocks.js';
 
 describe('resolvePageSize (BTK_PAGE_SIZE)', () => {
     it('defaults to 500 when unset', () => {
-        const logger = makeLogger();
+        const logger = createMockLogger();
         expect(DEFAULT_PAGE_SIZE).toBe(500);
         expect(MAX_PAGE_SIZE).toBe(500);
         expect(resolvePageSize(undefined, logger)).toBe(500);
@@ -32,7 +23,7 @@ describe('resolvePageSize (BTK_PAGE_SIZE)', () => {
         ['500', 500],
         [' 25 ', 25],
     ])('accepts %p as %p', (raw, expected) => {
-        const logger = makeLogger();
+        const logger = createMockLogger();
         expect(resolvePageSize(raw, logger)).toBe(expected);
         expect(logger.warn).not.toHaveBeenCalled();
     });
@@ -40,7 +31,7 @@ describe('resolvePageSize (BTK_PAGE_SIZE)', () => {
     it.each(['0', '501', '-5', '10.5', '1e2', 'abc', '10abc', '0x10', 'Infinity'])(
         'falls back to 500 and warns for %p',
         raw => {
-            const logger = makeLogger();
+            const logger = createMockLogger();
             expect(resolvePageSize(raw, logger)).toBe(500);
             expect(logger.warn).toHaveBeenCalledTimes(1);
             expect(logger.warn).toHaveBeenCalledWith(

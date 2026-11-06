@@ -1,5 +1,6 @@
 import { Agent } from 'https';
 import { jest } from '@jest/globals';
+import { createMockLogger } from '../shared/mocks.js';
 
 // Mock fs with actual jest mock functions
 const mockExistsSync = jest.fn<(path: string) => boolean>();
@@ -7,12 +8,7 @@ const mockReadFileSync = jest.fn<(path: string) => Buffer>();
 const mockAxiosCreate = jest.fn<(config?: unknown) => unknown>().mockReturnValue({});
 
 jest.unstable_mockModule('../../src/logger', () => ({
-    logger: {
-        debug: jest.fn<(obj: unknown, msg: string) => void>(),
-        info: jest.fn<(obj: unknown, msg: string) => void>(),
-        warn: jest.fn<(obj: unknown, msg: string) => void>(),
-        error: jest.fn<(obj: unknown, msg: string) => void>(),
-    },
+    logger: createMockLogger(),
 }));
 
 jest.unstable_mockModule('axios', () => ({

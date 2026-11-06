@@ -1,22 +1,8 @@
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TEST_DATE, deposit, withdrawal } from '../../shared/test-data.js';
 import { serializeBudgetReport } from '../../../src/services/display/budget-report-json.serializer.js';
 import { BudgetReportDto } from '../../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
 import { BudgetReportJson } from '../../../src/types/dto/report-json.types.js';
-
-const tx = (overrides: Partial<TransactionSplit>): TransactionSplit =>
-    ({
-        transaction_journal_id: 'j0',
-        description: 'Transaction',
-        type: 'withdrawal',
-        amount: '0.00',
-        date: '2025-01-15T00:00:00+00:00',
-        source_id: 'cc',
-        destination_id: 'shop',
-        budget_id: null,
-        bill_id: null,
-        ...overrides,
-    }) as TransactionSplit;
 
 const budget = (overrides: Partial<BudgetReportDto>): BudgetReportDto => ({
     budgetId: 'b',
@@ -61,12 +47,15 @@ describe('serializeBudgetReport', () => {
         historicalComparison: { previousMonthSpent: 45.004, averageSpent: 52.555 },
     });
 
-    const coffee = tx({ transaction_journal_id: 'u1', description: 'Coffee', amount: '35.00' });
-    const refund = tx({
+    const coffee = withdrawal(35, {
+        transaction_journal_id: 'u1',
+        description: 'Coffee',
+        source_id: 'cc',
+        destination_id: 'shop',
+    });
+    const refund = deposit(5, {
         transaction_journal_id: 'u2',
         description: 'Coffee refund',
-        type: 'deposit',
-        amount: '5.00',
         source_id: 'shop',
         destination_id: 'cc',
     });
@@ -131,7 +120,7 @@ describe('serializeBudgetReport', () => {
                         description: 'Coffee',
                         type: 'withdrawal',
                         amount: 35,
-                        date: '2025-01-15T00:00:00+00:00',
+                        date: TEST_DATE,
                         sourceId: 'cc',
                         destinationId: 'shop',
                         budgetId: null,
@@ -142,7 +131,7 @@ describe('serializeBudgetReport', () => {
                         description: 'Coffee refund',
                         type: 'deposit',
                         amount: 5,
-                        date: '2025-01-15T00:00:00+00:00',
+                        date: TEST_DATE,
                         sourceId: 'shop',
                         destinationId: 'cc',
                         budgetId: null,
