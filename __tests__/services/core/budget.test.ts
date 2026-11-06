@@ -1,13 +1,11 @@
 import { BudgetService, allocationsByBudget } from '../../../src/services/core/budget.service.js';
 import { BudgetArray, BudgetLimitArray, BudgetLimitRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
-import { IDateRangeService } from '../../../src/types/interface/date-range.service.interface.js';
 import { jest } from '@jest/globals';
 
 describe('BudgetService', () => {
     let budgetService: BudgetService;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
-    let mockDateRangeService: jest.Mocked<IDateRangeService>;
 
     beforeEach(() => {
         mockApiClient = {
@@ -16,15 +14,7 @@ describe('BudgetService', () => {
                 listBudgetLimit: jest.fn(),
             },
         } as unknown as jest.Mocked<FireflyClientWithCerts>;
-        mockDateRangeService = {
-            getDateRange: jest.fn().mockReturnValue({
-                startDate: new Date('2024-01-01'),
-                endDate: new Date('2024-01-31'),
-                startDateString: '2024-01-01',
-                endDateString: '2024-01-31',
-            }),
-        } as unknown as jest.Mocked<IDateRangeService>;
-        budgetService = new BudgetService(mockApiClient, mockDateRangeService);
+        budgetService = new BudgetService(mockApiClient);
     });
 
     describe('getBudgets', () => {

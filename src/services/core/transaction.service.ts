@@ -5,12 +5,12 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../../logger.js';
-import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
 import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
+import { monthRange } from '../../utils/date.utils.js';
 
 class TransactionError extends Error {
     constructor(
@@ -32,7 +32,6 @@ export class TransactionService implements ITransactionService {
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
         private readonly client: FireflyClientWithCerts,
-        private readonly dateRangeService: IDateRangeService,
         cacheImplementation: TransactionCache = new Map(),
         logger: ILogger = defaultLogger
     ) {
@@ -257,15 +256,15 @@ export class TransactionService implements ITransactionService {
         month: number,
         year: number
     ): Promise<TransactionRead[]> {
-        const range = this.dateRangeService.getDateRange(month, year);
+        const { start, end } = monthRange(month, year);
         return fetchAllPages(
             page =>
                 this.client.transactions.listTransaction(
                     undefined, // xTraceId
                     PAGE_SIZE,
                     page,
-                    range.startDateString,
-                    range.endDateString
+                    start,
+                    end
                 ),
             `fetch transactions for month: ${month}`,
             this.logger

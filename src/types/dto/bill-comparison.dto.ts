@@ -1,4 +1,4 @@
-import { today } from '../../utils/bill-schedule.utils.js';
+import { localDay } from '../../utils/date.utils.js';
 
 /**
  * Data Transfer Object for individual bill details.
@@ -89,7 +89,7 @@ export class BillComparisonDto {
  */
 export function isBillUpcoming(bill: BillDetailDto, now: Date = new Date()): boolean {
     // By calendar day, so a bill due today is still ahead of us
-    return !!bill.dueDate && today(bill.dueDate) >= today(now);
+    return !!bill.dueDate && localDay(bill.dueDate) >= localDay(now);
 }
 
 /**

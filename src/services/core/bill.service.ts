@@ -1,14 +1,10 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
-import { DateUtils } from '../../utils/date.utils.js';
+import { DateUtils, monthRange } from '../../utils/date.utils.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 
 export class BillService {
-    constructor(
-        private readonly client: FireflyClientWithCerts,
-        private readonly dateRangeService: IDateRangeService
-    ) {}
+    constructor(private readonly client: FireflyClientWithCerts) {}
 
     /**
      * Get all bills with pay_dates populated for the specified month.
@@ -22,9 +18,7 @@ export class BillService {
      */
     async getBillsForMonth(month: number, year: number): Promise<BillRead[]> {
         DateUtils.validateMonthYear(month, year);
-        const range = this.dateRangeService.getDateRange(month, year);
-        const start = range.startDateString;
-        const end = range.endDateString;
+        const { start, end } = monthRange(month, year);
 
         return fetchAllPages(
             page => this.client.bills.listBill(undefined, PAGE_SIZE, page, start, end),

@@ -1,5 +1,5 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
-import { dueDatesInMonth, toDay, today } from '../../src/utils/bill-schedule.utils.js';
+import { dueDatesInMonth } from '../../src/utils/bill-schedule.utils.js';
 
 const bill = (date: string, repeat_freq: string, skip = 0, end_date?: string) =>
     ({
@@ -51,19 +51,5 @@ describe('dueDatesInMonth', () => {
     it('should list nothing for a bill with no usable schedule', () => {
         expect(dueDatesInMonth(bill('', 'monthly'), 1, 2025)).toEqual([]);
         expect(dueDatesInMonth(bill('2025-01-10', 'fortnightly'), 1, 2025)).toEqual([]);
-    });
-});
-
-describe('toDay', () => {
-    it('should read the calendar day a Firefly datetime names, ignoring its offset', () => {
-        // Parsed as an instant this is January 31 in UTC
-        expect(toDay('2027-02-01T00:00:00+01:00')).toBe('2027-02-01');
-        expect(toDay('garbage')).toBeNull();
-    });
-});
-
-describe('today', () => {
-    it('should format the local calendar day', () => {
-        expect(today(new Date(2025, 0, 5, 23, 30))).toBe('2025-01-05');
     });
 });

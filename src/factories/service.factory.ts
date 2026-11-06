@@ -21,7 +21,6 @@ import { SplitTransactionDisplayService } from '../services/display/split-transa
 import { BillService } from '../services/core/bill.service.js';
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionSplitService } from '../services/transaction-split.service.js';
-import { DateRangeService } from '../services/core/date-range.service.js';
 import { BudgetAnalyticsService } from '../services/budget-analytics.service.js';
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
@@ -43,8 +42,7 @@ export class ServiceFactory {
         apiClient: FireflyClientWithCerts,
         config: AppConfig = ConfigManager.getInstance().getConfig()
     ) {
-        const dateRangeService = new DateRangeService();
-        const budgetService = new BudgetService(apiClient, dateRangeService);
+        const budgetService = new BudgetService(apiClient);
         const categoryService = new CategoryService(apiClient);
         const userInputService = new UserInputService(config.api.firefly.url);
         const excludedTransactionService = new ExcludedTransactionService(
@@ -56,11 +54,7 @@ export class ServiceFactory {
             config.accounts.untrackedAccounts
         );
 
-        const transactionService = new TransactionService(
-            excludedTransactionService,
-            apiClient,
-            dateRangeService
-        );
+        const transactionService = new TransactionService(excludedTransactionService, apiClient);
 
         const transactionClassificationService = new TransactionClassificationService(
             config.transactions.tags.disposableIncome,
@@ -80,7 +74,7 @@ export class ServiceFactory {
         const splitTransactionDisplayService = new SplitTransactionDisplayService(
             config.api.firefly.url
         );
-        const billService = new BillService(apiClient, dateRangeService);
+        const billService = new BillService(apiClient);
         const billComparisonService = new BillComparisonService(billService, cashFlowService);
         const transactionSplitService = new TransactionSplitService(apiClient);
         const budgetAnalyticsService = new BudgetAnalyticsService(budgetReport, cashFlowService);

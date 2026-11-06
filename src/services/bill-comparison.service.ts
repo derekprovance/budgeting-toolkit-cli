@@ -2,8 +2,8 @@ import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
 import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
-import { DateUtils } from '../utils/date.utils.js';
-import { Day, dueDatesInMonth, toDay, today } from '../utils/bill-schedule.utils.js';
+import { DateUtils, Day, localDay, monthRange, toDay } from '../utils/date.utils.js';
+import { dueDatesInMonth } from '../utils/bill-schedule.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { BillService } from './core/bill.service.js';
 import { CashFlowService } from './cash-flow.service.js';
@@ -139,10 +139,10 @@ export class BillComparisonService implements IBillComparisonService {
      * schedule comes from {@link dueDatesInMonth} instead.
      */
     private unpaidDatesInMonth(bill: BillRead, month: number, year: number): Day[] {
-        const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+        const { start, end } = monthRange(month, year);
         return (bill.attributes.pay_dates ?? [])
             .map(toDay)
-            .filter((day): day is Day => day !== null && day.startsWith(prefix))
+            .filter((day): day is Day => day !== null && day >= start && day <= end)
             .sort();
     }
 
@@ -194,7 +194,7 @@ export class BillComparisonService implements IBillComparisonService {
         actualTotal: number;
         billDetails: BillDetailDto[];
     } {
-        const todayDay = today();
+        const todayDay = localDay(new Date());
         let predictedTotal = 0;
         let actualTotal = 0;
         const billDetails: BillDetailDto[] = [];

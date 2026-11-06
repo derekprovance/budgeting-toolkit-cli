@@ -1,16 +1,12 @@
 import { BudgetLimitRead, BudgetRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
-import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
-import { DateUtils } from '../../utils/date.utils.js';
+import { DateUtils, monthRange } from '../../utils/date.utils.js';
 import { IBudgetService } from './budget.service.interface.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
 import { logger } from '../../logger.js';
 
 export class BudgetService implements IBudgetService {
-    constructor(
-        private readonly client: FireflyClientWithCerts,
-        private readonly dateRangeService: IDateRangeService
-    ) {}
+    constructor(private readonly client: FireflyClientWithCerts) {}
 
     async getBudgets(includeInactive = false): Promise<BudgetRead[]> {
         const budgets = await this.fetchBudgets();
@@ -19,14 +15,11 @@ export class BudgetService implements IBudgetService {
 
     async getBudgetLimits(month: number, year: number): Promise<BudgetLimitRead[]> {
         DateUtils.validateMonthYear(month, year);
-        const range = this.dateRangeService.getDateRange(month, year);
+        const { start, end } = monthRange(month, year);
 
         let results: Awaited<ReturnType<typeof this.client.budgets.listBudgetLimit>> | undefined;
         try {
-            results = await this.client.budgets.listBudgetLimit(
-                range.startDateString,
-                range.endDateString
-            );
+            results = await this.client.budgets.listBudgetLimit(start, end);
         } catch (error) {
             throw new Error(
                 `Failed to get budget limits for month ${month}: ${error instanceof Error ? error.message : String(error)}`,

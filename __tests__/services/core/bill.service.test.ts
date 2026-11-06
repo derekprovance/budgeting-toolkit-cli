@@ -2,13 +2,10 @@ import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import { BillService } from '../../../src/services/core/bill.service.js';
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
-import { IDateRangeService } from '../../../src/types/interface/date-range.service.interface.js';
-import { DateRangeService } from '../../../src/services/core/date-range.service.js';
 
 describe('BillService', () => {
     let billService: BillService;
     let mockClient: any;
-    let mockDateRangeService: jest.Mocked<IDateRangeService>;
 
     const mockBill: BillRead = {
         type: 'bills',
@@ -34,13 +31,7 @@ describe('BillService', () => {
             },
         } as any;
 
-        mockDateRangeService = {
-            getDateRange: jest.fn((month: number, year: number) =>
-                new DateRangeService().getDateRange(month, year)
-            ),
-        } as jest.Mocked<IDateRangeService>;
-
-        billService = new BillService(mockClient, mockDateRangeService);
+        billService = new BillService(mockClient);
     });
 
     describe('getBillsForMonth', () => {

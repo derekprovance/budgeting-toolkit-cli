@@ -1,20 +1,5 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
-
-/** A calendar day as YYYY-MM-DD; plain string comparison orders these */
-export type Day = string;
-
-const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})/;
-
-/** The calendar day a Firefly date or datetime names, ignoring any offset */
-export function toDay(value: string | null | undefined): Day | null {
-    const match = ISO_DAY.exec(value ?? '');
-    return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
-}
-
-/** Today in local time, as the owner's calendar sees it */
-export function today(now: Date = new Date()): Day {
-    return formatDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
-}
+import { Day, daysInMonth, formatDay, monthRange, toDay } from './date.utils.js';
 
 /**
  * Every date a bill falls due in a month, from its own schedule.
@@ -32,8 +17,7 @@ export function dueDatesInMonth(bill: BillRead, month: number, year: number): Da
         return [];
     }
 
-    const first = formatDay(year, month, 1);
-    const last = formatDay(year, month, daysInMonth(year, month));
+    const { start: first, end: last } = monthRange(month, year);
     const end = toDay(bill.attributes.end_date);
     const stride = (bill.attributes.skip ?? 0) + 1;
 
@@ -69,13 +53,4 @@ function addDays(day: Day, days: number): Day {
     const [y, m, d] = day.split('-').map(Number);
     const date = new Date(Date.UTC(y, m - 1, d + days));
     return formatDay(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
-}
-
-function daysInMonth(year: number, month: number): number {
-    return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function formatDay(year: number, month: number, day: number): Day {
-    const pad = (n: number, width = 2) => String(n).padStart(width, '0');
-    return `${pad(year, 4)}-${pad(month)}-${pad(day)}`;
 }
