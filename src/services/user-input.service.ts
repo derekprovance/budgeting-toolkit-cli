@@ -253,9 +253,7 @@ export class UserInputService {
                 ? `${description.substring(0, this.DESCRIPTION_TRUNCATE_LENGTH)}...`
                 : description;
 
-        const url =
-            this.baseUrl && transactionId ? this.getTransactionLink(transactionId) : undefined;
-        return DisplayFormatterUtils.createHyperlink(truncatedDescription, url);
+        return DisplayFormatterUtils.linkedText(truncatedDescription, this.baseUrl, transactionId);
     }
 
     /**
@@ -339,13 +337,6 @@ export class UserInputService {
         });
 
         return reviewPrompt(expand({ message, default: 'a', choices }));
-    }
-
-    /*
-     * Returns the link to show a transaction to the user
-     */
-    private getTransactionLink(transactionId: string | undefined) {
-        return DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId ?? '');
     }
 
     /**
