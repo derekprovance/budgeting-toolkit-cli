@@ -324,12 +324,35 @@ describe('CLI', () => {
                 testConfig.transactions.expectedMonthlyPaycheck = 2000;
             }
             expect(processExitSpy).toHaveBeenCalledWith(1);
-            expect(consoleErrorSpy).toHaveBeenCalledWith(
-                expect.stringContaining(
-                    'Error analyzing budget: expectedMonthlyPaycheck is required for analyze command'
-                )
-            );
+            expect(consoleErrorSpy.mock.calls).toEqual([
+                ['\n❌ Configuration Error: analyze command\n'],
+                [
+                    'expectedMonthlyPaycheck is required for analyze command.\n' +
+                        '  Add to config.yaml:\n' +
+                        '    expectedMonthlyPaycheck: 5000.00\n',
+                ],
+                ['See CONFIG.md for detailed configuration documentation.'],
+            ]);
             expect(mockAnalyzeExecute).not.toHaveBeenCalled();
+        });
+
+        it('should exit 1 with the guidance when categorize has no ANTHROPIC_API_KEY', async () => {
+            const cli = createCli();
+
+            await expect(cli.parseAsync(argv('categorize', 'Import-2025-06-23'))).rejects.toThrow(
+                'process.exit called'
+            );
+            expect(processExitSpy).toHaveBeenCalledWith(1);
+            expect(consoleErrorSpy.mock.calls).toEqual([
+                ['\n❌ Configuration Error: categorize command\n'],
+                [
+                    'ANTHROPIC_API_KEY is required for categorize command.\n' +
+                        '  Add to .env file:\n' +
+                        '    ANTHROPIC_API_KEY=your_anthropic_key_here\n\n' +
+                        '  Get your API key from: https://console.anthropic.com/\n',
+                ],
+                ['See CONFIG.md for detailed AI configuration.'],
+            ]);
         });
 
         it('should still exit 1 when a json-mode command fails', async () => {
