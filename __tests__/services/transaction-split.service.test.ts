@@ -131,42 +131,6 @@ describe('TransactionSplitService', () => {
         });
     });
 
-    describe('validateSplitAmounts', () => {
-        it('should validate exact match', () => {
-            const result = service.validateSplitAmounts(100, [60, 40]);
-            expect(result).toBe(true);
-        });
-
-        it('should accept amounts within EPSILON tolerance (0.01)', () => {
-            const result = service.validateSplitAmounts(100, [60.005, 39.995]);
-            expect(result).toBe(true);
-        });
-
-        it('should reject amounts exceeding EPSILON tolerance', () => {
-            const result = service.validateSplitAmounts(100, [60, 41]);
-            expect(result).toBe(false);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
-
-        it('should reject negative amounts', () => {
-            const result = service.validateSplitAmounts(100, [60, -60]);
-            expect(result).toBe(false);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
-
-        it('should reject zero amounts', () => {
-            const result = service.validateSplitAmounts(100, [100, 0]);
-            expect(result).toBe(false);
-            expect(mockLogger.error).toHaveBeenCalled();
-        });
-
-        it('should handle floating-point precision correctly', () => {
-            // Classic floating-point issue: 0.1 + 0.2 !== 0.3
-            const result = service.validateSplitAmounts(10.1, [3.37, 6.73]);
-            expect(result).toBe(true);
-        });
-    });
-
     describe('splitTransaction', () => {
         it('should split transaction successfully', async () => {
             const mockTransaction = createMockTransaction();
@@ -195,17 +159,6 @@ describe('TransactionSplitService', () => {
                 'Failed to split transaction 123: Unauthenticated'
             );
             await expect(failure).rejects.toMatchObject({ cause: fireflyError });
-        });
-
-        it('should throw error when split amounts do not sum to original', async () => {
-            const mockTransaction = createMockTransaction();
-
-            await expect(
-                service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '50.00' }, // Sum is 110, not 100
-                ])
-            ).rejects.toThrow('do not equal');
         });
 
         describe('metadata handling', () => {

@@ -4,6 +4,7 @@ import { Command } from '../types/interface/command.interface.js';
 import { TransactionSplitService, SplitData } from '../services/transaction-split.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
+import { parseSplitAmount, remainderAmount } from '../utils/split-amount.utils.js';
 
 /**
  * Parameters for split transaction command
@@ -57,13 +58,10 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
 
         // Get split amount: use CLI parameter if provided, otherwise prompt
         const firstSplitAmount = amount
-            ? this.validateAndParseSplitAmount(amount, originalAmount, currencySymbol)
+            ? parseSplitAmount(amount, originalAmount, currencySymbol)
             : await this.userInputService.getSplitAmount(originalAmount, currencySymbol);
 
-        const secondSplitAmount = UserInputService.remainderAmount(
-            originalAmount,
-            firstSplitAmount
-        );
+        const secondSplitAmount = remainderAmount(originalAmount, firstSplitAmount);
 
         // Show remainder
         console.log(this.displayService.formatRemainder(secondSplitAmount, currencySymbol));
@@ -128,32 +126,6 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
         console.log(
             this.displayService.formatSuccess(transactionId, updated.attributes.transactions.length)
         );
-    }
-
-    /**
-     * Validates and parses split amount from CLI parameter
-     * @param amountStr Amount string from CLI parameter
-     * @param originalAmount Original transaction amount
-     * @param currencySymbol Currency symbol for error messages
-     * @returns Parsed amount as number
-     * @throws Error if validation fails
-     */
-    private validateAndParseSplitAmount(
-        amountStr: string,
-        originalAmount: number,
-        currencySymbol: string
-    ): number {
-        const validationResult = this.userInputService.validateSplitAmount(
-            amountStr,
-            originalAmount,
-            currencySymbol
-        );
-
-        if (validationResult !== true) {
-            throw new Error(validationResult);
-        }
-
-        return parseFloat(amountStr.trim());
     }
 }
 

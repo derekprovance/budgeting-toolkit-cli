@@ -24,12 +24,6 @@ export type SplitParts = readonly [SplitData, SplitData];
  * Service for splitting transactions into multiple parts
  */
 export class TransactionSplitService {
-    /**
-     * Tolerance for floating point comparison in currency calculations.
-     * Set to 0.01 (1 cent) to accommodate rounding differences.
-     */
-    private static readonly CURRENCY_COMPARISON_EPSILON = 0.01;
-
     private readonly logger: ILogger;
 
     constructor(
@@ -63,38 +57,24 @@ export class TransactionSplitService {
      * @param transactionId The ID of the transaction to split
      * @param originalSplit Its only split, from getSingleSplit
      * @param parts The first part keeps the original's category, budget and
-     *   tags; the second is left for manual assignment
+     *   tags; the second is left for manual assignment. Their amounts must sum
+     *   to the original's: the first is checked by validateSplitAmount
+     *   (split-amount.utils) and the second is its remainderAmount
      * @returns The updated transaction
-     * @throws when the parts do not sum to the original or Firefly rejects the update
+     * @throws when Firefly rejects the update
      */
     async splitTransaction(
         transactionId: string,
         originalSplit: TransactionSplit,
         parts: SplitParts
     ): Promise<TransactionRead> {
-        const [firstSplitData, secondSplitData] = parts;
-
-        // Validate the split amounts
-        const originalAmount = parseFloat(originalSplit.amount);
-        const firstAmount = parseFloat(firstSplitData.amount);
-        const secondAmount = parseFloat(secondSplitData.amount);
-
-        if (!this.validateSplitAmounts(originalAmount, [firstAmount, secondAmount])) {
-            throw new Error(
-                `Split amounts (${firstAmount} + ${secondAmount} = ${firstAmount + secondAmount}) ` +
-                    `do not equal original amount (${originalAmount})`
-            );
-        }
-
-        // Build the update payload
         const updatePayload = this.createSplitPayload(originalSplit, parts);
 
         this.logger.debug(
             {
                 transactionId,
-                originalAmount,
-                firstAmount,
-                secondAmount,
+                originalAmount: originalSplit.amount,
+                partAmounts: parts.map(part => part.amount),
             },
             'Splitting transaction'
         );
@@ -143,39 +123,6 @@ export class TransactionSplitService {
                 { cause: error }
             );
         }
-    }
-
-    /**
-     * Validates that split amounts sum to the original amount
-     * @param originalAmount The original transaction amount
-     * @param splitAmounts Array of split amounts to validate
-     * @returns true if valid, false otherwise
-     */
-    validateSplitAmounts(originalAmount: number, splitAmounts: number[]): boolean {
-        if (splitAmounts.some(amount => amount <= 0)) {
-            this.logger.error('Split amounts must be greater than zero');
-            return false;
-        }
-
-        const sum = splitAmounts.reduce((acc, amount) => acc + amount, 0);
-
-        // Use epsilon for floating point comparison
-        const isValid =
-            Math.abs(sum - originalAmount) < TransactionSplitService.CURRENCY_COMPARISON_EPSILON;
-
-        if (!isValid) {
-            this.logger.error(
-                {
-                    originalAmount,
-                    splitAmounts,
-                    sum,
-                    difference: sum - originalAmount,
-                },
-                'Split amounts do not sum to original amount'
-            );
-        }
-
-        return isValid;
     }
 
     /**

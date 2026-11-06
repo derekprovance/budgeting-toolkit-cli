@@ -58,7 +58,6 @@ describe('SplitTransactionCommand', () => {
             getSplitAmount: jest.fn(),
             getCustomSplitText: jest.fn(),
             confirmSplit: jest.fn(),
-            validateSplitAmount: jest.fn().mockReturnValue(true),
         } as unknown as jest.Mocked<UserInputService>;
 
         command = new SplitTransactionCommand(splitService, displayService, userInputService);
@@ -98,11 +97,9 @@ describe('SplitTransactionCommand', () => {
             expect(splitService.splitTransaction).not.toHaveBeenCalled();
         });
 
-        it('should throw error when amount validation fails', async () => {
-            userInputService.validateSplitAmount.mockReturnValue('Amount must be positive');
-
-            await expect(command.execute({ ...nonInteractive, amount: '-50.00' })).rejects.toThrow(
-                'Amount must be positive'
+        it('should reject an --amount the split cannot take', async () => {
+            await expect(command.execute({ ...nonInteractive, amount: '150.00' })).rejects.toThrow(
+                'Amount must be less than the original amount ($100)'
             );
 
             expect(splitService.splitTransaction).not.toHaveBeenCalled();
