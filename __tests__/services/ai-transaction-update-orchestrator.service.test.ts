@@ -75,11 +75,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             catalog,
             { assign } as unknown as LLMAssignmentService,
             validator,
-            force,
-            false,
             new TransactionHistoryService(historySource, 12, {
                 canCarryBudget: t => validator.shouldSetBudget(t),
-            })
+            }),
+            { force, dryRun: false }
         );
     };
 

@@ -26,6 +26,7 @@ import { BudgetAnalyticsService } from '../services/budget-analytics.service.js'
 import { BudgetInsightService } from '../services/budget-insight.service.js';
 import { BudgetDisplayService } from '../services/display/budget-display.service.js';
 import { AppConfig } from '../config/config.types.js';
+import { CategorizeOptions } from '../types/categorize.types.js';
 
 /** Every service the CLI wires, as returned by {@link ServiceFactory.createServices}. */
 export type AppServices = ReturnType<typeof ServiceFactory.createServices>;
@@ -110,9 +111,8 @@ export class ServiceFactory {
 
     static async createAITransactionUpdateOrchestrator(
         services: AppServices,
-        force: boolean = false,
-        dryRun: boolean = false,
-        config: AppConfig = ConfigManager.getInstance().getConfig()
+        config: AppConfig,
+        options: CategorizeOptions
     ): Promise<AITransactionUpdateOrchestrator> {
         const llmAssignmentService = new LLMAssignmentService(createClaudeClient(config), {
             batchSize: config.llm.batchSize,
@@ -130,7 +130,7 @@ export class ServiceFactory {
             services.transactionValidatorService,
             catalog,
             services.userInputService,
-            dryRun
+            options
         );
 
         return new AITransactionUpdateOrchestrator(
@@ -139,15 +139,14 @@ export class ServiceFactory {
             catalog,
             llmAssignmentService,
             services.transactionValidatorService,
-            force,
-            dryRun,
             new TransactionHistoryService(
                 services.transactionService,
                 config.categorize.historyMonths,
                 {
                     canCarryBudget: t => services.transactionValidatorService.shouldSetBudget(t),
                 }
-            )
+            ),
+            options
         );
     }
 }

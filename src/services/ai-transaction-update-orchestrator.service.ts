@@ -17,7 +17,12 @@ import {
 import { TransactionValidationError } from '../types/result.type.js';
 import { isCertificateError } from '../utils/error-detection.utils.js';
 import { TransactionHistoryService } from './transaction-history.service.js';
-import { JournaledTransaction, Suggestion, hasJournalId } from '../types/categorize.types.js';
+import {
+    CategorizeOptions,
+    JournaledTransaction,
+    Suggestion,
+    hasJournalId,
+} from '../types/categorize.types.js';
 
 interface SuggestionCounts {
     category: { history: number; ai: number };
@@ -36,9 +41,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         private readonly catalog: CategoryBudgetCatalog,
         private readonly llm: LLMAssignmentService,
         private readonly validator: ITransactionValidatorService,
-        private readonly force: boolean = false,
-        private readonly dryRun: boolean = false,
-        private readonly history?: TransactionHistoryService
+        private readonly history: TransactionHistoryService,
+        private readonly options: CategorizeOptions
     ) {}
 
     async updateTransactionsByTag(
@@ -51,7 +55,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         tag,
                         updateMode,
-                        dryRun: this.dryRun,
                     },
                     'Tag does not exist'
                 );
@@ -64,7 +67,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
 
             const transactions = unfilteredTransactions
-                .filter(t => this.validator.shouldProcessTransaction(t, this.force))
+                .filter(t => this.validator.shouldProcessTransaction(t, this.options.force))
                 .filter(t => this.isUpdatable(t));
 
             if (!transactions.length) {
@@ -72,7 +75,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         tag,
                         updateMode,
-                        dryRun: this.dryRun,
                         totalTransactions: unfilteredTransactions.length,
                         filteredTransactions: transactions.length,
                     },
@@ -88,7 +90,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 {
                     tag,
                     updateMode,
-                    dryRun: this.dryRun,
                     totalTransactions: transactions.length,
                 },
                 'Processing transactions'
@@ -119,7 +120,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     {
                         tag,
                         updateMode,
-                        dryRun: this.dryRun,
                         totalTransactions: transactions.length,
                         updatedTransactions: updatedTransactions.length,
                         validationErrors: errors.length,
@@ -147,7 +147,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 {
                     tag,
                     updateMode,
-                    dryRun: this.dryRun,
                     error: ex instanceof Error ? ex.message : 'Unknown error',
                 },
                 'Failed to update transactions'
@@ -182,9 +181,6 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
      * and the index stays empty. Never rejects.
      */
     private async loadHistory(transactions: JournaledTransaction[]): Promise<void> {
-        if (!this.history) {
-            return;
-        }
         const own = new Set(transactions.map(t => t.transaction_journal_id));
         try {
             await this.history.load(own);
@@ -217,7 +213,9 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
         // Group B: has category, no budget — budget assignment only
         const budgetOnlySet = new Set(
-            this.force ? [] : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
+            this.options.force
+                ? []
+                : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
         );
 
         await this.loadHistory(transactions);
@@ -244,7 +242,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
             // A history value is only used while it still names an existing
             // category or budget; otherwise the field falls through to the AI
-            const suggestion = this.history?.suggest(t);
+            const suggestion = this.history.suggest(t);
             const category = wantsCategory
                 ? this.catalog.findCategory(suggestion?.category)?.name
                 : undefined;
@@ -387,7 +385,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                     skipped: skippedCount,
                     validationErrors: errorCount,
                 },
-                `${this.dryRun ? '[DRYRUN] ' : ''}Transaction update completed`
+                'Transaction update completed'
             );
 
             if (errorCount > 0) {

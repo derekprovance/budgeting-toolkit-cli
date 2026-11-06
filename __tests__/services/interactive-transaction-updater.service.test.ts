@@ -39,7 +39,7 @@ describe('InteractiveTransactionUpdater', () => {
             mockValidator,
             catalog,
             mockUserInputService,
-            dryRun
+            { force: false, dryRun }
         );
 
     const prepare = (ai: Suggestion = suggestion, updater = build()) =>

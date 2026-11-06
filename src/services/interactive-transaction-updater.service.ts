@@ -12,7 +12,7 @@ import { Result, TransactionValidationError } from '../types/result.type.js';
 import { logger } from '../logger.js';
 import { ReviewAction } from '../types/enums.js';
 import { EditTransactionAttribute } from '../types/enums.js';
-import { JournaledTransaction, Suggestion } from '../types/categorize.types.js';
+import { CategorizeOptions, JournaledTransaction, Suggestion } from '../types/categorize.types.js';
 
 /** Position of a transaction in the review, shown to the user as `[index/total]` */
 export interface ReviewProgress {
@@ -39,7 +39,7 @@ export class InteractiveTransactionUpdater {
         private readonly validator: ITransactionValidatorService,
         private readonly catalog: CategoryBudgetCatalog,
         private readonly userInputService: UserInputService,
-        private readonly dryRun: boolean = false
+        private readonly options: CategorizeOptions
     ) {}
 
     /**
@@ -92,7 +92,7 @@ export class InteractiveTransactionUpdater {
     ): Promise<Result<TransactionRead | undefined, TransactionValidationError>> {
         const { transaction, journalId, category, budget, source } = update;
         try {
-            if (this.dryRun) {
+            if (this.options.dryRun) {
                 return this.executeDryRun(transaction, journalId, category, budget);
             }
 

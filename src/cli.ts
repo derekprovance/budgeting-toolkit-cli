@@ -9,8 +9,9 @@ import { AppServices, ServiceFactory } from './factories/service.factory.js';
 import { createAnalyzeCommand, createBudgetReportCommand } from './factories/command.factory.js';
 import {
     BudgetDateOptions,
-    CategorizeOptions,
+    CategorizeCliOptions,
 } from './types/interface/command-options.interface.js';
+import { CategorizeOptions } from './types/categorize.types.js';
 import { CategorizeMode } from './types/enums.js';
 import { CommandConfigValidator } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
@@ -306,7 +307,7 @@ Examples:
   $ budgeting-toolkit categorize Import-2025-06-23 -n           # preview changes only
   $ budgeting-toolkit categorize Import-2025-06-23 -m category  # categories only`
         )
-        .action(async (tag: string, opts: CategorizeOptions) => {
+        .action(async (tag: string, opts: CategorizeCliOptions) => {
             requireArg(
                 tag,
                 'Tag parameter',
@@ -319,18 +320,22 @@ Examples:
                 const config = ConfigManager.getInstance().getConfig();
                 CommandConfigValidator.validateCategorizeCommand(config);
 
+                const options: CategorizeOptions = {
+                    force: opts.force ?? false,
+                    dryRun: opts.dryRun ?? false,
+                };
                 const aiTransactionUpdateOrchestrator =
                     await ServiceFactory.createAITransactionUpdateOrchestrator(
                         services,
-                        opts.force,
-                        opts.dryRun
+                        config,
+                        options
                     );
 
                 const command = new CategorizeCommand(aiTransactionUpdateOrchestrator);
                 await command.execute({
                     tag,
                     updateMode: opts.mode,
-                    dryRun: opts.dryRun,
+                    dryRun: options.dryRun,
                 });
             } catch (error) {
                 handleError(error, 'categorizing transactions');
