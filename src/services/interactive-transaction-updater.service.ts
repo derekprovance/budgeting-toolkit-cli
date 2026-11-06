@@ -101,6 +101,7 @@ export class InteractiveTransactionUpdater {
     ): Promise<TransactionRead | undefined> {
         const { transaction } = update;
         const { id: transactionId } = this.findTransactionRead(transaction);
+        const canSetBudget = this.validator.shouldSetBudget(transaction);
         // Once per transaction: an Edit re-prompts below without a new separator
         this.userInputService.printSeparator();
 
@@ -110,6 +111,7 @@ export class InteractiveTransactionUpdater {
                 transaction,
                 transactionId,
                 {
+                    canSetBudget,
                     category: choice.category?.name,
                     budget: choice.budget?.attributes.name,
                     source: this.sourceOf(update, choice),
@@ -121,7 +123,7 @@ export class InteractiveTransactionUpdater {
                 case ReviewAction.Skip:
                     return undefined;
                 case ReviewAction.Edit:
-                    choice = await this.edit(update, choice);
+                    choice = await this.edit(update, choice, canSetBudget);
                     break;
                 case ReviewAction.UpdateAll:
                     return this.apply(transaction, choice);
@@ -155,10 +157,12 @@ export class InteractiveTransactionUpdater {
     }
 
     /** Asks which fields to change and for their new values; keeps the rest */
-    private async edit(update: PreparedUpdate, choice: Choice): Promise<Choice> {
-        const fields = await this.userInputService.shouldEditCategoryBudget(
-            update.transaction.type === 'deposit'
-        );
+    private async edit(
+        update: PreparedUpdate,
+        choice: Choice,
+        canSetBudget: boolean
+    ): Promise<Choice> {
+        const fields = await this.userInputService.shouldEditCategoryBudget(canSetBudget);
 
         const edited = { ...choice };
         for (const field of fields) {

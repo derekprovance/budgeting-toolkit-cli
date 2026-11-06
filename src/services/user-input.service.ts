@@ -12,6 +12,11 @@ import { SuggestionSource } from '../types/categorize.types.js';
  * Interface for transaction update options
  */
 interface TransactionUpdateOptions {
+    /**
+     * Whether the transaction may be given a budget (the validator's
+     * shouldSetBudget). When false the budget shows as N/A and cannot be chosen.
+     */
+    canSetBudget: boolean;
     category?: string;
     budget?: string;
     /** Where each suggestion came from; shown after the proposed value */
@@ -89,9 +94,7 @@ export class UserInputService {
             changes,
             options.progress
         );
-        const isDeposit = transaction.type === 'deposit';
-
-        return this.promptUser(message, isDeposit);
+        return this.promptUser(message, options.canSetBudget);
     }
 
     /**
@@ -101,9 +104,7 @@ export class UserInputService {
         console.log();
     }
 
-    async shouldEditCategoryBudget(
-        isDeposit: boolean = false
-    ): Promise<EditTransactionAttribute[]> {
+    async shouldEditCategoryBudget(canSetBudget: boolean): Promise<EditTransactionAttribute[]> {
         const choices: { name: string; value: EditTransactionAttribute; description: string }[] = [
             {
                 name: 'Modify Category',
@@ -112,8 +113,7 @@ export class UserInputService {
             },
         ];
 
-        // Only allow budget modification for non-deposit transactions
-        if (!isDeposit) {
+        if (canSetBudget) {
             choices.push({
                 name: 'Modify Budget',
                 value: EditTransactionAttribute.Budget,
@@ -238,8 +238,7 @@ export class UserInputService {
         }
 
         // Budget field
-        if (transaction.type === 'deposit') {
-            // Deposits cannot have budgets in Firefly III - show N/A
+        if (!options.canSetBudget) {
             changes.push(`${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`);
         } else if (options.budget && options.budget === transaction.budget_name) {
             changes.push(this.formatUnchanged(EditTransactionAttribute.Budget, options.budget));
@@ -346,7 +345,7 @@ export class UserInputService {
     /**
      * Prompts the user for confirmation
      */
-    private async promptUser(message: string, isDeposit: boolean = false): Promise<ReviewAction> {
+    private async promptUser(message: string, canSetBudget: boolean): Promise<ReviewAction> {
         type InquirerKey = 'a' | 'b' | 'c' | 'e' | 's';
 
         const choices: Array<{
@@ -361,9 +360,7 @@ export class UserInputService {
             },
         ];
 
-        // Only offer budget option for non-deposit transactions
-        // This allows users to manually set fields via Edit even when AI didn't suggest a value
-        if (!isDeposit) {
+        if (canSetBudget) {
             choices.push({
                 key: 'b',
                 name: 'Update only the budget',

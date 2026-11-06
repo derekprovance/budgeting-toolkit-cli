@@ -82,6 +82,7 @@ describe('InteractiveTransactionUpdater', () => {
 
         mockValidator = {
             categoryOrBudgetChanged: jest.fn().mockReturnValue(true),
+            shouldSetBudget: jest.fn().mockReturnValue(true),
         } as unknown as jest.Mocked<TransactionValidatorService>;
 
         mockUserInputService = {
@@ -150,12 +151,31 @@ describe('InteractiveTransactionUpdater', () => {
                 transaction,
                 '42',
                 {
+                    canSetBudget: true,
                     category: 'New Category',
                     budget: 'New Budget',
                     source: { category: 'history', budget: 'ai' },
                     progress: { index: 3, total: 26 },
                 }
             );
+        });
+
+        it('offers no budget choice where the validator refuses one (bill-linked)', async () => {
+            mockValidator.shouldSetBudget.mockReturnValue(false);
+            mockUserInputService.askToUpdateTransaction
+                .mockResolvedValueOnce(ReviewAction.Edit)
+                .mockResolvedValueOnce(ReviewAction.Skip);
+            mockUserInputService.shouldEditCategoryBudget.mockResolvedValue([]);
+
+            await review({ category: 'New Category' });
+
+            expect(mockValidator.shouldSetBudget).toHaveBeenCalledWith(transaction);
+            expect(mockUserInputService.askToUpdateTransaction).toHaveBeenCalledWith(
+                transaction,
+                '42',
+                expect.objectContaining({ canSetBudget: false })
+            );
+            expect(mockUserInputService.shouldEditCategoryBudget).toHaveBeenCalledWith(false);
         });
 
         it('applies only the category when the user chooses it', async () => {
