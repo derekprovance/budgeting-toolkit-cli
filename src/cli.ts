@@ -201,9 +201,7 @@ const loadServices = (configPath?: string): { config: AppConfig; services: AppSe
         const apiClient = new FireflyClientWithCerts({
             BASE: config.api.firefly.url + '/api',
             TOKEN: config.api.firefly.token,
-            caCertPath: config.api.firefly.certificates?.caCertPath,
-            clientCertPath: config.api.firefly.certificates?.clientCertPath,
-            clientCertPassword: config.api.firefly.certificates?.clientCertPassword,
+            certificates: config.api.firefly.certificates,
         });
 
         return { config, services: ServiceFactory.createServices(apiClient, config) };

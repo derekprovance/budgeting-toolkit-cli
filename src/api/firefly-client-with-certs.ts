@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { FireflyClient, BaseHttpRequest, CancelablePromise } from '@derekprovance/firefly-iii-sdk';
 import type { OpenAPIConfig } from '@derekprovance/firefly-iii-sdk';
 import type { ApiRequestOptions } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/ApiRequestOptions.js';
@@ -8,9 +6,10 @@ import { CertificateConfig } from '../config/config.types.js';
 import { request as __request } from '@derekprovance/firefly-iii-sdk/dist/sdk/core/request.js';
 import type { AxiosInstance } from 'axios';
 
-export interface FireflyClientWithCertsConfig extends CertificateConfig {
+export interface FireflyClientWithCertsConfig {
     BASE: string;
     TOKEN: string;
+    certificates?: CertificateConfig;
 }
 
 /**
@@ -18,16 +17,19 @@ export interface FireflyClientWithCertsConfig extends CertificateConfig {
  */
 export type CertificateAxiosFactory = (config: CertificateConfig) => AxiosInstance;
 
+/** What FireflyClient accepts as its request class (the SDK does not export the type) */
+type HttpRequestConstructor = ConstructorParameters<typeof FireflyClient>[1];
+
 /**
  * Custom HTTP Request implementation that uses a custom axios instance
  * with client certificate support.
  */
 class CustomAxiosHttpRequest extends BaseHttpRequest {
-    private axiosInstance: AxiosInstance;
-
-    constructor(config: OpenAPIConfig, axiosInstance: AxiosInstance) {
+    constructor(
+        config: OpenAPIConfig,
+        private readonly axiosInstance: AxiosInstance
+    ) {
         super(config);
-        this.axiosInstance = axiosInstance;
     }
 
     public override request<T>(options: ApiRequestOptions): CancelablePromise<T> {
@@ -41,6 +43,15 @@ class CustomAxiosHttpRequest extends BaseHttpRequest {
     }
 }
 
+/** A request class the SDK can construct from its config alone, bound to axiosInstance */
+function requestClassFor(axiosInstance: AxiosInstance): HttpRequestConstructor {
+    return class extends CustomAxiosHttpRequest {
+        constructor(config: OpenAPIConfig) {
+            super(config, axiosInstance);
+        }
+    };
+}
+
 /**
  * Firefly III SDK Client with Client Certificate Support
  *
@@ -52,9 +63,11 @@ class CustomAxiosHttpRequest extends BaseHttpRequest {
  * const client = new FireflyClientWithCerts({
  *   BASE: 'https://your-firefly-instance.com/api',
  *   TOKEN: 'your-api-token',
- *   caCertPath: '/path/to/ca.pem',
- *   clientCertPath: '/path/to/client.p12',
- *   clientCertPassword: 'password'
+ *   certificates: {
+ *     caCertPath: '/path/to/ca.pem',
+ *     clientCertPath: '/path/to/client.p12',
+ *     clientCertPassword: 'password',
+ *   },
  * });
  *
  * // Use the client services
@@ -63,30 +76,14 @@ class CustomAxiosHttpRequest extends BaseHttpRequest {
  */
 export class FireflyClientWithCerts extends FireflyClient {
     constructor(
-        config: FireflyClientWithCertsConfig,
+        { BASE, TOKEN, certificates }: FireflyClientWithCertsConfig,
         certificateAxiosFactory: CertificateAxiosFactory = createCertificateAxios
     ) {
-        // Create custom axios instance when any certificate (client or CA) is provided
-        const axiosInstance =
-            config.clientCertPath || config.caCertPath
-                ? certificateAxiosFactory({
-                      caCertPath: config.caCertPath,
-                      clientCertPath: config.clientCertPath,
-                      clientCertPassword: config.clientCertPassword,
-                  })
-                : undefined;
-
+        // A custom agent is needed when any certificate (client or CA) is configured
         super(
-            {
-                BASE: config.BASE,
-                TOKEN: config.TOKEN,
-            },
-            axiosInstance
-                ? (class extends CustomAxiosHttpRequest {
-                      constructor(cfg: OpenAPIConfig) {
-                          super(cfg, axiosInstance!);
-                      }
-                  } as any)
+            { BASE, TOKEN },
+            certificates?.clientCertPath || certificates?.caCertPath
+                ? requestClassFor(certificateAxiosFactory(certificates))
                 : undefined
         );
     }
