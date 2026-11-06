@@ -138,8 +138,7 @@ export class BudgetDisplayService {
             );
         }
 
-        // Days remaining (for current month only)
-        if (data.isCurrentMonth && data.daysInfo) {
+        if (data.daysInfo) {
             lines.push(`${chalk.bold('Days Remaining:')}   ${data.daysInfo.daysLeft} days`);
             if (data.daysInfo.dataThrough) {
                 // A month looks cheap when the last few days have not imported

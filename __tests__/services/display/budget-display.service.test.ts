@@ -50,7 +50,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -100,7 +99,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, true);
@@ -148,7 +146,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -203,7 +200,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, true);
@@ -253,7 +249,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -298,7 +293,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, true);
@@ -330,7 +324,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -373,7 +366,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceWithUrl.formatReport(reportData, false);
@@ -424,7 +416,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceWithUrl.formatReport(reportData, false);
@@ -464,7 +455,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceNoUrl.formatReport(reportData, false);
@@ -504,7 +494,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceWithUrl.formatReport(reportData, false);
@@ -541,7 +530,6 @@ describe('BudgetDisplayService', () => {
             insights: [],
             month: 8,
             year: 2026,
-            isCurrentMonth: false,
         });
 
         it('should render the unbudgeted bucket under its header', () => {

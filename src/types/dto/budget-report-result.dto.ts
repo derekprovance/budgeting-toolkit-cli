@@ -16,7 +16,7 @@ export interface BudgetReportResult {
     insights: BudgetInsight[];
     month: number;
     year: number;
-    isCurrentMonth: boolean;
+    /** Set only when the report is for the current month */
     daysInfo?: {
         daysLeft: number;
         /** Date of the most recent imported transaction, if known */

@@ -125,7 +125,6 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
                 insights,
                 month,
                 year,
-                isCurrentMonth,
                 daysInfo,
             };
 
