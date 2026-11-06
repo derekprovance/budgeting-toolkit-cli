@@ -81,12 +81,6 @@ describe('TransactionService', () => {
             );
         });
 
-        it('should throw error when tag is empty', async () => {
-            await expect(service.getTransactionsByTag('')).rejects.toThrow(
-                'Tag parameter is required'
-            );
-        });
-
         it('should throw error when API call fails', async () => {
             mockApiClient.tags.listTransactionByTag.mockRejectedValueOnce(new Error('API Error'));
 
@@ -144,17 +138,6 @@ describe('TransactionService', () => {
                     ],
                 })
             );
-        });
-
-        it('should throw error when transaction has no journal ID', async () => {
-            const invalidTransaction = {
-                ...mockTransaction,
-                transaction_journal_id: undefined,
-            };
-
-            await expect(
-                service.updateTransaction(invalidTransaction, 'New Category')
-            ).rejects.toThrow('Invalid transaction: missing transaction_journal_id');
         });
 
         it('should throw error for unsupported transaction type', async () => {

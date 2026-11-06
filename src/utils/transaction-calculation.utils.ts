@@ -1,4 +1,4 @@
-import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ILogger } from '../types/interface/logger.interface.js';
 
 /**
@@ -15,13 +15,6 @@ import { ILogger } from '../types/interface/logger.interface.js';
  * bucket it should reduce.
  */
 export class TransactionCalculationUtils {
-    /**
-     * Flattens Firefly III transaction groups into their individual splits
-     */
-    static flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
-        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
-    }
-
     /**
      * Sums a set of transactions as *spending*, honouring direction.
      *
