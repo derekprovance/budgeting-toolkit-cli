@@ -44,6 +44,7 @@ jest.unstable_mockModule('dotenv', () => ({
 
 // Import ConfigManager after mocks are set up
 const { ConfigManager } = await import('../../src/config/config-manager.js');
+const { ConfigValidationError } = await import('../../src/config/config.validator.js');
 
 describe('ConfigManager', () => {
     let originalEnv: NodeJS.ProcessEnv;
@@ -507,6 +508,25 @@ qZXQ
             delete process.env.FIREFLY_API_TOKEN;
 
             expect(() => ConfigManager.getInstance()).toThrow(/Configuration validation failed/);
+        });
+
+        it('should carry each problem and missing variable on the thrown error', () => {
+            delete process.env.FIREFLY_API_URL;
+            delete process.env.FIREFLY_API_TOKEN;
+
+            const thrown = (() => {
+                try {
+                    ConfigManager.getInstance();
+                } catch (error) {
+                    return error;
+                }
+            })();
+
+            expect(thrown).toBeInstanceOf(ConfigValidationError);
+            expect(thrown).toMatchObject({
+                problems: ['FIREFLY_API_URL is required', 'FIREFLY_API_TOKEN is required'],
+                missingEnvVars: ['FIREFLY_API_URL', 'FIREFLY_API_TOKEN'],
+            });
         });
     });
 

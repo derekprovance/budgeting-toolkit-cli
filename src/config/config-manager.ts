@@ -5,7 +5,7 @@ import * as os from 'os';
 import dotenv from 'dotenv';
 import { AppConfig, CategorizeConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
-import { ConfigValidator } from './config.validator.js';
+import { ConfigValidationError, ConfigValidator } from './config.validator.js';
 import { errorMessage } from '../utils/error-detection.utils.js';
 
 /**
@@ -509,18 +509,19 @@ export class ConfigManager {
     }
 
     /**
-     * Validates the configuration and throws if invalid
+     * Prints any warnings, then throws a ConfigValidationError if the
+     * configuration has problems.
      */
     private validateConfiguration(): void {
-        const validator = new ConfigValidator();
-        const result = validator.validate(this.config);
+        const report = new ConfigValidator().validate(this.config);
 
-        if (!result.ok) {
-            const errors = (result.error.details?.errors as string[]) || [
-                'Unknown validation error',
-            ];
-            const errorList = errors.join('\n  - ');
-            throw new Error(`Configuration validation failed:\n  - ${errorList}`);
+        if (report.warnings.length > 0) {
+            console.warn('\n⚠️  Certificate Warnings:');
+            report.warnings.forEach(warning => console.warn(`  ${warning}\n`));
+        }
+
+        if (report.problems.length > 0) {
+            throw new ConfigValidationError(report);
         }
     }
 }

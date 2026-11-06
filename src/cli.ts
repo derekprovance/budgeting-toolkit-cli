@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { FireflyClientWithCerts } from './api/firefly-client-with-certs.js';
 import { ConfigManager } from './config/config-manager.js';
+import { ConfigValidationError } from './config/config.validator.js';
 import { CategorizeCommand } from './commands/categorize.command.js';
 import { SplitTransactionCommand } from './commands/split-transaction.command.js';
 import { AppServices, ServiceFactory } from './factories/service.factory.js';
@@ -97,6 +98,59 @@ const handleError = (error: unknown, operation: string): never => {
     process.exit(1);
 };
 
+/**
+ * Explains why configuration could not be loaded. Never re-enters
+ * ConfigManager.getInstance: when the constructor threw, a second call would
+ * throw the identical error. The resolved paths are captured statically before
+ * validation runs.
+ */
+const printConfigFailure = (error: unknown): void => {
+    if (error instanceof ConfigValidationError) {
+        printValidationFailure(error);
+        return;
+    }
+    console.error('Failed to initialize API client:', errorMessage(error));
+    console.error(
+        '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
+    );
+};
+
+const printValidationFailure = (error: ConfigValidationError): void => {
+    const { configPath, envPath } = ConfigManager.getResolvedPaths();
+
+    console.error('\n[!] Configuration validation failed\n');
+    console.error('Loaded files:');
+    console.error(`  config.yaml: ${configPath ?? '(none found)'}`);
+    console.error(`  .env:        ${envPath ?? '(none found)'}`);
+
+    // Every problem, not a bare "validation failed": that leaves no way to
+    // tell which setting is wrong
+    console.error('\nProblems found:');
+    error.problems.forEach(problem => console.error(`  - ${problem}`));
+
+    // Missing credentials come from .env rather than config.yaml, so point at
+    // the right file when that is what is wrong
+    if (error.missingEnvVars.length > 0) {
+        console.error(`\nSet the missing environment variables in ${envPath || '.env'}:`);
+        error.missingEnvVars.forEach(name => console.error(`  - ${name}`));
+    }
+
+    const isUsingCwdFiles = [configPath, envPath].some(file => file?.startsWith(process.cwd()));
+    if (isUsingCwdFiles) {
+        console.error('\nNote: Files in the current directory take priority over ~/.budget/');
+        console.error('      You can:');
+        console.error('      - Move/delete local config files to use ~/.budget/ instead');
+        console.error('      - Or update values in the current directory files');
+        console.error(
+            '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
+        );
+    } else {
+        console.error('\nCopy config.yaml.example and .env.example to ~/.budget/ to get started.');
+    }
+
+    console.error('\nSee example file: .env.example\n');
+};
+
 export const createCli = (configPath?: string): Command => {
     const program = new Command();
 
@@ -130,81 +184,7 @@ export const createCli = (configPath?: string): Command => {
 
         services = ServiceFactory.createServices(apiClient, config);
     } catch (error) {
-        const isValidationError =
-            error instanceof Error && error.message.includes('Configuration validation failed');
-        // Never re-enter getInstance here: when the constructor threw, a second
-        // call would throw the identical error and skip this friendly output.
-        // The resolved paths are captured statically before validation runs.
-        const { configPath: loadedConfigPath, envPath: loadedEnvPath } =
-            ConfigManager.getResolvedPaths();
-
-        if (isValidationError) {
-            // Show detailed validation error with file paths
-            console.error('\n[!] Configuration validation failed\n');
-
-            console.error('Loaded files:');
-            console.error(`  config.yaml: ${loadedConfigPath ? loadedConfigPath : '(none found)'}`);
-            console.error(`  .env:        ${loadedEnvPath ? loadedEnvPath : '(none found)'}`);
-
-            // ConfigManager formats the message as a bulleted list, one entry
-            // per validation error. Print all of them — a bare "validation
-            // failed" leaves no way to tell which setting is wrong.
-            const problems = errorMessage(error)
-                .split('\n')
-                .map((line: string) => line.trim())
-                .filter((line: string) => line.startsWith('- '))
-                .map((line: string) => line.slice(2));
-
-            if (problems.length > 0) {
-                console.error('\nProblems found:');
-                problems.forEach((problem: string) => console.error(`  - ${problem}`));
-            }
-
-            // Missing credentials come from .env rather than config.yaml, so
-            // point at the right file when that is what is wrong
-            const missingVars = problems
-                .map((problem: string) => problem.match(/^([A-Z][A-Z0-9_]*) is required$/))
-                .filter((match): match is RegExpMatchArray => match !== null)
-                .map((match: RegExpMatchArray) => match[1]);
-
-            if (missingVars.length > 0) {
-                console.error(
-                    `\nSet the missing environment variables in ${loadedEnvPath || '.env'}:`
-                );
-                missingVars.forEach((varName: string) => {
-                    console.error(`  - ${varName}`);
-                });
-            }
-
-            // Check if current directory files are being used
-            const usingCwdFiles =
-                (loadedConfigPath && loadedConfigPath.startsWith(process.cwd())) ||
-                (loadedEnvPath && loadedEnvPath.startsWith(process.cwd()));
-
-            if (usingCwdFiles) {
-                console.error(
-                    '\nNote: Files in the current directory take priority over ~/.budget/'
-                );
-                console.error('      You can:');
-                console.error('      - Move/delete local config files to use ~/.budget/ instead');
-                console.error('      - Or update values in the current directory files');
-                console.error(
-                    '      - Or use --config flag to override: btk --config ~/.budget/config.yaml'
-                );
-            } else {
-                console.error(
-                    '\nCopy config.yaml.example and .env.example to ~/.budget/ to get started.'
-                );
-            }
-
-            console.error('\nSee example file: .env.example\n');
-        } else {
-            console.error('Failed to initialize API client:', errorMessage(error));
-            console.error(
-                '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
-            );
-        }
-
+        printConfigFailure(error);
         process.exit(1);
     }
 
