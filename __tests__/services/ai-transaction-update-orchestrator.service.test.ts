@@ -8,7 +8,7 @@ import { TransactionValidatorService } from '../../src/services/core/transaction
 import { TransactionHistoryService } from '../../src/services/transaction-history.service.js';
 import { LLMAssignmentService } from '../../src/services/ai/llm-assignment.service.js';
 import { InteractiveTransactionUpdater } from '../../src/services/interactive-transaction-updater.service.js';
-import { ReviewCancelledError } from '../../src/services/user-input.service.js';
+import { ReviewCancelledError, UserInputService } from '../../src/services/user-input.service.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 import { budgetRead, deposit, transactionRead, transfer, withdrawal } from '../shared/test-data.js';
@@ -47,6 +47,8 @@ interface BuildOptions {
     past?: TransactionSplit[];
     force?: boolean;
     historyFails?: boolean;
+    /** Runs dry, through the real InteractiveTransactionUpdater */
+    dryRun?: boolean;
 }
 
 describe('AITransactionUpdateOrchestrator', () => {
@@ -56,7 +58,12 @@ describe('AITransactionUpdateOrchestrator', () => {
     let mockUpdater: jest.Mocked<InteractiveTransactionUpdater>;
     let assign: jest.Mock<LLMAssignmentService['assign']>;
 
-    const build = async ({ past = [], force = false, historyFails = false }: BuildOptions = {}) => {
+    const build = async ({
+        past = [],
+        force = false,
+        historyFails = false,
+        dryRun = false,
+    }: BuildOptions = {}) => {
         const catalog = await loadCatalog(CATEGORIES, BUDGETS);
         const validator = new TransactionValidatorService(
             new TransactionClassificationService('Disposable Income', 'Paycheck')
@@ -67,16 +74,27 @@ describe('AITransactionUpdateOrchestrator', () => {
                 return past;
             },
         });
+        const options = { force, dryRun };
+        // Any prompt would throw: the user-input mock has no members
+        const updater = dryRun
+            ? new InteractiveTransactionUpdater(
+                  mockTransactionService,
+                  validator,
+                  catalog,
+                  partialMock<UserInputService>({}),
+                  options
+              )
+            : mockUpdater;
         return new AITransactionUpdateOrchestrator(
             mockTransactionService,
-            mockUpdater,
+            updater,
             catalog,
             partialMock<LLMAssignmentService>({ assign }),
             validator,
             new TransactionHistoryService(historySource, 12, {
                 canCarryBudget: t => validator.shouldSetBudget(t),
             }),
-            { force, dryRun: false }
+            options
         );
     };
 
@@ -121,6 +139,10 @@ describe('AITransactionUpdateOrchestrator', () => {
             getTransactionsByTag: jest
                 .fn<TransactionService['getTransactionsByTag']>()
                 .mockImplementation(async () => tagged),
+            getTransactionReadBySplit: jest
+                .fn<TransactionService['getTransactionReadBySplit']>()
+                .mockReturnValue(transactionRead('42')),
+            updateTransaction: jest.fn<TransactionService['updateTransaction']>(),
         });
 
         assign = jest.fn<LLMAssignmentService['assign']>(async (type, transactions) =>
@@ -459,6 +481,22 @@ describe('AITransactionUpdateOrchestrator', () => {
                 budget: 'Fun',
                 source: { category: 'ai', budget: 'ai' },
             });
+        });
+    });
+
+    describe('dry run', () => {
+        it('suggests for every transaction but updates none', async () => {
+            tagged = [incoming('1'), incoming('2')];
+            givenAI({ '1': { category: 'Dining', budget: 'Fun' }, '2': { category: 'Groceries' } });
+
+            const result = await run(CategorizeMode.Both, { dryRun: true });
+
+            expect(result).toEqual({
+                status: CategorizeStatus.HAS_RESULTS,
+                transactionsUpdated: 2,
+                errors: [],
+            });
+            expect(mockTransactionService.updateTransaction).not.toHaveBeenCalled();
         });
     });
 });
