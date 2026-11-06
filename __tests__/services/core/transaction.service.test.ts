@@ -15,7 +15,7 @@ import {
     createMockFireflyClient,
     createMockLogger,
 } from '../../shared/mocks.js';
-import { deposit, transactionRead, withdrawal } from '../../shared/test-data.js';
+import { deposit, journaled, transactionRead, withdrawal } from '../../shared/test-data.js';
 import { ILogger } from '../../../src/types/interface/logger.interface.js';
 
 /** What the Firefly SDK throws for an HTTP error status */
@@ -93,10 +93,9 @@ describe('TransactionService', () => {
     });
 
     describe('updateTransaction', () => {
-        const mockTransaction = withdrawal(10, {
-            transaction_journal_id: '1',
-            description: 'Test Transaction',
-        });
+        const mockTransaction = journaled(
+            withdrawal(10, { transaction_journal_id: '1', description: 'Test Transaction' })
+        );
         const mockTransactionRead = transactionRead('1', mockTransaction);
 
         it('should update transaction with category and budget', async () => {
@@ -155,7 +154,9 @@ describe('TransactionService', () => {
 
         it('should list every split of a multi-split group so Firefly keeps them', async () => {
             const first = withdrawal(60, { transaction_journal_id: '10', description: 'Part A' });
-            const target = withdrawal(40, { transaction_journal_id: '11', description: 'Part B' });
+            const target = journaled(
+                withdrawal(40, { transaction_journal_id: '11', description: 'Part B' })
+            );
             const third = withdrawal(5, { transaction_journal_id: '12', description: 'Part C' });
             const group = transactionRead('7', first, target, third);
             group.attributes.group_title = 'Costco';

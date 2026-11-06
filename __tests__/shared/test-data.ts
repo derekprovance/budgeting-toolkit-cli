@@ -1,4 +1,5 @@
 import { BudgetRead, TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { hasJournalId, JournaledTransaction } from '../../src/types/categorize.types.js';
 
 /** Fixed date for builder-made transactions, inside the 2025-01 test month. */
 export const TEST_DATE = '2025-01-15';
@@ -78,6 +79,14 @@ export const deposit = (amount: number | string, overrides: BuilderOverrides = {
 
 export const transfer = (amount: number | string, overrides: BuilderOverrides = {}) =>
     build('transfer', amount, overrides);
+
+/** The split typed as one Firefly can update; throws when it has no journal id */
+export const journaled = (split: TransactionSplit): JournaledTransaction => {
+    if (!hasJournalId(split)) {
+        throw new Error(`Test split "${split.description}" has no transaction_journal_id`);
+    }
+    return split;
+};
 
 /** A Firefly budget, with only the fields the code under test reads. */
 export const budgetRead = (id: string, name: string, active = true): BudgetRead =>

@@ -1,4 +1,5 @@
 import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { JournaledTransaction } from '../../types/categorize.types.js';
 
 export interface ITransactionService {
     getTransactionsForMonth(month: number, year: number): Promise<TransactionSplit[]>;
@@ -14,7 +15,7 @@ export interface ITransactionService {
     tagExists(tag: string): Promise<boolean>;
 
     updateTransaction(
-        transaction: TransactionSplit,
+        transaction: JournaledTransaction,
         category?: string,
         budgetId?: string
     ): Promise<TransactionRead>;

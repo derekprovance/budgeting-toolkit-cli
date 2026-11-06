@@ -4,6 +4,7 @@ import {
     TransactionSplit,
     TransactionUpdate,
 } from '@derekprovance/firefly-iii-sdk';
+import { JournaledTransaction } from '../../types/categorize.types.js';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../../logger.js';
 import { ITransactionService } from './transaction.service.interface.js';
@@ -109,7 +110,7 @@ export class TransactionService implements ITransactionService {
     }
 
     async updateTransaction(
-        transaction: TransactionSplit,
+        transaction: JournaledTransaction,
         category?: string,
         budgetId?: string
     ): Promise<TransactionRead> {
