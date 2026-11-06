@@ -365,15 +365,12 @@ export class AnalyzeDisplayService {
     private formatBillDetail(bill: BillDetailDto, symbol: string): string {
         const isUpcoming = isBillUpcoming(bill);
         const variance = bill.actual - bill.predicted;
-        const varianceColor = variance > 0 ? chalk.red : chalk.green;
-        // formatWithSymbol renders the absolute value, so the sign must be explicit
-        const sign = variance >= 0 ? '+' : '-';
 
         // An unpaid bill's "variance" is just its whole amount, which reads as
         // a saving. Say when it is due instead.
         const trailer = isUpcoming
             ? chalk.dim(`(due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)})`)
-            : varianceColor(`(${sign}${CurrencyUtils.formatWithSymbol(variance, symbol)})`);
+            : `(${DisplayFormatterUtils.formatSignedAmount(variance, symbol, false)})`;
 
         // Format frequency with capitalization
         const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);

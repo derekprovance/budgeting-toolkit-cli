@@ -362,17 +362,11 @@ export class BudgetDisplayService {
             billComparison.variance,
             billComparison.predictedTotal
         );
-        const varianceFormatted = CurrencyUtils.formatWithSymbol(
-            Math.abs(billComparison.variance),
-            billComparison.currencySymbol
-        );
-
-        const varianceDisplay =
-            billComparison.variance === 0
-                ? chalk.white(`${varianceEmoji} ${varianceFormatted}`)
-                : billComparison.variance > 0
-                  ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
-                  : chalk.green(`${varianceEmoji} -${varianceFormatted}`);
+        const varianceDisplay = `${varianceEmoji} ${DisplayFormatterUtils.formatSignedAmount(
+            billComparison.variance,
+            billComparison.currencySymbol,
+            false
+        )}`;
 
         return `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${this.formatNotYetDueNote(billComparison)}`;
     }
