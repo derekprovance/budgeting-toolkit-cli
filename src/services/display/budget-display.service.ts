@@ -18,6 +18,13 @@ import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
 import { budgetTotals } from './budget-totals.js';
 
+/** The budget rows one section lists */
+interface BudgetSection {
+    readonly budgets: BudgetReportDto[];
+    readonly currencySymbol: string;
+    readonly verbose: boolean;
+}
+
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
     private static readonly NAME_COLUMN_WIDTH = 25;
@@ -35,23 +42,20 @@ export class BudgetDisplayService {
         const overBudgets = data.budgets.filter(b => b.status === 'over');
         const onTrackBudgets = data.budgets.filter(b => b.status !== 'over');
 
+        const currencySymbol = data.billComparison.currencySymbol;
         if (overBudgets.length > 0) {
             sections.push(
-                this.formatAttentionNeededSection(
-                    overBudgets,
-                    data.billComparison.currencySymbol,
-                    verbose
-                )
+                this.formatAttentionNeededSection({
+                    budgets: overBudgets,
+                    currencySymbol,
+                    verbose,
+                })
             );
         }
 
         if (onTrackBudgets.length > 0) {
             sections.push(
-                this.formatOnTrackSection(
-                    onTrackBudgets,
-                    data.billComparison.currencySymbol,
-                    verbose
-                )
+                this.formatOnTrackSection({ budgets: onTrackBudgets, currencySymbol, verbose })
             );
         }
 
@@ -140,12 +144,8 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    private formatAttentionNeededSection(
-        budgets: BudgetReportDto[],
-        currencySymbol: string,
-        verbose: boolean
-    ): string {
-        return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
+    private formatAttentionNeededSection(section: BudgetSection): string {
+        return this.formatBudgetSectionWithConfig(section, {
             sectionTitle: 'ATTENTION NEEDED',
             statusColor: chalk.red,
             statusEmoji: '🔴',
@@ -154,12 +154,8 @@ export class BudgetDisplayService {
         });
     }
 
-    private formatOnTrackSection(
-        budgets: BudgetReportDto[],
-        currencySymbol: string,
-        verbose: boolean
-    ): string {
-        return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
+    private formatOnTrackSection(section: BudgetSection): string {
+        return this.formatBudgetSectionWithConfig(section, {
             sectionTitle: 'ON TRACK',
             statusColor: chalk.green,
             statusEmoji: '🟢',
@@ -172,9 +168,7 @@ export class BudgetDisplayService {
     }
 
     private formatBudgetSectionWithConfig(
-        budgets: BudgetReportDto[],
-        currencySymbol: string,
-        verbose: boolean,
+        { budgets, currencySymbol, verbose }: BudgetSection,
         config: {
             sectionTitle: string;
             statusColor: (str: string) => string;

@@ -11,6 +11,13 @@ import {
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { DisposablePoolDirection, disposablePoolAction } from './disposable-pool-action.js';
 
+/** A summary line: a bucket's total and how many transactions it holds */
+interface SummaryItem {
+    readonly label: string;
+    readonly amount: number;
+    readonly count: number;
+}
+
 export class AnalyzeDisplayService {
     constructor(private transactionClassificationService: ITransactionClassificationService) {}
 
@@ -39,10 +46,12 @@ export class AnalyzeDisplayService {
             DisplayFormatterUtils.createSectionHeader('INCOME SOURCES'),
             '',
             this.formatIncomeItem(
-                'Additional Income',
-                data.additionalIncomeTotal,
-                data.currencySymbol,
-                data.additionalIncome.length
+                {
+                    label: 'Additional Income',
+                    amount: data.additionalIncomeTotal,
+                    count: data.additionalIncome.length,
+                },
+                data.currencySymbol
             ),
         ];
 
@@ -71,10 +80,12 @@ export class AnalyzeDisplayService {
     private formatUnbudgetedLines(data: AnalyzeReportDto, verbose: boolean): string[] {
         const lines = [
             this.formatExpenseItem(
-                'Unbudgeted Expenses',
-                data.unbudgetedExpenseTotal,
-                data.currencySymbol,
-                data.unbudgetedExpenses.length
+                {
+                    label: 'Unbudgeted Expenses',
+                    amount: data.unbudgetedExpenseTotal,
+                    count: data.unbudgetedExpenses.length,
+                },
+                data.currencySymbol
             ),
         ];
         if (verbose && data.unbudgetedExpenses.length > 0) {
@@ -268,19 +279,14 @@ export class AnalyzeDisplayService {
         return lines.join('\n');
     }
 
-    private formatIncomeItem(label: string, amount: number, symbol: string, count: number): string {
+    private formatIncomeItem({ label, amount, count }: SummaryItem, symbol: string): string {
         const formattedAmount = CurrencyUtils.formatWithSymbol(amount, symbol);
         const icon = DisplayFormatterUtils.getStatusIcon(amount, true);
 
         return `  ${chalk.bold(label.padEnd(28))} ${chalk.green(formattedAmount)} ${icon}${transactionCount(count)}`;
     }
 
-    private formatExpenseItem(
-        label: string,
-        amount: number,
-        symbol: string,
-        count: number
-    ): string {
+    private formatExpenseItem({ label, amount, count }: SummaryItem, symbol: string): string {
         // formatNetImpact already carries the status icon; appending another
         // renders every expense line as "-$300.00 ⚠ ⚠"
         const formattedAmount = DisplayFormatterUtils.formatNetImpact(-amount, symbol, true);
