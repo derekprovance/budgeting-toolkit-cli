@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import * as os from 'os';
+import path from 'path';
 
 const mockExistsSync = jest.fn<(filePath: string) => boolean>();
 const mockReadFileSync = jest.fn<(filePath: string) => string>();
@@ -537,105 +538,106 @@ qZXQ
             expect(envPath).toContain(os.homedir());
         });
 
-        it('should resolve config path from CLI --config flag with highest priority', () => {
-            const customPath = '/custom/config.yaml';
+        describe('lookup order (getResolvedPaths)', () => {
+            const cwdConfig = '/test/path/config.yaml';
+            const cwdEnv = '/test/path/.env';
+            const customConfig = '/custom/config.yaml';
+            const explicitEnv = '/explicit/.env';
+            let homeConfig: string;
+            let homeEnv: string;
 
-            mockExistsSync.mockImplementation((filePath: string) => {
-                if (typeof filePath === 'string') {
-                    return filePath === customPath;
-                }
-                return false;
-            });
-            mockReadFileSync.mockReturnValue('yaml content');
-            mockYamlLoad.mockReturnValue({});
+            const existing = (...paths: string[]) =>
+                mockExistsSync.mockImplementation(filePath => paths.includes(filePath));
 
-            expect(ConfigManager.getInstance(customPath)).toBeDefined();
-        });
-
-        it('should fallback to current directory config.yaml as second priority', () => {
-            mockExistsSync.mockImplementation((filePath: string) => {
-                if (typeof filePath === 'string') {
-                    return filePath === './config.yaml';
-                }
-                return false;
-            });
-            mockReadFileSync.mockReturnValue('yaml content');
-            mockYamlLoad.mockReturnValue({});
-
-            const configManager = ConfigManager.getInstance();
-            expect(configManager).toBeDefined();
-        });
-
-        it('should fallback to home directory config as third priority', () => {
-            const homeDir = os.homedir();
-            const homePath = `${homeDir}/.budget/config.yaml`;
-
-            mockExistsSync.mockImplementation((filePath: string) => {
-                if (typeof filePath === 'string') {
-                    return filePath === homePath;
-                }
-                return false;
-            });
-            mockReadFileSync.mockReturnValue('yaml content');
-            mockYamlLoad.mockReturnValue({});
-
-            const configManager = ConfigManager.getInstance();
-            expect(configManager).toBeDefined();
-        });
-
-        it('should use defaults when no config file is found', () => {
-            mockExistsSync.mockReturnValue(false);
-
-            const configManager = ConfigManager.getInstance();
-            const config = configManager.getConfig();
-
-            expect(config.api.firefly.url).toBe('http://localhost:8080');
-        });
-
-        it('should prefer CLI --config flag over current directory config', () => {
-            const customPath = '/custom/priority-config.yaml';
-
-            mockExistsSync.mockImplementation((filePath: string) => {
-                if (typeof filePath === 'string') {
-                    return filePath === customPath || filePath === './config.yaml';
-                }
-                return false;
+            beforeEach(() => {
+                homeConfig = path.join(os.homedir(), '.budget', 'config.yaml');
+                homeEnv = path.join(os.homedir(), '.budget', '.env');
+                mockReadFileSync.mockReturnValue('yaml content');
+                mockYamlLoad.mockReturnValue({});
             });
 
-            mockReadFileSync.mockImplementation((filePath: string) => {
-                if (filePath === customPath) {
-                    return 'custom yaml';
-                }
-                return 'default yaml';
+            it('should take --config over ./config.yaml and ~/.budget/config.yaml', () => {
+                existing(customConfig, cwdConfig, homeConfig);
+
+                ConfigManager.getInstance(customConfig);
+
+                expect(ConfigManager.getResolvedPaths().configPath).toBe(customConfig);
             });
 
-            mockYamlLoad.mockImplementation((content: string) => {
-                if (content === 'custom yaml') {
-                    return { customConfigUsed: true };
-                }
-                return { customConfigUsed: false };
+            it('should fall back to ./config.yaml over ~/.budget/config.yaml', () => {
+                existing(cwdConfig, homeConfig);
+
+                ConfigManager.getInstance();
+
+                expect(ConfigManager.getResolvedPaths().configPath).toBe(cwdConfig);
             });
 
-            const configManager = ConfigManager.getInstance(customPath);
-            expect(configManager).toBeDefined();
-        });
+            it('should fall back to ~/.budget/config.yaml', () => {
+                existing(homeConfig);
 
-        it('should prefer home directory over defaults when no CLI path provided', () => {
-            const homeDir = os.homedir();
-            const homePath = `${homeDir}/.budget/config.yaml`;
+                ConfigManager.getInstance();
 
-            mockExistsSync.mockImplementation((filePath: string) => {
-                if (typeof filePath === 'string') {
-                    return filePath === homePath;
-                }
-                return false;
+                expect(ConfigManager.getResolvedPaths().configPath).toBe(homeConfig);
             });
 
-            mockReadFileSync.mockReturnValue('home yaml');
-            mockYamlLoad.mockReturnValue({ loadedFromHome: true });
+            it('should resolve no config file, and warn, when none exists', () => {
+                const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+                existing();
 
-            const configManager = ConfigManager.getInstance();
-            expect(configManager).toBeDefined();
+                ConfigManager.getInstance();
+
+                expect(ConfigManager.getResolvedPaths().configPath).toBeNull();
+                expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('No config.yaml'));
+                warnSpy.mockRestore();
+            });
+
+            it('should take ENV_FILE over ./.env and ~/.budget/.env, even when it is missing', () => {
+                process.env.ENV_FILE = explicitEnv;
+                existing(customConfig, cwdEnv, homeEnv);
+
+                ConfigManager.getInstance(customConfig);
+
+                expect(ConfigManager.getResolvedPaths().envPath).toBe(explicitEnv);
+            });
+
+            it('should fall back to ./.env over ~/.budget/.env', () => {
+                existing(customConfig, cwdEnv, homeEnv);
+
+                ConfigManager.getInstance(customConfig);
+
+                expect(ConfigManager.getResolvedPaths().envPath).toBe(cwdEnv);
+            });
+
+            it('should fall back to ~/.budget/.env', () => {
+                existing(customConfig, homeEnv);
+
+                ConfigManager.getInstance(customConfig);
+
+                expect(ConfigManager.getResolvedPaths().envPath).toBe(homeEnv);
+                expect(mockConfigSync).toHaveBeenCalledWith({ path: homeEnv, quiet: true });
+            });
+
+            it('should load no .env file when none exists', () => {
+                existing(customConfig);
+
+                ConfigManager.getInstance(customConfig);
+
+                expect(ConfigManager.getResolvedPaths().envPath).toBeNull();
+                expect(mockConfigSync).not.toHaveBeenCalled();
+            });
+
+            it('should resolve only the explicit files in strict mode, with every fallback present', () => {
+                process.env.BTK_STRICT_CONFIG = '1';
+                process.env.ENV_FILE = explicitEnv;
+                existing(customConfig, explicitEnv, cwdConfig, homeConfig, cwdEnv, homeEnv);
+
+                ConfigManager.getInstance(customConfig);
+
+                expect(ConfigManager.getResolvedPaths()).toEqual({
+                    configPath: customConfig,
+                    envPath: explicitEnv,
+                });
+            });
         });
     });
     describe('Strict mode (BTK_STRICT_CONFIG)', () => {
