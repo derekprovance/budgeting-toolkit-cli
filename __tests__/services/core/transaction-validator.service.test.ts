@@ -1,231 +1,118 @@
 import { TransactionValidatorService } from '../../../src/services/core/transaction-validator.service.js';
 import { TransactionClassificationService } from '../../../src/services/core/transaction-classification.service.js';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { jest } from '@jest/globals';
+import { deposit, transfer, withdrawal } from '../../shared/test-data.js';
 
 describe('TransactionValidatorService', () => {
-    let service: TransactionValidatorService;
-    let mockPropertyService: jest.Mocked<TransactionClassificationService>;
+    const service = new TransactionValidatorService(
+        new TransactionClassificationService('Disposable Income', 'Paycheck')
+    );
 
-    const mockTransaction: Partial<TransactionSplit> = {
-        transaction_journal_id: '1',
-        description: 'Test Transaction',
-        amount: '100.00',
-        category_name: 'Old Category',
-        budget_id: '1',
-        budget_name: 'Old Budget',
-    };
-
-    beforeEach(() => {
-        mockPropertyService = {
-            isTransfer: jest.fn<(transaction: TransactionSplit) => boolean>(),
-            hasCategory: jest.fn<(transaction: TransactionSplit) => boolean>(),
-            hasBudget: jest.fn<(transaction: TransactionSplit) => boolean>(),
-            isBill: jest.fn<(transaction: TransactionSplit) => boolean>(),
-            isDisposableIncome: jest.fn<(transaction: TransactionSplit) => boolean>(),
-            isDeposit: jest.fn<(transaction: TransactionSplit) => boolean>(),
-        } as unknown as jest.Mocked<TransactionClassificationService>;
-
-        service = new TransactionValidatorService(mockPropertyService);
-    });
+    const categorized = { category_id: '7', category_name: 'Old Category' };
+    const budgeted = { budget_id: '1', budget_name: 'Old Budget' };
+    const uncategorized = { category_id: null, category_name: null };
+    const unbudgeted = { budget_id: null, budget_name: null };
 
     describe('shouldProcessTransaction', () => {
         it('should return true for non-transfer transactions when force is true', () => {
-            mockPropertyService.isTransfer.mockReturnValue(false);
-            mockPropertyService.hasCategory.mockReturnValue(true);
-            mockPropertyService.hasBudget.mockReturnValue(true);
+            const transaction = withdrawal(100, { ...categorized, ...budgeted });
 
-            const result = service.shouldProcessTransaction(
-                mockTransaction as TransactionSplit,
-                true
-            );
-
-            expect(result).toBe(true);
-            expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
+            expect(service.shouldProcessTransaction(transaction, true)).toBe(true);
         });
 
         it('should return false for transfer transactions when force is true', () => {
-            mockPropertyService.isTransfer.mockReturnValue(true);
-            mockPropertyService.hasCategory.mockReturnValue(true);
-            mockPropertyService.hasBudget.mockReturnValue(true);
+            const transaction = transfer(100, { ...categorized, ...budgeted });
 
-            const result = service.shouldProcessTransaction(
-                mockTransaction as TransactionSplit,
-                true
-            );
-
-            expect(result).toBe(false);
-            expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
+            expect(service.shouldProcessTransaction(transaction, true)).toBe(false);
         });
 
         it('should return true for non-transfer transactions without categories when force is false', () => {
-            mockPropertyService.isTransfer.mockReturnValue(false);
-            mockPropertyService.hasCategory.mockReturnValue(false);
+            const transaction = withdrawal(100, { ...uncategorized, ...budgeted });
 
-            const result = service.shouldProcessTransaction(
-                mockTransaction as TransactionSplit,
-                false
-            );
-
-            expect(result).toBe(true);
-            expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.hasCategory).toHaveBeenCalledWith(mockTransaction);
+            expect(service.shouldProcessTransaction(transaction, false)).toBe(true);
         });
 
         it('should return true for transactions with category but no budget when force is false', () => {
-            mockPropertyService.isTransfer.mockReturnValue(false);
-            mockPropertyService.hasCategory.mockReturnValue(true);
-            mockPropertyService.hasBudget.mockReturnValue(false);
+            const transaction = withdrawal(100, { ...categorized, ...unbudgeted });
 
-            const result = service.shouldProcessTransaction(
-                mockTransaction as TransactionSplit,
-                false
-            );
-
-            expect(result).toBe(true);
-            expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.hasCategory).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.hasBudget).toHaveBeenCalledWith(mockTransaction);
+            expect(service.shouldProcessTransaction(transaction, false)).toBe(true);
         });
 
         it('should return false for transactions with both category and budget when force is false', () => {
-            mockPropertyService.isTransfer.mockReturnValue(false);
-            mockPropertyService.hasCategory.mockReturnValue(true);
-            mockPropertyService.hasBudget.mockReturnValue(true);
+            const transaction = withdrawal(100, { ...categorized, ...budgeted });
 
-            const result = service.shouldProcessTransaction(
-                mockTransaction as TransactionSplit,
-                false
-            );
+            expect(service.shouldProcessTransaction(transaction, false)).toBe(false);
+        });
 
-            expect(result).toBe(false);
-            expect(mockPropertyService.isTransfer).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.hasCategory).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.hasBudget).toHaveBeenCalledWith(mockTransaction);
+        it('should return false for an uncategorized transfer when force is false', () => {
+            const transaction = transfer(100, { ...uncategorized, ...unbudgeted });
+
+            expect(service.shouldProcessTransaction(transaction, false)).toBe(false);
         });
     });
 
     describe('shouldSetBudget', () => {
         it('should return true when all conditions are met', () => {
-            mockPropertyService.isBill.mockReturnValue(false);
-            mockPropertyService.isDisposableIncome.mockReturnValue(false);
-            mockPropertyService.isDeposit.mockReturnValue(false);
-
-            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(true);
-            expect(mockPropertyService.isBill).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.isDisposableIncome).toHaveBeenCalledWith(mockTransaction);
-
-            expect(mockPropertyService.isDeposit).toHaveBeenCalledWith(mockTransaction);
+            expect(service.shouldSetBudget(withdrawal(100))).toBe(true);
         });
 
         it('should return false when transaction is a bill', () => {
-            mockPropertyService.isBill.mockReturnValue(true);
-            mockPropertyService.isDisposableIncome.mockReturnValue(false);
-            mockPropertyService.isDeposit.mockReturnValue(false);
-
-            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(false);
+            expect(service.shouldSetBudget(withdrawal(100, { bill_id: '5' }))).toBe(false);
         });
 
         it('should return false when transaction is disposable income', () => {
-            mockPropertyService.isBill.mockReturnValue(false);
-            mockPropertyService.isDisposableIncome.mockReturnValue(true);
-            mockPropertyService.isDeposit.mockReturnValue(false);
-
-            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(false);
+            expect(service.shouldSetBudget(withdrawal(100, { tags: ['Disposable Income'] }))).toBe(
+                false
+            );
         });
 
         it('should return false when transaction is a deposit', () => {
-            mockPropertyService.isBill.mockReturnValue(false);
-            mockPropertyService.isDisposableIncome.mockReturnValue(false);
-            mockPropertyService.isDeposit.mockReturnValue(true);
-
-            const result = service.shouldSetBudget(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(false);
+            expect(service.shouldSetBudget(deposit(100))).toBe(false);
         });
     });
 
     describe('isBudgetOnlyCandidate', () => {
         it('should return true when transaction has category but no budget', () => {
-            mockPropertyService.hasCategory.mockReturnValue(true);
-            mockPropertyService.hasBudget.mockReturnValue(false);
+            const transaction = withdrawal(100, { ...categorized, ...unbudgeted });
 
-            const result = service.isBudgetOnlyCandidate(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(true);
-            expect(mockPropertyService.hasCategory).toHaveBeenCalledWith(mockTransaction);
-            expect(mockPropertyService.hasBudget).toHaveBeenCalledWith(mockTransaction);
+            expect(service.isBudgetOnlyCandidate(transaction)).toBe(true);
         });
 
         it('should return false when transaction has no category', () => {
-            mockPropertyService.hasCategory.mockReturnValue(false);
-            mockPropertyService.hasBudget.mockReturnValue(false);
+            const transaction = withdrawal(100, { ...uncategorized, ...unbudgeted });
 
-            const result = service.isBudgetOnlyCandidate(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(false);
+            expect(service.isBudgetOnlyCandidate(transaction)).toBe(false);
         });
 
         it('should return false when transaction has both category and budget', () => {
-            mockPropertyService.hasCategory.mockReturnValue(true);
-            mockPropertyService.hasBudget.mockReturnValue(true);
+            const transaction = withdrawal(100, { ...categorized, ...budgeted });
 
-            const result = service.isBudgetOnlyCandidate(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(false);
+            expect(service.isBudgetOnlyCandidate(transaction)).toBe(false);
         });
     });
 
     describe('categoryOrBudgetChanged', () => {
+        const transaction = withdrawal(100, { ...categorized, ...budgeted });
+
         it('should return true when category has changed', () => {
-            const category = { name: 'New Category' };
-            const budget = { id: '1' };
-
-            const result = service.categoryOrBudgetChanged(
-                mockTransaction as TransactionSplit,
-                category,
-                budget
-            );
-
-            expect(result).toBe(true);
+            expect(
+                service.categoryOrBudgetChanged(transaction, { name: 'New Category' }, { id: '1' })
+            ).toBe(true);
         });
 
         it('should return true when budget has changed', () => {
-            const category = { name: 'Old Category' };
-            const budget = { id: '2' };
-
-            const result = service.categoryOrBudgetChanged(
-                mockTransaction as TransactionSplit,
-                category,
-                budget
-            );
-
-            expect(result).toBe(true);
+            expect(
+                service.categoryOrBudgetChanged(transaction, { name: 'Old Category' }, { id: '2' })
+            ).toBe(true);
         });
 
         it('should return false when neither category nor budget has changed', () => {
-            const category = { name: 'Old Category' };
-            const budget = { id: '1' };
-
-            const result = service.categoryOrBudgetChanged(
-                mockTransaction as TransactionSplit,
-                category,
-                budget
-            );
-
-            expect(result).toBe(false);
+            expect(
+                service.categoryOrBudgetChanged(transaction, { name: 'Old Category' }, { id: '1' })
+            ).toBe(false);
         });
 
         it('should return false when category and budget are undefined', () => {
-            const result = service.categoryOrBudgetChanged(mockTransaction as TransactionSplit);
-
-            expect(result).toBe(false);
+            expect(service.categoryOrBudgetChanged(transaction)).toBe(false);
         });
     });
 });
