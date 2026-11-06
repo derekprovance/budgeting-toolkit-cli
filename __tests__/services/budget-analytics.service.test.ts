@@ -531,5 +531,17 @@ describe('BudgetAnalyticsService', () => {
             expect(result[0].date).toBe('2024-01-20');
             expect(result[0].transactionId).toBe('journal-123');
         });
+
+        it("should show Firefly's own calendar day, ignoring the offset", async () => {
+            transactionService.getTransactionsForMonth = jest
+                .fn<GetTransactions>()
+                .mockResolvedValue([
+                    withdrawal('50.00', { ...base, date: '2024-01-31T23:30:00-05:00' }),
+                ]);
+
+            const [expense] = await service.getTopExpenses(1, 2024, 1);
+
+            expect(expense.date).toBe('2024-01-31');
+        });
     });
 });

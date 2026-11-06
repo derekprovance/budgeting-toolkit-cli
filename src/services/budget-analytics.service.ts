@@ -13,7 +13,7 @@ import { logger } from '../logger.js';
 import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { DEFAULT_CURRENCY } from '../utils/currency.utils.js';
-import { shiftMonth } from '../utils/date.utils.js';
+import { shiftMonth, toDay } from '../utils/date.utils.js';
 
 /**
  * Budget rows with statistics and history, and the month's top expenses, for
@@ -82,7 +82,7 @@ export class BudgetAnalyticsService {
             // Not "Unbudgeted": the report's section by that name excludes
             // bills, which would carry this label too
             budgetName: t.budget_name || 'no budget',
-            date: (t.date || new Date().toISOString()).split('T')[0],
+            date: toDay(t.date) ?? '',
             transactionId: t.transaction_journal_id || '',
             currencySymbol: t.currency_symbol || DEFAULT_CURRENCY.symbol,
         }));
