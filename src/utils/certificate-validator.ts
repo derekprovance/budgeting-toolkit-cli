@@ -8,284 +8,223 @@ export interface CertificateValidationResult {
     warnings: string[];
 }
 
+export type CertificateType = 'client' | 'ca';
+
+const CERTIFICATE_LABELS: Record<CertificateType, string> = { client: 'Client', ca: 'CA' };
+
+const EXPIRY_WARNING_DAYS = 30;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+/** Smallest plausible P12/PFX file */
+const MIN_P12_BYTES = 100;
+/** A PKCS#12 file is a DER SEQUENCE, which starts with this byte */
+const DER_SEQUENCE_TAG = 0x30;
+
+const passed = (): CertificateValidationResult => ({ errors: [], warnings: [] });
+const failed = (error: string): CertificateValidationResult => ({ errors: [error], warnings: [] });
+
 /**
- * Validates certificates with detailed error messages.
- * Supports PEM and P12/PFX formats with expiration checking.
+ * Checks a certificate file with detailed, actionable messages: that it can be
+ * read, that its format matches its extension (PEM or P12/PFX), that a PEM is
+ * within its validity period (warning when it expires within 30 days), and
+ * that a P12 password, when given, opens it.
  */
-export class CertificateValidator {
-    /**
-     * Validate a certificate file with comprehensive checks
-     */
-    validateCertificate(
-        certPath: string,
-        certType: 'client' | 'ca',
-        certPassword?: string
-    ): CertificateValidationResult {
-        const errors: string[] = [];
-        const warnings: string[] = [];
+export function validateCertificate(
+    certPath: string,
+    certType: CertificateType,
+    certPassword?: string
+): CertificateValidationResult {
+    const label = `${CERTIFICATE_LABELS[certType]} certificate`;
 
-        // Check file access (existence and readability)
-        const accessError = this.checkFileAccess(certPath, certType);
-        if (accessError) {
-            errors.push(accessError);
-            return { errors, warnings };
-        }
-
-        // Determine certificate format and validate accordingly
-        if (this.isP12Certificate(certPath)) {
-            const p12Error = this.validateP12Certificate(certPath, certType, certPassword);
-            if (p12Error) errors.push(p12Error);
-        } else if (this.isPemCertificate(certPath)) {
-            const pemResult = this.validatePemCertificate(certPath, certType);
-            errors.push(...pemResult.errors);
-            warnings.push(...pemResult.warnings);
-        } else {
-            errors.push(
-                `${this.capitalize(certType)} certificate has unknown format: ${certPath}\n  Supported formats: .pem, .crt, .p12, .pfx`
-            );
-        }
-
-        return { errors, warnings };
+    const accessError = checkFileAccess(certPath, label);
+    if (accessError) {
+        return failed(accessError);
     }
 
-    /**
-     * Check file exists and is readable
-     */
-    private checkFileAccess(certPath: string, certType: string): string | null {
-        try {
-            // Check if file exists
-            if (!fs.existsSync(certPath)) {
-                return (
-                    `${this.capitalize(certType)} certificate not found: ${certPath}\n` +
-                    `  Suggestion: Verify the path in your .env file (CLIENT_CERT_PATH or CLIENT_CERT_CA_PATH)`
-                );
-            }
+    if (isP12Certificate(certPath)) {
+        const p12Error = validateP12Certificate(certPath, label, certPassword);
+        return p12Error ? failed(p12Error) : passed();
+    }
 
-            // Check if file is readable
-            fs.accessSync(certPath, fs.constants.R_OK);
-            return null; // No error
-        } catch (error) {
-            const err = error as NodeJS.ErrnoException;
+    if (isPemCertificate(certPath)) {
+        return validatePemCertificate(certPath, label);
+    }
 
-            if (err.code === 'EACCES') {
-                return (
-                    `${this.capitalize(certType)} certificate is not readable: ${certPath}\n` +
-                    `  Permission denied (EACCES)\n` +
-                    `  Suggestion: Check file permissions with 'ls -la ${certPath}' and ensure the current user has read access`
-                );
-            }
+    return failed(
+        `${label} has unknown format: ${certPath}\n  Supported formats: .pem, .crt, .p12, .pfx`
+    );
+}
 
+function checkFileAccess(certPath: string, label: string): string | undefined {
+    if (!fs.existsSync(certPath)) {
+        return (
+            `${label} not found: ${certPath}\n` +
+            `  Suggestion: Verify the path in your .env file (CLIENT_CERT_PATH or CLIENT_CERT_CA_PATH)`
+        );
+    }
+
+    try {
+        fs.accessSync(certPath, fs.constants.R_OK);
+        return undefined;
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EACCES') {
             return (
-                `${this.capitalize(certType)} certificate cannot be accessed: ${certPath}\n` +
-                `  Error: ${err.message}`
+                `${label} is not readable: ${certPath}\n` +
+                `  Permission denied (EACCES)\n` +
+                `  Suggestion: Check file permissions with 'ls -la ${certPath}' and ensure the current user has read access`
             );
         }
+        return `${label} cannot be accessed: ${certPath}\n  Error: ${errorMessage(error)}`;
+    }
+}
+
+function validatePemCertificate(certPath: string, label: string): CertificateValidationResult {
+    let certContent: string;
+    try {
+        certContent = fs.readFileSync(certPath, 'utf-8');
+    } catch (readError) {
+        return failed(
+            `${label} could not be read: ${certPath}\n  Error: ${errorMessage(readError)}`
+        );
     }
 
-    /**
-     * Validate PEM certificate (includes expiration checking)
-     */
-    private validatePemCertificate(
-        certPath: string,
-        certType: string
-    ): CertificateValidationResult {
-        const errors: string[] = [];
-        const warnings: string[] = [];
-
-        try {
-            const certContent = fs.readFileSync(certPath, 'utf-8');
-
-            // Check for PEM header
-            if (!certContent.includes('-----BEGIN CERTIFICATE-----')) {
-                errors.push(
-                    `${this.capitalize(certType)} certificate has invalid format: ${certPath}\n` +
-                        `  The file does not contain a valid PEM certificate (missing '-----BEGIN CERTIFICATE-----')\n` +
-                        `  Suggestion: Verify the file is a valid PEM certificate, not a private key or other format`
-                );
-                return { errors, warnings };
-            }
-
-            // Parse certificate
-            try {
-                const cert = new X509Certificate(certContent);
-                const validFrom = new Date(cert.validFrom);
-                const validTo = new Date(cert.validTo);
-                const now = new Date();
-
-                // Check if expired
-                if (validTo < now) {
-                    const daysAgo = Math.floor(
-                        (now.getTime() - validTo.getTime()) / (1000 * 60 * 60 * 24)
-                    );
-                    errors.push(
-                        `${this.capitalize(certType)} certificate has expired: ${certPath}\n` +
-                            `  Valid until: ${this.formatDate(validTo)} (${daysAgo} days ago)\n` +
-                            `  Subject: ${cert.subject}\n` +
-                            `  Suggestion: Obtain a new certificate from your certificate authority`
-                    );
-                    return { errors, warnings };
-                }
-
-                // Check if not yet valid
-                if (validFrom > now) {
-                    const daysUntil = Math.floor(
-                        (validFrom.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-                    );
-                    errors.push(
-                        `${this.capitalize(certType)} certificate is not yet valid: ${certPath}\n` +
-                            `  Valid from: ${this.formatDate(validFrom)} (in ${daysUntil} days)\n` +
-                            `  Subject: ${cert.subject}\n` +
-                            `  Suggestion: Check your system clock or wait until the certificate becomes valid`
-                    );
-                    return { errors, warnings };
-                }
-
-                // Warn if expiring soon (within 30 days)
-                const daysUntilExpiry = Math.floor(
-                    (validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-                );
-                if (daysUntilExpiry < 30 && daysUntilExpiry >= 0) {
-                    warnings.push(
-                        `${this.capitalize(certType)} certificate expires soon: ${certPath}\n` +
-                            `  Valid until: ${this.formatDate(validTo)} (${daysUntilExpiry} days remaining)\n` +
-                            `  Subject: ${cert.subject}\n` +
-                            `  Suggestion: Consider renewing the certificate before it expires`
-                    );
-                }
-            } catch (parseError) {
-                errors.push(
-                    `${this.capitalize(certType)} certificate could not be parsed: ${certPath}\n` +
-                        `  Error: ${errorMessage(parseError)}\n` +
-                        `  Suggestion: Verify the file is a valid PEM certificate`
-                );
-            }
-        } catch (readError) {
-            errors.push(
-                `${this.capitalize(certType)} certificate could not be read: ${certPath}\n` +
-                    `  Error: ${errorMessage(readError)}`
-            );
-        }
-
-        return { errors, warnings };
+    if (!certContent.includes('-----BEGIN CERTIFICATE-----')) {
+        return failed(
+            `${label} has invalid format: ${certPath}\n` +
+                `  The file does not contain a valid PEM certificate (missing '-----BEGIN CERTIFICATE-----')\n` +
+                `  Suggestion: Verify the file is a valid PEM certificate, not a private key or other format`
+        );
     }
 
-    /**
-     * Validate P12/PFX certificate (includes password validation)
-     */
-    private validateP12Certificate(
-        certPath: string,
-        certType: string,
-        certPassword?: string
-    ): string | null {
-        try {
-            const buffer = fs.readFileSync(certPath);
-
-            // Check file size (P12 files should be at least 100 bytes)
-            if (buffer.length < 100) {
-                return (
-                    `${this.capitalize(certType)} certificate appears to be corrupted: ${certPath}\n` +
-                    `  File is too small to be a valid P12/PFX certificate\n` +
-                    `  Suggestion: Verify the file is not corrupted and is a valid P12/PFX certificate`
-                );
-            }
-
-            // Basic PKCS#12 structure check (should start with 0x30 for DER SEQUENCE)
-            if (buffer[0] !== 0x30) {
-                return (
-                    `${this.capitalize(certType)} certificate has invalid P12 format: ${certPath}\n` +
-                    `  The file does not appear to be a valid PKCS#12 (P12/PFX) certificate\n` +
-                    `  Suggestion: Verify the file is not corrupted and is a valid P12/PFX certificate`
-                );
-            }
-
-            // Validate password if provided
-            if (certPassword !== undefined) {
-                const passwordError = this.validateP12Password(certPath, certPassword);
-                if (passwordError) {
-                    return passwordError;
-                }
-            }
-
-            return null; // Valid P12 structure
-        } catch (error) {
-            return (
-                `${this.capitalize(certType)} certificate could not be validated: ${certPath}\n` +
-                `  Error: ${errorMessage(error)}`
-            );
-        }
+    let cert: X509Certificate;
+    try {
+        cert = new X509Certificate(certContent);
+    } catch (parseError) {
+        return failed(
+            `${label} could not be parsed: ${certPath}\n` +
+                `  Error: ${errorMessage(parseError)}\n` +
+                `  Suggestion: Verify the file is a valid PEM certificate`
+        );
     }
 
-    /**
-     * Validate P12 password by attempting to decrypt it
-     */
-    private validateP12Password(certPath: string, password: string): string | null {
-        try {
-            // Use spawnSync with arguments array to avoid shell interpretation of password
-            const result = spawnSync(
-                'openssl',
-                ['pkcs12', '-in', certPath, '-passin', `pass:${password}`, '-noout'],
-                {
-                    encoding: 'utf-8',
-                    stdio: 'pipe',
-                }
-            );
+    return checkValidityPeriod(cert, certPath, label);
+}
 
-            // openssl exits with status 0 on success
-            if (result.status === 0) {
-                return null; // Password is correct
-            }
+function checkValidityPeriod(
+    cert: X509Certificate,
+    certPath: string,
+    label: string
+): CertificateValidationResult {
+    const validFrom = new Date(cert.validFrom);
+    const validTo = new Date(cert.validTo);
+    const now = new Date();
 
-            // Status 1 typically means MAC verify error (wrong password)
-            if (result.status === 1) {
-                return (
-                    `${certPath}: Invalid CLIENT_CERT_PASSWORD\n` +
-                    `  The password provided does not match the P12/PFX certificate\n` +
-                    `  Suggestion: Verify CLIENT_CERT_PASSWORD in your .env file is correct, or set it to empty if the certificate has no password`
-                );
-            }
-
-            // Other errors - don't fail validation
-            return null;
-        } catch {
-            // spawnSync shouldn't throw, but handle just in case
-            return null;
-        }
+    if (validTo < now) {
+        return failed(
+            `${label} has expired: ${certPath}\n` +
+                `  Valid until: ${formatDate(validTo)} (${wholeDaysBetween(validTo, now)} days ago)\n` +
+                `  Subject: ${cert.subject}\n` +
+                `  Suggestion: Obtain a new certificate from your certificate authority`
+        );
     }
 
-    /**
-     * Check if certificate path indicates PEM format
-     */
-    private isPemCertificate(certPath: string): boolean {
-        return certPath.endsWith('.pem') || certPath.endsWith('.crt');
+    if (validFrom > now) {
+        return failed(
+            `${label} is not yet valid: ${certPath}\n` +
+                `  Valid from: ${formatDate(validFrom)} (in ${wholeDaysBetween(now, validFrom)} days)\n` +
+                `  Subject: ${cert.subject}\n` +
+                `  Suggestion: Check your system clock or wait until the certificate becomes valid`
+        );
     }
 
-    /**
-     * Check if certificate path indicates P12 format
-     */
-    private isP12Certificate(certPath: string): boolean {
-        return certPath.endsWith('.p12') || certPath.endsWith('.pfx');
+    const daysUntilExpiry = wholeDaysBetween(now, validTo);
+    if (daysUntilExpiry >= EXPIRY_WARNING_DAYS) {
+        return passed();
+    }
+    return {
+        errors: [],
+        warnings: [
+            `${label} expires soon: ${certPath}\n` +
+                `  Valid until: ${formatDate(validTo)} (${daysUntilExpiry} days remaining)\n` +
+                `  Subject: ${cert.subject}\n` +
+                `  Suggestion: Consider renewing the certificate before it expires`,
+        ],
+    };
+}
+
+function validateP12Certificate(
+    certPath: string,
+    label: string,
+    certPassword: string | undefined
+): string | undefined {
+    let buffer: Buffer;
+    try {
+        buffer = fs.readFileSync(certPath);
+    } catch (error) {
+        return `${label} could not be validated: ${certPath}\n  Error: ${errorMessage(error)}`;
     }
 
-    /**
-     * Format date for display
-     */
-    private formatDate(date: Date): string {
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZoneName: 'short',
-        });
+    if (buffer.length < MIN_P12_BYTES) {
+        return (
+            `${label} appears to be corrupted: ${certPath}\n` +
+            `  File is too small to be a valid P12/PFX certificate\n` +
+            `  Suggestion: Verify the file is not corrupted and is a valid P12/PFX certificate`
+        );
     }
 
-    /**
-     * Format certificate type for display (handles acronyms)
-     */
-    private capitalize(str: string): string {
-        // Special case for acronyms
-        if (str === 'ca') return 'CA';
-        return str.charAt(0).toUpperCase() + str.slice(1);
+    if (buffer[0] !== DER_SEQUENCE_TAG) {
+        return (
+            `${label} has invalid P12 format: ${certPath}\n` +
+            `  The file does not appear to be a valid PKCS#12 (P12/PFX) certificate\n` +
+            `  Suggestion: Verify the file is not corrupted and is a valid P12/PFX certificate`
+        );
     }
+
+    return certPassword === undefined ? undefined : checkP12Password(certPath, certPassword);
+}
+
+/**
+ * Tries to open the P12 with openssl. Only openssl's "wrong password" exit
+ * status (1) is reported; anything else (openssl missing, another failure) is
+ * not treated as a configuration problem.
+ */
+function checkP12Password(certPath: string, password: string): string | undefined {
+    // An argument array, so the password never passes through a shell
+    const result = spawnSync(
+        'openssl',
+        ['pkcs12', '-in', certPath, '-passin', `pass:${password}`, '-noout'],
+        { encoding: 'utf-8', stdio: 'pipe' }
+    );
+
+    if (result.status !== 1) {
+        return undefined;
+    }
+    return (
+        `${certPath}: Invalid CLIENT_CERT_PASSWORD\n` +
+        `  The password provided does not match the P12/PFX certificate\n` +
+        `  Suggestion: Verify CLIENT_CERT_PASSWORD in your .env file is correct, or set it to empty if the certificate has no password`
+    );
+}
+
+function isPemCertificate(certPath: string): boolean {
+    return certPath.endsWith('.pem') || certPath.endsWith('.crt');
+}
+
+function isP12Certificate(certPath: string): boolean {
+    return certPath.endsWith('.p12') || certPath.endsWith('.pfx');
+}
+
+function wholeDaysBetween(earlier: Date, later: Date): number {
+    return Math.floor((later.getTime() - earlier.getTime()) / MS_PER_DAY);
+}
+
+function formatDate(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short',
+    });
 }

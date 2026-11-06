@@ -1,5 +1,5 @@
 import { AppConfig, LOG_LEVELS } from './config.types.js';
-import { CertificateValidator } from '../utils/certificate-validator.js';
+import { validateCertificate } from '../utils/certificate-validator.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 
 /** What a configuration check found. */
@@ -160,17 +160,12 @@ export class ConfigValidator {
 
     private checkCertificates(config: AppConfig): { errors: string[]; warnings: string[] } {
         const certs = config.api.firefly.certificates;
-        const validator = new CertificateValidator();
 
         // Certificates are optional — validate whichever (client and/or CA) is configured
         const results = [
             certs?.clientCertPath &&
-                validator.validateCertificate(
-                    certs.clientCertPath,
-                    'client',
-                    certs.clientCertPassword
-                ),
-            certs?.caCertPath && validator.validateCertificate(certs.caCertPath, 'ca'),
+                validateCertificate(certs.clientCertPath, 'client', certs.clientCertPassword),
+            certs?.caCertPath && validateCertificate(certs.caCertPath, 'ca'),
         ].filter(result => !!result);
 
         return {
