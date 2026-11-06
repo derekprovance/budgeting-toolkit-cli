@@ -4,34 +4,18 @@ import { TopExpenseDto } from '../../types/dto/top-expense.dto.js';
 import { BudgetInsight } from '../../types/dto/budget-insight.dto.js';
 import {
     BillComparisonDto,
+    BillDetailDto,
     getTopBills,
     getRemainingBills,
     isBillUpcoming,
 } from '../../types/dto/bill-comparison.dto.js';
-import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { BudgetReportResult } from '../../types/dto/budget-report-result.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
-
-/**
- * Interface for report data
- */
-interface ReportData {
-    budgets: BudgetReportDto[];
-    topExpenses: TopExpenseDto[];
-    billComparison: BillComparisonDto;
-    unbudgeted: CategorizedUnbudgetedDto[];
-    insights: BudgetInsight[];
-    month: number;
-    year: number;
-    isCurrentMonth: boolean;
-    daysInfo?: {
-        daysLeft: number;
-        /** Date of the most recent imported transaction, if known */
-        dataThrough?: Date;
-    };
-}
+import { budgetTotals } from './budget-totals.js';
 
 /**
  * Service for formatting budget reports with insights and visual sections
@@ -44,10 +28,7 @@ export class BudgetDisplayService {
     private static readonly SECTION_WIDTH = 79;
     private static readonly DESCRIPTION_MAX_LENGTH = 60;
 
-    constructor(private readonly baseUrl: string = '') {
-        // Strip trailing slash to avoid double-slash in constructed URLs
-        this.baseUrl = this.baseUrl.replace(/\/+$/, '');
-    }
+    constructor(private readonly baseUrl: string = '') {}
 
     /**
      * Formats the complete budget report
@@ -55,7 +36,7 @@ export class BudgetDisplayService {
      * @param verbose Whether to show detailed information
      * @returns Formatted report string
      */
-    formatReport(data: ReportData, verbose = false): string {
+    formatReport(data: BudgetReportResult, verbose: boolean): string {
         const sections: string[] = [];
 
         // Header
@@ -115,13 +96,13 @@ export class BudgetDisplayService {
     /**
      * Formats the overview section with summary and status
      */
-    private formatOverviewSection(data: ReportData): string {
-        const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
-        const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
-        const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+    private formatOverviewSection(data: BudgetReportResult): string {
+        const {
+            spent: totalSpent,
+            allocated: totalBudget,
+            percentageUsed,
+        } = budgetTotals(data.budgets);
         const isOverBudget = totalSpent > totalBudget;
-
-        const statusEmoji = EmojiUtils.getStatusEmoji(percentageUsed, isOverBudget);
 
         const header = DisplayFormatterUtils.createBoxHeader(
             `BUDGET REPORT - ${DisplayFormatterUtils.formatMonthYear(data.month, data.year).toUpperCase()}`
@@ -148,16 +129,15 @@ export class BudgetDisplayService {
                 data.billComparison.currencySymbol
             );
             lines.push(
-                `${chalk.bold('Status:')}           ${statusEmoji} OVER BUDGET by ${overFormatted} (${percentageUsed.toFixed(1)}%)`
+                `${chalk.bold('Status:')}           🔴 OVER BUDGET by ${overFormatted} (${percentageUsed.toFixed(1)}%)`
             );
         } else {
             lines.push(
-                `${chalk.bold('Status:')}           ${statusEmoji} ON TRACK (${percentageUsed.toFixed(1)}% spent)`
+                `${chalk.bold('Status:')}           ${EmojiUtils.getStatusEmoji(percentageUsed)} ON TRACK (${percentageUsed.toFixed(1)}% spent)`
             );
         }
 
-        // Days remaining (for current month only)
-        if (data.isCurrentMonth && data.daysInfo) {
+        if (data.daysInfo) {
             lines.push(`${chalk.bold('Days Remaining:')}   ${data.daysInfo.daysLeft} days`);
             if (data.daysInfo.dataThrough) {
                 // A month looks cheap when the last few days have not imported
@@ -187,7 +167,7 @@ export class BudgetDisplayService {
     private formatAttentionNeededSection(
         budgets: BudgetReportDto[],
         currencySymbol: string,
-        verbose = false
+        verbose: boolean
     ): string {
         return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
             sectionTitle: 'ATTENTION NEEDED',
@@ -204,7 +184,7 @@ export class BudgetDisplayService {
     private formatOnTrackSection(
         budgets: BudgetReportDto[],
         currencySymbol: string,
-        verbose = false
+        verbose: boolean
     ): string {
         return this.formatBudgetSectionWithConfig(budgets, currencySymbol, verbose, {
             sectionTitle: 'ON TRACK',
@@ -254,9 +234,9 @@ export class BudgetDisplayService {
                 config.statusColor(config.statusEmoji) +
                 ' ' +
                 budget.name.padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH) +
-                spentFormatted.padStart(12) +
+                spentFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 ' / ' +
-                budgetFormatted.padStart(12) +
+                budgetFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 '  ' +
                 config.statusColor(`${budget.percentageUsed.toFixed(0)}%`.padStart(5)) +
                 '  ' +
@@ -268,19 +248,9 @@ export class BudgetDisplayService {
         });
 
         lines.push('');
-
-        // Display statistics below all budgets if verbose
         if (verbose) {
-            sorted.forEach(budget => {
-                const stats = this.formatBudgetStatistics(budget, currencySymbol);
-                if (stats) {
-                    lines.push(budget.name.toUpperCase());
-                    lines.push(stats);
-                    lines.push('');
-                }
-            });
+            lines.push(...this.formatVerboseStatistics(sorted, currencySymbol));
         }
-
         lines.push('');
         return lines.join('\n');
     }
@@ -298,13 +268,14 @@ export class BudgetDisplayService {
                 expense.amount,
                 expense.currencySymbol
             );
-            const truncatedDescription = expense.description
-                .substring(0, BudgetDisplayService.DESCRIPTION_MAX_LENGTH)
-                .padEnd(BudgetDisplayService.DESCRIPTION_MAX_LENGTH);
+            const truncatedDescription = DisplayFormatterUtils.fitWidth(
+                expense.description,
+                BudgetDisplayService.DESCRIPTION_MAX_LENGTH
+            );
 
             const line =
                 chalk.gray(`${index + 1}. `) +
-                amountFormatted.padStart(12) +
+                amountFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 '   ' +
                 truncatedDescription +
                 '  ' +
@@ -317,6 +288,15 @@ export class BudgetDisplayService {
 
         lines.push('');
         return lines.join('\n');
+    }
+
+    /** Each budget's statistics, listed below the section's rows in verbose mode */
+    private formatVerboseStatistics(budgets: BudgetReportDto[], currencySymbol: string): string[] {
+        return budgets.flatMap(budget => [
+            budget.name.toUpperCase(),
+            this.formatBudgetStatistics(budget, currencySymbol),
+            '',
+        ]);
     }
 
     /**
@@ -349,11 +329,26 @@ export class BudgetDisplayService {
     /**
      * Formats the bills and recurring section
      */
-    private formatBillsSection(billComparison: BillComparisonDto, verbose = false): string {
-        const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'));
-        lines.push('');
+    private formatBillsSection(billComparison: BillComparisonDto, verbose: boolean): string {
+        const symbol = billComparison.currencySymbol;
+        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
+        const otherBills = verbose ? [] : getRemainingBills(billComparison);
 
+        const lines = [
+            DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'),
+            '',
+            this.formatBillsSummary(billComparison),
+            '',
+            ...billsToShow.map(bill => this.formatBillRow(bill, symbol)),
+        ];
+        if (otherBills.length > 0) {
+            lines.push(this.formatOtherBillsRow(otherBills, symbol));
+        }
+        lines.push('');
+        return lines.join('\n');
+    }
+
+    private formatBillsSummary(billComparison: BillComparisonDto): string {
         const expectedFormatted = CurrencyUtils.formatWithSymbol(
             billComparison.predictedTotal,
             billComparison.currencySymbol
@@ -367,99 +362,97 @@ export class BudgetDisplayService {
             billComparison.variance,
             billComparison.predictedTotal
         );
-        const varianceFormatted = CurrencyUtils.formatWithSymbol(
-            Math.abs(billComparison.variance),
-            billComparison.currencySymbol
-        );
+        const varianceDisplay = `${varianceEmoji} ${DisplayFormatterUtils.formatSignedAmount(
+            billComparison.variance,
+            billComparison.currencySymbol,
+            false
+        )}`;
 
-        const varianceDisplay =
-            billComparison.variance === 0
-                ? chalk.white(`${varianceEmoji} ${varianceFormatted}`)
-                : billComparison.variance > 0
-                  ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
-                  : chalk.green(`${varianceEmoji} -${varianceFormatted}`);
-        // A favourable variance is only good news once the month's bills have
-        // actually come around. Say how much of it is merely unpaid.
+        return `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${this.formatNotYetDueNote(billComparison)}`;
+    }
+
+    /**
+     * A favourable variance is only good news once the month's bills have
+     * actually come around. Says how much of it is merely unpaid.
+     */
+    private formatNotYetDueNote(billComparison: BillComparisonDto): string {
         const notYetDue = billComparison.bills.reduce(
             (sum, bill) => sum + (bill.upcomingAmount ?? 0),
             0
         );
-        const notYetDueNote =
-            notYetDue > 0
-                ? chalk.dim(
-                      `  (${CurrencyUtils.formatWithSymbol(notYetDue, billComparison.currencySymbol)} not yet due)`
-                  )
-                : '';
-
-        const summaryLine = `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${notYetDueNote}`;
-
-        lines.push(summaryLine);
-        lines.push('');
-
-        // Determine how many bills to show individually (top bills by actual spend)
-        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
-        const otherBills = verbose ? [] : getRemainingBills(billComparison);
-
-        billsToShow.forEach(bill => {
-            const predictedFormatted = CurrencyUtils.formatWithSymbol(
-                bill.predicted,
-                billComparison.currencySymbol
-            );
-            const actualFormatted = CurrencyUtils.formatWithSymbol(
-                bill.actual,
-                billComparison.currencySymbol
-            );
-            const variance = bill.actual - bill.predicted;
-            const isUpcoming = isBillUpcoming(bill);
-            const varianceEmoji = EmojiUtils.getBillVarianceEmoji(
-                variance,
-                bill.predicted,
-                isUpcoming
-            );
-
-            // Truncate as well as pad — a longer name would otherwise shove the
-            // amount column right and break alignment
-            const name = bill.name
-                .substring(0, BudgetDisplayService.NAME_COLUMN_WIDTH)
-                .padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH);
-            const trailer = isUpcoming
-                ? chalk.dim(
-                      `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, billComparison.currencySymbol)} of ${predictedFormatted})`
-                  )
-                : `(expected ${predictedFormatted})`;
-            const line = `${varianceEmoji} ${name} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  ${trailer}`;
-            lines.push(line);
-        });
-
-        // Only show "Others" grouping if not verbose and there are other bills
-        if (otherBills.length > 0) {
-            const otherActual = otherBills.reduce((sum, b) => sum + b.actual, 0);
-            const otherPredicted = otherBills.reduce((sum, b) => sum + b.predicted, 0);
-            const otherVariance = otherActual - otherPredicted;
-            const otherVarianceEmoji = EmojiUtils.getBillVarianceEmoji(
-                otherVariance,
-                otherPredicted
-            );
-
-            const otherActualFormatted = CurrencyUtils.formatWithSymbol(
-                otherActual,
-                billComparison.currencySymbol
-            );
-            const otherPredictedFormatted = CurrencyUtils.formatWithSymbol(
-                otherPredicted,
-                billComparison.currencySymbol
-            );
-
-            // Same shape as the per-bill rows so the amount column lines up
-            const line = `${otherVarianceEmoji} ${`Others (${otherBills.length})`.padEnd(
-                BudgetDisplayService.NAME_COLUMN_WIDTH
-            )} ${otherActualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${otherPredictedFormatted})`;
-
-            lines.push(line);
+        if (notYetDue <= 0) {
+            return '';
         }
+        return chalk.dim(
+            `  (${CurrencyUtils.formatWithSymbol(notYetDue, billComparison.currencySymbol)} not yet due)`
+        );
+    }
 
-        lines.push('');
-        return lines.join('\n');
+    private formatBillRow(bill: BillDetailDto, symbol: string): string {
+        if (!isBillUpcoming(bill)) {
+            return this.formatJudgedBillRow(bill, symbol);
+        }
+        // A bill that has not come around yet is not "under budget": it is
+        // simply unpaid, and rendering it green beside genuinely cheap bills
+        // invites the reader to bank money they still owe
+        const upcoming = CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, symbol);
+        const predicted = CurrencyUtils.formatWithSymbol(bill.predicted, symbol);
+        return this.billRow(
+            {
+                emoji: EmojiUtils.UPCOMING_BILL_EMOJI,
+                name: bill.name,
+                actual: bill.actual,
+                trailer: chalk.dim(
+                    `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${upcoming} of ${predicted})`
+                ),
+            },
+            symbol
+        );
+    }
+
+    /** The bills not shown individually, as one row shaped like theirs */
+    private formatOtherBillsRow(otherBills: BillDetailDto[], symbol: string): string {
+        return this.formatJudgedBillRow(
+            {
+                name: `Others (${otherBills.length})`,
+                actual: otherBills.reduce((sum, bill) => sum + bill.actual, 0),
+                predicted: otherBills.reduce((sum, bill) => sum + bill.predicted, 0),
+            },
+            symbol
+        );
+    }
+
+    /** A bill row judged on its variance from the expected amount */
+    private formatJudgedBillRow(
+        bill: Pick<BillDetailDto, 'name' | 'actual' | 'predicted'>,
+        symbol: string
+    ): string {
+        return this.billRow(
+            {
+                emoji: EmojiUtils.getBillVarianceEmoji(
+                    bill.actual - bill.predicted,
+                    bill.predicted
+                ),
+                name: bill.name,
+                actual: bill.actual,
+                trailer: `(expected ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)})`,
+            },
+            symbol
+        );
+    }
+
+    private billRow(
+        row: { emoji: string; name: string; actual: number; trailer: string },
+        symbol: string
+    ): string {
+        const name = DisplayFormatterUtils.fitWidth(
+            row.name,
+            BudgetDisplayService.NAME_COLUMN_WIDTH
+        );
+        const actual = CurrencyUtils.formatWithSymbol(row.actual, symbol).padStart(
+            BudgetDisplayService.AMOUNT_COLUMN_WIDTH
+        );
+        return `${row.emoji} ${name} ${actual}  ${row.trailer}`;
     }
 
     /**
@@ -468,54 +461,47 @@ export class BudgetDisplayService {
      * Wraps with OSC 8 hyperlink if baseUrl and transactionId are available
      */
     private formatDescription(description: string, transactionId: string | undefined): string {
-        const truncated = description
-            .substring(0, BudgetDisplayService.DESCRIPTION_MAX_LENGTH)
-            .padEnd(BudgetDisplayService.DESCRIPTION_MAX_LENGTH);
-
-        const url =
-            this.baseUrl && transactionId
-                ? DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId)
-                : undefined;
-        return DisplayFormatterUtils.createHyperlink(truncated, url);
+        const truncated = DisplayFormatterUtils.fitWidth(
+            description,
+            BudgetDisplayService.DESCRIPTION_MAX_LENGTH
+        );
+        return DisplayFormatterUtils.linkedText(truncated, this.baseUrl, transactionId);
     }
 
     /**
      * Formats the unbudgeted expenses section
      */
     private formatUnbudgetedSection(
-        unbudgeted: CategorizedUnbudgetedDto[],
+        unbudgeted: TransactionSplit[],
         currencySymbol: string
     ): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('UNBUDGETED EXPENSES'));
         lines.push('');
 
-        let total = 0;
-
-        unbudgeted.forEach(item => {
+        unbudgeted.forEach(transaction => {
             // Signed: a card refund in the bucket reduces the total (R-REFUND-1)
-            const amount = TransactionCalculationUtils.calculateNetSpend([item.transaction]);
-            total += amount;
+            const amount = TransactionCalculationUtils.calculateNetSpend([transaction]);
 
             // A refund keeps its minus sign so the rows visibly add up
             const amountFormatted = CurrencyUtils.formatSigned(
                 amount,
-                item.transaction.currency_symbol || currencySymbol
+                transaction.currency_symbol || currencySymbol
             );
-            const date = (item.transaction.date || new Date().toISOString()).split('T')[0];
+            const date = DisplayFormatterUtils.isoDay(transaction.date);
 
-            const transactionId = item.transaction.transaction_journal_id;
+            const transactionId = transaction.transaction_journal_id;
             const formattedDescription = this.formatDescription(
-                item.transaction.description || 'Transaction',
+                transaction.description || 'Transaction',
                 transactionId
             );
 
             const line =
-                item.categoryEmoji +
+                EmojiUtils.getCategoryEmoji(transaction.category_name ?? undefined) +
                 ' ' +
                 formattedDescription +
                 ' ' +
-                amountFormatted.padStart(12) +
+                amountFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 '   ' +
                 chalk.gray(date);
 
@@ -523,6 +509,7 @@ export class BudgetDisplayService {
         });
 
         lines.push('');
+        const total = TransactionCalculationUtils.calculateNetSpend(unbudgeted);
         lines.push(chalk.bold(`Total: ${CurrencyUtils.formatSigned(total, currencySymbol)}`));
         lines.push('');
         return lines.join('\n');
@@ -581,15 +568,7 @@ export class BudgetDisplayService {
         );
         const empty = BudgetDisplayService.PROGRESS_BAR_WIDTH - filled;
 
-        let bar = '';
-        for (let i = 0; i < filled; i++) {
-            bar += '▓';
-        }
-        for (let i = 0; i < empty; i++) {
-            bar += '░';
-        }
-
-        return `[${bar}]`;
+        return `[${'▓'.repeat(filled)}${'░'.repeat(empty)}]`;
     }
 
     /**

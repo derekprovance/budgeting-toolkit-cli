@@ -1,9 +1,5 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import {
-    serializeAnalyzeReport,
-    toCents,
-    toTransactionJson,
-} from '../../../src/services/display/analyze-json.serializer.js';
+import { serializeAnalyzeReport } from '../../../src/services/display/analyze-json.serializer.js';
 import { AnalyzeReportDto } from '../../../src/types/dto/analyze-report.dto.js';
 import { BillComparisonDto, BillDetailDto } from '../../../src/types/dto/bill-comparison.dto.js';
 import { AnalyzeReportJson } from '../../../src/types/dto/report-json.types.js';
@@ -21,53 +17,6 @@ const tx = (overrides: Partial<TransactionSplit>): TransactionSplit =>
         bill_id: null,
         ...overrides,
     }) as TransactionSplit;
-
-describe('toCents', () => {
-    it.each([
-        [1626, 1626],
-        [1625.9999999999998, 1626],
-        [0.1 + 0.2, 0.3],
-        [360.505, 360.51],
-        [-360.505, -360.51],
-        [-0.001, 0],
-        [-0, 0],
-        [-20, -20],
-    ])('rounds %p to %p', (input, expected) => {
-        expect(Object.is(toCents(input), expected)).toBe(true);
-    });
-});
-
-describe('toTransactionJson', () => {
-    it('keeps the amount unsigned and maps ids to null when absent', () => {
-        expect(
-            toTransactionJson(
-                tx({
-                    transaction_journal_id: undefined,
-                    type: 'deposit',
-                    amount: '20.000000000000',
-                    source_id: null,
-                    destination_id: null,
-                    budget_id: undefined,
-                    bill_id: undefined,
-                })
-            )
-        ).toEqual({
-            journalId: '',
-            description: 'Transaction',
-            type: 'deposit',
-            amount: 20,
-            date: '2025-01-15T00:00:00+00:00',
-            sourceId: null,
-            destinationId: null,
-            budgetId: null,
-            billId: null,
-        });
-    });
-
-    it('falls back to subscription_id for the bill link', () => {
-        expect(toTransactionJson(tx({ bill_id: null, subscription_id: 's9' })).billId).toBe('s9');
-    });
-});
 
 describe('serializeAnalyzeReport', () => {
     const freelance = tx({

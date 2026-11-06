@@ -1,37 +1,24 @@
-import { BudgetReportDto } from '../../types/dto/budget-report.dto.js';
-import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
-import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
+import { BudgetReportResult } from '../../types/dto/budget-report-result.dto.js';
 import { BudgetReportJson } from '../../types/dto/report-json.types.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
-import { toCents, toTransactionJson } from './analyze-json.serializer.js';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { budgetTotals } from './budget-totals.js';
+import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
 
-/**
- * The parts of BudgetReportCommand's report data that the JSON contract
- * carries. The command's full result is a structural superset.
- */
-export interface BudgetReportSerializerInput {
-    budgets: BudgetReportDto[];
-    billComparison: BillComparisonDto;
-    unbudgeted: CategorizedUnbudgetedDto[];
-    month: number;
-    year: number;
-}
+const { toCents } = CurrencyUtils;
 
 /**
  * Builds the `report --json` document from what BudgetReportCommand computed.
  *
- * Per-budget figures are read straight off the DTOs. The totals and the
- * unbudgeted sum are the same arithmetic BudgetDisplayService performs for the text
- * report (sum of `spent` and `amount`; `calculateNetSpend` for unbudgeted), so
- * the two outputs cannot disagree. Money is rounded to cents and percentages
- * to two decimals.
+ * Per-budget figures are read straight off the DTOs. The totals come from
+ * `budgetTotals` and `calculateNetSpend`, as in BudgetDisplayService, so the
+ * two outputs cannot disagree. Money is rounded to cents and percentages to
+ * two decimals.
  */
-export function serializeBudgetReport(data: BudgetReportSerializerInput): BudgetReportJson {
-    const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
-    const totalAllocated = data.budgets.reduce((sum, b) => sum + b.amount, 0);
-    const totalPercentage = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
-
-    const unbudgeted = data.unbudgeted.map(item => item.transaction);
+export function serializeBudgetReport(
+    data: Pick<BudgetReportResult, 'budgets' | 'billComparison' | 'unbudgeted' | 'month' | 'year'>
+): BudgetReportJson {
+    const totals = budgetTotals(data.budgets);
 
     return {
         schemaVersion: 2,
@@ -39,9 +26,9 @@ export function serializeBudgetReport(data: BudgetReportSerializerInput): Budget
         year: data.year,
         currencySymbol: data.billComparison.currencySymbol,
         totals: {
-            spent: toCents(totalSpent),
-            allocated: toCents(totalAllocated),
-            percentageUsed: toCents(totalPercentage),
+            spent: toCents(totals.spent),
+            allocated: toCents(totals.allocated),
+            percentageUsed: toCents(totals.percentageUsed),
         },
         budgets: data.budgets.map(budget => ({
             id: budget.budgetId,
@@ -51,23 +38,13 @@ export function serializeBudgetReport(data: BudgetReportSerializerInput): Budget
             remaining: toCents(budget.remaining),
             percentageUsed: toCents(budget.percentageUsed),
             status: budget.status,
-            previousMonthSpent:
-                budget.historicalComparison?.previousMonthSpent !== undefined
-                    ? toCents(budget.historicalComparison.previousMonthSpent)
-                    : null,
-            averageSpent:
-                budget.historicalComparison?.averageSpent !== undefined
-                    ? toCents(budget.historicalComparison.averageSpent)
-                    : null,
+            previousMonthSpent: toCents(budget.historicalComparison.previousMonthSpent),
+            averageSpent: toCents(budget.historicalComparison.averageSpent),
         })),
-        bills: {
-            predicted: toCents(data.billComparison.predictedTotal),
-            actual: toCents(data.billComparison.actualTotal),
-            variance: toCents(data.billComparison.variance),
-        },
+        bills: toBillTotalsJson(data.billComparison),
         unbudgetedExpenses: {
-            total: toCents(TransactionCalculationUtils.calculateNetSpend(unbudgeted)),
-            transactions: unbudgeted.map(toTransactionJson),
+            total: toCents(TransactionCalculationUtils.calculateNetSpend(data.unbudgeted)),
+            transactions: data.unbudgeted.map(toTransactionJson),
         },
     };
 }

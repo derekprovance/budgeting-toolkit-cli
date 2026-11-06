@@ -22,23 +22,4 @@ export class StringUtils {
     static normalizeForMatching(value: string): string {
         return value.trim().toLowerCase();
     }
-
-    /**
-     * Normalizes a string for comparison by:
-     * 1. Converting to lowercase
-     * 2. Trimming whitespace
-     * 3. Normalizing spaces, hyphens, and underscores to single spaces
-     * 4. Removing special characters
-     *
-     * @example
-     * StringUtils.normalize("My-String_Test")  // "my string test"
-     * StringUtils.normalize("  HELLO  WORLD  ") // "hello world"
-     */
-    static normalize(input: string): string {
-        return input
-            .toLowerCase()
-            .trim()
-            .replace(/[-_\s]+/g, ' ') // Replace multiple spaces, hyphens, underscores with single space
-            .replace(/[^\w\s]/g, ''); // Remove all other special characters
-    }
 }

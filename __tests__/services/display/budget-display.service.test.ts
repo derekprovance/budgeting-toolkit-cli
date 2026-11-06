@@ -16,6 +16,44 @@ describe('BudgetDisplayService', () => {
     });
 
     describe('formatReport - Bills Section', () => {
+        it('should mark an upcoming bill rather than judging its variance', () => {
+            // Rendering it green puts it beside genuinely cheap bills and
+            // invites the reader to bank money they still owe
+            const billComparison: BillComparisonDto = {
+                predictedTotal: 50,
+                actualTotal: 0,
+                variance: -50,
+                bills: [
+                    {
+                        id: 'starry',
+                        name: 'Starry Internet',
+                        actual: 0,
+                        predicted: 50,
+                        frequency: 'monthly',
+                        dueDate: new Date('2099-08-27T00:00:00Z'),
+                        upcomingAmount: 50,
+                    },
+                ],
+                currencySymbol: '$',
+                currencyCode: 'USD',
+            };
+            const reportData = {
+                budgets: [],
+                topExpenses: [],
+                billComparison,
+                unbudgeted: [],
+                insights: [],
+                month: 8,
+                year: 2099,
+            };
+
+            const billLine = stripAnsi(service.formatReport(reportData, false))
+                .split('\n')
+                .find(line => line.includes('Starry Internet'));
+
+            expect(billLine).toMatch(/^⏳ /);
+        });
+
         it('should show top 4 bills when verbose=false', () => {
             const mockBill = (name: string, actual: number, predicted: number) => ({
                 id: name.replace(/\s/g, '_'),
@@ -50,7 +88,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -100,7 +137,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, true);
@@ -148,7 +184,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -203,7 +238,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, true);
@@ -253,7 +287,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -298,7 +331,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, true);
@@ -330,7 +362,6 @@ describe('BudgetDisplayService', () => {
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = service.formatReport(reportData, false);
@@ -364,16 +395,10 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '📊',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceWithUrl.formatReport(reportData, false);
@@ -415,16 +440,10 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '🛒',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceWithUrl.formatReport(reportData, false);
@@ -455,16 +474,10 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '📱',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceNoUrl.formatReport(reportData, false);
@@ -495,16 +508,10 @@ describe('BudgetDisplayService', () => {
                     currencySymbol: '$',
                     currencyCode: 'USD',
                 },
-                unbudgeted: [
-                    {
-                        transaction: mockTransaction,
-                        categoryEmoji: '💳',
-                    },
-                ],
+                unbudgeted: [mockTransaction],
                 insights: [],
                 month: 1,
                 year: 2025,
-                isCurrentMonth: false,
             };
 
             const result = serviceWithUrl.formatReport(reportData, false);
@@ -515,15 +522,18 @@ describe('BudgetDisplayService', () => {
     });
 
     describe('formatReport - unbudgeted section', () => {
-        const item = (description: string, amount: string, type = 'withdrawal') => ({
-            transaction: {
-                description,
-                amount,
-                type,
-                transaction_journal_id: '1',
-                date: '2026-08-11',
-            },
-            categoryEmoji: '💰',
+        const item = (
+            description: string,
+            amount: string,
+            type = 'withdrawal',
+            category_name?: string
+        ) => ({
+            description,
+            amount,
+            type,
+            category_name,
+            transaction_journal_id: '1',
+            date: '2026-08-11',
         });
 
         const baseData = () => ({
@@ -541,7 +551,6 @@ describe('BudgetDisplayService', () => {
             insights: [],
             month: 8,
             year: 2026,
-            isCurrentMonth: false,
         });
 
         it('should render the unbudgeted bucket under its header', () => {
@@ -551,6 +560,17 @@ describe('BudgetDisplayService', () => {
 
             expect(result).toContain('UNBUDGETED EXPENSES');
             expect(result).toContain('Coffee');
+        });
+
+        it('should mark each row with its category emoji', () => {
+            const data = {
+                ...baseData(),
+                unbudgeted: [item('Pharmacy', '12.00', 'withdrawal', 'Healthcare')],
+            };
+
+            const result = stripAnsi(service.formatReport(data as never, false));
+
+            expect(result).toContain('🏥 Pharmacy');
         });
 
         it('should omit the unbudgeted section when the bucket is empty', () => {

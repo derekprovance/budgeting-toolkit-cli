@@ -58,7 +58,7 @@ describe('serializeBudgetReport', () => {
         status: 'over',
         percentageUsed: 120.19999999999999,
         remaining: -10.099999999999994,
-        historicalComparison: undefined as never,
+        historicalComparison: { previousMonthSpent: 45.004, averageSpent: 52.555 },
     });
 
     const coffee = tx({ transaction_journal_id: 'u1', description: 'Coffee', amount: '35.00' });
@@ -73,10 +73,7 @@ describe('serializeBudgetReport', () => {
     const input = {
         budgets: [groceries, dining, fun],
         billComparison: new BillComparisonDto(240, 290, 50, [], 'USD', '$'),
-        unbudgeted: [
-            { transaction: coffee, categoryEmoji: '', categoryName: undefined },
-            { transaction: refund, categoryEmoji: '', categoryName: undefined },
-        ],
+        unbudgeted: [coffee, refund],
         month: 1,
         year: 2025,
     };
@@ -120,8 +117,8 @@ describe('serializeBudgetReport', () => {
                     remaining: -10.1,
                     percentageUsed: 120.2,
                     status: 'over',
-                    previousMonthSpent: null,
-                    averageSpent: null,
+                    previousMonthSpent: 45,
+                    averageSpent: 52.56,
                 },
             ],
             bills: { predicted: 240, actual: 290, variance: 50 },

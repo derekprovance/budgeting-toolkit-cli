@@ -537,6 +537,31 @@ describe('AnalyzeDisplayService', () => {
     });
 
     describe('Bill Details with Frequency', () => {
+        it('should print a bill paid exactly as predicted without a sign', () => {
+            const data = {
+                ...createBasicReportData(),
+                billComparison: {
+                    ...createBasicReportData().billComparison,
+                    bills: [
+                        {
+                            id: '1',
+                            name: 'Rent',
+                            predicted: 1000,
+                            actual: 1000,
+                            frequency: 'monthly',
+                            upcomingAmount: 0,
+                        },
+                    ],
+                },
+            };
+
+            const rentLine = stripAnsi(service.formatAnalysisReport(data, true))
+                .split('\n')
+                .find(line => line.includes('Rent'));
+
+            expect(rentLine).toMatch(/\(\$0\.00\)$/);
+        });
+
         it('should include bill details with frequency badges in verbose mode', () => {
             const data = {
                 ...createBasicReportData(),

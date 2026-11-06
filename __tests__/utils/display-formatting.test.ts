@@ -16,6 +16,40 @@ describe('display rounding', () => {
     });
 });
 
+describe('fitWidth', () => {
+    it('pads a short text to the column width', () => {
+        expect(DisplayFormatterUtils.fitWidth('Rent', 6)).toBe('Rent  ');
+    });
+
+    it('truncates a long text to the column width', () => {
+        expect(DisplayFormatterUtils.fitWidth('Electricity', 6)).toBe('Electr');
+    });
+});
+
+describe('isoDay', () => {
+    it('keeps only the day of a Firefly timestamp', () => {
+        expect(DisplayFormatterUtils.isoDay('2025-04-12T00:00:00+02:00')).toBe('2025-04-12');
+    });
+});
+
+describe('linkedText', () => {
+    it('links the text to the transaction, tolerating a trailing slash', () => {
+        expect(DisplayFormatterUtils.linkedText('Coffee', 'http://ff.local/', '7')).toBe(
+            '\x1B]8;;http://ff.local/transactions/show/7\x1B\\Coffee\x1B]8;;\x1B\\'
+        );
+    });
+
+    it('returns the text unchanged without a base URL', () => {
+        expect(DisplayFormatterUtils.linkedText('Coffee', '', '7')).toBe('Coffee');
+    });
+
+    it('returns the text unchanged without a transaction id', () => {
+        expect(DisplayFormatterUtils.linkedText('Coffee', 'http://ff.local', undefined)).toBe(
+            'Coffee'
+        );
+    });
+});
+
 describe('category emoji', () => {
     it.each([
         ['Healthcare', '🏥'],

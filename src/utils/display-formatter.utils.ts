@@ -7,16 +7,6 @@ import { CurrencyUtils } from './currency.utils.js';
  */
 export class DisplayFormatterUtils {
     /**
-     * Formats currency with symbol.
-     *
-     * Note: renders the ABSOLUTE value — callers that need to convey direction
-     * must add the sign themselves (or use {@link formatNetImpact}).
-     */
-    static formatCurrency(amount: number, symbol: string): string {
-        return CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
-    }
-
-    /**
      * Pads a string to a visible width, ignoring ANSI escape codes.
      * Plain `padEnd`/`padStart` count escape sequences as characters, so
      * padding a colored string is silently a no-op.
@@ -31,6 +21,11 @@ export class DisplayFormatterUtils {
         return side === 'end' ? text + padding : padding + text;
     }
 
+    /** Truncates or pads plain text to exactly `width` characters, keeping a column aligned */
+    static fitWidth(text: string, width: number): string {
+        return text.substring(0, width).padEnd(width);
+    }
+
     /**
      * Formats a month/year as "January 2025".
      * Locale is pinned so reports read identically on every machine.
@@ -40,6 +35,11 @@ export class DisplayFormatterUtils {
             new Date(year, month - 1)
         );
         return `${monthName} ${year}`;
+    }
+
+    /** The YYYY-MM-DD day of a Firefly ISO timestamp, as printed beside a transaction */
+    static isoDay(timestamp: string): string {
+        return timestamp.split('T')[0];
     }
 
     /**
@@ -166,6 +166,18 @@ export class DisplayFormatterUtils {
         } else {
             return amount < 0 ? chalk.green('✓') : chalk.red('⚠');
         }
+    }
+
+    /**
+     * Links text to a Firefly III transaction, or returns it unchanged when
+     * there is no base URL or transaction id to link to
+     */
+    static linkedText(text: string, baseUrl: string, transactionId: string | undefined): string {
+        if (!transactionId) return text;
+        return DisplayFormatterUtils.createHyperlink(
+            text,
+            DisplayFormatterUtils.transactionUrl(baseUrl, transactionId)
+        );
     }
 
     /**
