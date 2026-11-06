@@ -1385,13 +1385,6 @@ export class FakeFirefly {
     }
 }
 
-/** Starts a fake on an ephemeral 127.0.0.1 port */
-export async function startFakeFirefly(options: FakeFireflyOptions = {}): Promise<FakeFirefly> {
-    const fake = new FakeFirefly(options);
-    await fake.start();
-    return fake;
-}
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function readBody(req: http.IncomingMessage): Promise<string> {
