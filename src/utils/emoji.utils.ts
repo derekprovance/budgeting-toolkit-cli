@@ -1,18 +1,9 @@
 import { BUSINESS_CONSTANTS } from './business-constants.js';
 
-/**
- * Utility class for emoji selection based on status, variance, and categories
- * Provides consistent emoji indicators for the report display
- */
 export class EmojiUtils {
-    /** Marks a bill that has not come around yet, in place of a variance emoji */
     static readonly UPCOMING_BILL_EMOJI = '⏳';
 
-    /**
-     * Gets the status emoji of a budget total that is not over its limit
-     * @param percentage The percentage of budget used (0-100)
-     * @returns 🟡 (nearly spent) or 🟢 (good)
-     */
+    /** For a budget total that is not over its limit. */
     static getStatusEmoji(percentage: number): string {
         // Same boundary as BudgetAnalyticsService.determineStatus
         if (percentage >= BUSINESS_CONSTANTS.BUDGET.ON_TRACK_THRESHOLD) {
@@ -21,14 +12,8 @@ export class EmojiUtils {
         return '🟢';
     }
 
-    /**
-     * Gets a bill variance emoji based on the variance from predicted amount
-     * @param variance The actual - predicted amount (positive = over, negative = under)
-     * @param predictedAmount The expected/predicted bill amount
-     * @returns Emoji indicating bill variance status
-     */
+    /** `variance` is actual minus predicted (positive = over). */
     static getBillVarianceEmoji(variance: number, predictedAmount: number): string {
-        // Handle zero predicted amount case
         if (predictedAmount === 0) {
             return variance > 0 ? '🔴' : '🟢';
         }
@@ -36,23 +21,16 @@ export class EmojiUtils {
         const percentageOver = (variance / Math.abs(predictedAmount)) * 100;
 
         if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.CRITICAL_VARIANCE_PERCENT) {
-            return '🔴'; // Significantly over
+            return '🔴';
         }
         if (percentageOver > BUSINESS_CONSTANTS.VARIANCE.WARNING_VARIANCE_PERCENT) {
-            return '🟡'; // Moderately over
+            return '🟡';
         }
-        return '🟢'; // On track or under
+        return '🟢';
     }
 
-    /**
-     * Gets a category emoji based on category name
-     * Maps common budget categories to representative emojis
-     * @param categoryName The category name from transaction/budget
-     * @returns Emoji representing the category, or default 📊
-     */
     static getCategoryEmoji(categoryName: string | undefined): string {
-        // Whole words only: a substring test sent "Healthcare" to 🚗 via "car"
-        // and "Parent" to 🏠 via "rent"
+        // Whole words only: a substring test would send "Parent" to 🏠 via "rent"
         const words = ` ${(categoryName ?? '')
             .toLowerCase()
             .split(/[^a-z0-9]+/)

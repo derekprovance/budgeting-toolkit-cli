@@ -4,14 +4,10 @@ type ConfiguredCommand = 'analyze' | 'categorize';
 
 interface CommandRequirement {
     isMet: (config: AppConfig) => boolean;
-    /** What is missing, where to set it, and where to read more */
     guidance: string;
 }
 
-/**
- * What each command needs beyond the startup checks. ConfigValidator handles
- * format validation for every command; this handles business requirements.
- */
+/** What each command needs beyond ConfigValidator's startup format checks. */
 const COMMAND_REQUIREMENTS: Record<ConfiguredCommand, CommandRequirement> = {
     analyze: {
         isMet: config => config.transactions.expectedMonthlyPaycheck !== undefined,
@@ -42,11 +38,6 @@ export function requireCommandConfig(config: AppConfig, command: ConfiguredComma
     }
 }
 
-/**
- * The categorize action in cli.ts still calls this name; it is owned by a
- * parallel change and switches to requireCommandConfig(config, 'categorize')
- * when that lands, after which this object goes.
- */
 export const CommandConfigValidator = {
     validateCategorizeCommand: (config: AppConfig): void =>
         requireCommandConfig(config, 'categorize'),

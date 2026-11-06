@@ -15,7 +15,6 @@ const CERTIFICATE_LABELS: Record<CertificateType, string> = { client: 'Client', 
 const EXPIRY_WARNING_DAYS = 30;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-/** Smallest plausible P12/PFX file */
 const MIN_P12_BYTES = 100;
 /** A PKCS#12 file is a DER SEQUENCE, which starts with this byte */
 const DER_SEQUENCE_TAG = 0x30;
@@ -23,12 +22,7 @@ const DER_SEQUENCE_TAG = 0x30;
 const passed = (): CertificateValidationResult => ({ errors: [], warnings: [] });
 const failed = (error: string): CertificateValidationResult => ({ errors: [error], warnings: [] });
 
-/**
- * Checks a certificate file with detailed, actionable messages: that it can be
- * read, that its format matches its extension (PEM or P12/PFX), that a PEM is
- * within its validity period (warning when it expires within 30 days), and
- * that a P12 password, when given, opens it.
- */
+/** The format is chosen by extension; only a PEM's validity period is checked. */
 export function validateCertificate(
     certPath: string,
     certType: CertificateType,
@@ -184,9 +178,8 @@ function validateP12Certificate(
 }
 
 /**
- * Tries to open the P12 with openssl. Only openssl's "wrong password" exit
- * status (1) is reported; anything else (openssl missing, another failure) is
- * not treated as a configuration problem.
+ * Only openssl's "wrong password" exit status (1) is reported; anything else
+ * (openssl missing, another failure) is not a configuration problem.
  */
 function checkP12Password(certPath: string, password: string): string | undefined {
     // An argument array, so the password never passes through a shell

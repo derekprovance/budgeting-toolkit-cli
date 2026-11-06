@@ -1,33 +1,21 @@
 /** The currency assumed when Firefly names none, as for a month with no bills */
 export const DEFAULT_CURRENCY = { code: 'USD', symbol: '$' } as const;
 
-/**
- * Utility functions for currency formatting
- */
 export class CurrencyUtils {
-    /**
-     * Formats an amount with a currency symbol (simple format)
-     * @param amount The amount to format
-     * @param currencySymbol The currency symbol to prepend (e.g., '$', '€')
-     * @returns Formatted string like "$123.45"
-     */
+    /** Drops the sign; see {@link formatSigned}. */
     static formatWithSymbol(amount: number, currencySymbol: string): string {
         return `${currencySymbol}${Math.abs(amount).toFixed(2)}`;
     }
 
-    /** Like {@link formatWithSymbol}, but a negative amount keeps its minus sign */
     static formatSigned(amount: number, currencySymbol: string): string {
         const cents = CurrencyUtils.toCents(amount);
         return `${cents < 0 ? '-' : ''}${CurrencyUtils.formatWithSymbol(cents, currencySymbol)}`;
     }
 
     /**
-     * Rounds a value to two decimal places, half away from zero, and never
-     * returns `-0`.
-     *
-     * The epsilon absorbs binary floating-point noise (`360.505 * 100` is
-     * `36050.49999…`) so a value that is a true half-cent rounds the way a person
-     * would. It is far below a cent, so it cannot move any real amount.
+     * Rounds half away from zero and never returns `-0`. The epsilon absorbs
+     * float noise (`360.505 * 100` is `36050.49999…`) so a true half-cent rounds
+     * up; it is far below a cent, so it cannot move a real amount.
      */
     static toCents(value: number): number {
         const rounded = (Math.sign(value) * Math.round(Math.abs(value) * 100 + 1e-7)) / 100;

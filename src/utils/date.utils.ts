@@ -3,25 +3,23 @@ export type Day = string;
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})/;
 
-/** The calendar day a Firefly date or datetime names, ignoring any offset */
+/** Ignores any offset in a Firefly date or datetime. */
 export function toDay(value: string | null | undefined): Day | null {
     const match = ISO_DAY.exec(value ?? '');
     return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
 }
 
 /**
- * The calendar day `date` falls on in local time, as the owner's calendar
- * sees it. Not `toISOString()`, which converts to UTC and shifts local
- * midnight to the previous day in UTC+ timezones.
+ * The local calendar day. Not `toISOString()`, which converts to UTC and
+ * shifts local midnight to the previous day in UTC+ timezones.
  */
 export function localDay(date: Date): Day {
     return formatDay(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 /**
- * The first and last day of a month, inclusive, as Firefly's date filters take
- * them. Every month query to Firefly is built here, so this is where a month
- * that does not exist is rejected.
+ * Inclusive, as Firefly's date filters take them. Every month query is built
+ * here, so this is where an impossible month is rejected.
  *
  * @throws Error when `month` is not 1–12 or `year` is not a four-digit year
  */
@@ -38,7 +36,6 @@ export function monthRange(month: number, year: number): { start: Day; end: Day 
     };
 }
 
-/** The month `by` months after month/year; a negative `by` goes back */
 export function shiftMonth(
     month: number,
     year: number,

@@ -1,22 +1,15 @@
 import { CurrencyUtils } from './currency.utils.js';
 
-/** A positive amount with at most two decimal places */
 const SPLIT_AMOUNT_FORMAT = /^\d+(\.\d{1,2})?$/;
 const MIN_SPLIT_AMOUNT = 0.01;
 
-/**
- * The second split's amount, rounded to cents to avoid floating-point drift.
- */
 export function remainderAmount(originalAmount: number, firstSplitAmount: number): number {
     return parseFloat((originalAmount - firstSplitAmount).toFixed(2));
 }
 
 /**
- * Checks the amount entered for the first split. It must leave at least a
- * cent for the second, so the two parts always sum to the original.
- *
- * @returns true when valid, otherwise the message to show (inquirer's
- *   `validate` contract)
+ * The first split must leave at least a cent for the second. Returns true or
+ * the message to show (inquirer's `validate` contract).
  */
 export function validateSplitAmount(
     value: string,
@@ -48,10 +41,7 @@ export function validateSplitAmount(
     return true;
 }
 
-/**
- * @returns the first split's amount
- * @throws Error carrying validateSplitAmount's message when it is invalid
- */
+/** @throws Error carrying validateSplitAmount's message when it is invalid */
 export function parseSplitAmount(
     value: string,
     originalAmount: number,

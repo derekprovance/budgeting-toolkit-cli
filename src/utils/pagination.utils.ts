@@ -1,10 +1,6 @@
 import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 
-/**
- * The shape every Firefly III list endpoint returns: a page of `data` plus a
- * `meta.pagination` block describing how many pages exist in total.
- */
 export interface PaginatedResponse<T> {
     data?: T[];
     meta?: {
@@ -18,23 +14,14 @@ export interface PaginatedResponse<T> {
     };
 }
 
-/** The page size requested when `BTK_PAGE_SIZE` is unset or invalid. */
 export const DEFAULT_PAGE_SIZE = 500;
 
-/** Largest page size `BTK_PAGE_SIZE` may request. */
 export const MAX_PAGE_SIZE = 500;
 
 /**
- * Resolves the page size from a raw `BTK_PAGE_SIZE` value.
- *
- * A test seam: the harness sets a small page size so that a modest seeded
- * ledger still spans several pages and pagination is exercised for real.
- * Accepts a whole number from 1 to {@link MAX_PAGE_SIZE}. Anything else falls
- * back to {@link DEFAULT_PAGE_SIZE} with a warning rather than failing, since
- * a wrong page size changes round-trips, never results.
- *
- * @param raw The raw environment value (undefined or empty means unset)
- * @param logger Optional logger override
+ * A test seam: the harness sets a small page size so a modest ledger still
+ * spans several pages. An invalid value falls back with a warning rather than
+ * failing, since a wrong page size changes round-trips, never results.
  */
 export function resolvePageSize(raw: string | undefined, logger: ILogger = defaultLogger): number {
     if (raw === undefined || raw.trim() === '') {
@@ -55,41 +42,21 @@ export function resolvePageSize(raw: string | undefined, logger: ILogger = defau
 }
 
 /**
- * Items requested per page.
- *
- * Firefly III's documented default is 50, but the page size is instance
- * configurable and a server may well default higher. Requesting fewer than the
- * server would have given costs extra round-trips for nothing, so this asks for
- * a generous page. The loop below follows `total_pages` regardless, so an
- * instance that serves a smaller page is still drained completely.
- *
- * Overridable through `BTK_PAGE_SIZE` (see {@link resolvePageSize}). Resolved
- * once, at module load: every call site passes this constant as `limit`, and a
- * page size that stays fixed for the life of the process means every page of
- * one listing is requested with the same `limit`. The variable must therefore
- * be in the process environment at startup — a value in a `.env` file loaded
- * later by ConfigManager is not seen.
+ * Firefly's documented default is 50, but the page size is instance
+ * configurable, so this asks for a generous page; `fetchAllPages` follows
+ * `total_pages` regardless. Resolved once at module load so every page of a
+ * listing uses the same `limit`: `BTK_PAGE_SIZE` must be in the process
+ * environment, as a value in a `.env` file loaded later is not seen.
  */
 export const PAGE_SIZE = resolvePageSize(process.env.BTK_PAGE_SIZE);
 
-/**
- * Guard against an endpoint that ignores the `page` parameter and would
- * otherwise return page 1 forever.
- */
+/** Guards against an endpoint that ignores `page` and returns page 1 forever. */
 const MAX_PAGES = 500;
 
 /**
- * Drains every page of a Firefly III list endpoint into a single array.
- *
- * Firefly paginates all list endpoints and reports the page count in
- * `meta.pagination.total_pages`. Callers that read only `response.data` get
- * the first page and nothing else, so every list call in this codebase must
- * go through here.
- *
- * @param fetchPage Fetches one page; receives the 1-based page number
- * @param operation Human-readable name used in errors and warnings
- * @param logger Optional logger override
- * @returns Every item across every page, in page order
+ * Firefly paginates every list endpoint, so reading only `response.data`
+ * silently truncates; every list call goes through here. `fetchPage` receives
+ * the 1-based page number. Throws when a page comes back without `data`.
  */
 export async function fetchAllPages<T>(
     fetchPage: (page: number) => Promise<PaginatedResponse<T> | undefined>,
@@ -110,8 +77,7 @@ export async function fetchAllPages<T>(
 
         const totalPages = response.meta?.pagination?.total_pages;
 
-        // No pagination block means the endpoint is not paginated (insights,
-        // for example). Trust the single response rather than guessing.
+        // No pagination block means the endpoint is not paginated (insights, for example)
         if (totalPages === undefined) {
             if (page === 1) {
                 logger.debug(

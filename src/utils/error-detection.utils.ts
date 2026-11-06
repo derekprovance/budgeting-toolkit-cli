@@ -1,6 +1,3 @@
-/**
- * OpenSSL error codes that indicate a TLS/certificate problem.
- */
 const CERT_ERROR_CODES = new Set([
     'CERT_HAS_EXPIRED',
     'CERT_NOT_YET_VALID',
@@ -15,14 +12,11 @@ const CERT_ERROR_CODES = new Set([
     'CERT_REVOKED',
 ]);
 
-/**
- * Returns true if the error (or any error in its cause chain) is a TLS/certificate error.
- * Walks up to 5 levels deep in the error.cause chain to find certificate-related issues.
- */
+/** Walks up to 5 levels of the `cause` chain. */
 export function isCertificateError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
 
-    // Regex with word boundaries to avoid false positives like "certified" or "certify"
+    // Word boundaries, so "certified" does not match
     const certKeywordRegex = /\b(certificate|ssl|tls)\b/i;
 
     let current: unknown = error;
@@ -30,14 +24,11 @@ export function isCertificateError(error: unknown): boolean {
     const MAX_DEPTH = 5;
 
     while (current instanceof Error && depth < MAX_DEPTH) {
-        // Check .code property (present on NodeJS.ErrnoException and AxiosError cause chains)
         const code = (current as NodeJS.ErrnoException).code;
         if (code && CERT_ERROR_CODES.has(code)) return true;
 
-        // Check the message for certificate-related keywords with word boundaries
         if (certKeywordRegex.test(current.message)) return true;
 
-        // Traverse cause chain
         current = current.cause;
         depth++;
     }
@@ -45,12 +36,10 @@ export function isCertificateError(error: unknown): boolean {
     return false;
 }
 
-/** A thrown value as an Error: an Error is returned as is, anything else is wrapped. */
 export function toError(thrown: unknown): Error {
     return thrown instanceof Error ? thrown : new Error(String(thrown));
 }
 
-/** The message of a thrown value, whatever was thrown. */
 export function errorMessage(thrown: unknown): string {
     return toError(thrown).message;
 }

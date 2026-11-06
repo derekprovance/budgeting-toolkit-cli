@@ -2,18 +2,10 @@ import chalk from 'chalk';
 import stripAnsi from 'strip-ansi';
 import { CurrencyUtils } from './currency.utils.js';
 
-/**
- * Utility class for common display formatting operations across display services
- */
 export class DisplayFormatterUtils {
     /**
-     * Pads a string to a visible width, ignoring ANSI escape codes.
-     * Plain `padEnd`/`padStart` count escape sequences as characters, so
-     * padding a colored string is silently a no-op.
-     *
-     * @param text Text that may contain ANSI color codes
-     * @param width Target visible width
-     * @param side Which side to pad (default: 'end')
+     * Pads to a visible width, ignoring ANSI escape codes: plain `padEnd`/`padStart`
+     * count escape sequences as characters, so padding a colored string is a no-op.
      */
     static padVisible(text: string, width: number, side: 'start' | 'end' = 'end'): string {
         const visibleLength = stripAnsi(text).length;
@@ -21,15 +13,11 @@ export class DisplayFormatterUtils {
         return side === 'end' ? text + padding : padding + text;
     }
 
-    /** Truncates or pads plain text to exactly `width` characters, keeping a column aligned */
     static fitWidth(text: string, width: number): string {
         return text.substring(0, width).padEnd(width);
     }
 
-    /**
-     * Formats a month/year as "January 2025".
-     * Locale is pinned so reports read identically on every machine.
-     */
+    /** Locale is pinned so reports read identically on every machine. */
     static formatMonthYear(month: number, year: number): string {
         const monthName = new Intl.DateTimeFormat('en', { month: 'long' }).format(
             new Date(year, month - 1)
@@ -37,15 +25,11 @@ export class DisplayFormatterUtils {
         return `${monthName} ${year}`;
     }
 
-    /** The YYYY-MM-DD day of a Firefly ISO timestamp, as printed beside a transaction */
     static isoDay(timestamp: string): string {
         return timestamp.split('T')[0];
     }
 
-    /**
-     * Short "Aug 27" style date, for annotating a row without stealing width.
-     * Formatted in UTC to match Firefly's date handling.
-     */
+    /** Formatted in UTC to match Firefly's date handling. */
     static formatShortDate(date: Date): string {
         return new Intl.DateTimeFormat('en', {
             month: 'short',
@@ -54,23 +38,13 @@ export class DisplayFormatterUtils {
         }).format(date);
     }
 
-    /**
-     * Builds a Firefly III transaction URL, tolerating a trailing slash on the
-     * configured base URL.
-     */
     static transactionUrl(baseUrl: string, transactionId: string): string {
         if (!baseUrl) return '';
         return `${baseUrl.replace(/\/+$/, '')}/transactions/show/${transactionId}`;
     }
 
-    /**
-     * Creates a header box with box drawing characters
-     * @param text Header text (may contain ANSI color codes)
-     * @returns Formatted header with top, middle, and bottom borders
-     */
     static createBoxHeader(text: string): string {
         const padding = 2;
-        // Use stripAnsi to get the actual visible text length, excluding ANSI escape codes
         const textLength = stripAnsi(text).length;
         const totalLength = textLength + padding * 2;
 
@@ -81,15 +55,8 @@ export class DisplayFormatterUtils {
         return `\n${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
     }
 
-    /**
-     * Creates a section header with box drawing characters
-     * @param title Section title
-     * @param width Total width of the header (default: 45)
-     * @returns Formatted section header with borders
-     */
     static createSectionHeader(title: string, width: number = 45): string {
         const topBorder = '┌' + '─'.repeat(width) + '┐';
-        // ANSI-aware like createBoxHeader, and never negative for long titles
         const titleLength = stripAnsi(title).length;
         const middleLine =
             '│ ' + chalk.bold(title) + ' '.repeat(Math.max(0, width - titleLength - 1)) + '│';
@@ -98,25 +65,10 @@ export class DisplayFormatterUtils {
         return `${chalk.cyan(topBorder)}\n${chalk.cyan(middleLine)}\n${chalk.cyan(bottomBorder)}`;
     }
 
-    /**
-     * Creates a horizontal line with specified character
-     * @param char Character to repeat (default: '━')
-     * @param width Line width (default: 60)
-     * @returns Formatted horizontal line
-     */
     static createHorizontalLine(char: string = '━', width: number = 60): string {
         return chalk.dim(char.repeat(width));
     }
 
-    /**
-     * Formats a financial value with accounting-style display.
-     * Shows sign based on impact to net position.
-     *
-     * @param amount The amount to format (can be positive or negative)
-     * @param symbol Currency symbol
-     * @param positiveIsGood Whether positive values are good (default: true)
-     * @returns Formatted string with sign, color, and icon
-     */
     static formatNetImpact(amount: number, symbol: string, positiveIsGood: boolean = true): string {
         // Signs and icons are decided on the displayed cents, so float noise
         // like -5e-15 never renders as "-$0.00 ⚠"
@@ -124,15 +76,7 @@ export class DisplayFormatterUtils {
         return `${DisplayFormatterUtils.formatSignedAmount(amount, symbol, positiveIsGood)} ${icon}`;
     }
 
-    /**
-     * The same coloured, signed amount {@link formatNetImpact} renders, without
-     * the trailing status icon.
-     *
-     * For call sites that place the icon themselves — a leading icon column,
-     * say. Sharing the body keeps the two from disagreeing about sign or
-     * colour, and stops a caller appending a second icon to a string that
-     * already has one.
-     */
+    /** {@link formatNetImpact} without the status icon, for callers that place the icon themselves. */
     static formatSignedAmount(
         amount: number,
         symbol: string,
@@ -152,12 +96,6 @@ export class DisplayFormatterUtils {
         return color(`${sign}${absFormatted}`);
     }
 
-    /**
-     * Gets appropriate status icon based on amount
-     * @param amount The amount to evaluate
-     * @param positiveIsGood Whether positive values are good
-     * @returns Colored status icon
-     */
     static getStatusIcon(amount: number, positiveIsGood: boolean): string {
         amount = CurrencyUtils.toCents(amount);
         if (amount === 0) return '○';
@@ -168,10 +106,7 @@ export class DisplayFormatterUtils {
         }
     }
 
-    /**
-     * Links text to a Firefly III transaction, or returns it unchanged when
-     * there is no base URL or transaction id to link to
-     */
+    /** Returns `text` unchanged when there is no transaction id to link to. */
     static linkedText(text: string, baseUrl: string, transactionId: string | undefined): string {
         if (!transactionId) return text;
         return DisplayFormatterUtils.createHyperlink(
@@ -180,14 +115,7 @@ export class DisplayFormatterUtils {
         );
     }
 
-    /**
-     * Wraps text in an OSC 8 ANSI hyperlink escape sequence
-     * Returns plain text if no URL is provided
-     *
-     * @param text The visible text to display
-     * @param url Optional URL for the hyperlink
-     * @returns Text wrapped in OSC 8 escape sequence, or plain text if no URL
-     */
+    /** OSC 8 terminal hyperlink; plain text when there is no URL. */
     static createHyperlink(text: string, url?: string): string {
         if (!url) return text;
         return `\x1B]8;;${url}\x1B\\${text}\x1B]8;;\x1B\\`;

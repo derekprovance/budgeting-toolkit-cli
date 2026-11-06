@@ -7,10 +7,6 @@ import { CertificateConfig } from '../config/config.types.js';
 const REQUEST_TIMEOUT_MS = 30000;
 
 /**
- * Creates an axios instance whose HTTPS agent presents the client certificate
- * and/or trusts the CA. ConfigValidator has already checked at startup that
- * the files exist and parse.
- *
  * @throws when a certificate file cannot be read; there is no fallback to
  *   plain axios, which would silently drop mTLS
  */
