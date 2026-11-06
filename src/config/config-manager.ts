@@ -171,9 +171,7 @@ export class ConfigManager {
     private static resolveConfigPath(customPath?: string): string | null {
         // Priority 1: CLI flag --config path (highest priority)
         if (customPath) {
-            const resolved = path.isAbsolute(customPath)
-                ? customPath
-                : path.resolve(process.cwd(), customPath);
+            const resolved = path.resolve(process.cwd(), customPath);
 
             if (fs.existsSync(resolved)) {
                 return resolved;
@@ -229,9 +227,7 @@ export class ConfigManager {
                         'The ./.env and ~/.budget/.env fallbacks are disabled.'
                 );
             }
-            const resolved = path.isAbsolute(envFile)
-                ? envFile
-                : path.resolve(process.cwd(), envFile);
+            const resolved = path.resolve(process.cwd(), envFile);
             if (!fs.existsSync(resolved)) {
                 throw new Error(`BTK_STRICT_CONFIG is set: ENV_FILE not found: ${resolved}`);
             }
@@ -280,14 +276,16 @@ export class ConfigManager {
         // Firefly Certificate Configuration
         if (process.env.CLIENT_CERT_PATH) {
             config.api.firefly.certificates = config.api.firefly.certificates || {};
-            config.api.firefly.certificates.clientCertPath = this.resolveCertPath(
+            config.api.firefly.certificates.clientCertPath = path.resolve(
+                process.cwd(),
                 process.env.CLIENT_CERT_PATH
             );
         }
 
         if (process.env.CLIENT_CERT_CA_PATH) {
             config.api.firefly.certificates = config.api.firefly.certificates || {};
-            config.api.firefly.certificates.caCertPath = this.resolveCertPath(
+            config.api.firefly.certificates.caCertPath = path.resolve(
+                process.cwd(),
                 process.env.CLIENT_CERT_CA_PATH
             );
         }
@@ -438,19 +436,6 @@ export class ConfigManager {
                 { cause: error }
             );
         }
-    }
-
-    /**
-     * Resolves certificate paths correctly for both development and production
-     */
-    private resolveCertPath(envPath: string): string {
-        if (path.isAbsolute(envPath)) {
-            return envPath;
-        }
-
-        // Resolve relative paths from project root
-        const projectRoot = process.cwd();
-        return path.resolve(projectRoot, envPath);
     }
 
     /**
