@@ -1,20 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '../logger.js';
-import { LLMConfig as LLMConfigType } from '../config/config.types.js';
+import { ClaudeApiConfig, LLMConfig } from '../config/config.types.js';
 
 /** Kept as an alias so call sites and tests keep their import */
 export type ChatMessage = Anthropic.MessageParam;
 
 export interface ClaudeClientConfig {
-    apiKey?: string;
-    baseURL?: string;
-    /** Forwarded to the SDK client */
-    timeout?: number;
-    /** Retries after the first attempt — owned entirely by the SDK, which
+    /** Transport settings; `maxRetries` is owned entirely by the SDK, which
      * honors retry-after and only retries retryable failures */
-    maxRetries?: number;
-    model: string;
-    maxTokens: number;
+    api: ClaudeApiConfig;
+    llm: LLMConfig;
 }
 
 export interface ChatOptions {
@@ -76,9 +71,8 @@ export class ClaudeClient {
     /** Set once a model rejects output_config, so later chunks skip it */
     private effortUnsupported = false;
 
-    private client: Anthropic;
-    private config: Required<Pick<ClaudeClientConfig, 'model' | 'maxTokens'>> &
-        Omit<ClaudeClientConfig, 'model' | 'maxTokens'>;
+    private readonly client: Anthropic;
+    private readonly llmConfig: LLMConfig;
     private rateLimitState: RateLimitState;
     private circuitBreaker: CircuitBreakerState = {
         failures: 0,
@@ -87,38 +81,23 @@ export class ClaudeClient {
         probeInFlight: false,
     };
 
-    // Minimal fallbacks for direct construction in tests; production always
-    // passes model/maxTokens from configuration (see llm.config.ts)
-    private static readonly DEFAULT_MODEL = 'claude-sonnet-5';
-    private static readonly DEFAULT_MAX_TOKENS = 2000;
-
-    constructor(
-        config: Partial<ClaudeClientConfig> = {},
-        client?: Anthropic,
-        private readonly llmConfig?: LLMConfigType
-    ) {
-        this.config = {
-            ...config,
-            model: config.model ?? ClaudeClient.DEFAULT_MODEL,
-            maxTokens: config.maxTokens ?? ClaudeClient.DEFAULT_MAX_TOKENS,
-        };
+    /** @param client Replaces the SDK client built from `config.api`; tests pass a fake */
+    constructor(config: ClaudeClientConfig, client?: Anthropic) {
+        this.llmConfig = config.llm;
         this.client =
-            client ||
+            client ??
             new Anthropic({
-                apiKey: this.config.apiKey || process.env.ANTHROPIC_API_KEY || '',
-                baseURL: this.config.baseURL,
-                maxRetries: this.config.maxRetries,
-                timeout: this.config.timeout,
+                apiKey: config.api.apiKey,
+                baseURL: config.api.baseURL,
+                maxRetries: config.api.maxRetries,
+                timeout: config.api.timeout,
             });
-
-        // Initialize rate limit state from config
-        const maxTokens = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
         this.rateLimitState = {
-            tokens: maxTokens,
+            tokens: this.llmConfig.rateLimit.maxTokensPerMinute,
             lastRefill: Date.now(),
         };
 
-        logger.debug(`Initializing AI Client with model: ${this.config.model}`);
+        logger.debug(`Initializing AI Client with model: ${this.llmConfig.model}`);
     }
 
     /**
@@ -134,8 +113,8 @@ export class ClaudeClient {
         await this.waitForRateLimit();
 
         const request: Anthropic.MessageCreateParamsNonStreaming = {
-            model: options.model ?? this.config.model,
-            max_tokens: options.maxTokens ?? this.config.maxTokens,
+            model: options.model ?? this.llmConfig.model,
+            max_tokens: options.maxTokens ?? this.llmConfig.maxTokens,
             messages,
             ...(options.systemPrompt && { system: options.systemPrompt }),
             ...(options.tools && { tools: options.tools }),
@@ -222,8 +201,8 @@ export class ClaudeClient {
     }
 
     private async waitForRateLimit(): Promise<void> {
-        const REFILL_INTERVAL = this.llmConfig?.rateLimit?.refillInterval ?? 60000;
-        const MAX_TOKENS = this.llmConfig?.rateLimit?.maxTokensPerMinute ?? 50;
+        const { refillInterval: REFILL_INTERVAL, maxTokensPerMinute: MAX_TOKENS } =
+            this.llmConfig.rateLimit;
 
         for (;;) {
             const now = Date.now();
@@ -256,7 +235,7 @@ export class ClaudeClient {
      */
     private assertCircuitAllows(): void {
         const now = Date.now();
-        const RESET_TIMEOUT = this.llmConfig?.circuitBreaker?.resetTimeout ?? 60000;
+        const RESET_TIMEOUT = this.llmConfig.circuitBreaker.resetTimeout;
 
         switch (this.circuitBreaker.state) {
             case 'OPEN':
@@ -292,7 +271,7 @@ export class ClaudeClient {
     }
 
     private onRequestFailure(): void {
-        const FAILURE_THRESHOLD = this.llmConfig?.circuitBreaker?.failureThreshold ?? 5;
+        const FAILURE_THRESHOLD = this.llmConfig.circuitBreaker.failureThreshold;
         this.circuitBreaker.lastFailureTime = Date.now();
         this.circuitBreaker.probeInFlight = false;
 

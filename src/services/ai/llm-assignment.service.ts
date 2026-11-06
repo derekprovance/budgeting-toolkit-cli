@@ -61,17 +61,12 @@ export interface LLMAssignmentDependencies {
  */
 export class LLMAssignmentService {
     private readonly deps: LLMAssignmentDependencies;
-    private readonly batchOptions: LLMBatchOptions;
 
     constructor(
         private readonly claudeClient: ClaudeClient,
-        batchOptions?: Partial<LLMBatchOptions>,
+        private readonly batchOptions: LLMBatchOptions,
         deps?: Partial<LLMAssignmentDependencies>
     ) {
-        this.batchOptions = {
-            batchSize: batchOptions?.batchSize ?? 10,
-            maxConcurrent: batchOptions?.maxConcurrent ?? 3,
-        };
         this.deps = {
             mapTransactionForLLM,
             getSystemPrompt,

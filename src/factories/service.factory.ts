@@ -13,7 +13,7 @@ import { LLMAssignmentService } from '../services/ai/llm-assignment.service.js';
 import { LLMTransactionProcessingService } from '../services/ai/llm-transaction-processing.service.js';
 import { TransactionHistoryService } from '../services/transaction-history.service.js';
 import { AITransactionUpdateOrchestrator } from '../services/ai-transaction-update-orchestrator.service.js';
-import { LLMConfig } from '../config/llm.config.js';
+import { createClaudeClient } from '../config/llm.config.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { InteractiveTransactionUpdater } from '../services/interactive-transaction-updater.service.js';
 import { ConfigManager } from '../config/config-manager.js';
@@ -115,12 +115,9 @@ export class ServiceFactory {
         dryRun: boolean = false,
         config: AppConfig = ConfigManager.getInstance().getConfig()
     ): Promise<AITransactionUpdateOrchestrator> {
-        const claudeClient = LLMConfig.createClient();
-
-        const llmConfig = config.llm;
-        const llmAssignmentService = new LLMAssignmentService(claudeClient, {
-            batchSize: llmConfig.batchSize,
-            maxConcurrent: llmConfig.maxConcurrent,
+        const llmAssignmentService = new LLMAssignmentService(createClaudeClient(config), {
+            batchSize: config.llm.batchSize,
+            maxConcurrent: config.llm.maxConcurrent,
         });
         const llmProcessingService = new LLMTransactionProcessingService(llmAssignmentService);
 

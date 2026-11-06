@@ -4,7 +4,7 @@ import {
     CircuitOpenError,
     ClaudeResponseError,
 } from '../../src/api/claude.client.js';
-import { LLMConfig } from '../../src/config/config.types.js';
+import { ClaudeApiConfig, LLMConfig } from '../../src/config/config.types.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { jest } from '@jest/globals';
 
@@ -21,6 +21,13 @@ const testLlmConfig: LLMConfig = {
         failureThreshold: 5,
         resetTimeout: 60000,
     },
+};
+
+const testApiConfig: ClaudeApiConfig = {
+    apiKey: 'test-api-key',
+    baseURL: 'https://api.anthropic.com',
+    timeout: 30000,
+    maxRetries: 0,
 };
 
 const textResponse = (text: string): Anthropic.Message =>
@@ -52,7 +59,7 @@ describe('ClaudeClient', () => {
             },
         } as unknown as jest.Mocked<Anthropic>;
 
-        client = new ClaudeClient({}, mockAnthropicClient, testLlmConfig);
+        client = new ClaudeClient({ api: testApiConfig, llm: testLlmConfig }, mockAnthropicClient);
     });
 
     describe('chat', () => {

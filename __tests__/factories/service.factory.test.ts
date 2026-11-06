@@ -6,9 +6,8 @@ import type { AppConfig } from '../../src/config/config.types.js';
 /*
  * Native ESM: `jest.mock` is inert (see __tests__/meta/esm-mocking.test.ts), so
  * the real services are built here from an injected config. ConfigManager is
- * replaced only because LLMConfig.createClient still reads the singleton; the
- * real one would look for config files (and refuses to under
- * BTK_STRICT_CONFIG).
+ * replaced so the default-config fallback can be observed without the real
+ * singleton looking for config files (it refuses to under BTK_STRICT_CONFIG).
  */
 const testConfig: AppConfig = structuredClone(DEFAULT_CONFIG);
 testConfig.api.claude.apiKey = 'test-api-key';
