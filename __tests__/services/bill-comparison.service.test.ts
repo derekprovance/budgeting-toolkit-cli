@@ -360,10 +360,10 @@ describe('BillComparisonService', () => {
 
         it('should handle transactions without bill_id', async () => {
             const mockBills = [createMockBill('1', 'Bill A', '100', 'monthly', 0, true)];
-            const unbilledTransaction: TransactionSplit = {
-                ...billPayment('Unbilled', '50.00', ''),
-                bill_id: null,
-            };
+            const unbilledTransaction = withdrawal(50, {
+                description: 'Unbilled',
+                date: '2024-10-15',
+            });
 
             mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([unbilledTransaction]);
@@ -406,11 +406,11 @@ describe('BillComparisonService', () => {
 
         it('should handle bills with subscription_id instead of bill_id', async () => {
             const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
-            const transactionWithSubscriptionId: TransactionSplit = {
-                ...billPayment('Sub Payment', '50.00', ''),
-                bill_id: null,
+            const transactionWithSubscriptionId = withdrawal(50, {
+                description: 'Sub Payment',
+                date: '2024-10-15',
                 subscription_id: '1',
-            };
+            });
 
             mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([

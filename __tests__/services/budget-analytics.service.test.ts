@@ -7,7 +7,7 @@ import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { MonthError } from '../../src/types/error/month.error.js';
-import { withdrawal } from '../shared/test-data.js';
+import { deposit, transfer, withdrawal } from '../shared/test-data.js';
 import { createMockAccountScopeService, createMockLogger, partialMock } from '../shared/mocks.js';
 
 /** Envelope accounts: the builders' default source, and a card */
@@ -30,14 +30,14 @@ describe('BudgetAnalyticsService', () => {
         spent: 200,
     };
 
-    // Firefly returns amounts unsigned; direction comes from `type`
-    const mockTransaction: TransactionSplit = withdrawal('50.00', {
+    const base = {
         transaction_journal_id: 'trans-1',
         description: 'Walmart',
         budget_id: 'budget-1',
         currency_symbol: '$',
         date: '2024-01-15',
-    });
+    };
+    const mockTransaction = withdrawal('50.00', base);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -281,10 +281,10 @@ describe('BudgetAnalyticsService', () => {
     describe('getTopExpenses', () => {
         it('should return top expenses sorted by amount descending', async () => {
             const transactions: TransactionSplit[] = [
-                { ...mockTransaction, amount: '50.00', description: 'Walmart' },
-                { ...mockTransaction, amount: '25.00', description: 'Gas Station' },
-                { ...mockTransaction, amount: '100.00', description: 'Restaurant' },
-                { ...mockTransaction, amount: '10.00', description: 'Coffee' },
+                withdrawal('50.00', { ...base, description: 'Walmart' }),
+                withdrawal('25.00', { ...base, description: 'Gas Station' }),
+                withdrawal('100.00', { ...base, description: 'Restaurant' }),
+                withdrawal('10.00', { ...base, description: 'Coffee' }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -304,22 +304,10 @@ describe('BudgetAnalyticsService', () => {
             // Regression: amounts are all positive, so the old `amount < 0`
             // filter matched nothing and this section never rendered
             const transactions: TransactionSplit[] = [
-                { ...mockTransaction, amount: '50.00', description: 'Expense' },
-                {
-                    ...mockTransaction,
-                    amount: '100.00',
-                    type: 'deposit',
-                    destination_id: CHECKING,
-                    description: 'Income',
-                },
-                {
-                    ...mockTransaction,
-                    amount: '75.00',
-                    type: 'transfer',
-                    destination_id: CARD,
-                    description: 'Card payment',
-                },
-                { ...mockTransaction, amount: '25.00', description: 'Another Expense' },
+                withdrawal('50.00', { ...base, description: 'Expense' }),
+                deposit('100.00', { ...base, destination_id: CHECKING, description: 'Income' }),
+                transfer('75.00', { ...base, destination_id: CARD, description: 'Card payment' }),
+                withdrawal('25.00', { ...base, description: 'Another Expense' }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -335,13 +323,12 @@ describe('BudgetAnalyticsService', () => {
 
         it('[R-DISP-1] should leave out purchases the disposable pool pays for', async () => {
             const transactions: TransactionSplit[] = [
-                {
-                    ...mockTransaction,
-                    amount: '900.00',
+                withdrawal('900.00', {
+                    ...base,
                     tags: ['Disposable Income'],
                     description: 'Concert',
-                },
-                { ...mockTransaction, amount: '50.00', description: 'Groceries' },
+                }),
+                withdrawal('50.00', { ...base, description: 'Groceries' }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -355,19 +342,16 @@ describe('BudgetAnalyticsService', () => {
 
         it('[R-XFER-3] [R-SCOPE-2] should include money leaving the envelope and nothing from outside it', async () => {
             const transactions: TransactionSplit[] = [
-                {
-                    ...mockTransaction,
-                    amount: '200.00',
-                    type: 'transfer',
+                transfer('200.00', {
+                    ...base,
                     destination_id: 'savings',
                     description: 'Extra to savings',
-                },
-                {
-                    ...mockTransaction,
-                    amount: '1000.00',
+                }),
+                withdrawal('1000.00', {
+                    ...base,
                     source_id: 'brokerage',
                     description: 'Fund purchase',
-                },
+                }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -381,13 +365,8 @@ describe('BudgetAnalyticsService', () => {
 
         it('should return empty array when no expenses exist', async () => {
             const transactions: TransactionSplit[] = [
-                { ...mockTransaction, amount: '100.00', type: 'deposit', description: 'Income' },
-                {
-                    ...mockTransaction,
-                    amount: '50.00',
-                    type: 'deposit',
-                    description: 'More Income',
-                },
+                deposit('100.00', { ...base, description: 'Income' }),
+                deposit('50.00', { ...base, description: 'More Income' }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -401,11 +380,11 @@ describe('BudgetAnalyticsService', () => {
 
         it('should respect the limit parameter', async () => {
             const transactions: TransactionSplit[] = [
-                { ...mockTransaction, amount: '10.00', description: 'Exp1' },
-                { ...mockTransaction, amount: '20.00', description: 'Exp2' },
-                { ...mockTransaction, amount: '30.00', description: 'Exp3' },
-                { ...mockTransaction, amount: '40.00', description: 'Exp4' },
-                { ...mockTransaction, amount: '50.00', description: 'Exp5' },
+                withdrawal('10.00', { ...base, description: 'Exp1' }),
+                withdrawal('20.00', { ...base, description: 'Exp2' }),
+                withdrawal('30.00', { ...base, description: 'Exp3' }),
+                withdrawal('40.00', { ...base, description: 'Exp4' }),
+                withdrawal('50.00', { ...base, description: 'Exp5' }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -420,11 +399,9 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should use default limit of 5 when not provided', async () => {
-            const transactions: TransactionSplit[] = Array.from({ length: 10 }, (_, i) => ({
-                ...mockTransaction,
-                amount: `${(i + 1) * 10}.00`,
-                description: `Expense ${i + 1}`,
-            }));
+            const transactions: TransactionSplit[] = Array.from({ length: 10 }, (_, i) =>
+                withdrawal((i + 1) * 10, { ...base, description: `Expense ${i + 1}` })
+            );
 
             transactionService.getTransactionsForMonth = jest
                 .fn<GetTransactions>()
@@ -437,7 +414,7 @@ describe('BudgetAnalyticsService', () => {
 
         it('should include budget name for each expense', async () => {
             const transactions: TransactionSplit[] = [
-                { ...mockTransaction, amount: '50.00', budget_name: 'Groceries' },
+                withdrawal('50.00', { ...base, budget_name: 'Groceries' }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -451,7 +428,7 @@ describe('BudgetAnalyticsService', () => {
 
         it('should label a transaction with no budget explicitly', async () => {
             const transactions: TransactionSplit[] = [
-                { ...mockTransaction, amount: '50.00', budget_name: null },
+                withdrawal('50.00', { ...base, budget_name: null }),
             ];
 
             transactionService.getTransactionsForMonth = jest
@@ -476,12 +453,11 @@ describe('BudgetAnalyticsService', () => {
 
         it('should include date and transaction ID in results', async () => {
             const transactions: TransactionSplit[] = [
-                {
-                    ...mockTransaction,
-                    amount: '50.00',
+                withdrawal('50.00', {
+                    ...base,
                     date: '2024-01-20',
                     transaction_journal_id: 'journal-123',
-                },
+                }),
             ];
 
             transactionService.getTransactionsForMonth = jest
