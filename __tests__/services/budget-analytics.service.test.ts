@@ -101,6 +101,69 @@ describe('BudgetAnalyticsService', () => {
             expect(budgetReportService.getBudgetReport).toHaveBeenNthCalledWith(3, 1, 2024);
         });
 
+        describe('historical comparison', () => {
+            const spentIn = (spent: number) => ({
+                ok: true as const,
+                value: [{ ...mockBudget, spent }],
+            });
+
+            beforeEach(() => {
+                transactionService.getTransactionsForMonth = jest
+                    .fn<GetTransactions>()
+                    .mockResolvedValue([]);
+            });
+
+            it('should read the three months before January from the previous year', async () => {
+                budgetReportService.getBudgetReport = jest
+                    .fn<GetReport>()
+                    .mockResolvedValue(spentIn(100));
+
+                await service.getBudgetReport(1, 2024, 3);
+
+                expect(budgetReportService.getBudgetReport.mock.calls).toEqual([
+                    [1, 2024],
+                    [12, 2023],
+                    [11, 2023],
+                    [10, 2023],
+                ]);
+            });
+
+            it('should average this month with every history month', async () => {
+                budgetReportService.getBudgetReport = jest
+                    .fn<GetReport>()
+                    .mockResolvedValueOnce(spentIn(100))
+                    .mockResolvedValueOnce(spentIn(200))
+                    .mockResolvedValueOnce(spentIn(300))
+                    .mockResolvedValueOnce(spentIn(400));
+
+                const [row] = await service.getBudgetReport(1, 2024, 3);
+
+                // (100 + 200 + 300 + 400) / 4
+                expect(row.historicalComparison).toEqual({
+                    previousMonthSpent: 200,
+                    averageSpent: 250,
+                });
+            });
+
+            it('should leave a history month that cannot be read out of the average', async () => {
+                budgetReportService.getBudgetReport = jest
+                    .fn<GetReport>()
+                    .mockResolvedValueOnce(spentIn(100))
+                    .mockResolvedValueOnce(spentIn(200))
+                    .mockResolvedValueOnce({
+                        ok: false,
+                        error: { message: 'API error' } as unknown as MonthError,
+                    })
+                    .mockResolvedValueOnce(spentIn(400));
+
+                const [row] = await service.getBudgetReport(1, 2024, 3);
+
+                // (100 + 200 + 400) / 3; the failed month is not a month of 0
+                expect(row.historicalComparison.previousMonthSpent).toBe(200);
+                expect(row.historicalComparison.averageSpent).toBeCloseTo(233.33, 2);
+            });
+        });
+
         it('should throw error when budget report service fails', async () => {
             budgetReportService.getBudgetReport = jest.fn<GetReport>().mockResolvedValue({
                 ok: false,
