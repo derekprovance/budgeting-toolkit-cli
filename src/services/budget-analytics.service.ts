@@ -191,10 +191,7 @@ function topMerchant(transactions: TransactionSplit[]): MerchantInsight | undefi
 
     let top: MerchantInsight | undefined;
     for (const [name, visits] of byMerchant) {
-        const totalSpent = visits.reduce(
-            (sum, t) => sum + TransactionCalculationUtils.calculateNetSpend([t]),
-            0
-        );
+        const totalSpent = TransactionCalculationUtils.calculateNetSpend(visits);
         const wins =
             !top ||
             visits.length > top.visitCount ||
