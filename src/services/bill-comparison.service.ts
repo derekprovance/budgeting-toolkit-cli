@@ -1,7 +1,6 @@
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BillComparisonDto, BillDetailDto } from '../types/dto/bill-comparison.dto.js';
-import { BillComparisonService as IBillComparisonService } from '../types/interface/bill-comparison.service.interface.js';
 import { Day, localDay, monthRange, toDay } from '../utils/date.utils.js';
 import { dueDatesInMonth } from '../utils/bill-schedule.utils.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
@@ -10,7 +9,7 @@ import { CashFlowService } from './cash-flow.service.js';
 import { Result } from '../types/result.type.js';
 import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
 
-export class BillComparisonService implements IBillComparisonService {
+export class BillComparisonService {
     constructor(
         private readonly billService: BillService,
         private readonly cashFlowService: CashFlowService

@@ -1,14 +1,13 @@
 import { BudgetLimitDto } from '../types/dto/budget-limit.dto.js';
 import { IBudgetService } from './core/budget.service.interface.js';
 import { allocationsByBudget } from './core/budget.service.js';
-import { BudgetReportService as IBudgetReportService } from '../types/interface/budget-report.service.interface.js';
 import { CashFlowService } from './cash-flow.service.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
 import { logger } from '../logger.js';
 import { Result } from '../types/result.type.js';
 import { BudgetError, BudgetErrorFactory, BudgetErrorType } from '../types/error/budget.error.js';
 
-export class BudgetReportService implements IBudgetReportService {
+export class BudgetReportService {
     constructor(
         private readonly budgetService: IBudgetService,
         private readonly cashFlowService: CashFlowService
