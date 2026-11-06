@@ -87,16 +87,6 @@ describe('UserInputService', () => {
 
         const mockTransactionId = '5';
 
-        it('should throw error when transaction is null', async () => {
-            await expect(
-                service.askToUpdateTransaction(
-                    null as unknown as TransactionSplit,
-                    mockTransactionId,
-                    { canSetBudget: true }
-                )
-            ).rejects.toThrow('Transaction cannot be null or undefined');
-        });
-
         it('should always show both fields even when values match current', async () => {
             mockExpand.mockResolvedValueOnce(ReviewAction.Skip);
 

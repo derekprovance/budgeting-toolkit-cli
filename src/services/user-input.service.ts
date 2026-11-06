@@ -67,27 +67,15 @@ export class UserInputService {
 
     /**
      * Asks the user whether to update a transaction with new category and/or budget
-     * @param transaction The transaction to potentially update
-     * @param transactionId The transaction ID for linking
-     * @param options The proposed changes to the transaction
-     * @param updateMode The mode indicating what to update (category, budget, or both)
-     * @returns Promise<ReviewAction> The user's choice
-     * @throws Error if the transaction is invalid
+     * @param transactionId The Firefly transaction id, for the link; none when undefined
+     * @throws ReviewCancelledError when the user presses Ctrl-C
      */
     async askToUpdateTransaction(
         transaction: TransactionSplit,
         transactionId: string | undefined,
         options: TransactionUpdateOptions
     ): Promise<ReviewAction> {
-        if (!transaction) {
-            throw new Error('Transaction cannot be null or undefined');
-        }
-
         const changes = this.getChangeList(transaction, options);
-        if (changes.length === 0) {
-            return ReviewAction.Skip;
-        }
-
         const message = this.formatUpdateMessage(
             transaction,
             transactionId,
@@ -198,71 +186,42 @@ export class UserInputService {
         );
     }
 
-    /**
-     * Gets a list of changes to be made to the transaction
-     * @param transaction The transaction being updated
-     * @param options The proposed changes (category and/or budget)
-     * @param updateMode The mode indicating what to update (category, budget, or both)
-     * @returns Array of formatted change strings to display
-     */
+    /** One row per field: its suggested change, or its current value */
     private getChangeList(
         transaction: TransactionSplit,
         options: TransactionUpdateOptions
     ): string[] {
-        const changes: string[] = [];
+        return [
+            this.describeField(
+                EditTransactionAttribute.Category,
+                transaction.category_name,
+                options.category,
+                options.source?.category
+            ),
+            options.canSetBudget
+                ? this.describeField(
+                      EditTransactionAttribute.Budget,
+                      transaction.budget_name,
+                      options.budget,
+                      options.source?.budget
+                  )
+                : `${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`,
+        ];
+    }
 
-        // Always show both fields for all modes - this gives users flexibility to manually set either field
-        // If AI has a suggestion, show as change. Otherwise, just show current value.
-
-        // Category field
-        if (options.category && options.category === transaction.category_name) {
-            changes.push(this.formatUnchanged(EditTransactionAttribute.Category, options.category));
-        } else if (options.category) {
-            // AI has a suggestion - show as change
-            changes.push(
-                this.formatChange(
-                    EditTransactionAttribute.Category,
-                    transaction.category_name ?? undefined,
-                    options.category,
-                    options.source?.category
-                )
-            );
-        } else {
-            // No AI suggestion - just show current value
-            changes.push(
-                this.formatCurrentValue(
-                    EditTransactionAttribute.Category,
-                    transaction.category_name ?? undefined
-                )
-            );
+    private describeField(
+        field: EditTransactionAttribute,
+        current: string | null | undefined,
+        suggested: string | undefined,
+        source: SuggestionSource | undefined
+    ): string {
+        if (!suggested) {
+            return this.formatCurrentValue(field, current ?? undefined);
         }
-
-        // Budget field
-        if (!options.canSetBudget) {
-            changes.push(`${chalk.bold(EditTransactionAttribute.Budget)}: ${chalk.dim('N/A')}`);
-        } else if (options.budget && options.budget === transaction.budget_name) {
-            changes.push(this.formatUnchanged(EditTransactionAttribute.Budget, options.budget));
-        } else if (options.budget) {
-            // AI has a suggestion - show as change
-            changes.push(
-                this.formatChange(
-                    EditTransactionAttribute.Budget,
-                    transaction.budget_name ?? undefined,
-                    options.budget,
-                    options.source?.budget
-                )
-            );
-        } else {
-            // No AI suggestion - just show current value
-            changes.push(
-                this.formatCurrentValue(
-                    EditTransactionAttribute.Budget,
-                    transaction.budget_name ?? undefined
-                )
-            );
+        if (suggested === current) {
+            return this.formatUnchanged(field, suggested);
         }
-
-        return changes;
+        return this.formatChange(field, current ?? undefined, suggested, source);
     }
 
     /**
