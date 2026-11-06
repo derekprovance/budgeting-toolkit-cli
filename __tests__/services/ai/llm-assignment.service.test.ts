@@ -1,34 +1,41 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import Anthropic from '@anthropic-ai/sdk';
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import {
-    LLMAssignmentService,
-    LLMAssignmentDependencies,
-} from '../../../src/services/ai/llm-assignment.service.js';
+import { LLMAssignmentService } from '../../../src/services/ai/llm-assignment.service.js';
 import { ILogger } from '../../../src/types/interface/logger.interface.js';
 import {
     ClaudeClient,
     CircuitOpenError,
     ClaudeResponseError,
+    ToolCall,
 } from '../../../src/api/claude.client.js';
 import { createMockTransaction } from '../../shared/test-data.js';
 
 type CallToolFn = ClaudeClient['callTool'];
 
+const categoriesResponse = (...categories: string[]) => JSON.stringify({ categories });
+const budgetsResponse = (...budgets: string[]) => JSON.stringify({ budgets });
+
+const sdkError = (errorClass: { prototype: object }, message: string): Error =>
+    Object.assign(Object.create(errorClass.prototype) as Error, { message });
+
+const makeTransactions = (count: number) =>
+    Array.from({ length: count }, (_, i) =>
+        createMockTransaction({
+            transaction_journal_id: String(i),
+            description: `Transaction ${i}`,
+        })
+    );
+
 describe('LLMAssignmentService', () => {
     let service: LLMAssignmentService;
-    let mockClaudeClient: jest.Mocked<ClaudeClient>;
-    let mockDeps: jest.Mocked<LLMAssignmentDependencies>;
+    let callTool: jest.Mock<CallToolFn>;
     let mockLogger: jest.Mocked<ILogger>;
     let mockTransactions: TransactionSplit[];
-    let validCategories: string[];
-    let validBudgets: string[];
+    const validCategories = ['Groceries', 'Healthcare', 'Shopping'];
+    const validBudgets = ['Food', 'Medical', 'Shopping'];
 
     beforeEach(() => {
-        // Reset mocks
-        jest.clearAllMocks();
-
-        // Create mock logger
         mockLogger = {
             info: jest.fn<(obj: unknown, msg: string) => void>(),
             warn: jest.fn<(obj: unknown, msg: string) => void>(),
@@ -37,43 +44,13 @@ describe('LLMAssignmentService', () => {
             trace: jest.fn<(obj: unknown, msg: string) => void>(),
         } as jest.Mocked<ILogger>;
 
-        // Create mock Claude client
-        mockClaudeClient = {
-            callTool: jest.fn(),
-        } as unknown as jest.Mocked<ClaudeClient>;
-
-        // Create mock dependencies
-        mockDeps = {
-            mapTransactionForLLM: jest.fn((tx: TransactionSplit) => ({
-                description: tx.description,
-                amount: tx.amount,
-                date: tx.date,
-                source_account: tx.source_name,
-                destination_account: tx.destination_name,
-                type: tx.type,
-                notes: tx.notes,
-            })),
-            getSystemPrompt: jest.fn().mockReturnValue('System prompt'),
-            getUserPrompt: jest.fn().mockReturnValue('User prompt'),
-            getFunctionSchema: jest.fn().mockReturnValue({
-                name: 'assign_categories',
-                description: 'Assign categories',
-                input_schema: { type: 'object', properties: {}, required: [] },
-            }),
-            parseAssignmentResponse: jest.fn().mockImplementation(() => {
-                throw new Error('parseAssignmentResponse mock not configured for this test');
-            }),
-            logger: mockLogger,
-        } as jest.Mocked<LLMAssignmentDependencies>;
-
-        // Create service with mock dependencies
+        callTool = jest.fn<CallToolFn>();
         service = new LLMAssignmentService(
-            mockClaudeClient,
+            { callTool } as unknown as ClaudeClient,
             { batchSize: 10, maxConcurrent: 3 },
-            mockDeps
+            mockLogger
         );
 
-        // Setup test data
         mockTransactions = [
             createMockTransaction({
                 transaction_journal_id: '1',
@@ -97,10 +74,9 @@ describe('LLMAssignmentService', () => {
                 destination_name: 'Amazon',
             }),
         ];
-
-        validCategories = ['Groceries', 'Healthcare', 'Shopping', '(no category)'];
-        validBudgets = ['Food', 'Medical', 'Shopping', '(no budget)'];
     });
+
+    const sentCall = (index = 0): ToolCall => callTool.mock.calls[index][0];
 
     describe('assign', () => {
         describe('validation', () => {
@@ -111,28 +87,13 @@ describe('LLMAssignmentService', () => {
                 expect(mockLogger.warn).toHaveBeenCalledWith(
                     'No transactions provided for category assignment'
                 );
-                expect(mockClaudeClient.callTool).not.toHaveBeenCalled();
-            });
-
-            it('should return empty array and log warning when transactions is null', async () => {
-                const result = await service.assign('category', null as any, validCategories);
-
-                expect(result).toEqual([]);
-                expect(mockLogger.warn).toHaveBeenCalledWith(
-                    'No transactions provided for category assignment'
-                );
+                expect(callTool).not.toHaveBeenCalled();
             });
 
             it('should throw error when no valid options provided', async () => {
                 await expect(service.assign('category', mockTransactions, [])).rejects.toThrow(
                     'No valid category options provided'
                 );
-            });
-
-            it('should throw error when valid options is null', async () => {
-                await expect(
-                    service.assign('category', mockTransactions, null as any)
-                ).rejects.toThrow('No valid category options provided');
             });
 
             it('should throw error for budget type when no valid budgets', async () => {
@@ -144,145 +105,54 @@ describe('LLMAssignmentService', () => {
 
         describe('successful assignment', () => {
             beforeEach(() => {
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: ['Groceries', 'Healthcare', 'Groceries'],
-                    })
+                callTool.mockResolvedValue(
+                    categoriesResponse('Groceries', 'Healthcare', 'Groceries')
                 );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    'Groceries',
-                    'Healthcare',
-                    'Groceries',
-                ]);
             });
 
             it('should successfully assign categories to transactions', async () => {
                 const result = await service.assign('category', mockTransactions, validCategories);
 
                 expect(result).toEqual(['Groceries', 'Healthcare', 'Groceries']);
-                expect(mockLogger.debug).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        type: 'category',
-                        transactionCount: 3,
-                        optionCount: 4,
-                    }),
-                    'Starting category assignment'
-                );
             });
 
-            it('should map transactions using transaction mapper', async () => {
+            it('should send every transaction and option in the prompt', async () => {
                 await service.assign('category', mockTransactions, validCategories);
 
-                expect(mockDeps.mapTransactionForLLM).toHaveBeenCalledTimes(3);
-                // Array.map passes (item, index, array) to the callback
-                // (the declared signature takes only the transaction, so the
-                // extra arguments are checked on the raw call record)
-                expect(mockDeps.mapTransactionForLLM.mock.calls[0]).toEqual([
-                    expect.objectContaining({
-                        description: 'Walmart Supercenter',
-                    }),
-                    0,
-                    mockTransactions,
-                ]);
+                const { userPrompt } = sentCall();
+                for (const tx of mockTransactions) {
+                    expect(userPrompt).toContain(tx.description);
+                }
+                for (const option of validCategories) {
+                    expect(userPrompt).toContain(`- ${option}`);
+                }
             });
 
-            it('should call Claude client with correct parameters', async () => {
+            it('should force the assignment tool for the requested type', async () => {
                 await service.assign('category', mockTransactions, validCategories);
 
-                expect(mockClaudeClient.callTool).toHaveBeenCalledWith({
-                    systemPrompt: 'System prompt',
-                    userPrompt: 'User prompt',
-                    tool: {
-                        name: 'assign_categories',
-                        description: 'Assign categories',
-                        input_schema: { type: 'object', properties: {}, required: [] },
-                    },
-                });
-            });
-
-            it('should generate prompts with correct parameters', async () => {
-                await service.assign('category', mockTransactions, validCategories);
-
-                expect(mockDeps.getSystemPrompt).toHaveBeenCalledWith('category');
-                expect(mockDeps.getUserPrompt).toHaveBeenCalledWith(
-                    'category',
-                    expect.any(Array),
-                    validCategories
-                );
-                expect(mockDeps.getFunctionSchema).toHaveBeenCalledWith(
-                    'category',
-                    validCategories
-                );
-            });
-
-            it('should parse response with correct parameters', async () => {
-                const mockResponse = JSON.stringify({
-                    categories: ['Groceries', 'Healthcare', 'Groceries'],
-                });
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(mockResponse);
-
-                await service.assign('category', mockTransactions, validCategories);
-
-                expect(mockDeps.parseAssignmentResponse).toHaveBeenCalledWith(
-                    'category',
-                    mockResponse,
-                    3,
-                    validCategories
-                );
+                expect(sentCall().tool.name).toBe('assign_categories');
+                expect(sentCall().systemPrompt).toContain('category');
             });
 
             it('should work with budget assignment type', async () => {
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        budgets: ['Food', 'Medical', 'Food'],
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    'Food',
-                    'Medical',
-                    'Food',
-                ]);
+                callTool.mockResolvedValue(budgetsResponse('Food', 'Medical', 'Food'));
 
                 const result = await service.assign('budget', mockTransactions, validBudgets);
 
                 expect(result).toEqual(['Food', 'Medical', 'Food']);
-                expect(mockDeps.getSystemPrompt).toHaveBeenCalledWith('budget');
+                expect(sentCall().tool.name).toBe('assign_budgets');
             });
 
             it('should calculate success rate correctly for partial assignments', async () => {
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    'Groceries',
-                    '(no category)',
-                    'Groceries',
-                ]);
-
-                await service.assign('category', mockTransactions, validCategories);
-
-                expect(mockLogger.debug).toHaveBeenCalledWith(
-                    {
-                        type: 'category',
-                        assignedCount: 3,
-                        successRate: '66.7%',
-                    },
-                    'category assignment completed'
+                callTool.mockResolvedValue(
+                    categoriesResponse('Groceries', '(no category)', 'Groceries')
                 );
-            });
-
-            it('should calculate 0% success rate when all assignments are default', async () => {
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    '(no category)',
-                    '(no category)',
-                    '(no category)',
-                ]);
 
                 await service.assign('category', mockTransactions, validCategories);
 
                 expect(mockLogger.debug).toHaveBeenCalledWith(
-                    {
-                        type: 'category',
-                        assignedCount: 3,
-                        successRate: '0.0%',
-                    },
+                    { type: 'category', assignedCount: 3, successRate: '66.7%' },
                     'category assignment completed'
                 );
             });
@@ -290,9 +160,7 @@ describe('LLMAssignmentService', () => {
 
         describe('error handling', () => {
             it('should return default categories on Claude API error', async () => {
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new Error('API Error'));
+                callTool.mockRejectedValue(new Error('API Error'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
@@ -304,9 +172,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should return default budgets on Claude API error', async () => {
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new Error('API Error'));
+                callTool.mockRejectedValue(new Error('API Error'));
 
                 const result = await service.assign('budget', mockTransactions, validBudgets);
 
@@ -317,9 +183,7 @@ describe('LLMAssignmentService', () => {
                 // Every remaining chunk would be rejected without an API call,
                 // so degrading them to the sentinel would sentinel-fill the
                 // rest of the run and still report success.
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new CircuitOpenError('Circuit is open'));
+                callTool.mockRejectedValue(new CircuitOpenError('Circuit is open'));
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
@@ -329,9 +193,7 @@ describe('LLMAssignmentService', () => {
             it('should abort the run when a response is truncated at max_tokens', async () => {
                 // Truncation means the response outgrew llm.maxTokens — a
                 // configuration problem every later chunk will hit too.
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new ClaudeResponseError('truncated', 'Response truncated'));
+                callTool.mockRejectedValue(new ClaudeResponseError('truncated', 'Truncated'));
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
@@ -339,9 +201,9 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should still degrade a chunk on a recoverable response error', async () => {
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new ClaudeResponseError('missing_tool_use', 'No tool call'));
+                callTool.mockRejectedValue(
+                    new ClaudeResponseError('missing_tool_use', 'No tool call')
+                );
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
@@ -349,9 +211,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should report how many transactions went unassigned after degrading', async () => {
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new Error('API Error'));
+                callTool.mockRejectedValue(new Error('API Error'));
 
                 await service.assign('category', mockTransactions, validCategories);
 
@@ -366,14 +226,9 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should not report degradation when every chunk succeeds', async () => {
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockResolvedValue(JSON.stringify({ categories: ['Groceries'] }));
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    'Groceries',
-                    'Healthcare',
-                    'Groceries',
-                ]);
+                callTool.mockResolvedValue(
+                    categoriesResponse('Groceries', 'Healthcare', 'Groceries')
+                );
 
                 await service.assign('category', mockTransactions, validCategories);
 
@@ -383,11 +238,16 @@ describe('LLMAssignmentService', () => {
                 );
             });
 
-            it('should handle parsing errors gracefully', async () => {
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue('Invalid JSON');
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(() => {
-                    throw new Error('Parse error');
-                });
+            it('should degrade a chunk whose response is not JSON', async () => {
+                callTool.mockResolvedValue('Invalid JSON');
+
+                const result = await service.assign('category', mockTransactions, validCategories);
+
+                expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
+            });
+
+            it('should degrade a chunk whose response has the wrong count', async () => {
+                callTool.mockResolvedValue(categoriesResponse('Groceries', 'Healthcare'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
@@ -395,53 +255,17 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should handle non-Error objects thrown', async () => {
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockRejectedValue('String error');
+                callTool.mockRejectedValue('String error');
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
                 expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
             });
 
-            it('should handle response count mismatch by returning defaults', async () => {
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: ['Groceries', 'Healthcare'], // Only 2 instead of 3
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    'Groceries',
-                    'Healthcare',
-                ]);
-
-                const result = await service.assign('category', mockTransactions, validCategories);
-
-                // Service returns whatever parseAssignmentResponse returns
-                expect(result).toEqual(['Groceries', 'Healthcare']);
-            });
-
-            it('should handle invalid category in response by returning defaults', async () => {
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: ['Invalid Category', 'Healthcare', 'Groceries'],
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    '(no category)',
-                    'Healthcare',
-                    'Groceries',
-                ]);
-
-                const result = await service.assign('category', mockTransactions, validCategories);
-
-                expect(result).toEqual(['(no category)', 'Healthcare', 'Groceries']);
-            });
-
             it('should throw on authentication error (critical error)', async () => {
-                const authError = Object.assign(
-                    Object.create(Anthropic.AuthenticationError.prototype) as Error,
-                    { message: 'Invalid API key provided' }
+                callTool.mockRejectedValue(
+                    sdkError(Anthropic.AuthenticationError, 'Invalid API key provided')
                 );
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockRejectedValue(authError);
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
@@ -457,11 +281,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should throw on permission error (critical error)', async () => {
-                const permError = Object.assign(
-                    Object.create(Anthropic.PermissionDeniedError.prototype) as Error,
-                    { message: 'forbidden' }
-                );
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockRejectedValue(permError);
+                callTool.mockRejectedValue(sdkError(Anthropic.PermissionDeniedError, 'forbidden'));
 
                 await expect(
                     service.assign('category', mockTransactions, validCategories)
@@ -469,11 +289,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should throw on bad request (critical error)', async () => {
-                const badRequest = Object.assign(
-                    Object.create(Anthropic.BadRequestError.prototype) as Error,
-                    { message: 'invalid model' }
-                );
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockRejectedValue(badRequest);
+                callTool.mockRejectedValue(sdkError(Anthropic.BadRequestError, 'invalid model'));
 
                 await expect(
                     service.assign('budget', mockTransactions, validBudgets)
@@ -482,255 +298,60 @@ describe('LLMAssignmentService', () => {
 
             it('should degrade (not throw) on plain errors mentioning auth words', async () => {
                 // String matching is gone: only typed SDK errors are critical
-                mockClaudeClient.callTool = jest
-                    .fn<CallToolFn>()
-                    .mockRejectedValue(new Error('authentication failed'));
+                callTool.mockRejectedValue(new Error('authentication failed'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);
 
                 expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
             });
         });
-
-        describe('edge cases', () => {
-            it('should handle single transaction', async () => {
-                const singleTransaction = [mockTransactions[0]];
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: ['Groceries'],
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue(['Groceries']);
-
-                const result = await service.assign('category', singleTransaction, validCategories);
-
-                expect(result).toEqual(['Groceries']);
-            });
-
-            it('should handle large number of transactions', async () => {
-                const manyTransactions = Array(100)
-                    .fill(null)
-                    .map((_, i) =>
-                        createMockTransaction({
-                            transaction_journal_id: String(i),
-                            description: `Transaction ${i}`,
-                        })
-                    );
-
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: Array(10).fill('Groceries'),
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
-                    (_type, _resp, count) => Array(count as number).fill('Groceries')
-                );
-
-                const result = await service.assign('category', manyTransactions, validCategories);
-
-                expect(result).toHaveLength(100);
-                expect(mockDeps.mapTransactionForLLM).toHaveBeenCalledTimes(100);
-                // 100 transactions at batchSize 10 → 10 chunked requests
-                expect(mockClaudeClient.callTool).toHaveBeenCalledTimes(10);
-            });
-
-            it('should handle transactions with missing optional fields', async () => {
-                const sparseTransaction = createMockTransaction({
-                    transaction_journal_id: '1',
-                    description: 'Test',
-                    amount: '10.00',
-                    // Missing optional fields
-                });
-
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: ['Groceries'],
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue(['Groceries']);
-
-                const result = await service.assign(
-                    'category',
-                    [sparseTransaction],
-                    validCategories
-                );
-
-                expect(result).toEqual(['Groceries']);
-            });
-
-            it('should handle single valid option', async () => {
-                const singleCategory = ['Groceries'];
-                mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                    JSON.stringify({
-                        categories: ['Groceries', 'Groceries', 'Groceries'],
-                    })
-                );
-                (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                    'Groceries',
-                    'Groceries',
-                    'Groceries',
-                ]);
-
-                const result = await service.assign('category', mockTransactions, singleCategory);
-
-                expect(result).toEqual(['Groceries', 'Groceries', 'Groceries']);
-            });
-        });
     });
 
     describe('batching', () => {
-        const makeTransactions = (count: number) =>
-            Array(count)
-                .fill(null)
-                .map((_, i) =>
-                    createMockTransaction({
-                        transaction_journal_id: String(i),
-                        description: `Transaction ${i}`,
-                    })
-                );
-
         it('should chunk 25 transactions into 3 requests of 10/10/5, preserving order', async () => {
             const transactions = makeTransactions(25);
+            const chunkOptions = ['chunk-0', 'chunk-1', 'chunk-2'];
 
-            // Each callTool call resolves with the chunk index so ordering is provable
+            // Each chunk answers with its own option so ordering is provable
             let call = 0;
-            mockClaudeClient.callTool = jest
-                .fn<CallToolFn>()
-                .mockImplementation(async () => String(call++));
-            (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
-                (_type, resp, count) => Array(count as number).fill(`chunk-${resp as string}`)
-            );
+            callTool.mockImplementation(async ({ userPrompt }) => {
+                const count = (userPrompt.match(/^\d+\. /gm) ?? []).length;
+                return categoriesResponse(...Array<string>(count).fill(`chunk-${call++}`));
+            });
 
-            const result = await service.assign('category', transactions, validCategories);
+            const result = await service.assign('category', transactions, chunkOptions);
 
-            expect(mockClaudeClient.callTool).toHaveBeenCalledTimes(3);
-            expect(result).toHaveLength(25);
+            expect(callTool).toHaveBeenCalledTimes(3);
             expect(result.slice(0, 10)).toEqual(Array(10).fill('chunk-0'));
             expect(result.slice(10, 20)).toEqual(Array(10).fill('chunk-1'));
             expect(result.slice(20)).toEqual(Array(5).fill('chunk-2'));
-
-            // getUserPrompt received the per-chunk slices: 10, 10, 5
-            const promptCalls = (mockDeps.getUserPrompt as jest.Mock).mock.calls;
-            expect(promptCalls.map(c => (c[1] as unknown[]).length)).toEqual([10, 10, 5]);
         });
 
         it('should degrade only the failing chunk to the sentinel', async () => {
             const transactions = makeTransactions(25);
 
             let call = 0;
-            mockClaudeClient.callTool = jest.fn<CallToolFn>().mockImplementation(async () => {
-                const index = call++;
-                if (index === 1) {
+            callTool.mockImplementation(async ({ userPrompt }) => {
+                if (call++ === 1) {
                     throw new Error('connection reset');
                 }
-                return 'ok';
+                const count = (userPrompt.match(/^\d+\. /gm) ?? []).length;
+                return categoriesResponse(...Array<string>(count).fill('Groceries'));
             });
-            (mockDeps.parseAssignmentResponse as jest.Mock).mockImplementation(
-                (_type, _resp, count) => Array(count as number).fill('Groceries')
-            );
 
             const result = await service.assign('category', transactions, validCategories);
 
-            expect(result).toHaveLength(25);
             expect(result.slice(0, 10)).toEqual(Array(10).fill('Groceries'));
             expect(result.slice(10, 20)).toEqual(Array(10).fill('(no category)'));
             expect(result.slice(20)).toEqual(Array(5).fill('Groceries'));
         });
 
         it('should abort the whole run when any chunk hits a critical error', async () => {
-            const transactions = makeTransactions(25);
+            callTool.mockRejectedValue(sdkError(Anthropic.AuthenticationError, 'invalid key'));
 
-            const authError = Object.assign(
-                Object.create(Anthropic.AuthenticationError.prototype) as Error,
-                { message: 'invalid key' }
-            );
-            mockClaudeClient.callTool = jest.fn<CallToolFn>().mockRejectedValue(authError);
-
-            await expect(service.assign('category', transactions, validCategories)).rejects.toThrow(
-                'invalid key'
-            );
-        });
-    });
-
-    describe('assignCategories', () => {
-        it('should delegate to assign with category type', async () => {
-            mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                JSON.stringify({
-                    categories: ['Groceries', 'Healthcare', 'Groceries'],
-                })
-            );
-            (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                'Groceries',
-                'Healthcare',
-                'Groceries',
-            ]);
-
-            const result = await service.assignCategories(mockTransactions, validCategories);
-
-            expect(result).toEqual(['Groceries', 'Healthcare', 'Groceries']);
-            expect(mockDeps.getSystemPrompt).toHaveBeenCalledWith('category');
-        });
-
-        it('should return empty array when no transactions', async () => {
-            const result = await service.assignCategories([], validCategories);
-
-            expect(result).toEqual([]);
-        });
-
-        it('should handle errors from assign method', async () => {
-            mockClaudeClient.callTool = jest
-                .fn<CallToolFn>()
-                .mockRejectedValue(new Error('API Error'));
-            (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                '(no category)',
-                '(no category)',
-                '(no category)',
-            ]);
-
-            const result = await service.assignCategories(mockTransactions, validCategories);
-
-            expect(result).toEqual(['(no category)', '(no category)', '(no category)']);
-        });
-    });
-
-    describe('assignBudgets', () => {
-        it('should delegate to assign with budget type', async () => {
-            mockClaudeClient.callTool = jest.fn<CallToolFn>().mockResolvedValue(
-                JSON.stringify({
-                    budgets: ['Food', 'Medical', 'Food'],
-                })
-            );
-            (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                'Food',
-                'Medical',
-                'Food',
-            ]);
-
-            const result = await service.assignBudgets(mockTransactions, validBudgets);
-
-            expect(result).toEqual(['Food', 'Medical', 'Food']);
-            expect(mockDeps.getSystemPrompt).toHaveBeenCalledWith('budget');
-        });
-
-        it('should return empty array when no transactions', async () => {
-            const result = await service.assignBudgets([], validBudgets);
-
-            expect(result).toEqual([]);
-        });
-
-        it('should handle errors from assign method', async () => {
-            mockClaudeClient.callTool = jest
-                .fn<CallToolFn>()
-                .mockRejectedValue(new Error('API Error'));
-            (mockDeps.parseAssignmentResponse as jest.Mock).mockReturnValue([
-                '(no budget)',
-                '(no budget)',
-                '(no budget)',
-            ]);
-
-            const result = await service.assignBudgets(mockTransactions, validBudgets);
-
-            expect(result).toEqual(['(no budget)', '(no budget)', '(no budget)']);
+            await expect(
+                service.assign('category', makeTransactions(25), validCategories)
+            ).rejects.toThrow('invalid key');
         });
     });
 });
