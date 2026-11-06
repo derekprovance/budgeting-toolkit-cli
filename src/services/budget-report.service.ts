@@ -48,24 +48,22 @@ export class BudgetReportService {
         // budget (R-BUDGET-1). An inactive budget still gets a row when it
         // has spending or a limit this month, or the rows would not sum to
         // analyze's totals.
-        const budgetBucket = buckets.value.budget;
+        const spendingByBudget = Map.groupBy(buckets.value.budget, t => t.budget_id);
         const allocations = allocationsByBudget(budgetLimits);
         const budgets = allBudgets.filter(
             budget =>
                 budget.attributes.active ||
                 allocations.has(budget.id) ||
-                budgetBucket.some(t => t.budget_id === budget.id)
+                spendingByBudget.has(budget.id)
         );
-        const budgetReports: BudgetLimitDto[] = budgets.map(budget => {
-            return {
-                budgetId: budget.id,
-                name: budget.attributes.name,
-                amount: allocations.get(budget.id) ?? 0,
-                spent: TransactionCalculationUtils.calculateNetSpend(
-                    budgetBucket.filter(t => t.budget_id === budget.id)
-                ),
-            };
-        });
+        const budgetReports: BudgetLimitDto[] = budgets.map(budget => ({
+            budgetId: budget.id,
+            name: budget.attributes.name,
+            amount: allocations.get(budget.id) ?? 0,
+            spent: TransactionCalculationUtils.calculateNetSpend(
+                spendingByBudget.get(budget.id) ?? []
+            ),
+        }));
 
         logger.debug(
             { month, year, budgetCount: budgetReports.length },

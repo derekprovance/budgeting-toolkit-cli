@@ -71,11 +71,15 @@ export class BudgetAnalyticsService {
             });
 
             // Statistics describe the same budget bucket the rows total
-            const budgetTransactions = (await this.getBuckets(month, year)).budget;
+            const { budget: bucket } = await this.getBuckets(month, year);
+            const spendingByBudget = Map.groupBy(bucket, t => t.budget_id);
 
             // Enhance each budget with statistics and historical data
             const enhanced = currentBudgets.map(budget => {
-                const stats = this.calculateBudgetStatistics(budget.budgetId, budgetTransactions);
+                const stats = this.calculateBudgetStatistics(
+                    budget.budgetId,
+                    spendingByBudget.get(budget.budgetId) ?? []
+                );
 
                 const historical = this.calculateHistoricalComparison(
                     budget.budgetId,
@@ -174,16 +178,14 @@ export class BudgetAnalyticsService {
     /**
      * Calculates transaction statistics for a budget
      * @param budgetId Budget ID
-     * @param bucket The month's budget bucket
+     * @param budgetTransactions The budget's share of the month's budget bucket
      * @returns Transaction statistics
      */
     private calculateBudgetStatistics(
         budgetId: string,
-        bucket: TransactionSplit[]
+        budgetTransactions: TransactionSplit[]
     ): TransactionStats {
         try {
-            const budgetTransactions = bucket.filter(t => t.budget_id === budgetId);
-
             if (budgetTransactions.length === 0) {
                 return {
                     count: 0,
