@@ -1236,7 +1236,9 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockValidator,
                 false,
                 false,
-                new TransactionHistoryService(historySource, 12)
+                new TransactionHistoryService(historySource, 12, {
+                    canCarryBudget: tx => tx.type === 'withdrawal',
+                })
             );
         };
 
@@ -1455,7 +1457,9 @@ describe('AITransactionUpdateOrchestrator', () => {
                 mockValidator,
                 false,
                 false,
-                new TransactionHistoryService(historySource, 12)
+                new TransactionHistoryService(historySource, 12, {
+                    canCarryBudget: tx => tx.type === 'withdrawal',
+                })
             );
 
             const result = await orchestrator.updateTransactionsByTag('t', CategorizeMode.Both);

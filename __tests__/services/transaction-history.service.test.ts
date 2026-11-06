@@ -24,7 +24,7 @@ describe('TransactionHistoryService', () => {
         return new TransactionHistoryService(
             { getTransactionsInRange } as unknown as ITransactionService,
             months,
-            { logger, now: at }
+            { logger, now: at, canCarryBudget: tx => tx.type === 'withdrawal' }
         );
     };
 

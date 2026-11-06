@@ -20,9 +20,8 @@ export interface TransactionHistoryOptions {
     /**
      * Whether a past transaction could have been given a budget, so its
      * missing budget means "left unbudgeted" rather than "cannot have one".
-     * Defaults to withdrawals only; the factory passes the validator's rule.
      */
-    canCarryBudget?: (transaction: TransactionSplit) => boolean;
+    canCarryBudget: (transaction: TransactionSplit) => boolean;
     logger?: ILogger;
     now?: () => Date;
 }
@@ -50,9 +49,9 @@ export class TransactionHistoryService {
     constructor(
         private readonly transactionService: ITransactionService,
         private readonly historyMonths: number,
-        options: TransactionHistoryOptions = {}
+        options: TransactionHistoryOptions
     ) {
-        this.canCarryBudget = options.canCarryBudget ?? (tx => tx.type === 'withdrawal');
+        this.canCarryBudget = options.canCarryBudget;
         this.logger = options.logger ?? defaultLogger;
         this.now = options.now ?? (() => new Date());
     }
