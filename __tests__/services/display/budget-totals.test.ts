@@ -9,6 +9,7 @@ describe('budgetTotals', () => {
             spent: 250,
             allocated: 500,
             percentageUsed: 50,
+            isOverBudget: false,
         });
     });
 
@@ -17,6 +18,7 @@ describe('budgetTotals', () => {
             spent: 50,
             allocated: 0,
             percentageUsed: 0,
+            isOverBudget: true,
         });
     });
 });

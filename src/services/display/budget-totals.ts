@@ -5,6 +5,7 @@ export interface BudgetTotals {
     allocated: number;
     /** 0 when nothing is allocated */
     percentageUsed: number;
+    isOverBudget: boolean;
 }
 
 /** The report's headline totals across every budget row, shared by the text and JSON reports */
@@ -15,5 +16,6 @@ export function budgetTotals(budgets: readonly BudgetReportDto[]): BudgetTotals 
         spent,
         allocated,
         percentageUsed: allocated > 0 ? (spent / allocated) * 100 : 0,
+        isOverBudget: spent > allocated,
     };
 }

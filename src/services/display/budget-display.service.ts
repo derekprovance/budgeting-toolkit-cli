@@ -98,8 +98,8 @@ export class BudgetDisplayService {
             spent: totalSpent,
             allocated: totalBudget,
             percentageUsed,
+            isOverBudget,
         } = budgetTotals(data.budgets);
-        const isOverBudget = totalSpent > totalBudget;
 
         const header = DisplayFormatterUtils.createBoxHeader(
             `BUDGET REPORT - ${DisplayFormatterUtils.formatMonthYear(data.month, data.year).toUpperCase()}`
