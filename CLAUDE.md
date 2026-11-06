@@ -342,7 +342,9 @@ Where the code disagrees with RULES.md, the test asserts the **rule** and runs a
 ### Unit-test rules
 
 - **`jest.mock` is inert under native ESM.** It is not hoisted and does not intercept ES module linking, so it silently does nothing. The canary `__tests__/meta/esm-mocking.test.ts` proves it and fails if that ever changes. Inject dependencies through constructors, or use `jest.unstable_mockModule(...)` followed by a dynamic `await import(...)` (as `__tests__/cli.test.ts` does).
-- Build transactions with the typed builders in `__tests__/shared/test-data.ts` — `withdrawal()`, `deposit()`, `transfer()` — which set a fixed date, an **unsigned** amount and an explicit `type`, matching Firefly's sign convention. Reuse `createMockAccountScopeService`, `createMockCashFlowService`, `buckets()` and `mockDate` rather than hand-rolling them.
+- Build fixtures with the typed builders in `__tests__/shared/test-data.ts`: `withdrawal()`, `deposit()`, `transfer()` (a fixed date, `TEST_DATE`, an **unsigned** amount and an explicit `type`, matching Firefly's sign convention), `transactionRead(id, ...splits)` and `budgetRead()`. Never cast a partial literal to `TransactionSplit`.
+- Build mocks with `__tests__/shared/mocks.ts`: `partialMock<T>({...})` for any collaborator (its members are typechecked against `T`, so a stub cannot outlive the method it stands for), `createMockLogger`, `createMockFireflyClient` (every endpoint `src` calls), `createMockAccountScopeService`, `createMockCashFlowService` with `buckets()`, and `loadCatalog`. Don't hand-roll another.
+- A test whose outcome depends on today pins it with `jest.useFakeTimers({ now })`, or injects the clock where the service takes one; never read the real date.
 - `__tests__/setup/env.ts` runs before every test file: `FORCE_COLOR=0`, `LOG_LEVEL=silent`, `BTK_STRICT_CONFIG=1`, and a temp `HOME`, so no test can read the real `config.yaml` or `~/.budget` credentials.
 - Import `jest` from `@jest/globals`. Jest does not typecheck; run `npm run typecheck:tests`.
 - Test both success and error scenarios.
