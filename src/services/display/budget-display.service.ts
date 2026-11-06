@@ -4,6 +4,7 @@ import { TopExpenseDto } from '../../types/dto/top-expense.dto.js';
 import { BudgetInsight } from '../../types/dto/budget-insight.dto.js';
 import {
     BillComparisonDto,
+    BillDetailDto,
     getTopBills,
     getRemainingBills,
     isBillUpcoming,
@@ -332,10 +333,25 @@ export class BudgetDisplayService {
      * Formats the bills and recurring section
      */
     private formatBillsSection(billComparison: BillComparisonDto, verbose: boolean): string {
-        const lines: string[] = [];
-        lines.push(DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'));
-        lines.push('');
+        const symbol = billComparison.currencySymbol;
+        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
+        const otherBills = verbose ? [] : getRemainingBills(billComparison);
 
+        const lines = [
+            DisplayFormatterUtils.createSectionHeader('BILLS & RECURRING'),
+            '',
+            this.formatBillsSummary(billComparison),
+            '',
+            ...billsToShow.map(bill => this.formatBillRow(bill, symbol)),
+        ];
+        if (otherBills.length > 0) {
+            lines.push(this.formatOtherBillsRow(otherBills, symbol));
+        }
+        lines.push('');
+        return lines.join('\n');
+    }
+
+    private formatBillsSummary(billComparison: BillComparisonDto): string {
         const expectedFormatted = CurrencyUtils.formatWithSymbol(
             billComparison.predictedTotal,
             billComparison.currencySymbol
@@ -360,88 +376,92 @@ export class BudgetDisplayService {
                 : billComparison.variance > 0
                   ? chalk.red(`${varianceEmoji} +${varianceFormatted}`)
                   : chalk.green(`${varianceEmoji} -${varianceFormatted}`);
-        // A favourable variance is only good news once the month's bills have
-        // actually come around. Say how much of it is merely unpaid.
+
+        return `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${this.formatNotYetDueNote(billComparison)}`;
+    }
+
+    /**
+     * A favourable variance is only good news once the month's bills have
+     * actually come around. Says how much of it is merely unpaid.
+     */
+    private formatNotYetDueNote(billComparison: BillComparisonDto): string {
         const notYetDue = billComparison.bills.reduce(
             (sum, bill) => sum + (bill.upcomingAmount ?? 0),
             0
         );
-        const notYetDueNote =
-            notYetDue > 0
-                ? chalk.dim(
-                      `  (${CurrencyUtils.formatWithSymbol(notYetDue, billComparison.currencySymbol)} not yet due)`
-                  )
-                : '';
-
-        const summaryLine = `Expected: ${expectedFormatted}    Actual: ${actualFormatted}    ${varianceDisplay}${notYetDueNote}`;
-
-        lines.push(summaryLine);
-        lines.push('');
-
-        // Determine how many bills to show individually (top bills by actual spend)
-        const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
-        const otherBills = verbose ? [] : getRemainingBills(billComparison);
-
-        billsToShow.forEach(bill => {
-            const predictedFormatted = CurrencyUtils.formatWithSymbol(
-                bill.predicted,
-                billComparison.currencySymbol
-            );
-            const actualFormatted = CurrencyUtils.formatWithSymbol(
-                bill.actual,
-                billComparison.currencySymbol
-            );
-            const variance = bill.actual - bill.predicted;
-            const isUpcoming = isBillUpcoming(bill);
-            // A bill that has not come around yet is not "under budget": it is
-            // simply unpaid, and rendering it green beside genuinely cheap bills
-            // invites the reader to bank money they still owe
-            const varianceEmoji = isUpcoming
-                ? EmojiUtils.UPCOMING_BILL_EMOJI
-                : EmojiUtils.getBillVarianceEmoji(variance, bill.predicted);
-
-            const name = DisplayFormatterUtils.fitWidth(
-                bill.name,
-                BudgetDisplayService.NAME_COLUMN_WIDTH
-            );
-            const trailer = isUpcoming
-                ? chalk.dim(
-                      `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, billComparison.currencySymbol)} of ${predictedFormatted})`
-                  )
-                : `(expected ${predictedFormatted})`;
-            const line = `${varianceEmoji} ${name} ${actualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  ${trailer}`;
-            lines.push(line);
-        });
-
-        // Only show "Others" grouping if not verbose and there are other bills
-        if (otherBills.length > 0) {
-            const otherActual = otherBills.reduce((sum, b) => sum + b.actual, 0);
-            const otherPredicted = otherBills.reduce((sum, b) => sum + b.predicted, 0);
-            const otherVariance = otherActual - otherPredicted;
-            const otherVarianceEmoji = EmojiUtils.getBillVarianceEmoji(
-                otherVariance,
-                otherPredicted
-            );
-
-            const otherActualFormatted = CurrencyUtils.formatWithSymbol(
-                otherActual,
-                billComparison.currencySymbol
-            );
-            const otherPredictedFormatted = CurrencyUtils.formatWithSymbol(
-                otherPredicted,
-                billComparison.currencySymbol
-            );
-
-            // Same shape as the per-bill rows so the amount column lines up
-            const line = `${otherVarianceEmoji} ${`Others (${otherBills.length})`.padEnd(
-                BudgetDisplayService.NAME_COLUMN_WIDTH
-            )} ${otherActualFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH)}  (expected ${otherPredictedFormatted})`;
-
-            lines.push(line);
+        if (notYetDue <= 0) {
+            return '';
         }
+        return chalk.dim(
+            `  (${CurrencyUtils.formatWithSymbol(notYetDue, billComparison.currencySymbol)} not yet due)`
+        );
+    }
 
-        lines.push('');
-        return lines.join('\n');
+    private formatBillRow(bill: BillDetailDto, symbol: string): string {
+        if (!isBillUpcoming(bill)) {
+            return this.formatJudgedBillRow(bill, symbol);
+        }
+        // A bill that has not come around yet is not "under budget": it is
+        // simply unpaid, and rendering it green beside genuinely cheap bills
+        // invites the reader to bank money they still owe
+        const upcoming = CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, symbol);
+        const predicted = CurrencyUtils.formatWithSymbol(bill.predicted, symbol);
+        return this.billRow(
+            {
+                emoji: EmojiUtils.UPCOMING_BILL_EMOJI,
+                name: bill.name,
+                actual: bill.actual,
+                trailer: chalk.dim(
+                    `due ${DisplayFormatterUtils.formatShortDate(bill.dueDate!)} (${upcoming} of ${predicted})`
+                ),
+            },
+            symbol
+        );
+    }
+
+    /** The bills not shown individually, as one row shaped like theirs */
+    private formatOtherBillsRow(otherBills: BillDetailDto[], symbol: string): string {
+        return this.formatJudgedBillRow(
+            {
+                name: `Others (${otherBills.length})`,
+                actual: otherBills.reduce((sum, bill) => sum + bill.actual, 0),
+                predicted: otherBills.reduce((sum, bill) => sum + bill.predicted, 0),
+            },
+            symbol
+        );
+    }
+
+    /** A bill row judged on its variance from the expected amount */
+    private formatJudgedBillRow(
+        bill: Pick<BillDetailDto, 'name' | 'actual' | 'predicted'>,
+        symbol: string
+    ): string {
+        return this.billRow(
+            {
+                emoji: EmojiUtils.getBillVarianceEmoji(
+                    bill.actual - bill.predicted,
+                    bill.predicted
+                ),
+                name: bill.name,
+                actual: bill.actual,
+                trailer: `(expected ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)})`,
+            },
+            symbol
+        );
+    }
+
+    private billRow(
+        row: { emoji: string; name: string; actual: number; trailer: string },
+        symbol: string
+    ): string {
+        const name = DisplayFormatterUtils.fitWidth(
+            row.name,
+            BudgetDisplayService.NAME_COLUMN_WIDTH
+        );
+        const actual = CurrencyUtils.formatWithSymbol(row.actual, symbol).padStart(
+            BudgetDisplayService.AMOUNT_COLUMN_WIDTH
+        );
+        return `${row.emoji} ${name} ${actual}  ${row.trailer}`;
     }
 
     /**
@@ -562,15 +582,7 @@ export class BudgetDisplayService {
         );
         const empty = BudgetDisplayService.PROGRESS_BAR_WIDTH - filled;
 
-        let bar = '';
-        for (let i = 0; i < filled; i++) {
-            bar += '▓';
-        }
-        for (let i = 0; i < empty; i++) {
-            bar += '░';
-        }
-
-        return `[${bar}]`;
+        return `[${'▓'.repeat(filled)}${'░'.repeat(empty)}]`;
     }
 
     /**

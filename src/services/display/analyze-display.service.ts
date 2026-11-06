@@ -55,10 +55,10 @@ export class AnalyzeDisplayService {
         ];
 
         if (verbose && data.additionalIncome.length > 0) {
-            lines.push('');
-            data.additionalIncome.forEach(transaction => {
-                lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
-            });
+            lines.push(
+                '',
+                ...this.formatTransactionDetails(data.additionalIncome, data.currencySymbol)
+            );
         }
 
         return lines.join('\n');
@@ -68,102 +68,100 @@ export class AnalyzeDisplayService {
      * Formats the expenses and spending section
      */
     private formatExpensesSection(data: AnalyzeReportDto, verbose: boolean): string {
-        const lines = ['', DisplayFormatterUtils.createSectionHeader('EXPENSES & SPENDING'), ''];
+        return [
+            '',
+            DisplayFormatterUtils.createSectionHeader('EXPENSES & SPENDING'),
+            '',
+            ...this.formatUnbudgetedLines(data, verbose),
+            ...this.formatBudgetAllocationLines(data),
+            ...this.formatBillsPerformanceLines(data, verbose),
+            ...this.formatDisposableIncomeLines(data, verbose),
+        ].join('\n');
+    }
 
-        // Unbudgeted Expenses section
-        lines.push(
+    private formatUnbudgetedLines(data: AnalyzeReportDto, verbose: boolean): string[] {
+        const lines = [
             this.formatExpenseItem(
                 'Unbudgeted Expenses',
                 data.unbudgetedExpenseTotal,
                 data.currencySymbol,
                 data.unbudgetedExpenses.length
-            )
-        );
-
+            ),
+        ];
         if (verbose && data.unbudgetedExpenses.length > 0) {
-            lines.push('');
-            data.unbudgetedExpenses.forEach(transaction => {
-                lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
-            });
-        }
-
-        // Budget allocation subsection
-        lines.push('');
-        lines.push(chalk.bold('  Budget Allocation'));
-
-        // Use actual values from DTO
-        lines.push(
-            `    Allocated:    ${CurrencyUtils.formatWithSymbol(data.budgetAllocated, data.currencySymbol)}`
-        );
-        lines.push(
-            `    Spent:        ${CurrencyUtils.formatWithSymbol(data.budgetSpent, data.currencySymbol)}`
-        );
-        lines.push(
-            `    Remaining:    ${DisplayFormatterUtils.formatNetImpact(data.budgetSurplus, data.currencySymbol, true)}`
-        );
-
-        // Bills performance subsection
-        lines.push('');
-        lines.push(chalk.bold('  Bills Performance'));
-        lines.push(
-            `    Predicted:    ${CurrencyUtils.formatWithSymbol(data.billComparison.predictedTotal, data.currencySymbol)}`
-        );
-        lines.push(
-            `    Actual:       ${CurrencyUtils.formatWithSymbol(data.billComparison.actualTotal, data.currencySymbol)}`
-        );
-        lines.push(
-            `    Variance:     ${DisplayFormatterUtils.formatNetImpact(data.billComparison.variance, data.currencySymbol, false)}`
-        );
-
-        if (verbose && data.billComparison.bills.length > 0) {
-            lines.push('');
-            lines.push(chalk.dim('  Bill Details:'));
-            data.billComparison.bills.forEach(bill => {
-                lines.push(this.formatBillDetail(bill, data.currencySymbol));
-            });
-        }
-
-        // Disposable income subsection
-        //
-        // Listed here for visibility, but deliberately NOT styled as a
-        // deduction: these purchases are charged to the disposable pool, not to
-        // the envelope, so they never reach netImpact. The amount the owner
-        // still owes themselves is stated in the summary instead. Pool funding
-        // and draws are internal transfers between accounts they already hold,
-        // so there is nothing to net off and no breakdown to print.
-        if (data.disposableIncomeTransactions.length > 0) {
-            // Net of refunds and NOT floored at zero. formatWithSymbol takes an
-            // absolute value, so the number alone renders a refund-heavy month
-            // identically to a spending one — the caption below carries the
-            // direction instead. Deliberately not a negative amount: this
-            // section states an action, and formatDisposableAction inverts the
-            // instruction rather than printing a negative transfer.
-            const isReimbursement =
-                disposablePoolAction(data.disposableIncome)?.direction !== 'toPool';
-            lines.push('');
             lines.push(
-                `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
-                    `${CurrencyUtils.formatWithSymbol(data.disposableIncome, data.currencySymbol)}` +
-                    transactionCount(data.disposableIncomeTransactions.length)
+                '',
+                ...this.formatTransactionDetails(data.unbudgetedExpenses, data.currencySymbol)
             );
-            lines.push(
-                chalk.dim(
-                    isReimbursement
-                        ? '    reimbursed from the disposable pool — not in the net'
-                        : '    refunds exceeded tagged spending — owed back to the pool, not in the net'
-                )
-            );
-
-            if (verbose) {
-                lines.push('');
-                lines.push(chalk.dim('  Tagged Transactions:'));
-                data.disposableIncomeTransactions.forEach(transaction => {
-                    lines.push(this.formatTransactionDetail(transaction, data.currencySymbol));
-                });
-            }
         }
+        return lines;
+    }
 
-        return lines.join('\n');
+    private formatBudgetAllocationLines(data: AnalyzeReportDto): string[] {
+        const symbol = data.currencySymbol;
+        return [
+            '',
+            chalk.bold('  Budget Allocation'),
+            `    Allocated:    ${CurrencyUtils.formatWithSymbol(data.budgetAllocated, symbol)}`,
+            `    Spent:        ${CurrencyUtils.formatWithSymbol(data.budgetSpent, symbol)}`,
+            `    Remaining:    ${DisplayFormatterUtils.formatNetImpact(data.budgetSurplus, symbol, true)}`,
+        ];
+    }
+
+    private formatBillsPerformanceLines(data: AnalyzeReportDto, verbose: boolean): string[] {
+        const { billComparison, currencySymbol: symbol } = data;
+        const lines = [
+            '',
+            chalk.bold('  Bills Performance'),
+            `    Predicted:    ${CurrencyUtils.formatWithSymbol(billComparison.predictedTotal, symbol)}`,
+            `    Actual:       ${CurrencyUtils.formatWithSymbol(billComparison.actualTotal, symbol)}`,
+            `    Variance:     ${DisplayFormatterUtils.formatNetImpact(billComparison.variance, symbol, false)}`,
+        ];
+        if (verbose && billComparison.bills.length > 0) {
+            lines.push(
+                '',
+                chalk.dim('  Bill Details:'),
+                ...billComparison.bills.map(bill => this.formatBillDetail(bill, symbol))
+            );
+        }
+        return lines;
+    }
+
+    /**
+     * Listed for visibility, but deliberately NOT styled as a deduction: these
+     * purchases are charged to the disposable pool, not to the envelope, so
+     * they never reach netImpact (R-DISP-1). The amount the owner still owes
+     * themselves is stated in the summary instead.
+     */
+    private formatDisposableIncomeLines(data: AnalyzeReportDto, verbose: boolean): string[] {
+        const transactions = data.disposableIncomeTransactions;
+        if (transactions.length === 0) {
+            return [];
+        }
+        // Net of refunds and NOT floored at zero. formatWithSymbol takes an
+        // absolute value, so the number alone renders a refund-heavy month
+        // identically to a spending one — the caption below carries the
+        // direction instead.
+        const isReimbursement = disposablePoolAction(data.disposableIncome)?.direction !== 'toPool';
+        const lines = [
+            '',
+            `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
+                `${CurrencyUtils.formatWithSymbol(data.disposableIncome, data.currencySymbol)}` +
+                transactionCount(transactions.length),
+            chalk.dim(
+                isReimbursement
+                    ? '    reimbursed from the disposable pool — not in the net'
+                    : '    refunds exceeded tagged spending — owed back to the pool, not in the net'
+            ),
+        ];
+        if (verbose) {
+            lines.push(
+                '',
+                chalk.dim('  Tagged Transactions:'),
+                ...this.formatTransactionDetails(transactions, data.currencySymbol)
+            );
+        }
+        return lines;
     }
 
     /**
@@ -331,9 +329,11 @@ export class AnalyzeDisplayService {
         return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount}${transactionCount(count)}`;
     }
 
-    /**
-     * Formats a transaction detail for verbose mode
-     */
+    /** One line per transaction, for verbose mode */
+    private formatTransactionDetails(transactions: TransactionSplit[], symbol: string): string[] {
+        return transactions.map(transaction => this.formatTransactionDetail(transaction, symbol));
+    }
+
     private formatTransactionDetail(transaction: TransactionSplit, symbol: string): string {
         const typeLabel = this.getTransactionTypeLabel(transaction);
         const description = transaction.description || 'No description';
