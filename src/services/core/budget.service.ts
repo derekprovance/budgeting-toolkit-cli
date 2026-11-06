@@ -22,14 +22,14 @@ export class BudgetService implements IBudgetService {
             results = await this.client.budgets.listBudgetLimit(start, end);
         } catch (error) {
             throw new Error(
-                `Failed to get budget limits for month ${month}: ${errorMessage(error)}`,
+                `Failed to get budget limits for month ${month}/${year}: ${errorMessage(error)}`,
                 { cause: error }
             );
         }
 
         if (!results?.data) {
             throw new Error(
-                `Failed to get budget limits for month ${month}: API returned empty response`
+                `Failed to get budget limits for month ${month}/${year}: API returned empty response`
             );
         }
 

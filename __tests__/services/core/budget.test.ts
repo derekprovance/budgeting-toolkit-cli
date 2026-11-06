@@ -113,11 +113,11 @@ describe('BudgetService', () => {
 
         it('should throw error when API call fails', async () => {
             jest.mocked(mockApiClient.budgets.listBudgetLimit).mockRejectedValue(
-                new Error('Failed to get budget limits for month 3')
+                new Error('Request failed with status code 401')
             );
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
-                'Failed to get budget limits for month 3'
+                'Failed to get budget limits for month 3/2024: Request failed with status code 401'
             );
         });
 
@@ -125,7 +125,7 @@ describe('BudgetService', () => {
             jest.mocked(mockApiClient.budgets.listBudgetLimit).mockResolvedValue(null as never); // malformed API response
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
-                'Failed to get budget limits for month 3: API returned empty response'
+                'Failed to get budget limits for month 3/2024: API returned empty response'
             );
         });
 
@@ -135,7 +135,7 @@ describe('BudgetService', () => {
             );
 
             await expect(budgetService.getBudgetLimits(3, 2024)).rejects.toThrow(
-                'Failed to get budget limits for month 3'
+                'Failed to get budget limits for month 3/2024: Some non-error rejection'
             );
         });
     });

@@ -85,7 +85,7 @@ describe('errors', () => {
         const r = await runCli(['analyze', ...JAN], { env: { ENV_FILE: envFile } });
         expect(r.code).toBe(1);
         expect(r.text).toMatch(
-            /Error analyzing budget: Failed to fetch transactions for month 1\/2025: .*(Unauthorized|Unauthenticated)/
+            /Error analyzing budget: Failed to [\w ]+ for month 1\/2025: Unauthenticated/
         );
         expect(r.stdout).not.toContain('Net Cash Flow');
     });
