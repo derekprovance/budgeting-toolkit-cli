@@ -12,6 +12,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { logger } from '../logger.js';
 import { BUSINESS_CONSTANTS } from '../utils/business-constants.js';
 import { TransactionCalculationUtils } from '../utils/transaction-calculation.utils.js';
+import { DEFAULT_CURRENCY } from '../utils/currency.utils.js';
 
 /**
  * Service for aggregating and analyzing budget data with historical context
@@ -150,7 +151,7 @@ export class BudgetAnalyticsService {
                 budgetName: t.budget_name || 'no budget',
                 date: (t.date || new Date().toISOString()).split('T')[0],
                 transactionId: t.transaction_journal_id || '',
-                currencySymbol: t.currency_symbol || '$',
+                currencySymbol: t.currency_symbol || DEFAULT_CURRENCY.symbol,
             }));
 
             logger.debug({ count: topExpenses.length }, 'Top expenses fetched');

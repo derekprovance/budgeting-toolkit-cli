@@ -193,13 +193,6 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
      * Creates an empty bill comparison DTO for error cases
      */
     private createEmptyBillComparison() {
-        return {
-            predictedTotal: 0,
-            actualTotal: 0,
-            variance: 0,
-            bills: [],
-            currencyCode: 'USD',
-            currencySymbol: '$',
-        };
+        return BillComparisonDto.empty();
     }
 }

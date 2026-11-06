@@ -1,4 +1,5 @@
 import { localDay } from '../../utils/date.utils.js';
+import { DEFAULT_CURRENCY } from '../../utils/currency.utils.js';
 
 /**
  * Data Transfer Object for individual bill details.
@@ -75,6 +76,11 @@ export class BillComparisonDto {
             currencySymbol
         );
     }
+
+    /** No bills and nothing paid, in the default currency */
+    static empty(): BillComparisonDto {
+        return BillComparisonDto.create(0, 0, [], DEFAULT_CURRENCY.code, DEFAULT_CURRENCY.symbol);
+    }
 }
 
 /**
@@ -87,7 +93,10 @@ export class BillComparisonDto {
  * A free function rather than a method because these DTOs are routinely built
  * as plain objects.
  */
-export function isBillUpcoming(bill: BillDetailDto, now: Date = new Date()): boolean {
+export function isBillUpcoming(
+    bill: BillDetailDto,
+    now: Date = new Date()
+): bill is BillDetailDto & { dueDate: Date } {
     // By calendar day, so a bill due today is still ahead of us
     return !!bill.dueDate && localDay(bill.dueDate) >= localDay(now);
 }

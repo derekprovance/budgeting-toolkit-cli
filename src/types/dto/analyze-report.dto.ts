@@ -2,6 +2,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BillComparisonDto } from './bill-comparison.dto.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { MonthBuckets } from '../../services/cash-flow.service.js';
+import { DEFAULT_CURRENCY } from '../../utils/currency.utils.js';
 
 /** What {@link AnalyzeReportDto.create} is built from */
 export interface AnalyzeReportInput {
@@ -102,8 +103,8 @@ export class AnalyzeReportDto {
             netImpact,
             month,
             year,
-            billComparison.currencySymbol || '$',
-            billComparison.currencyCode || 'USD'
+            billComparison.currencySymbol || DEFAULT_CURRENCY.symbol,
+            billComparison.currencyCode || DEFAULT_CURRENCY.code
         );
     }
 }

@@ -12,6 +12,7 @@ import { BillService } from './core/bill.service.js';
 import { CashFlowService } from './cash-flow.service.js';
 import { billIdOf } from './core/transaction-classification.service.js';
 import { Result } from '../types/result.type.js';
+import { DEFAULT_CURRENCY } from '../utils/currency.utils.js';
 import { MonthError, monthFailure } from '../types/error/month.error.js';
 
 export class BillComparisonService {
@@ -76,8 +77,8 @@ export class BillComparisonService {
                 predictedTotal,
                 actualTotal,
                 details,
-                first?.currency_code ?? first?.primary_currency_code ?? 'USD',
-                first?.currency_symbol ?? first?.primary_currency_symbol ?? '$'
+                first?.currency_code ?? first?.primary_currency_code ?? DEFAULT_CURRENCY.code,
+                first?.currency_symbol ?? first?.primary_currency_symbol ?? DEFAULT_CURRENCY.symbol
             )
         );
     }

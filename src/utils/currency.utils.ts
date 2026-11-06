@@ -1,3 +1,6 @@
+/** The currency assumed when Firefly names none, as for a month with no bills */
+export const DEFAULT_CURRENCY = { code: 'USD', symbol: '$' } as const;
+
 /**
  * Utility functions for currency formatting
  */
