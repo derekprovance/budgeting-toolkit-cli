@@ -693,10 +693,12 @@ qZXQ
             process.env.ENV_FILE = envFile;
             mockExistsSync.mockImplementation(existing(customPath, envFile));
 
-            const manager = ConfigManager.getInstance(customPath);
+            ConfigManager.getInstance(customPath);
 
-            expect(manager.getLoadedConfigPath()).toBe(customPath);
-            expect(manager.getLoadedEnvPath()).toBe(envFile);
+            expect(ConfigManager.getResolvedPaths()).toEqual({
+                configPath: customPath,
+                envPath: envFile,
+            });
             expect(mockConfigSync).toHaveBeenCalledTimes(1);
             expect(mockConfigSync).toHaveBeenCalledWith({ path: envFile, quiet: true });
         });
@@ -705,9 +707,9 @@ qZXQ
             process.env.ENV_FILE = 'rel/.env';
             mockExistsSync.mockImplementation(existing(customPath, '/test/path/rel/.env'));
 
-            const manager = ConfigManager.getInstance(customPath);
+            ConfigManager.getInstance(customPath);
 
-            expect(manager.getLoadedEnvPath()).toBe('/test/path/rel/.env');
+            expect(ConfigManager.getResolvedPaths().envPath).toBe('/test/path/rel/.env');
         });
 
         it('throws when no --config path is given, even if ./config.yaml and ~/.budget/config.yaml exist', () => {

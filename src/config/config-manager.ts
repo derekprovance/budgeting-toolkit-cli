@@ -51,14 +51,15 @@ export class ConfigManager {
     /** Resolved .env path, captured statically so it survives a validation throw */
     private static resolvedEnvPath: string | null = null;
     private config: AppConfig;
-    private loadedEnvPath: string | null = null;
 
     private constructor(configPath?: string) {
         // Resolve config file path (searches multiple locations based on priority)
         ConfigManager.configFilePath = ConfigManager.resolveConfigPath(configPath);
 
-        // Load .env file
-        this.loadEnvironmentFile();
+        ConfigManager.resolvedEnvPath = ConfigManager.findEnvFile();
+        if (ConfigManager.resolvedEnvPath) {
+            dotenv.config({ path: ConfigManager.resolvedEnvPath, quiet: true });
+        }
 
         // Build configuration with proper precedence
         this.config = this.loadConfiguration();
@@ -106,22 +107,6 @@ export class ConfigManager {
      */
     getConfig(): AppConfig {
         return this.config;
-    }
-
-    /**
-     * Gets the path to the loaded config.yaml file
-     * @returns Absolute path to loaded config file or null if none was loaded
-     */
-    getLoadedConfigPath(): string | null {
-        return ConfigManager.configFilePath;
-    }
-
-    /**
-     * Gets the path to the loaded .env file
-     * @returns Absolute path to loaded .env file or null if none was loaded
-     */
-    getLoadedEnvPath(): string | null {
-        return this.loadedEnvPath;
     }
 
     /**
@@ -224,21 +209,20 @@ export class ConfigManager {
     }
 
     /**
-     * Loads the .env file into process.env from multiple possible locations:
-     * 1. ENV_FILE environment variable (if set)
+     * Finds the .env file to load, in priority order:
+     * 1. ENV_FILE environment variable (if set; loaded even if it does not exist)
      * 2. Current working directory: ./.env
      * 3. User home directory: ~/.budget/.env
      *
      * In strict mode (BTK_STRICT_CONFIG) only ENV_FILE is consulted, and it
      * must be set and exist.
      *
-     * Uses dotenv.config which silently ignores missing files (quiet: true)
-     * Tracks which .env file was loaded in this.loadedEnvPath
+     * @returns The path to load, or null when there is none
      */
-    private loadEnvironmentFile(): void {
-        // Strict mode: ENV_FILE is the only source, and it must exist
+    private static findEnvFile(): string | null {
+        const envFile = process.env.ENV_FILE;
+
         if (ConfigManager.isStrictMode()) {
-            const envFile = process.env.ENV_FILE;
             if (!envFile) {
                 throw new Error(
                     'BTK_STRICT_CONFIG is set: ENV_FILE must name the .env file to load. ' +
@@ -251,54 +235,15 @@ export class ConfigManager {
             if (!fs.existsSync(resolved)) {
                 throw new Error(`BTK_STRICT_CONFIG is set: ENV_FILE not found: ${resolved}`);
             }
-            dotenv.config({ path: resolved, quiet: true });
-            this.loadedEnvPath = resolved;
-            ConfigManager.resolvedEnvPath = resolved;
-            return;
+            return resolved;
         }
 
-        // Priority 1: ENV_FILE environment variable
-        if (process.env.ENV_FILE) {
-            dotenv.config({
-                path: process.env.ENV_FILE,
-                quiet: true,
-            });
-            this.loadedEnvPath = process.env.ENV_FILE;
-            ConfigManager.resolvedEnvPath = process.env.ENV_FILE;
-            return;
+        if (envFile) {
+            return envFile;
         }
 
-        // Priority 2: Current working directory
-        const cwdEnv = path.join(process.cwd(), '.env');
-        const cwdEnvExists = fs.existsSync(cwdEnv);
-        if (cwdEnvExists) {
-            dotenv.config({
-                path: cwdEnv,
-                quiet: true,
-            });
-            this.loadedEnvPath = cwdEnv;
-            ConfigManager.resolvedEnvPath = cwdEnv;
-            return;
-        }
-
-        // Priority 3: User home directory ~/.budget/.env
-        const homeEnv = ConfigManager.getDefaultEnvPath();
-        if (fs.existsSync(homeEnv)) {
-            dotenv.config({
-                path: homeEnv,
-                quiet: true,
-            });
-            this.loadedEnvPath = homeEnv;
-            ConfigManager.resolvedEnvPath = homeEnv;
-            return;
-        }
-
-        // Priority 4: Fallback to .env in current directory (will be silently ignored if not found)
-        dotenv.config({
-            path: '.env',
-            quiet: true,
-        });
-        // loadedEnvPath remains null since this is a fallback that will be ignored anyway
+        const candidates = [path.join(process.cwd(), '.env'), ConfigManager.getDefaultEnvPath()];
+        return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
     }
 
     /**
