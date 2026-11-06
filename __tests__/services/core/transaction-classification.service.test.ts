@@ -242,7 +242,6 @@ describe('TransactionClassificationService', () => {
             ],
             ['[R-SCOPE-2] withdrawal with no source', withdrawal(10, { source_id: null }), null],
 
-            // Transfers
             ['[R-XFER-1] card payment', transfer(10, { source_id: CHK, destination_id: CC }), null],
             [
                 '[R-XFER-2] savings top-up',
@@ -275,7 +274,6 @@ describe('TransactionClassificationService', () => {
                 null,
             ],
 
-            // Income
             [
                 '[R-INCOME-1] paycheck into checking',
                 deposit(10, { destination_id: CHK, tags: PAYCHECK }),
@@ -298,7 +296,6 @@ describe('TransactionClassificationService', () => {
                 'unbudgeted',
             ],
 
-            // Refunds
             [
                 '[R-REFUND-1] unmarked card refund',
                 deposit(10, { destination_id: CC }),

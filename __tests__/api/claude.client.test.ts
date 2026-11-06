@@ -117,8 +117,8 @@ describe('ClaudeClient', () => {
 
     describe('forced tool extraction', () => {
         it('should return only the tool_use input, ignoring preamble text', async () => {
-            // Regression: preamble text used to be joined with the JSON,
-            // corrupting the payload and silently degrading the whole batch
+            // Preamble text joined with the JSON would corrupt the payload
+            // and silently degrade the whole batch
             mockMessagesCreate.mockResolvedValue(
                 response([
                     { type: 'text', text: 'Here are the assignments:' },

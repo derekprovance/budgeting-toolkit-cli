@@ -16,10 +16,6 @@ describe('BillComparisonService', () => {
     let mockBillService: jest.Mocked<BillService>;
     let mockTransactionService: jest.Mocked<TransactionService>;
 
-    /**
-     * Creates a mock bill with pay_dates to indicate if it's due this month
-     * @param isDueThisMonth - If true, pay_dates will be populated; if false, empty array
-     */
     const createMockBill = (
         id: string,
         name: string,
@@ -281,7 +277,6 @@ describe('BillComparisonService', () => {
         });
 
         it('should show full bill amounts when due, regardless of frequency', async () => {
-            // All bills are due this month (pay_dates populated)
             const mockBills = [
                 createMockBill('1', 'Monthly', '100', 'monthly', 0, true),
                 createMockBill('2', 'Yearly', '1200', 'yearly', 0, true),
@@ -309,7 +304,6 @@ describe('BillComparisonService', () => {
         });
 
         it('should show zero for bills not due this month', async () => {
-            // Mix of bills due and not due
             const mockBills = [
                 createMockBill('1', 'Monthly Due', '100', 'monthly', 0, true),
                 createMockBill('2', 'Yearly Not Due', '1200', 'yearly', 0, false),
@@ -326,7 +320,6 @@ describe('BillComparisonService', () => {
                 // Only monthly bill is due
                 expect(result.value.predictedTotal).toBe(100);
 
-                // Check individual bill predictions
                 const monthlyBill = result.value.bills.find(b => b.id === '1');
                 const yearlyBill = result.value.bills.find(b => b.id === '2');
                 const quarterlyBill = result.value.bills.find(b => b.id === '3');
@@ -631,7 +624,6 @@ describe('BillComparisonService', () => {
 
             expect(result.ok).toBe(true);
             if (result.ok) {
-                // Without pay_dates, bill is considered not due
                 expect(result.value.predictedTotal).toBe(0);
             }
         });
@@ -656,7 +648,6 @@ describe('BillComparisonService', () => {
                 // 75 + 600 + 1200 = 1875
                 expect(result.value.predictedTotal).toBe(1875);
 
-                // Each bill shows the full amount and includes frequency info for display
                 expect(result.value.bills[0].frequency).toBe('weekly');
                 expect(result.value.bills[0].predicted).toBe(75);
                 expect(result.value.bills[1].frequency).toBe('half-year');

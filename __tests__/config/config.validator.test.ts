@@ -35,7 +35,6 @@ describe('ConfigValidator', () => {
         mockAccessSync.mockReset();
         mockReadFileSync.mockReset();
 
-        // Base valid configuration
         validConfig = {
             api: {
                 firefly: {
@@ -264,7 +263,6 @@ qZXQ
             const result = validator.validate(validConfig);
 
             expect(result.problems).not.toEqual([]);
-            // The error message now includes a multi-line string with suggestions
             const errorMessage = result.problems.find(e =>
                 e.includes('CA certificate not found: /path/to/missing/ca.pem')
             );

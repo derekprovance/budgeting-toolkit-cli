@@ -143,7 +143,7 @@ describe('BudgetAnalyticsService', () => {
         it('should not mark a budget with no limit as over', async () => {
             // BudgetReportService sets amount 0 when no budgetLimit matches the
             // month. There is no limit to exceed, so spending against it is not
-            // "over budget" — it previously rendered an empty bar labelled over.
+            // "over budget".
             const noLimit: BudgetReportDto = {
                 ...mockBudget,
                 amount: 0,
@@ -167,8 +167,7 @@ describe('BudgetAnalyticsService', () => {
         it('should not count a net refund as spending', async () => {
             // Firefly reports difference_float POSITIVE for a budget whose
             // refunds outran its outflows, which BudgetReportService negates to
-            // a negative `spent`. Math.abs() per budget used to turn that refund
-            // back into spending and report the budget as used.
+            // a negative `spent`; a refund must not count as spending.
             const refunded: BudgetReportDto = {
                 ...mockBudget,
                 amount: 500,
@@ -301,8 +300,8 @@ describe('BudgetAnalyticsService', () => {
         });
 
         it('should keep envelope spending and drop income, refunds and card payments', async () => {
-            // Regression: amounts are all positive, so the old `amount < 0`
-            // filter matched nothing and this section never rendered
+            // Amounts are unsigned, so an `amount < 0` filter would match
+            // nothing and this section would never render
             const transactions: TransactionSplit[] = [
                 withdrawal('50.00', { ...base, description: 'Expense' }),
                 deposit('100.00', { ...base, destination_id: CHECKING, description: 'Income' }),

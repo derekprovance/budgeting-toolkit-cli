@@ -4,9 +4,7 @@ import { BudgetRead, TransactionRead, TransactionSplit } from '@derekprovance/fi
 export const TEST_DATE = '2025-01-15';
 
 /**
- * Typed transaction builders.
- *
- * They encode Firefly's actual wire format (verified against 6.6.6): `amount`
+ * The builders encode Firefly's wire format (verified against 6.6.6): `amount`
  * is always UNSIGNED, and direction lives only in `type`. Pass the amount as a
  * non-negative number or string; a signed value is a test bug and throws, so a
  * fixture can never smuggle direction through the sign.
@@ -72,15 +70,12 @@ const build = (
     amount: unsignedAmount(amount),
 });
 
-/** Money leaving a tracked asset account for an expense account. */
 export const withdrawal = (amount: number | string, overrides: BuilderOverrides = {}) =>
     build('withdrawal', amount, overrides);
 
-/** Money arriving in an asset account from a revenue account. */
 export const deposit = (amount: number | string, overrides: BuilderOverrides = {}) =>
     build('deposit', amount, overrides);
 
-/** Money moving between two asset accounts. */
 export const transfer = (amount: number | string, overrides: BuilderOverrides = {}) =>
     build('transfer', amount, overrides);
 

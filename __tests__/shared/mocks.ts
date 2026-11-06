@@ -22,9 +22,6 @@ import { jest } from '@jest/globals';
 export const partialMock = <T extends object>(members: Partial<T>): jest.Mocked<T> =>
     members as unknown as jest.Mocked<T>;
 
-/**
- * Creates a mocked Logger with common logging methods
- */
 export const createMockLogger = (): jest.Mocked<ILogger> => {
     return {
         debug: jest.fn<(obj: unknown, msg?: string) => void>(),
@@ -35,9 +32,6 @@ export const createMockLogger = (): jest.Mocked<ILogger> => {
     } as jest.Mocked<ILogger>;
 };
 
-/**
- * Creates a mocked ExcludedTransactionService
- */
 export const createMockExcludedTransactionService = (): jest.Mocked<ExcludedTransactionService> =>
     partialMock<ExcludedTransactionService>({
         isExcludedTransaction: jest

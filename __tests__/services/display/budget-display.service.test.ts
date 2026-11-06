@@ -83,13 +83,11 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, false);
 
-            // Should contain top 4 bills by actual amount (sorted descending)
             expect(result).toContain('Electric');
             expect(result).toContain('Internet');
             expect(result).toContain('Phone');
             expect(result).toContain('Gym');
 
-            // Smaller bills fall into the "Others" grouping
             expect(result).not.toContain('Water');
             expect(result).toContain('Others (2)');
         });
@@ -115,7 +113,6 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, true);
 
-            // Should contain all bills
             expect(result).toContain('Electric');
             expect(result).toContain('Internet');
             expect(result).toContain('Water');
@@ -123,7 +120,6 @@ describe('BudgetDisplayService', () => {
             expect(result).toContain('Gym');
             expect(result).toContain('Streaming');
 
-            // Should NOT contain "Others" grouping in verbose mode
             expect(result).not.toContain('Others (2)');
         });
 
@@ -141,12 +137,10 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, false);
 
-            // Should show all bills (less than 4)
             expect(result).toContain('Electric');
             expect(result).toContain('Internet');
             expect(result).toContain('Water');
 
-            // Should NOT contain "Others" grouping
             expect(result).not.toContain('Others');
         });
     });
@@ -180,7 +174,6 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, true);
 
-            // Should include statistics
             expect(result).toContain('Whole Foods');
             expect(result).toContain('Avg Spending');
             expect(result).toContain('$425');
@@ -214,7 +207,6 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, false);
 
-            // Should contain budget name but not detailed statistics
             expect(result).toContain('Groceries');
             expect(result).not.toContain('Whole Foods');
         });
@@ -243,11 +235,9 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, true);
 
-            // Should contain Avg Spending
             expect(result).toContain('Avg Spending');
             expect(result).toContain('$110');
 
-            // Should not contain "Top Merchant" line since it's missing
             const topMerchantLine = result.split('\n').find(line => line.includes('Top Merchant'));
             expect(topMerchantLine).toBeUndefined();
         });
@@ -259,7 +249,6 @@ describe('BudgetDisplayService', () => {
 
             const result = service.formatReport(reportData, false);
 
-            // Should mention verbose or -v flag
             expect(result).toMatch(/--verbose|--v|-v/);
         });
     });
@@ -281,17 +270,13 @@ describe('BudgetDisplayService', () => {
 
             const result = serviceWithUrl.formatReport(reportData, false);
 
-            // Find the line with this transaction
             const lines = result.split('\n');
             const transactionLine = lines.find(line => line.includes('📊'));
 
             expect(transactionLine).toBeDefined();
 
-            // Should contain first 60 chars of description
             expect(transactionLine).toContain('A'.repeat(60));
-            // Should not contain chars beyond 60
             expect(transactionLine).not.toContain('A'.repeat(61));
-            // Verify no ellipsis was added
             expect(transactionLine).not.toContain('...');
         });
 
@@ -311,7 +296,6 @@ describe('BudgetDisplayService', () => {
 
             const result = serviceWithUrl.formatReport(reportData, false);
 
-            // Should contain the expected hyperlink format (OSC 8 escape sequence)
             const expectedLink = `http://firefly.local/transactions/show/${transactionId}`;
             expect(result).toContain(`\x1B]8;;${expectedLink}\x1B\\`);
         });
@@ -330,7 +314,6 @@ describe('BudgetDisplayService', () => {
 
             const result = serviceNoUrl.formatReport(reportData, false);
 
-            // Should not contain OSC 8 escape sequences
             expect(result).not.toContain('\x1B]8;;');
         });
 
@@ -349,7 +332,6 @@ describe('BudgetDisplayService', () => {
 
             const result = serviceWithUrl.formatReport(reportData, false);
 
-            // Should not contain OSC 8 escape sequences since there's no transaction ID
             expect(result).not.toContain('\x1B]8;;');
         });
     });

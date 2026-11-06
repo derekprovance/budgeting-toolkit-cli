@@ -309,7 +309,7 @@ describe('LLMAssignmentService', () => {
             });
 
             it('should degrade (not throw) on plain errors mentioning auth words', async () => {
-                // String matching is gone: only typed SDK errors are critical
+                // Only typed SDK errors are critical, never a message match
                 callTool.mockRejectedValue(new Error('authentication failed'));
 
                 const result = await service.assign('category', mockTransactions, validCategories);

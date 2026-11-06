@@ -144,7 +144,6 @@ describe('FireflyClientWithCerts', () => {
                 mockCertificateAxiosFactory
             );
 
-            // Verify core services are available
             expect(client.transactions).toBeDefined();
             expect(client.budgets).toBeDefined();
             expect(client.categories).toBeDefined();

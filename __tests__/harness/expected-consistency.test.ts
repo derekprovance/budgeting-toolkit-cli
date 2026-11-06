@@ -41,7 +41,6 @@ import type {
     TxKey,
 } from '../../test-harness/scenario/types.js';
 
-// ── The model, inline ──────────────────────────────────────────────────────
 const ENVELOPE: AccountKey[] = ['CHK', 'CC', 'OLD']; // R-SCOPE-1: SAV/BRK/POOL untracked
 const INCOME: AccountKey[] = ['CHK', 'OLD']; // R-INCOME-1: the envelope minus the card
 

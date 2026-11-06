@@ -57,7 +57,6 @@ describe('CLI', () => {
     beforeEach(() => {
         jest.clearAllMocks();
 
-        // Setup spies
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
         consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
         processExitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {

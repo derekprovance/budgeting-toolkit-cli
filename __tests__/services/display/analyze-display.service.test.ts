@@ -124,7 +124,6 @@ describe('AnalyzeDisplayService', () => {
             };
             const result = service.formatAnalysisReport(data, false);
 
-            // All labels should be padded to 30 characters
             expect(result).toContain('Additional Income:'.padEnd(30));
             expect(result).toContain('Paycheck:'.padEnd(30));
             expect(result).toContain('Bills Paid:'.padEnd(30));

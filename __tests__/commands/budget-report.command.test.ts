@@ -49,10 +49,8 @@ describe('BudgetReportCommand', () => {
     const mockBillComparison = BillComparisonDto.create(500, 450, [], 'USD', '$');
 
     beforeEach(() => {
-        // Reset mocks
         jest.clearAllMocks();
 
-        // Setup service mocks
         budgetAnalyticsService = partialMock<BudgetAnalyticsService>({
             getBudgetReport: jest
                 .fn<BudgetAnalyticsService['getBudgetReport']>()
@@ -88,7 +86,6 @@ describe('BudgetReportCommand', () => {
 
         cashFlowService = createMockCashFlowService();
 
-        // Create command instance with new signature
         command = new BudgetReportCommand(
             budgetAnalyticsService,
             budgetInsightService,
@@ -98,7 +95,6 @@ describe('BudgetReportCommand', () => {
             cashFlowService
         );
 
-        // Spy on console.log
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     });
 

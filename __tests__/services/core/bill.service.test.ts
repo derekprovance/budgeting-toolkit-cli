@@ -45,7 +45,6 @@ describe('BillService', () => {
 
             const result = await billService.getBillsForMonth(10, 2024);
 
-            // Verify listBill was called with date range parameters
             expect(mockClient.bills.listBill).toHaveBeenCalledWith(
                 undefined, // xTraceId
                 PAGE_SIZE,

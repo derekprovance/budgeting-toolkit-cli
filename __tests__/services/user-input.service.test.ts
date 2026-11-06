@@ -11,7 +11,6 @@ type PromptConfig = {
 };
 type PromptFn<R> = (config: PromptConfig) => Promise<R>;
 
-// Create mock functions first
 const mockExpand = jest.fn<PromptFn<ReviewAction>>();
 const mockCheckbox = jest.fn<PromptFn<EditTransactionAttribute[]>>();
 const mockSelect = jest.fn<PromptFn<string>>();
@@ -21,7 +20,6 @@ const mockConfirm = jest.fn<PromptFn<boolean>>();
 
 // chalk is not mocked: FORCE_COLOR=0 (__tests__/setup/env.ts) keeps output plain.
 
-// Mock @inquirer/prompts
 jest.unstable_mockModule('@inquirer/prompts', () => ({
     expand: mockExpand,
     checkbox: mockCheckbox,
@@ -43,7 +41,6 @@ describe('UserInputService', () => {
     beforeEach(() => {
         service = new UserInputService(mockBaseUrl);
 
-        // Reset mocks
         mockExpand.mockReset();
         mockCheckbox.mockReset();
         mockSelect.mockReset();
@@ -99,7 +96,6 @@ describe('UserInputService', () => {
             );
 
             expect(result).toBe(ReviewAction.Skip);
-            // Should still prompt user since both fields are always displayed
             expect(mockExpand).toHaveBeenCalled();
         });
 
@@ -538,14 +534,12 @@ describe('UserInputService', () => {
                 category: newCategory,
             });
 
-            // Should not contain ANSI escape sequences for hyperlinks
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.not.stringContaining('\x1B]8;;'),
                 })
             );
 
-            // Should contain the plain description
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(mockTransaction.description as string),
@@ -611,14 +605,12 @@ describe('UserInputService', () => {
                 category: newCategory,
             });
 
-            // Empty string is falsy, so should not generate hyperlink
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.not.stringContaining('\x1B]8;;'),
                 })
             );
 
-            // Should contain the plain description
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining(mockTransaction.description as string),
@@ -694,7 +686,6 @@ describe('UserInputService', () => {
                 })
             );
 
-            // Should still have other options
             expect(mockExpand).toHaveBeenCalledWith(
                 expect.objectContaining({
                     choices: expect.arrayContaining([
@@ -809,7 +800,6 @@ describe('UserInputService', () => {
                 })
             );
 
-            // Verify budget option is not in the choices
             const callArgs = mockCheckbox.mock.calls[0][0];
             expect(callArgs.choices).toHaveLength(1);
             expect(callArgs.choices).not.toEqual(
@@ -1000,7 +990,6 @@ describe('UserInputService', () => {
 
                 const result = await service.getCustomSplitText(1);
 
-                // The implementation trims the result
                 expect(result).toBe('- Part 1');
             });
         });

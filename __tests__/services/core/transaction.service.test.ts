@@ -254,11 +254,9 @@ describe('TransactionService', () => {
                 page(transactionRead('1', withdrawal(10, { transaction_journal_id: '1' })))
             );
 
-            // First call should fetch from API
             await service.getTransactionsForMonth(1, 2024);
             expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
 
-            // Second call should use cache
             await service.getTransactionsForMonth(1, 2024);
             expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
         });
@@ -491,11 +489,9 @@ describe('TransactionService', () => {
             const mockTransactionRead = transactionRead('read-1', mockTransaction);
             await indexByTag(mockTransactionRead);
 
-            // Lookup with exact same transaction
             const result = service.getTransactionReadBySplit(mockTransaction);
             expect(result).toEqual(mockTransactionRead);
 
-            // Lookup with different date should fail
             const differentTransaction: TransactionSplit = {
                 ...mockTransaction,
                 date: '2024-01-16',
@@ -589,10 +585,8 @@ describe('TransactionService', () => {
                 page(transactionRead('1', mockTransaction))
             );
 
-            // First call
             const result1 = await service.getTransactionsByTag('test-tag');
 
-            // Second call should use cache
             const result2 = await service.getTransactionsByTag('test-tag');
 
             expect(result1).toEqual(result2);
@@ -604,11 +598,9 @@ describe('TransactionService', () => {
                 page(transactionRead('1', mockTransaction))
             );
 
-            // First call
             await service.getTransactionsByTag('test-tag');
             expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledTimes(1);
 
-            // Second call should not make API call
             await service.getTransactionsByTag('test-tag');
             expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledTimes(1);
         });
@@ -637,7 +629,6 @@ describe('TransactionService', () => {
 
             await expect(service.getTransactionsForMonth(1, 2024)).rejects.toThrow();
 
-            // Retry after failure should hit the API again and succeed
             await expect(service.getTransactionsForMonth(1, 2024)).resolves.toEqual([]);
             expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(2);
         });
@@ -647,11 +638,9 @@ describe('TransactionService', () => {
                 page(transactionRead('1', mockTransaction))
             );
 
-            // Fetch for January
             await service.getTransactionsForMonth(1, 2024);
             expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(1);
 
-            // Fetch for February should make another API call
             await service.getTransactionsForMonth(2, 2024);
             expect(mockApiClient.transactions.listTransaction).toHaveBeenCalledTimes(2);
         });
@@ -661,13 +650,10 @@ describe('TransactionService', () => {
             mockApiClient.tags.listTransactionByTag.mockResolvedValueOnce(page(group));
             mockApiClient.transactions.listTransaction.mockResolvedValueOnce(page(group));
 
-            // Fetch by tag
             const tagResult = await service.getTransactionsByTag('test-tag');
 
-            // Fetch by month
             const monthResult = await service.getTransactionsForMonth(1, 2024);
 
-            // Both should succeed without cache collision
             expect(tagResult).toHaveLength(1);
             expect(monthResult).toHaveLength(1);
             expect(mockApiClient.tags.listTransactionByTag).toHaveBeenCalledTimes(1);
@@ -705,10 +691,8 @@ describe('TransactionService', () => {
 
             await serviceWithCache.getTransactionsByTag('test-tag');
 
-            // Verify cache is populated
             expect(mockCache.size).toBe(1);
 
-            // Verify split index is populated
             const indexedTransaction = serviceWithCache.getTransactionReadBySplit(mockTransaction);
             expect(indexedTransaction).toEqual(mockTransactionRead);
         });

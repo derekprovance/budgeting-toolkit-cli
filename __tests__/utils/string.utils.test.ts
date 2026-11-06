@@ -51,7 +51,6 @@ describe('StringUtils', () => {
         });
 
         it('should match real-world category names', () => {
-            // Test cases from the actual bug that was fixed
             expect(StringUtils.normalizeForMatching('Groceries')).toBe('groceries');
             expect(StringUtils.normalizeForMatching('groceries')).toBe('groceries');
             expect(StringUtils.normalizeForMatching('GROCERIES')).toBe('groceries');

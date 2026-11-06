@@ -2,7 +2,6 @@ import { Agent } from 'https';
 import { jest } from '@jest/globals';
 import { createMockLogger } from '../shared/mocks.js';
 
-// Mock fs with actual jest mock functions
 const mockExistsSync = jest.fn<(path: string) => boolean>();
 const mockReadFileSync = jest.fn<(path: string) => Buffer>();
 const mockAxiosCreate = jest.fn<(config?: unknown) => unknown>().mockReturnValue({});
@@ -27,7 +26,6 @@ const { createCertificateAxios } = await import('../../src/utils/certificate-axi
 
 describe('createCertificateAxios', () => {
     beforeEach(() => {
-        // Reset mocks
         mockExistsSync.mockReset();
         mockReadFileSync.mockReset();
         mockAxiosCreate.mockReset().mockReturnValue({});

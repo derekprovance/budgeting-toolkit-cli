@@ -1,14 +1,12 @@
 import { jest } from '@jest/globals';
 import * as os from 'os';
 
-// Create mock functions
 const mockExistsSync = jest.fn<(filePath: string) => boolean>();
 const mockReadFileSync = jest.fn<(filePath: string) => string>();
 const mockAccessSync = jest.fn<() => void>();
 const mockYamlLoad = jest.fn<(content: string) => any>();
 const mockConfigSync = jest.fn<() => void>();
 
-// Mock fs module
 jest.unstable_mockModule('fs', () => ({
     existsSync: mockExistsSync,
     readFileSync: mockReadFileSync,
@@ -26,7 +24,6 @@ jest.unstable_mockModule('fs', () => ({
     },
 }));
 
-// Mock js-yaml module
 jest.unstable_mockModule('js-yaml', () => ({
     load: mockYamlLoad,
     default: {
@@ -34,7 +31,6 @@ jest.unstable_mockModule('js-yaml', () => ({
     },
 }));
 
-// Mock dotenv module
 jest.unstable_mockModule('dotenv', () => ({
     config: mockConfigSync,
     default: {
@@ -61,13 +57,10 @@ describe('ConfigManager', () => {
     });
 
     beforeEach(() => {
-        // Reset singleton instance
         ConfigManager.resetInstance();
 
-        // Mock process.cwd
         process.cwd = jest.fn(() => '/test/path');
 
-        // Clear environment variables
         process.env = { ...originalEnv };
         delete process.env.FIREFLY_API_URL;
         delete process.env.FIREFLY_API_TOKEN;
@@ -82,14 +75,12 @@ describe('ConfigManager', () => {
         delete process.env.BTK_STRICT_CONFIG;
         delete process.env.ENV_FILE;
 
-        // Reset mocks
         mockExistsSync.mockReset();
         mockReadFileSync.mockReset();
         mockAccessSync.mockReset();
         mockYamlLoad.mockReset();
         mockConfigSync.mockReset();
 
-        // Default mock implementations
         mockConfigSync.mockReturnValue(undefined);
         mockExistsSync.mockReturnValue(false); // No YAML file by default
         mockAccessSync.mockReturnValue(undefined);
@@ -97,7 +88,6 @@ describe('ConfigManager', () => {
 
     describe('FIREFLY_API_URL trailing slash normalization', () => {
         beforeEach(() => {
-            // Set required environment variables for validation
             process.env.FIREFLY_API_TOKEN = 'test-token';
             process.env.ANTHROPIC_API_KEY = 'test-key';
         });
@@ -159,7 +149,6 @@ describe('ConfigManager', () => {
 
     describe('Environment variable loading', () => {
         beforeEach(() => {
-            // Set required variables
             process.env.FIREFLY_API_URL = 'http://localhost:8080';
             process.env.FIREFLY_API_TOKEN = 'test-token';
             process.env.ANTHROPIC_API_KEY = 'test-key';
@@ -193,7 +182,6 @@ describe('ConfigManager', () => {
             process.env.CLIENT_CERT_CA_PATH = '/path/to/ca.pem';
             process.env.CLIENT_CERT_PASSWORD = 'secret';
 
-            // Mock the certificate files as existing
             mockExistsSync.mockImplementation((filePath: string) => {
                 if (typeof filePath === 'string') {
                     return filePath === '/path/to/cert.pem' || filePath === '/path/to/ca.pem';
@@ -201,7 +189,6 @@ describe('ConfigManager', () => {
                 return false;
             });
 
-            // Mock readFileSync to return a valid PEM certificate content
             const validPemCert = `-----BEGIN CERTIFICATE-----
 MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
 BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
@@ -234,7 +221,6 @@ qZXQ
         it('should resolve relative certificate paths from project root', () => {
             process.env.CLIENT_CERT_PATH = 'certs/client.pem';
 
-            // Mock the resolved certificate file as existing
             mockExistsSync.mockImplementation((filePath: string) => {
                 if (typeof filePath === 'string') {
                     return filePath === '/test/path/certs/client.pem';
@@ -242,7 +228,6 @@ qZXQ
                 return false;
             });
 
-            // Mock readFileSync to return a valid PEM certificate content
             const validPemCert = `-----BEGIN CERTIFICATE-----
 MIIC/zCCAeegAwIBAgIUF4AQS0bg3A3d5b2Hw/xqWezubKowDQYJKoZIhvcNAQEL
 BQAwDzENMAsGA1UEAwwEdGVzdDAeFw0yNTEyMDkyMDQzMTFaFw0yNjEyMDkyMDQz
@@ -275,7 +260,6 @@ qZXQ
 
     describe('YAML configuration loading', () => {
         beforeEach(() => {
-            // Set required environment variables
             process.env.FIREFLY_API_URL = 'http://localhost:8080';
             process.env.FIREFLY_API_TOKEN = 'test-token';
             process.env.ANTHROPIC_API_KEY = 'test-key';
@@ -304,14 +288,12 @@ qZXQ
             const configManager = ConfigManager.getInstance();
             const config = configManager.getConfig();
 
-            // Should use defaults
             expect(config).toBeDefined();
             expect(config.api.firefly.url).toBe('http://localhost:8080');
         });
 
         it('should give YAML config priority over environment variables', () => {
-            // This test demonstrates YAML has highest priority
-            // But FIREFLY_API_URL comes from env, not YAML
+            // FIREFLY_API_URL comes from env, not YAML
             const yamlConfig = {
                 expectedMonthlyPaycheck: 6000,
             };
@@ -558,7 +540,6 @@ qZXQ
         it('should resolve config path from CLI --config flag with highest priority', () => {
             const customPath = '/custom/config.yaml';
 
-            // Custom path exists, others don't
             mockExistsSync.mockImplementation((filePath: string) => {
                 if (typeof filePath === 'string') {
                     return filePath === customPath;
@@ -568,12 +549,10 @@ qZXQ
             mockReadFileSync.mockReturnValue('yaml content');
             mockYamlLoad.mockReturnValue({});
 
-            // The config path should be stored internally when provided
             expect(ConfigManager.getInstance(customPath)).toBeDefined();
         });
 
         it('should fallback to current directory config.yaml as second priority', () => {
-            // Mock: custom path doesn't exist, current dir exists
             mockExistsSync.mockImplementation((filePath: string) => {
                 if (typeof filePath === 'string') {
                     return filePath === './config.yaml';
@@ -588,7 +567,6 @@ qZXQ
         });
 
         it('should fallback to home directory config as third priority', () => {
-            // Mock: CLI and current dir don't exist, home dir exists
             const homeDir = os.homedir();
             const homePath = `${homeDir}/.budget/config.yaml`;
 
@@ -611,7 +589,6 @@ qZXQ
             const configManager = ConfigManager.getInstance();
             const config = configManager.getConfig();
 
-            // Should have defaults loaded
             expect(config.api.firefly.url).toBe('http://localhost:8080');
         });
 

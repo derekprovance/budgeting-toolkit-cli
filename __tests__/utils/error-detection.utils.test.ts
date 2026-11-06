@@ -170,7 +170,6 @@ describe('isCertificateError', () => {
             });
             const levels: Error[] = [current];
 
-            // Build a chain 6 levels deep
             for (let i = 0; i < 6; i++) {
                 const outer = new Error(`Level ${i}`);
                 (outer as Error & { cause?: unknown }).cause = current;
@@ -178,8 +177,7 @@ describe('isCertificateError', () => {
                 current = outer;
             }
 
-            // The cert error is at the bottom, but MAX_DEPTH is 5
-            // So we should NOT find it
+            // MAX_DEPTH is 5, so the cert error at the bottom is out of reach
             expect(isCertificateError(levels[6])).toBe(false);
         });
 

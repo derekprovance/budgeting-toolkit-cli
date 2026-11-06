@@ -183,7 +183,6 @@ describe('transaction-mapper', () => {
 
             const result = mapTransactionForLLM(transaction);
 
-            // Type guard to ensure result is LLMTransactionData
             const keys = Object.keys(result);
             expect(keys).toEqual([
                 'description',
@@ -253,7 +252,6 @@ describe('transaction-mapper', () => {
 
             const result: LLMTransactionData = mapTransactionForLLM(transaction);
 
-            // TypeScript should enforce this structure
             expect(typeof result.description).toBe('string');
             expect(typeof result.amount).toBe('string');
             expect(typeof result.date).toBe('string');
