@@ -1,4 +1,9 @@
-import { BudgetRead, TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import {
+    ApiError,
+    BudgetRead,
+    TransactionRead,
+    TransactionSplit,
+} from '@derekprovance/firefly-iii-sdk';
 import { hasJournalId, JournaledTransaction } from '../../src/types/categorize.types.js';
 
 /** Fixed date for builder-made transactions, inside the 2025-01 test month. */
@@ -95,3 +100,11 @@ export const budgetRead = (id: string, name: string, active = true): BudgetRead 
 /** A Firefly transaction group holding `splits`, with only the fields the code under test reads. */
 export const transactionRead = (id: string, ...splits: TransactionSplit[]): TransactionRead =>
     ({ type: 'transactions', id, attributes: { transactions: splits } }) as TransactionRead;
+
+/** The error the Firefly SDK throws for a non-2xx response */
+export const apiError = (status: number, url = '/v1/x'): ApiError =>
+    new ApiError(
+        { method: 'GET', url },
+        { url, ok: false, status, statusText: '', body: undefined },
+        'error'
+    );

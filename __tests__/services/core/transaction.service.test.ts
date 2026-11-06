@@ -2,7 +2,6 @@ import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import { jest } from '@jest/globals';
 import { TransactionService } from '../../../src/services/core/transaction.service.js';
 import {
-    ApiError,
     TransactionArray,
     TransactionRead,
     TransactionSplit,
@@ -15,17 +14,16 @@ import {
     createMockFireflyClient,
     createMockLogger,
 } from '../../shared/mocks.js';
-import { deposit, journaled, transactionRead, withdrawal } from '../../shared/test-data.js';
+import {
+    apiError,
+    deposit,
+    journaled,
+    transactionRead,
+    withdrawal,
+} from '../../shared/test-data.js';
 import { ILogger } from '../../../src/types/interface/logger.interface.js';
 
 /** What the Firefly SDK throws for an HTTP error status */
-const apiError = (status: number) =>
-    new ApiError(
-        { method: 'GET', url: '/v1/tags/x' },
-        { url: '/v1/tags/x', ok: false, status, statusText: '', body: undefined },
-        'error'
-    );
-
 // Partial Firefly responses: only the fields the service reads.
 type TagSingleResponse = Awaited<ReturnType<FireflyClientWithCerts['tags']['getTag']>>;
 
