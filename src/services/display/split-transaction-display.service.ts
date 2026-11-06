@@ -2,6 +2,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
+import { SplitParts } from '../transaction-split.service.js';
 
 /**
  * Service for formatting split transaction display output
@@ -49,19 +50,11 @@ export class SplitTransactionDisplayService {
     /**
      * Formats the split preview showing parent transaction and both child splits before confirmation
      * @param parentDescription The parent transaction title (group_title)
-     * @param split1Amount Amount for first split
-     * @param split1Description Description for first split
-     * @param split2Amount Amount for second split
-     * @param split2Description Description for second split
-     * @param currencySymbol Currency symbol to display
      * @returns Formatted preview showing parent and both child splits
      */
     formatSplitPreview(
         parentDescription: string,
-        split1Amount: string,
-        split1Description: string,
-        split2Amount: string,
-        split2Description: string,
+        [first, second]: SplitParts,
         currencySymbol: string
     ): string {
         const lines = [
@@ -69,12 +62,12 @@ export class SplitTransactionDisplayService {
             DisplayFormatterUtils.createHorizontalLine(),
             chalk.yellow.bold(`\nParent Transaction: "${parentDescription}"`),
             chalk.cyan.bold('\nSplit 1:'),
-            `  ${chalk.bold('Description:')} ${split1Description}`,
-            `  ${chalk.bold('Amount:')} ${currencySymbol}${split1Amount}`,
+            `  ${chalk.bold('Description:')} ${first.description}`,
+            `  ${chalk.bold('Amount:')} ${currencySymbol}${first.amount}`,
             `  ${chalk.dim('(preserves category, budget, and tags from original)')}`,
             chalk.cyan.bold('\nSplit 2:'),
-            `  ${chalk.bold('Description:')} ${split2Description}`,
-            `  ${chalk.bold('Amount:')} ${currencySymbol}${split2Amount}`,
+            `  ${chalk.bold('Description:')} ${second.description}`,
+            `  ${chalk.bold('Amount:')} ${currencySymbol}${second.amount}`,
             `  ${chalk.dim('(category and budget left unset for manual assignment)')}`,
             DisplayFormatterUtils.createHorizontalLine(),
         ];

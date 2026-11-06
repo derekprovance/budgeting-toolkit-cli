@@ -1,7 +1,7 @@
 import ora, { Ora } from 'ora';
 import chalk from 'chalk';
 import { Command } from '../types/interface/command.interface.js';
-import { TransactionSplitService, SplitData } from '../services/transaction-split.service.js';
+import { TransactionSplitService, SplitParts } from '../services/transaction-split.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { parseSplitAmount, remainderAmount } from '../utils/split-amount.utils.js';
@@ -81,27 +81,13 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             ? `${originalSplit.description} ${secondCustomText}`
             : originalSplit.description;
 
-        // Prepare split data
-        const firstSplitData: SplitData = {
-            amount: firstSplitAmount.toFixed(2),
-            description: firstDescription,
-        };
+        const parts: SplitParts = [
+            { amount: firstSplitAmount.toFixed(2), description: firstDescription },
+            { amount: secondSplitAmount.toFixed(2), description: secondDescription },
+        ];
 
-        const secondSplitData: SplitData = {
-            amount: secondSplitAmount.toFixed(2),
-            description: secondDescription,
-        };
-
-        // Show preview with parent description
         console.log(
-            this.displayService.formatSplitPreview(
-                originalSplit.description, // Parent transaction title
-                firstSplitData.amount,
-                firstSplitData.description,
-                secondSplitData.amount,
-                secondSplitData.description,
-                currencySymbol
-            )
+            this.displayService.formatSplitPreview(originalSplit.description, parts, currencySymbol)
         );
 
         // Confirm with user: skip if --yes flag provided
@@ -114,10 +100,7 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
 
         spinner.start('Splitting transaction...');
         const updated = await failSpinnerOnError(spinner, 'Failed to split transaction', () =>
-            this.splitService.splitTransaction(transactionId, originalSplit, [
-                firstSplitData,
-                secondSplitData,
-            ])
+            this.splitService.splitTransaction(transactionId, originalSplit, parts)
         );
         spinner.succeed('Transaction split successfully');
         console.log(

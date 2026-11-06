@@ -68,10 +68,10 @@ describe('SplitTransactionDisplayService', () => {
         it('should format preview with descriptions and amounts', () => {
             const result = service.formatSplitPreview(
                 'Test Transaction',
-                '60.00',
-                'Test Transaction - Part 1',
-                '40.00',
-                'Test Transaction - Part 2',
+                [
+                    { amount: '60.00', description: 'Test Transaction - Part 1' },
+                    { amount: '40.00', description: 'Test Transaction - Part 2' },
+                ],
                 '$'
             );
 
@@ -91,10 +91,10 @@ describe('SplitTransactionDisplayService', () => {
         it('should indicate metadata behavior for both splits', () => {
             const result = service.formatSplitPreview(
                 'Test Transaction',
-                '60.00',
-                'Part 1',
-                '40.00',
-                'Part 2',
+                [
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
+                ],
                 '$'
             );
 
