@@ -10,20 +10,21 @@ const CHK = '1';
 const CC = '2';
 const SAV = '3';
 
-describe('CashFlowService', () => {
-    const build = (transactions: TransactionSplit[]) => {
-        const transactionService = {
-            getTransactionsForMonth: jest
-                .fn<(month: number, year: number) => Promise<TransactionSplit[]>>()
-                .mockResolvedValue(transactions),
-        } as unknown as ITransactionService;
+type GetTransactions = ITransactionService['getTransactionsForMonth'];
 
-        return new CashFlowService(
-            transactionService,
+describe('CashFlowService', () => {
+    const build = (
+        transactions: TransactionSplit[],
+        accountScope = createMockAccountScopeService([CHK, CC], [CHK])
+    ) => {
+        const getTransactionsForMonth = jest.fn<GetTransactions>().mockResolvedValue(transactions);
+        const service = new CashFlowService(
+            { getTransactionsForMonth } as unknown as ITransactionService,
             new TransactionClassificationService('Disposable Income', 'Paycheck'),
-            createMockAccountScopeService([CHK, CC], [CHK]),
+            accountScope,
             createMockLogger()
         );
+        return Object.assign(service, { getTransactionsForMonth });
     };
 
     it('[R-BUCKET-1] should put each transaction in the one bucket it is charged to', async () => {
@@ -63,9 +64,39 @@ describe('CashFlowService', () => {
         expect(result.ok && Object.values(result.value).flat()).toEqual([]);
     });
 
-    it('should report an invalid month as an error rather than empty buckets', async () => {
-        const result = await build([]).getBuckets(13, 2025);
+    it('should fetch the requested month', async () => {
+        const service = build([]);
 
-        expect(result.ok).toBe(false);
+        await service.getBuckets(6, 2024);
+
+        expect(service.getTransactionsForMonth).toHaveBeenCalledWith(6, 2024);
+    });
+
+    it('should return empty buckets for a month with no transactions', async () => {
+        const result = await build([]).getBuckets(5, 2024);
+
+        expect(result.ok && Object.values(result.value).flat()).toEqual([]);
+    });
+
+    it('should report a failed fetch as an error naming the month', async () => {
+        const service = build([]);
+        service.getTransactionsForMonth.mockRejectedValue(new Error('API error'));
+
+        const result = await service.getBuckets(5, 2024);
+
+        expect(!result.ok && result.error.message).toBe(
+            'Failed to fetch transactions for month 5: API error'
+        );
+    });
+
+    it('should report a failure to resolve the account scope as an error', async () => {
+        const accountScope = createMockAccountScopeService();
+        accountScope.getScope.mockRejectedValue(new Error('No income account'));
+
+        const result = await build([withdrawal(10)], accountScope).getBuckets(5, 2024);
+
+        expect(!result.ok && result.error.message).toBe(
+            'Calculation failed for getBuckets on month 5: No income account'
+        );
     });
 });

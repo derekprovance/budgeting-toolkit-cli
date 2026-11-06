@@ -17,7 +17,7 @@ export class TransactionValidatorService implements ITransactionValidatorService
     shouldProcessTransaction(transaction: TransactionSplit, force: boolean): boolean {
         const conditions = {
             notATransfer: !this.transactionClassificationService.isTransfer(transaction),
-            hasACategory: this.transactionClassificationService.hasACategory(transaction),
+            hasACategory: this.transactionClassificationService.hasCategory(transaction),
             hasBudget: this.transactionClassificationService.hasBudget(transaction),
         };
 
@@ -33,7 +33,7 @@ export class TransactionValidatorService implements ITransactionValidatorService
      */
     isBudgetOnlyCandidate(transaction: TransactionSplit): boolean {
         return (
-            this.transactionClassificationService.hasACategory(transaction) &&
+            this.transactionClassificationService.hasCategory(transaction) &&
             !this.transactionClassificationService.hasBudget(transaction)
         );
     }

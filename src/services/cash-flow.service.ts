@@ -5,9 +5,11 @@ import {
     BUCKETS,
     ITransactionClassificationService,
 } from './core/transaction-classification.service.interface.js';
-import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { AccountScopeService } from './core/account-scope.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
+import { logger as defaultLogger } from '../logger.js';
+import { Result } from '../types/result.type.js';
+import { MonthError, monthFailure } from '../types/error/month.error.js';
 
 /** A month's transactions, each in the one bucket it is charged to */
 export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
@@ -20,30 +22,38 @@ export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
  * Transactions no bucket claims — anything outside the envelope, and transfers
  * inside or into it — are dropped here and appear nowhere (RULES.md).
  */
-export class CashFlowService extends BaseTransactionAnalysisService<MonthBuckets> {
+export class CashFlowService {
     constructor(
-        transactionService: ITransactionService,
-        transactionClassificationService: ITransactionClassificationService,
+        private readonly transactionService: ITransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService,
         private readonly accountScope: AccountScopeService,
-        logger?: ILogger
-    ) {
-        super(transactionService, transactionClassificationService, logger);
-    }
+        private readonly logger: ILogger = defaultLogger
+    ) {}
 
-    getBuckets(month: number, year: number) {
-        return this.executeAnalysis(month, year);
-    }
-
-    protected async analyzeTransactions(transactions: TransactionSplit[]): Promise<MonthBuckets> {
-        const scope = await this.accountScope.getScope();
-        const buckets = Object.fromEntries(BUCKETS.map(b => [b, []])) as unknown as MonthBuckets;
-
-        for (const transaction of transactions) {
-            const bucket = this.transactionClassificationService.classify(transaction, scope);
-            if (bucket) {
-                buckets[bucket].push(transaction);
-            }
+    async getBuckets(month: number, year: number): Promise<Result<MonthBuckets, MonthError>> {
+        let transactions: TransactionSplit[];
+        try {
+            transactions = await this.transactionService.getTransactionsForMonth(month, year);
+        } catch (error) {
+            return monthFailure('TRANSACTIONS_FETCH_FAILED', { month, year }, error);
         }
+
+        try {
+            return Result.ok(await this.sort(transactions));
+        } catch (error) {
+            return monthFailure('BUCKETS_FAILED', { month, year }, error);
+        }
+    }
+
+    private async sort(transactions: TransactionSplit[]): Promise<MonthBuckets> {
+        const scope = await this.accountScope.getScope();
+        const sorted = Map.groupBy(transactions, transaction =>
+            this.transactionClassificationService.classify(transaction, scope)
+        );
+        // Object.fromEntries types its keys as plain strings; BUCKETS supplies every key
+        const buckets = Object.fromEntries(
+            BUCKETS.map(bucket => [bucket, sorted.get(bucket) ?? []])
+        ) as MonthBuckets;
 
         this.logger.debug(
             Object.fromEntries(BUCKETS.map(b => [b, buckets[b].length])),
@@ -51,9 +61,5 @@ export class CashFlowService extends BaseTransactionAnalysisService<MonthBuckets
         );
 
         return buckets;
-    }
-
-    protected getOperationName(): string {
-        return 'getBuckets';
     }
 }

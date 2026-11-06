@@ -63,7 +63,7 @@ export class TransactionClassificationService implements ITransactionClassificat
     }
 
     isBill(transaction: TransactionSplit): boolean {
-        return !!(transaction.bill_id || transaction.subscription_id);
+        return billIdOf(transaction) !== undefined;
     }
 
     isDisposableIncome(transaction: TransactionSplit): boolean {
@@ -78,8 +78,8 @@ export class TransactionClassificationService implements ITransactionClassificat
         return transaction.type === 'withdrawal';
     }
 
-    hasACategory(transaction: TransactionSplit): boolean {
-        return !(transaction.category_id === undefined || transaction.category_id === null);
+    hasCategory(transaction: TransactionSplit): boolean {
+        return transaction.category_id != null;
     }
 
     hasBudget(transaction: TransactionSplit): boolean {
@@ -106,6 +106,11 @@ export class TransactionClassificationService implements ITransactionClassificat
     private isMarked(transaction: TransactionSplit): boolean {
         return this.bucketByMarker(transaction) !== 'unbudgeted';
     }
+}
+
+/** The bill or subscription a transaction is linked to, if any */
+export function billIdOf(transaction: TransactionSplit): string | undefined {
+    return transaction.bill_id || transaction.subscription_id || undefined;
 }
 
 function isIn(accounts: ReadonlySet<string>, id: string | null | undefined): boolean {

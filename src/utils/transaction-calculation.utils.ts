@@ -1,5 +1,5 @@
-import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ILogger } from '../types/interface/logger.interface.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { logger } from '../logger.js';
 
 /**
  * Utility class for common transaction calculation operations
@@ -16,13 +16,6 @@ import { ILogger } from '../types/interface/logger.interface.js';
  */
 export class TransactionCalculationUtils {
     /**
-     * Flattens Firefly III transaction groups into their individual splits
-     */
-    static flattenTransactions(transactions: TransactionRead[]): TransactionSplit[] {
-        return transactions.flatMap(transaction => transaction.attributes?.transactions ?? []);
-    }
-
-    /**
      * Sums a set of transactions as *spending*, honouring direction.
      *
      * Firefly reports `amount` unsigned, so direction has to come from `type`:
@@ -31,8 +24,8 @@ export class TransactionCalculationUtils {
      *
      * @returns Net spend; negative when refunds exceed outflows
      */
-    static calculateNetSpend(transactions: TransactionSplit[], logger?: ILogger): number {
-        return TransactionCalculationUtils.sumBySignedType(transactions, 'spend', logger);
+    static calculateNetSpend(transactions: TransactionSplit[]): number {
+        return TransactionCalculationUtils.sumBySignedType(transactions, 'spend');
     }
 
     /**
@@ -42,14 +35,13 @@ export class TransactionCalculationUtils {
      * withdrawals subtract. The income buckets hold only deposits today; the
      * signs keep a total honest if that ever changes.
      */
-    static calculateNetIncome(transactions: TransactionSplit[], logger?: ILogger): number {
-        return TransactionCalculationUtils.sumBySignedType(transactions, 'income', logger);
+    static calculateNetIncome(transactions: TransactionSplit[]): number {
+        return TransactionCalculationUtils.sumBySignedType(transactions, 'income');
     }
 
     private static sumBySignedType(
         transactions: TransactionSplit[],
-        direction: 'spend' | 'income',
-        logger?: ILogger
+        direction: 'spend' | 'income'
     ): number {
         const positiveType = direction === 'spend' ? 'withdrawal' : 'deposit';
         const negativeType = direction === 'spend' ? 'deposit' : 'withdrawal';
@@ -57,7 +49,7 @@ export class TransactionCalculationUtils {
         return transactions.reduce((sum, transaction) => {
             const amount = parseFloat(transaction.amount);
             if (isNaN(amount)) {
-                logger?.warn({ transaction }, 'Invalid transaction amount found');
+                logger.warn({ transaction }, 'Invalid transaction amount found');
                 return sum;
             }
 
@@ -68,7 +60,7 @@ export class TransactionCalculationUtils {
             }
 
             if (transaction.type !== positiveType && transaction.type !== 'transfer') {
-                logger?.debug(
+                logger.debug(
                     { type: transaction.type, description: transaction.description, direction },
                     'Unrecognised transaction type in signed sum - counting toward the total'
                 );
@@ -78,25 +70,21 @@ export class TransactionCalculationUtils {
         }, 0);
     }
 
-    /**
-     * Safely parses an amount string, handling currency formatting
-     * @param amount Amount string to parse
-     * @param defaultValue Default value if parsing fails
-     * @returns Parsed amount or default value
-     */
-    static parseAmountSafe(amount: string, defaultValue: number = 0): number {
-        const parsed = TransactionCalculationUtils.cleanAmount(amount);
-        return parsed ?? defaultValue;
+    /** {@link parseAmount}, reading an unparseable amount as 0 */
+    static parseAmountSafe(amount: string): number {
+        return TransactionCalculationUtils.parseAmount(amount) ?? 0;
     }
 
     /**
      * Parses a currency-formatted string ("$1,234.56", "(50.00)") to a number
-     * rounded to 2 decimals, or null if the string is not a valid amount.
-     * Accounting-style parentheses denote a negative amount.
+     * rounded to 2 decimals. Accounting-style parentheses denote a negative
+     * amount.
+     *
+     * @returns undefined when the string is not a valid amount
      */
-    private static cleanAmount(amount: string): number | null {
+    static parseAmount(amount: string): number | undefined {
         if (!amount) {
-            return null;
+            return undefined;
         }
 
         const isNegative = amount.includes('(') && amount.includes(')');
@@ -108,7 +96,7 @@ export class TransactionCalculationUtils {
             .trim();
 
         if (!/^-?\d*\.?\d+$/.test(cleaned)) {
-            return null;
+            return undefined;
         }
 
         const parsed = parseFloat(cleaned);

@@ -2,6 +2,7 @@ import { CategoryService } from '../../../src/services/core/category.service.js'
 import { CategoryArray, CategoryRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 import { jest } from '@jest/globals';
+import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 
 describe('CategoryService', () => {
     let service: CategoryService;
@@ -39,6 +40,27 @@ describe('CategoryService', () => {
 
             expect(result).toEqual([{ name: 'Category 1' }, { name: 'Category 2' }]);
             expect(mockClient.categories.listCategory).toHaveBeenCalled();
+        });
+
+        it('should read every page of categories', async () => {
+            const page = (name: string, current: number) =>
+                ({
+                    data: [{ type: 'categories', id: name, attributes: { name } }],
+                    meta: { pagination: { current_page: current, total_pages: 2 } },
+                }) as CategoryArray;
+            jest.mocked(mockClient.categories.listCategory)
+                .mockResolvedValueOnce(page('Groceries', 1))
+                .mockResolvedValueOnce(page('Dining', 2));
+
+            const result = await service.getCategories();
+
+            expect(result).toEqual([{ name: 'Groceries' }, { name: 'Dining' }]);
+            expect(mockClient.categories.listCategory).toHaveBeenNthCalledWith(
+                2,
+                undefined,
+                PAGE_SIZE,
+                2
+            );
         });
 
         it('should throw error when API call fails', async () => {

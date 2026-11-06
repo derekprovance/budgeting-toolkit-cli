@@ -2,67 +2,32 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { AccountScope } from './account-scope.service.js';
 
 /** Where a transaction is charged. See RULES.md. */
-export type Bucket =
-    'paycheck' | 'additionalIncome' | 'bill' | 'disposable' | 'budget' | 'unbudgeted';
-
-export const BUCKETS: readonly Bucket[] = [
+export const BUCKETS = [
     'paycheck',
     'additionalIncome',
     'bill',
     'disposable',
     'budget',
     'unbudgeted',
-];
+] as const;
 
-/**
- * Interface for TransactionClassificationService
- * Enables dependency injection and testing without mocking ESM modules
- */
+export type Bucket = (typeof BUCKETS)[number];
+
+/** Implemented by TransactionClassificationService; injected so tests can replace it */
 export interface ITransactionClassificationService {
     /**
      * The one bucket a transaction is charged to, or null when it is counted
      * nowhere
      */
     classify(transaction: TransactionSplit, scope: AccountScope): Bucket | null;
-
-    /**
-     * Checks if transaction is a transfer
-     */
     isTransfer(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction is linked to a bill (bill_id or subscription_id is set)
-     */
+    /** Linked to a bill or subscription */
     isBill(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction is tagged as disposable income
-     */
     isDisposableIncome(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction is a deposit
-     */
     isDeposit(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction is a withdrawal (spending).
-     * Firefly returns amounts unsigned, so direction must come from the type.
-     */
+    /** Firefly returns amounts unsigned, so spending is identified by type, never by sign */
     isWithdrawal(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction has a category assigned
-     */
-    hasACategory(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction has a budget assigned
-     */
+    hasCategory(transaction: TransactionSplit): boolean;
     hasBudget(transaction: TransactionSplit): boolean;
-
-    /**
-     * Checks if transaction is tagged as a paycheck
-     */
     isPaycheck(transaction: TransactionSplit): boolean;
 }

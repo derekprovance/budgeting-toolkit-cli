@@ -1,23 +1,20 @@
 import {
+    ApiError,
     TransactionRead,
     TransactionSplit,
     TransactionUpdate,
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../../logger.js';
-import { IDateRangeService } from '../../types/interface/date-range.service.interface.js';
 import { ITransactionService } from './transaction.service.interface.js';
 import { ILogger } from '../../types/interface/logger.interface.js';
 import { IExcludedTransactionService } from '../excluded-transaction.service.interface.js';
-import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { fetchAllPages, PAGE_SIZE } from '../../utils/pagination.utils.js';
+import { monthRange } from '../../utils/date.utils.js';
 
 class TransactionError extends Error {
-    constructor(
-        message: string,
-        public readonly originalError?: Error
-    ) {
-        super(message);
+    constructor(message: string, options?: ErrorOptions) {
+        super(message, options);
         this.name = 'TransactionError';
     }
 }
@@ -32,7 +29,6 @@ export class TransactionService implements ITransactionService {
     constructor(
         private readonly excludedTransactionService: IExcludedTransactionService,
         private readonly client: FireflyClientWithCerts,
-        private readonly dateRangeService: IDateRangeService,
         cacheImplementation: TransactionCache = new Map(),
         logger: ILogger = defaultLogger
     ) {
@@ -85,24 +81,22 @@ export class TransactionService implements ITransactionService {
      * was this imported" — importing a backdated batch today would report data
      * current as of today, which is the false reassurance this exists to
      * prevent.
+     *
+     * @returns undefined when the ledger has no dated transaction
      */
-    async getMostRecentTransactionDate(): Promise<Date | null> {
+    async getMostRecentTransactionDate(): Promise<Date | undefined> {
         const response = await this.client.transactions.listTransaction(undefined, 1);
-        if (!response || !response.data || response.data.length === 0) {
-            throw new Error(`Failed to fetch transactions`);
+        if (!response?.data) {
+            throw new Error('Failed to fetch transactions: API returned empty response');
         }
         const date = response.data[0]?.attributes?.transactions?.[0]?.date;
-        return date ? new Date(date) : null;
+        return date ? new Date(date) : undefined;
     }
 
     /**
      * Retrieves transactions by tag
      */
     async getTransactionsByTag(tag: string): Promise<TransactionSplit[]> {
-        if (!tag) {
-            throw new TransactionError('Tag parameter is required');
-        }
-
         try {
             const cacheKey = `tag-${tag}`;
             const transactions = await this.getFromCacheOrFetch(cacheKey, () =>
@@ -115,13 +109,16 @@ export class TransactionService implements ITransactionService {
         }
     }
 
+    /** @throws when Firefly cannot be asked; only its 404 means the tag is absent */
     async tagExists(tag: string): Promise<boolean> {
         try {
             const response = await this.client.tags.getTag(tag);
             return response?.data !== undefined;
-        } catch {
-            // Tag doesn't exist
-            return false;
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 404) {
+                return false;
+            }
+            throw error;
         }
     }
 
@@ -130,12 +127,6 @@ export class TransactionService implements ITransactionService {
         category?: string,
         budgetId?: string
     ): Promise<TransactionRead> {
-        if (!transaction?.transaction_journal_id) {
-            throw new TransactionError(
-                `Invalid transaction: missing transaction_journal_id for ${transaction.description}`
-            );
-        }
-
         if (!['deposit', 'withdrawal'].includes(transaction.type)) {
             throw new TransactionError(
                 `Unsupported transaction type ${transaction.type} for transaction_journal_id ${transaction.transaction_journal_id}`
@@ -218,11 +209,13 @@ export class TransactionService implements ITransactionService {
         // downstream reads from here, so an excluded transaction is gone from
         // every bucket in every command.
         const promise = (async () => {
-            const data = await fetchFn();
-            this.storeTransactionSplitInIndex(data);
-            return TransactionCalculationUtils.flattenTransactions(data).filter(
-                trx => !this.isExcluded(trx)
+            const included = (await fetchFn()).flatMap(group =>
+                (group.attributes?.transactions ?? [])
+                    .filter(split => !this.isExcluded(split))
+                    .map(split => ({ group, split }))
             );
+            this.index(included);
+            return included.map(({ split }) => split);
         })();
 
         this.cache.set(key, promise);
@@ -234,27 +227,17 @@ export class TransactionService implements ITransactionService {
         return promise;
     }
 
-    private storeTransactionSplitInIndex(transactions: TransactionRead[]) {
-        transactions.forEach(tx => {
-            const splitTransactions = tx.attributes.transactions;
-            splitTransactions.forEach(txSp => {
-                if (!this.isExcluded(txSp)) {
-                    const indexKey = this.generateSplitTransactionKey(txSp);
-
-                    if (this.splitTransactionIdx.has(indexKey)) {
-                        this.logger.debug(
-                            {
-                                transactionId: txSp.transaction_journal_id,
-                                description: txSp.description,
-                            },
-                            'Duplicate transaction found in index'
-                        );
-                    }
-
-                    this.splitTransactionIdx.set(this.generateSplitTransactionKey(txSp), tx);
-                }
-            });
-        });
+    private index(included: { group: TransactionRead; split: TransactionSplit }[]): void {
+        for (const { group, split } of included) {
+            const key = this.generateSplitTransactionKey(split);
+            if (this.splitTransactionIdx.has(key)) {
+                this.logger.debug(
+                    { transactionId: split.transaction_journal_id, description: split.description },
+                    'Duplicate transaction found in index'
+                );
+            }
+            this.splitTransactionIdx.set(key, group);
+        }
     }
 
     private isExcluded(transaction: TransactionSplit): boolean {
@@ -276,10 +259,10 @@ export class TransactionService implements ITransactionService {
         month: number,
         year: number
     ): Promise<TransactionRead[]> {
-        const range = this.dateRangeService.getDateRange(month, year);
+        const { start, end } = monthRange(month, year);
         return this.fetchTransactionsFromAPIByRange(
-            range.startDateString,
-            range.endDateString,
+            start,
+            end,
             `fetch transactions for month: ${month}`
         );
     }
@@ -325,9 +308,6 @@ export class TransactionService implements ITransactionService {
             message
         );
 
-        if (error instanceof Error) {
-            return new TransactionError(message, error);
-        }
-        return new TransactionError(message);
+        return new TransactionError(message, { cause: error });
     }
 }

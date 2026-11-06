@@ -33,6 +33,7 @@ describe('BudgetInsightService', () => {
                     remaining: -100,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
             ];
 
@@ -58,6 +59,7 @@ describe('BudgetInsightService', () => {
                     remaining: -100,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
                 {
                     budgetId: 'budget-2',
@@ -70,6 +72,7 @@ describe('BudgetInsightService', () => {
                     remaining: -150,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
             ];
 
@@ -147,6 +150,7 @@ describe('BudgetInsightService', () => {
                     remaining: 450,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
             ];
 
@@ -170,6 +174,7 @@ describe('BudgetInsightService', () => {
                     remaining: 500,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
             ];
 
@@ -228,6 +233,7 @@ describe('BudgetInsightService', () => {
                     remaining: -50,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
                 {
                     budgetId: 'budget-2',
@@ -240,6 +246,7 @@ describe('BudgetInsightService', () => {
                     remaining: 475,
                     currencyCode: 'USD',
                     currencySymbol: '$',
+                    transactionStats: { count: 0, average: 0 },
                 } as any,
             ];
 

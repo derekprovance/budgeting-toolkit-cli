@@ -7,6 +7,7 @@ import { BudgetDisplayService } from '../services/display/budget-display.service
 import { BillComparisonService } from '../services/bill-comparison.service.js';
 import { TransactionService } from '../services/core/transaction.service.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
+import { BillComparisonDto } from '../types/dto/bill-comparison.dto.js';
 import { BudgetReportResult } from '../types/dto/budget-report-result.dto.js';
 import { daysLeftInMonth } from '../utils/days-left.utils.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
@@ -81,7 +82,7 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
 
         const billComparison = billComparisonResult.ok
             ? billComparisonResult.value
-            : this.createEmptyBillComparison();
+            : BillComparisonDto.empty();
 
         const insights = this.budgetInsightService.generateInsights(budgets, billComparison);
 
@@ -114,22 +115,7 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
             // Kept as its own signal rather than folded into daysLeft: a month
             // can look cheap simply because the last few days have not been
             // imported yet.
-            dataThrough:
-                (await this.transactionService.getMostRecentTransactionDate()) ?? undefined,
-        };
-    }
-
-    /**
-     * Creates an empty bill comparison DTO for error cases
-     */
-    private createEmptyBillComparison() {
-        return {
-            predictedTotal: 0,
-            actualTotal: 0,
-            variance: 0,
-            bills: [],
-            currencyCode: 'USD',
-            currencySymbol: '$',
+            dataThrough: await this.transactionService.getMostRecentTransactionDate(),
         };
     }
 }

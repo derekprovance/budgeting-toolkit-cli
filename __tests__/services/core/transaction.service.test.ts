@@ -3,6 +3,7 @@ import { mockLogger, resetMockLogger } from '../../setup/mock-logger.js';
 import { jest } from '@jest/globals';
 import { TransactionService } from '../../../src/services/core/transaction.service.js';
 import {
+    ApiError,
     TransactionArray,
     TransactionRead,
     TransactionSplit,
@@ -10,12 +11,19 @@ import {
 } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 import { ExcludedTransactionService } from '../../../src/services/excluded-transaction.service.js';
-import { IDateRangeService } from '../../../src/types/interface/date-range.service.interface.js';
 import {
     createMockExcludedTransactionService,
     createMockFireflyClient,
 } from '../../setup/mock-services.js';
 import { withdrawal } from '../../shared/test-data.js';
+
+/** What the Firefly SDK throws for an HTTP error status */
+const apiError = (status: number) =>
+    new ApiError(
+        { method: 'GET', url: '/v1/tags/x' },
+        { url: '/v1/tags/x', ok: false, status, statusText: '', body: undefined },
+        'error'
+    );
 
 // Partial Firefly responses: only the fields the service reads.
 type TagSingleResponse = Awaited<ReturnType<FireflyClientWithCerts['tags']['getTag']>>;
@@ -24,24 +32,14 @@ describe('TransactionService', () => {
     let service: TransactionService;
     let mockExcludedTransactionService: jest.Mocked<ExcludedTransactionService>;
     let mockApiClient: jest.Mocked<FireflyClientWithCerts>;
-    let mockDateRangeService: jest.Mocked<IDateRangeService>;
 
     beforeEach(() => {
         resetMockLogger();
         mockExcludedTransactionService = createMockExcludedTransactionService();
         mockApiClient = createMockFireflyClient();
-        mockDateRangeService = {
-            getDateRange: jest.fn().mockReturnValue({
-                startDate: new Date('2024-01-01'),
-                endDate: new Date('2024-01-31'),
-                startDateString: '2024-01-01',
-                endDateString: '2024-01-31',
-            }),
-        } as jest.Mocked<IDateRangeService>;
         service = new TransactionService(
             mockExcludedTransactionService,
             mockApiClient,
-            mockDateRangeService,
             new Map(),
             mockLogger
         );
@@ -89,12 +87,6 @@ describe('TransactionService', () => {
                 undefined,
                 PAGE_SIZE,
                 1
-            );
-        });
-
-        it('should throw error when tag is empty', async () => {
-            await expect(service.getTransactionsByTag('')).rejects.toThrow(
-                'Tag parameter is required'
             );
         });
 
@@ -155,17 +147,6 @@ describe('TransactionService', () => {
                     ],
                 })
             );
-        });
-
-        it('should throw error when transaction has no journal ID', async () => {
-            const invalidTransaction = {
-                ...mockTransaction,
-                transaction_journal_id: undefined,
-            };
-
-            await expect(
-                service.updateTransaction(invalidTransaction, 'New Category')
-            ).rejects.toThrow('Invalid transaction: missing transaction_journal_id');
         });
 
         it('should throw error for unsupported transaction type', async () => {
@@ -534,7 +515,7 @@ describe('TransactionService', () => {
             expect(result).toEqual(new Date('2024-01-15T10:30:00Z'));
         });
 
-        it('should return null when the group carries no splits', async () => {
+        it('should return undefined when the group carries no splits', async () => {
             const mockTransaction = {
                 id: '1',
                 attributes: { created_at: '2024-01-15T10:30:00Z', transactions: [] },
@@ -546,10 +527,10 @@ describe('TransactionService', () => {
 
             const result = await service.getMostRecentTransactionDate();
 
-            expect(result).toBeNull();
+            expect(result).toBeUndefined();
         });
 
-        it('should return null when created_at is null', async () => {
+        it('should return undefined when created_at is null', async () => {
             const mockTransaction: TransactionRead = {
                 id: '1',
                 attributes: {
@@ -564,17 +545,17 @@ describe('TransactionService', () => {
 
             const result = await service.getMostRecentTransactionDate();
 
-            expect(result).toBeNull();
+            expect(result).toBeUndefined();
         });
 
-        it('should throw error when API returns empty data array', async () => {
+        it('should return undefined for a ledger with no transactions', async () => {
             mockApiClient.transactions.listTransaction.mockResolvedValueOnce({
                 data: [],
             } as unknown as TransactionArray);
 
-            await expect(service.getMostRecentTransactionDate()).rejects.toThrow(
-                'Failed to fetch transactions'
-            );
+            const result = await service.getMostRecentTransactionDate();
+
+            expect(result).toBeUndefined();
         });
 
         it('should throw error when response is undefined', async () => {
@@ -617,29 +598,24 @@ describe('TransactionService', () => {
             expect(result).toBe(true);
         });
 
-        it('should return false when tag does not exist (API throws)', async () => {
-            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('Tag not found'));
+        it('should return false when Firefly has no such tag', async () => {
+            mockApiClient.tags.getTag.mockRejectedValueOnce(apiError(404));
 
             const result = await service.tagExists('nonexistent-tag');
 
             expect(result).toBe(false);
         });
 
-        it('should return false for empty tag string', async () => {
-            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('Invalid tag'));
+        it('should fail rather than report a tag missing when Firefly cannot be asked', async () => {
+            mockApiClient.tags.getTag.mockRejectedValueOnce(apiError(401));
 
-            const result = await service.tagExists('');
-
-            expect(result).toBe(false);
-            expect(mockApiClient.tags.getTag).toHaveBeenCalledWith('');
+            await expect(service.tagExists('test-tag')).rejects.toThrow();
         });
 
-        it('should handle API errors gracefully', async () => {
-            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('API Error'));
+        it('should fail on a network error', async () => {
+            mockApiClient.tags.getTag.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
-            const result = await service.tagExists('test-tag');
-
-            expect(result).toBe(false);
+            await expect(service.tagExists('test-tag')).rejects.toThrow('ECONNREFUSED');
         });
 
         it('should return false when API returns undefined data', async () => {
@@ -1171,7 +1147,6 @@ describe('TransactionService', () => {
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
                 mockApiClient,
-                mockDateRangeService,
                 mockCache
             );
 
@@ -1206,7 +1181,6 @@ describe('TransactionService', () => {
             const serviceWithCache = new TransactionService(
                 mockExcludedTransactionService,
                 mockApiClient,
-                mockDateRangeService,
                 mockCache
             );
 

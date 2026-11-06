@@ -269,14 +269,6 @@ describe('BillComparisonService', () => {
             }
         });
 
-        it('should validate month and year', async () => {
-            const result1 = await billComparisonService.calculateBillComparison(0, 2024);
-            expect(result1.ok).toBe(false);
-
-            const result2 = await billComparisonService.calculateBillComparison(13, 2024);
-            expect(result2.ok).toBe(false);
-        });
-
         it('should calculate variance correctly', async () => {
             const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
             const mockTransactions = [createMockTransaction('Subscription Payment', '60.00', '1')];
@@ -550,9 +542,7 @@ describe('BillComparisonService', () => {
             const result = await billComparisonService.calculateBillComparison(10, 2024);
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.message).toContain(
-                    'Bill comparison calculation failed for calculateBillComparison on month 10'
-                );
+                expect(result.error.message).toContain('Transaction Error');
             }
         });
     });

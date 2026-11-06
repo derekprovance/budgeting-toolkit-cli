@@ -43,8 +43,6 @@ export class BudgetInsightService {
         // Rule 2: High transaction frequency
         budgets.forEach(budget => {
             if (
-                budget.transactionStats &&
-                budget.transactionStats.count &&
                 budget.transactionStats.count >=
                     BUSINESS_CONSTANTS.TRANSACTIONS.HIGH_FREQUENCY_COUNT &&
                 budget.spent !== 0

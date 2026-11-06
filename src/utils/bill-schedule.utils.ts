@@ -1,20 +1,6 @@
 import { BillRead } from '@derekprovance/firefly-iii-sdk';
-
-/** A calendar day as YYYY-MM-DD; plain string comparison orders these */
-export type Day = string;
-
-const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})/;
-
-/** The calendar day a Firefly date or datetime names, ignoring any offset */
-export function toDay(value: string | null | undefined): Day | null {
-    const match = ISO_DAY.exec(value ?? '');
-    return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
-}
-
-/** Today in local time, as the owner's calendar sees it */
-export function today(now: Date = new Date()): Day {
-    return formatDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
-}
+import { Day, daysInMonth, formatDay, monthRange, shiftMonth, toDay } from './date.utils.js';
+import { logger } from '../logger.js';
 
 /**
  * Every date a bill falls due in a month, from its own schedule.
@@ -32,8 +18,7 @@ export function dueDatesInMonth(bill: BillRead, month: number, year: number): Da
         return [];
     }
 
-    const first = formatDay(year, month, 1);
-    const last = formatDay(year, month, daysInMonth(year, month));
+    const { start: first, end: last } = monthRange(month, year);
     const end = toDay(bill.attributes.end_date);
     const stride = (bill.attributes.skip ?? 0) + 1;
 
@@ -49,6 +34,53 @@ export function dueDatesInMonth(bill: BillRead, month: number, year: number): Da
     }
 }
 
+/**
+ * The unpaid due dates Firefly reports for this month, in order.
+ *
+ * `pay_dates` is payment-aware: it lists only the occurrences after the
+ * latest payment in the window, and falls back to the next one outside it
+ * (V11). So it says what is still owed, not what fell due; the month's
+ * schedule comes from {@link dueDatesInMonth} instead.
+ */
+export function unpaidDatesInMonth(bill: BillRead, month: number, year: number): Day[] {
+    const { start, end } = monthRange(month, year);
+    return (bill.attributes.pay_dates ?? [])
+        .map(toDay)
+        .filter((day): day is Day => day !== null && day >= start && day <= end)
+        .sort();
+}
+
+/**
+ * What one payment of a bill is expected to cost: `amount_avg`, else the
+ * midpoint of `amount_min` and `amount_max`. Display-only (R-BILL-1). An
+ * unreadable or negative amount expects nothing.
+ */
+export function expectedBillAmount(bill: BillRead): number {
+    const amount = parseExpectedAmount(bill.attributes);
+    if (isNaN(amount) || amount < 0) {
+        const { amount_avg, amount_min, amount_max } = bill.attributes;
+        logger.debug(
+            { billId: bill.id, billName: bill.attributes.name, amount_avg, amount_min, amount_max },
+            'Invalid bill amount, defaulting to 0'
+        );
+        return 0;
+    }
+    return amount;
+}
+
+function parseExpectedAmount({
+    amount_avg,
+    amount_min,
+    amount_max,
+}: BillRead['attributes']): number {
+    if (amount_avg) {
+        return parseFloat(amount_avg);
+    }
+    const min = parseFloat(amount_min ?? '0');
+    const max = amount_max == null ? min : parseFloat(amount_max);
+    return (min + max) / 2;
+}
+
 const PERIODS: Record<string, (start: Day, steps: number) => Day> = {
     weekly: (start, steps) => addDays(start, 7 * steps),
     monthly: (start, steps) => addMonths(start, steps),
@@ -59,9 +91,7 @@ const PERIODS: Record<string, (start: Day, steps: number) => Day> = {
 
 function addMonths(day: Day, months: number): Day {
     const [y, m, d] = day.split('-').map(Number);
-    const total = y * 12 + (m - 1) + months;
-    const year = Math.floor(total / 12);
-    const month = (total % 12) + 1;
+    const { month, year } = shiftMonth(m, y, months);
     return formatDay(year, month, Math.min(d, daysInMonth(year, month)));
 }
 
@@ -69,13 +99,4 @@ function addDays(day: Day, days: number): Day {
     const [y, m, d] = day.split('-').map(Number);
     const date = new Date(Date.UTC(y, m - 1, d + days));
     return formatDay(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
-}
-
-function daysInMonth(year: number, month: number): number {
-    return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function formatDay(year: number, month: number, day: number): Day {
-    const pad = (n: number, width = 2) => String(n).padStart(width, '0');
-    return `${pad(year, 4)}-${pad(month)}-${pad(day)}`;
 }

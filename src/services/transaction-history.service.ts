@@ -1,6 +1,6 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { ITransactionService } from './core/transaction.service.interface.js';
-import { DateRangeService } from './core/date-range.service.js';
+import { localDay } from '../utils/date.utils.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 import { normalizeDescription } from '../utils/description-normalizer.js';
@@ -70,8 +70,8 @@ export class TransactionHistoryService {
         const end = this.now();
         const start = TransactionHistoryService.monthsBefore(end, this.historyMonths);
         const transactions = await this.transactionService.getTransactionsInRange(
-            DateRangeService.toLocalDateString(start),
-            DateRangeService.toLocalDateString(end)
+            localDay(start),
+            localDay(end)
         );
 
         for (const tx of transactions) {
