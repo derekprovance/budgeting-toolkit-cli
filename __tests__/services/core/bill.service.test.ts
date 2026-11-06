@@ -1,11 +1,16 @@
 import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 import { BillService } from '../../../src/services/core/bill.service.js';
-import { BillRead } from '@derekprovance/firefly-iii-sdk';
+import { BillArray, BillRead } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
+import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
+import { createMockFireflyClient } from '../../shared/mocks.js';
+
+/** One page of bills; the service reads only `data`. */
+const billPage = (data: BillRead[]) => ({ data }) as BillArray;
 
 describe('BillService', () => {
     let billService: BillService;
-    let mockClient: any;
+    let mockClient: jest.Mocked<FireflyClientWithCerts>;
 
     const mockBill: BillRead = {
         type: 'bills',
@@ -21,15 +26,7 @@ describe('BillService', () => {
     };
 
     beforeEach(() => {
-        const mockListBill = jest.fn();
-        const mockGetBill = jest.fn();
-
-        mockClient = {
-            bills: {
-                listBill: mockListBill,
-                getBill: mockGetBill,
-            },
-        } as any;
+        mockClient = createMockFireflyClient();
 
         billService = new BillService(mockClient);
     });
@@ -44,9 +41,7 @@ describe('BillService', () => {
                 },
             };
 
-            mockClient.bills.listBill.mockResolvedValue({
-                data: [billWithPayDates],
-            });
+            mockClient.bills.listBill.mockResolvedValue(billPage([billWithPayDates]));
 
             const result = await billService.getBillsForMonth(10, 2024);
 
@@ -62,9 +57,7 @@ describe('BillService', () => {
         });
 
         it('should handle different months correctly', async () => {
-            mockClient.bills.listBill.mockResolvedValue({
-                data: [mockBill],
-            });
+            mockClient.bills.listBill.mockResolvedValue(billPage([mockBill]));
 
             await billService.getBillsForMonth(2, 2024);
 
@@ -78,9 +71,7 @@ describe('BillService', () => {
         });
 
         it('should handle December correctly (month 12)', async () => {
-            mockClient.bills.listBill.mockResolvedValue({
-                data: [mockBill],
-            });
+            mockClient.bills.listBill.mockResolvedValue(billPage([mockBill]));
 
             await billService.getBillsForMonth(12, 2024);
 
@@ -96,7 +87,7 @@ describe('BillService', () => {
         it('should throw error when API returns no data', async () => {
             mockClient.bills.listBill.mockResolvedValue({
                 data: undefined,
-            } as any);
+            } as unknown as BillArray);
 
             await expect(billService.getBillsForMonth(10, 2024)).rejects.toThrow(
                 'Failed to fetch bills'
@@ -104,7 +95,7 @@ describe('BillService', () => {
         });
 
         it('should throw error when API returns null', async () => {
-            mockClient.bills.listBill.mockResolvedValue(null as any);
+            mockClient.bills.listBill.mockResolvedValue(null as unknown as BillArray);
 
             await expect(billService.getBillsForMonth(10, 2024)).rejects.toThrow(
                 'Failed to fetch bills'
@@ -112,9 +103,7 @@ describe('BillService', () => {
         });
 
         it('should return empty array when no bills exist', async () => {
-            mockClient.bills.listBill.mockResolvedValue({
-                data: [],
-            });
+            mockClient.bills.listBill.mockResolvedValue(billPage([]));
 
             const result = await billService.getBillsForMonth(10, 2024);
 

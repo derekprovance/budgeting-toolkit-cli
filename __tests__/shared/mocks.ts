@@ -45,30 +45,33 @@ export const createMockExcludedTransactionService = (): jest.Mocked<ExcludedTran
             .mockReturnValue(false),
     });
 
+type Client = FireflyClientWithCerts;
+
 /**
- * Creates a mocked FireflyClientWithCerts (API client)
+ * A Firefly client with a bare mock for every endpoint `src` calls; each
+ * resolves to undefined until a test stubs it. The cast remains because the
+ * SDK's endpoint groups are classes with many members, which `partialMock`
+ * cannot check one level down.
  */
-export const createMockFireflyClient = (): jest.Mocked<FireflyClientWithCerts> => {
-    return {
-        transactions: {
-            listTransaction: jest.fn(),
-            getTransaction: jest.fn(),
-            updateTransaction: jest.fn(),
-        },
-        categories: {
-            listCategory: jest.fn(),
-            getCategory: jest.fn(),
-        },
+export const createMockFireflyClient = (): jest.Mocked<Client> =>
+    ({
+        accounts: { listAccount: jest.fn<Client['accounts']['listAccount']>() },
+        bills: { listBill: jest.fn<Client['bills']['listBill']>() },
         budgets: {
-            listBudget: jest.fn(),
-            getBudget: jest.fn(),
+            listBudget: jest.fn<Client['budgets']['listBudget']>(),
+            listBudgetLimit: jest.fn<Client['budgets']['listBudgetLimit']>(),
         },
+        categories: { listCategory: jest.fn<Client['categories']['listCategory']>() },
         tags: {
-            getTag: jest.fn(),
-            listTransactionByTag: jest.fn(),
+            getTag: jest.fn<Client['tags']['getTag']>(),
+            listTransactionByTag: jest.fn<Client['tags']['listTransactionByTag']>(),
         },
-    } as unknown as jest.Mocked<FireflyClientWithCerts>;
-};
+        transactions: {
+            listTransaction: jest.fn<Client['transactions']['listTransaction']>(),
+            getTransaction: jest.fn<Client['transactions']['getTransaction']>(),
+            updateTransaction: jest.fn<Client['transactions']['updateTransaction']>(),
+        },
+    }) as unknown as jest.Mocked<Client>;
 
 /**
  * Account scope mock. `income` defaults to the envelope's first account, the

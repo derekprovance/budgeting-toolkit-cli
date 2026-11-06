@@ -2,6 +2,7 @@ import { CategoryService } from '../../../src/services/core/category.service.js'
 import { CategoryArray, CategoryRead } from '@derekprovance/firefly-iii-sdk';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
 import { jest } from '@jest/globals';
+import { createMockFireflyClient } from '../../shared/mocks.js';
 import { PAGE_SIZE } from '../../../src/utils/pagination.utils.js';
 
 describe('CategoryService', () => {
@@ -9,11 +10,7 @@ describe('CategoryService', () => {
     let mockClient: jest.Mocked<FireflyClientWithCerts>;
 
     beforeEach(() => {
-        mockClient = {
-            categories: {
-                listCategory: jest.fn(),
-            },
-        } as unknown as jest.Mocked<FireflyClientWithCerts>;
+        mockClient = createMockFireflyClient();
         service = new CategoryService(mockClient);
     });
 

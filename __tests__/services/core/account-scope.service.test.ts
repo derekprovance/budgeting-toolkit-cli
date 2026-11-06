@@ -1,7 +1,8 @@
 import { jest } from '@jest/globals';
 import { AccountScopeService } from '../../../src/services/core/account-scope.service.js';
 import { FireflyClientWithCerts } from '../../../src/api/firefly-client-with-certs.js';
-import { createMockLogger } from '../../shared/mocks.js';
+import { createMockFireflyClient, createMockLogger } from '../../shared/mocks.js';
+import { AccountArray } from '@derekprovance/firefly-iii-sdk';
 
 type Role = 'defaultAsset' | 'savingAsset' | 'ccAsset' | 'sharedAsset' | 'cashWalletAsset';
 
@@ -10,6 +11,10 @@ const account = (id: string, role: Role, active = true) => ({
     id,
     attributes: { name: `Account ${id}`, type: 'asset', account_role: role, active },
 });
+
+/** One page of accounts; only the fields the service reads. */
+const accountPage = (data: ReturnType<typeof account>[]) =>
+    ({ data, meta: { pagination: { total_pages: 1 } } }) as unknown as AccountArray;
 
 describe('AccountScopeService', () => {
     // Mirrors the real shape: checking, savings, three cards, a brokerage, the
@@ -25,18 +30,13 @@ describe('AccountScopeService', () => {
         account('13', 'defaultAsset', false),
     ];
 
-    let listAccount: jest.Mock;
-    let client: FireflyClientWithCerts;
+    let client: jest.Mocked<FireflyClientWithCerts>;
+    let listAccount: typeof client.accounts.listAccount;
 
     beforeEach(() => {
-        listAccount = jest.fn(() =>
-            Promise.resolve({
-                data: ACCOUNTS,
-                meta: { pagination: { total_pages: 1 } },
-            })
-        ) as unknown as jest.Mock;
-
-        client = { accounts: { listAccount } } as unknown as FireflyClientWithCerts;
+        client = createMockFireflyClient();
+        listAccount = client.accounts.listAccount;
+        listAccount.mockResolvedValue(accountPage(ACCOUNTS));
     });
 
     // The real config: savings, the brokerage and the pool are outside
@@ -112,10 +112,9 @@ describe('AccountScopeService', () => {
         });
 
         it('should not cache a failure', async () => {
-            listAccount.mockRejectedValueOnce(new Error('boom') as never).mockResolvedValueOnce({
-                data: ACCOUNTS,
-                meta: { pagination: { total_pages: 1 } },
-            } as never);
+            listAccount
+                .mockRejectedValueOnce(new Error('boom'))
+                .mockResolvedValueOnce(accountPage(ACCOUNTS));
 
             const scope = build();
 
@@ -128,10 +127,7 @@ describe('AccountScopeService', () => {
         it('should fail loudly when there are no accounts at all', async () => {
             // Silently deriving nothing would report no income or spending at
             // all, which is far worse than an error
-            listAccount.mockResolvedValue({
-                data: [],
-                meta: { pagination: { total_pages: 1 } },
-            } as never);
+            listAccount.mockResolvedValue(accountPage([]));
 
             await expect(build().getScope()).rejects.toThrow(/No income account/);
         });
@@ -139,10 +135,9 @@ describe('AccountScopeService', () => {
         it('should fail when every envelope account is a credit card', async () => {
             // Cards can hold spending but never receive income, so the paycheck
             // and additional income would silently report $0 forever
-            listAccount.mockResolvedValue({
-                data: [account('8', 'ccAsset'), account('11', 'ccAsset')],
-                meta: { pagination: { total_pages: 1 } },
-            } as never);
+            listAccount.mockResolvedValue(
+                accountPage([account('8', 'ccAsset'), account('11', 'ccAsset')])
+            );
 
             await expect(build().getScope()).rejects.toThrow(/No income account/);
         });
