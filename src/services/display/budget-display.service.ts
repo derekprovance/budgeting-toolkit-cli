@@ -254,9 +254,9 @@ export class BudgetDisplayService {
                 config.statusColor(config.statusEmoji) +
                 ' ' +
                 budget.name.padEnd(BudgetDisplayService.NAME_COLUMN_WIDTH) +
-                spentFormatted.padStart(12) +
+                spentFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 ' / ' +
-                budgetFormatted.padStart(12) +
+                budgetFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 '  ' +
                 config.statusColor(`${budget.percentageUsed.toFixed(0)}%`.padStart(5)) +
                 '  ' +
@@ -305,7 +305,7 @@ export class BudgetDisplayService {
 
             const line =
                 chalk.gray(`${index + 1}. `) +
-                amountFormatted.padStart(12) +
+                amountFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 '   ' +
                 truncatedDescription +
                 '  ' +
@@ -516,7 +516,7 @@ export class BudgetDisplayService {
                 ' ' +
                 formattedDescription +
                 ' ' +
-                amountFormatted.padStart(12) +
+                amountFormatted.padStart(BudgetDisplayService.AMOUNT_COLUMN_WIDTH) +
                 '   ' +
                 chalk.gray(date);
 
