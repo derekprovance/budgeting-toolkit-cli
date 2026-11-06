@@ -7,16 +7,6 @@ import { CurrencyUtils } from './currency.utils.js';
  */
 export class DisplayFormatterUtils {
     /**
-     * Formats currency with symbol.
-     *
-     * Note: renders the ABSOLUTE value — callers that need to convey direction
-     * must add the sign themselves (or use {@link formatNetImpact}).
-     */
-    static formatCurrency(amount: number, symbol: string): string {
-        return CurrencyUtils.formatWithSymbol(Math.abs(amount), symbol);
-    }
-
-    /**
      * Pads a string to a visible width, ignoring ANSI escape codes.
      * Plain `padEnd`/`padStart` count escape sequences as characters, so
      * padding a colored string is silently a no-op.

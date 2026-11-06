@@ -429,7 +429,7 @@ export class AnalyzeDisplayService {
      * Formats currency with symbol
      */
     private formatCurrency(amount: number, symbol: string): string {
-        return DisplayFormatterUtils.formatCurrency(amount, symbol);
+        return CurrencyUtils.formatWithSymbol(amount, symbol);
     }
 
     /**
