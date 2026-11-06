@@ -1,6 +1,7 @@
 import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import chalk from 'chalk';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
+import { CurrencyUtils } from '../../utils/currency.utils.js';
 
 /**
  * Service for formatting split transaction display output
@@ -116,7 +117,9 @@ export class SplitTransactionDisplayService {
      * @returns Formatted remainder message
      */
     formatRemainder(amount: number, currencySymbol: string): string {
-        return chalk.dim(`Remainder for second split: ${currencySymbol}${amount.toFixed(2)}`);
+        return chalk.dim(
+            `Remainder for second split: ${CurrencyUtils.formatWithSymbol(amount, currencySymbol)}`
+        );
     }
 
     /**
