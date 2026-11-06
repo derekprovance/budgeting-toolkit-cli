@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { AppConfig, CategorizeConfig, ExcludedTransaction, LLMConfig } from './config.types.js';
 import { DEFAULT_CONFIG } from './config.defaults.js';
 import { ConfigValidator } from './config.validator.js';
+import { errorMessage } from '../utils/error-detection.utils.js';
 
 /**
  * YAML configuration file structure (maps to AppConfig)
@@ -488,7 +489,7 @@ export class ConfigManager {
             return (yaml.load(fileContents) as YamlConfig) || null;
         } catch (error) {
             throw new Error(
-                `Failed to parse YAML configuration at ${configPath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                `Failed to parse YAML configuration at ${configPath}: ${errorMessage(error)}`,
                 { cause: error }
             );
         }

@@ -14,6 +14,7 @@ import {
 import { CategorizeMode } from './types/enums.js';
 import { CommandConfigValidator } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
+import { errorMessage } from './utils/error-detection.utils.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -92,7 +93,7 @@ const handleError = (error: unknown, operation: string): never => {
     logger.error({ err: error }, `Error ${operation}:`);
     // The structured log is silenced at LOG_LEVEL=silent; the user still needs
     // to see why the command failed.
-    console.error(`Error ${operation}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Error ${operation}: ${errorMessage(error)}`);
     process.exit(1);
 };
 
@@ -148,8 +149,7 @@ export const createCli = (configPath?: string): Command => {
             // ConfigManager formats the message as a bulleted list, one entry
             // per validation error. Print all of them — a bare "validation
             // failed" leaves no way to tell which setting is wrong.
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            const problems = errorMsg
+            const problems = errorMessage(error)
                 .split('\n')
                 .map((line: string) => line.trim())
                 .filter((line: string) => line.startsWith('- '))
@@ -199,10 +199,7 @@ export const createCli = (configPath?: string): Command => {
 
             console.error('\nSee example file: .env.example\n');
         } else {
-            console.error(
-                'Failed to initialize API client:',
-                error instanceof Error ? error.message : String(error)
-            );
+            console.error('Failed to initialize API client:', errorMessage(error));
             console.error(
                 '\nCopy config.yaml.example and .env.example to ~/.budget/ or check your config.\n'
             );

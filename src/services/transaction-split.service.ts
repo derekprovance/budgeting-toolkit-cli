@@ -7,6 +7,7 @@ import {
 import { FireflyClientWithCerts } from '../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../logger.js';
 import { ILogger } from '../types/interface/logger.interface.js';
+import { errorMessage, toError } from '../utils/error-detection.utils.js';
 
 /**
  * Data for a single split portion
@@ -56,7 +57,7 @@ export class TransactionSplitService {
         } catch (error) {
             this.logger.error(
                 {
-                    error: error instanceof Error ? error.message : 'Unknown error',
+                    error: errorMessage(error),
                     transactionId,
                 },
                 'Failed to fetch transaction'
@@ -153,11 +154,9 @@ export class TransactionSplitService {
                 transaction: result.data,
             };
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
             this.logger.error(
                 {
-                    error: errorMessage,
+                    error: errorMessage(error),
                     transactionId,
                 },
                 'Failed to split transaction'
@@ -165,7 +164,7 @@ export class TransactionSplitService {
 
             return {
                 success: false,
-                error: error instanceof Error ? error : new Error(errorMessage),
+                error: toError(error),
             };
         }
     }

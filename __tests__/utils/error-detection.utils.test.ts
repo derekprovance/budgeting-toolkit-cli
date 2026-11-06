@@ -1,5 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import { isCertificateError } from '../../src/utils/error-detection.utils.js';
+import {
+    errorMessage,
+    isCertificateError,
+    toError,
+} from '../../src/utils/error-detection.utils.js';
 
 describe('isCertificateError', () => {
     describe('non-Error inputs', () => {
@@ -202,5 +206,29 @@ describe('isCertificateError', () => {
             });
             expect(isCertificateError(error)).toBe(false);
         });
+    });
+});
+
+describe('toError', () => {
+    it('returns an Error unchanged', () => {
+        const error = new TypeError('bad type');
+        expect(toError(error)).toBe(error);
+    });
+
+    it('wraps a thrown string in an Error carrying it as the message', () => {
+        const error = toError('plain failure');
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toBe('plain failure');
+    });
+});
+
+describe('errorMessage', () => {
+    it("returns an Error's message", () => {
+        expect(errorMessage(new Error('boom'))).toBe('boom');
+    });
+
+    it('stringifies anything else that was thrown', () => {
+        expect(errorMessage(42)).toBe('42');
+        expect(errorMessage(undefined)).toBe('undefined');
     });
 });

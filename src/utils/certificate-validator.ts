@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import { X509Certificate } from 'crypto';
 import { spawnSync } from 'child_process';
+import { errorMessage } from './error-detection.utils.js';
 
 export interface CertificateValidationResult {
     errors: string[];
@@ -154,14 +155,14 @@ export class CertificateValidator {
             } catch (parseError) {
                 errors.push(
                     `${this.capitalize(certType)} certificate could not be parsed: ${certPath}\n` +
-                        `  Error: ${(parseError as Error).message}\n` +
+                        `  Error: ${errorMessage(parseError)}\n` +
                         `  Suggestion: Verify the file is a valid PEM certificate`
                 );
             }
         } catch (readError) {
             errors.push(
                 `${this.capitalize(certType)} certificate could not be read: ${certPath}\n` +
-                    `  Error: ${(readError as Error).message}`
+                    `  Error: ${errorMessage(readError)}`
             );
         }
 
@@ -209,7 +210,7 @@ export class CertificateValidator {
         } catch (error) {
             return (
                 `${this.capitalize(certType)} certificate could not be validated: ${certPath}\n` +
-                `  Error: ${(error as Error).message}`
+                `  Error: ${errorMessage(error)}`
             );
         }
     }

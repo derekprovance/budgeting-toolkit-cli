@@ -5,6 +5,7 @@ import { TransactionSplitService, SplitData } from '../services/transaction-spli
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
 import { logger } from '../logger.js';
+import { toError } from '../utils/error-detection.utils.js';
 
 /**
  * Parameters for split transaction command
@@ -168,7 +169,7 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             }
         } catch (error) {
             spinner.fail(this.SPLIT_CMD_FAIL);
-            const errorObject = error instanceof Error ? error : new Error('Unknown error');
+            const errorObject = toError(error);
 
             // Diagnostic logging for troubleshooting
             logger.error(
