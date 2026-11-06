@@ -21,6 +21,7 @@ import {
     TRANSACTION_PAGINATION,
     TRANSACTIONS_BY_MONTH,
     UNCAPPED_PROBE_LIMIT,
+    UNKNOWN_TAG,
     WIRE_FORMAT,
 } from '../scenario/firefly-contract.js';
 import type { AccountKey, BillKey, IdMap, MonthId } from '../scenario/types.js';
@@ -211,6 +212,13 @@ export function defineFireflyContractSuite(getJson: GetJson, idMap: IdMap | (() 
                     type: NO_NAME_REVENUE.sourceType,
                 });
             }
+        });
+
+        // V23: getJson rejects on any non-200, naming the status
+        test('an unknown tag is a 404', async () => {
+            await expect(getJson(`/v1/tags/${UNKNOWN_TAG.tag}`)).rejects.toThrow(
+                new RegExp(`\\b${UNKNOWN_TAG.status}\\b`)
+            );
         });
 
         // V13

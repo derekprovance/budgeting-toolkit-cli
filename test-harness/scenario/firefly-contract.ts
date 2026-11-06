@@ -163,6 +163,12 @@ export const CC_READBACK = {
 export const BUDGET_ONLY_ON_WITHDRAWALS = true;
 
 /**
+ * V23 (verified): GET /v1/tags/{tag} for a tag that does not exist answers
+ * 404. `tagExists` relies on it: only this status means "no such tag".
+ */
+export const UNKNOWN_TAG = { tag: 'btk-contract-no-such-tag', status: 404 } as const;
+
+/**
  * Wire formats (verified): amounts are unsigned strings with 12 decimals
  * ("1000.000000000000"); dates look like "2025-01-01T00:00:00+00:00"; group
  * ids and journal ids are distinct sequences.

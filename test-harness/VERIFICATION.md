@@ -28,6 +28,7 @@ These are observations of Firefly's own server behavior. Anything the harness re
 | V19 | Store against inactive bill or account                 | **Both accepted (200).** A withdrawal from a deactivated account and one linked to a deactivated bill both persist, and `bill_id` is kept                                                                                                                                                                                                                                                                                                           |
 | V20 | `bill_id` on a transfer                                | **Silently dropped** on POST and on PUT (`bill_id` and `subscription_id` read back `null`). A withdrawal keeps it. So a transfer can carry no marker but tags (R-XFER-3)                                                                                                                                                                                                                                                                            |
 | V21 | Bill schedule and payment-aware `pay_dates`            | Occurrences step from `date` every (skip + 1) periods; a month-end day clamps without drifting (Jan 31 → Feb 28 → Mar 31). `pay_dates` lists only occurrences after the latest payment in the window: a weekly bill with 2 of 4 paid reports 2 dates, all paid reports next month's. A late payment for last month (Jan 2) leaves this month's date (Jan 25) listed. An unpaid bill with nothing due in the window reports its next date outside it |
+| V23 | `GET /v1/tags/{tag}` for an unknown tag                | **404** `{"message":"Resource not found","exception":"NotFoundHttpException"}`, by name or by id. An existing tag by name → 200; a bad token → 401. So only a 404 means the tag is absent                                                                                                                                                                                                                                                           |
 | V22 | PUT on a multi-split group                             | Every split the PUT does not list is **deleted**. Listing a split by `transaction_journal_id` alone leaves its fields unchanged. A PUT naming more than one split is rejected (422) without `group_title`                                                                                                                                                                                                                                           |
 | —   | `apply_rules` / `fire_webhooks`                        | Accepted, as is `error_if_duplicate_hash`. They are validated as booleans (`"nope"` → 422)                                                                                                                                                                                                                                                                                                                                                          |
 | —   | Group vs journal id                                    | Distinct sequences. A group's `data.id` is the group id; each split carries `transaction_journal_id`. For a single split the two happened to match (1/1). A 2-split group had id `19` with journals `["20","19"]`: **splits came back in reverse order**                                                                                                                                                                                            |
@@ -264,3 +265,18 @@ PUT  {group_title: "Costco", transactions: [{journal 7, category_name Groceries}
 
 `TransactionService.updateTransaction` therefore lists every split of the
 group and sends its title back.
+
+### V23: unknown tag
+
+Checked 2026-11-06 against the same pinned stack (6.6.6).
+
+```
+GET /api/v1/tags/no-such-tag-btk-probe            -> 404 {"message":"Resource not found","exception":"NotFoundHttpException"}
+GET /api/v1/tags/99999                            -> 404 (same body)
+GET /api/v1/tags/Disposable%20Income              -> 200
+GET /api/v1/tags/no-such-tag-btk-probe, bad token -> 401
+Through the SDK, TransactionService.tagExists:  existing -> true, unknown -> false, bad token -> throws ApiError 401
+```
+
+`tagExists` therefore treats only a 404 as "no such tag"; any other failure
+propagates instead of being reported as a missing tag.
