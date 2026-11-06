@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { TransactionSplitService } from '../../src/services/transaction-split.service.js';
 import { FireflyClientWithCerts } from '../../src/api/firefly-client-with-certs.js';
 import { TransactionRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
-import { ILogger } from '../../src/types/interface/logger.interface.js';
+import { createMockFireflyClient, createMockLogger } from '../shared/mocks.js';
+import { transactionRead, withdrawal } from '../shared/test-data.js';
 
 type UpdatePayload = Parameters<FireflyClientWithCerts['transactions']['updateTransaction']>[1];
 
@@ -18,56 +19,39 @@ const sentSplits = (payload: UpdatePayload) => {
 const onlySplit = (transaction: TransactionRead): TransactionSplit =>
     transaction.attributes.transactions[0];
 
+/** Transaction 123: a withdrawal carrying the metadata the first split keeps */
+const createMockTransaction = ({
+    amount = '100.00',
+    ...overrides
+}: Partial<Omit<TransactionSplit, 'type'>> = {}): TransactionRead =>
+    transactionRead(
+        '123',
+        withdrawal(amount, {
+            transaction_journal_id: 'journal-123',
+            date: '2024-01-15',
+            description: 'Test Transaction',
+            source_id: 'source-1',
+            source_name: 'Checking Account',
+            destination_id: 'dest-1',
+            destination_name: 'Grocery Store',
+            currency_id: 'curr-1',
+            currency_code: 'USD',
+            currency_symbol: '$',
+            category_name: 'Groceries',
+            budget_id: 'budget-1',
+            budget_name: 'Monthly Budget',
+            tags: ['shopping', 'food'],
+            ...overrides,
+        })
+    );
+
 describe('TransactionSplitService', () => {
     let service: TransactionSplitService;
     let mockClient: jest.Mocked<FireflyClientWithCerts>;
-    let mockLogger: jest.Mocked<ILogger>;
-
-    const createMockTransaction = (overrides?: Partial<TransactionSplit>): TransactionRead => ({
-        type: 'transactions',
-        id: '123',
-        links: { self: 'http://firefly.test/api/v1/transactions/123' },
-        attributes: {
-            transactions: [
-                {
-                    transaction_journal_id: 'journal-123',
-                    type: 'withdrawal',
-                    date: '2024-01-15',
-                    amount: '100.00',
-                    description: 'Test Transaction',
-                    source_id: 'source-1',
-                    source_name: 'Checking Account',
-                    destination_id: 'dest-1',
-                    destination_name: 'Grocery Store',
-                    currency_id: 'curr-1',
-                    currency_code: 'USD',
-                    currency_symbol: '$',
-                    category_name: 'Groceries',
-                    budget_id: 'budget-1',
-                    budget_name: 'Monthly Budget',
-                    tags: ['shopping', 'food'],
-                    ...overrides,
-                },
-            ],
-        },
-    });
 
     beforeEach(() => {
-        mockLogger = {
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
-        } as unknown as jest.Mocked<ILogger>;
-
-        mockClient = {
-            transactions: {
-                getTransaction: jest.fn(),
-                updateTransaction: jest.fn(),
-            },
-        } as unknown as jest.Mocked<FireflyClientWithCerts>;
-
-        service = new TransactionSplitService(mockClient, mockLogger);
+        mockClient = createMockFireflyClient();
+        service = new TransactionSplitService(mockClient, createMockLogger());
     });
 
     describe('getSingleSplit', () => {
