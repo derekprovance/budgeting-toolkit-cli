@@ -6,6 +6,7 @@ import { CashFlowService } from '../../src/services/cash-flow.service.js';
 import { BillRead, TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { jest } from '@jest/globals';
 import { createMockAccountScopeService, createMockLogger, partialMock } from '../shared/mocks.js';
+import { withdrawal } from '../shared/test-data.js';
 
 /** The envelope account every fixture here pays from */
 const ENVELOPE = 'source1';
@@ -47,24 +48,9 @@ describe('BillComparisonService', () => {
         },
     });
 
-    const createMockTransaction = (
-        description: string,
-        amount: string,
-        bill_id: string,
-        budget_id?: string
-    ): TransactionSplit =>
-        ({
-            transaction_journal_id: '1',
-            description,
-            amount,
-            type: 'withdrawal',
-            date: '2024-10-15',
-            source_id: 'source1',
-            destination_id: 'dest1',
-            currency_code: 'USD',
-            bill_id,
-            ...(budget_id ? { budget_id } : {}),
-        }) as TransactionSplit;
+    /** A withdrawal from the envelope linked to `billId` */
+    const billPayment = (description: string, amount: string, billId: string) =>
+        withdrawal(amount, { description, bill_id: billId, date: '2024-10-15' });
 
     beforeEach(() => {
         mockBillService = partialMock<BillService>({
@@ -122,7 +108,7 @@ describe('BillComparisonService', () => {
         ) => {
             mockBillService.getBillsForMonth.mockResolvedValue([bill]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(
-                paid.map(amount => createMockTransaction('Payment', amount, '1'))
+                paid.map(amount => billPayment('Payment', amount, '1'))
             );
             const result = await billComparisonService.calculateBillComparison(month, year);
             if (!result.ok) throw new Error(result.error.message);
@@ -236,8 +222,8 @@ describe('BillComparisonService', () => {
             ];
 
             const mockTransactions = [
-                createMockTransaction('Rent Payment', '2000.00', '1'),
-                createMockTransaction('Internet Payment', '100.00', '2'),
+                billPayment('Rent Payment', '2000.00', '1'),
+                billPayment('Internet Payment', '100.00', '2'),
             ];
 
             mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
@@ -271,7 +257,7 @@ describe('BillComparisonService', () => {
 
         it('should calculate variance correctly', async () => {
             const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
-            const mockTransactions = [createMockTransaction('Subscription Payment', '60.00', '1')];
+            const mockTransactions = [billPayment('Subscription Payment', '60.00', '1')];
 
             mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue(mockTransactions);
@@ -352,9 +338,9 @@ describe('BillComparisonService', () => {
             ];
 
             const mockTransactions = [
-                createMockTransaction('Payment A', '105.00', '1'),
-                createMockTransaction('Payment B1', '100.00', '2'),
-                createMockTransaction('Payment B2', '100.00', '2'),
+                billPayment('Payment A', '105.00', '1'),
+                billPayment('Payment B1', '100.00', '2'),
+                billPayment('Payment B2', '100.00', '2'),
             ];
 
             mockBillService.getBillsForMonth.mockResolvedValue(mockBills);
@@ -375,7 +361,7 @@ describe('BillComparisonService', () => {
         it('should handle transactions without bill_id', async () => {
             const mockBills = [createMockBill('1', 'Bill A', '100', 'monthly', 0, true)];
             const unbilledTransaction: TransactionSplit = {
-                ...createMockTransaction('Unbilled', '50.00', ''),
+                ...billPayment('Unbilled', '50.00', ''),
                 bill_id: null,
             };
 
@@ -421,7 +407,7 @@ describe('BillComparisonService', () => {
         it('should handle bills with subscription_id instead of bill_id', async () => {
             const mockBills = [createMockBill('1', 'Subscription', '50', 'monthly', 0, true)];
             const transactionWithSubscriptionId: TransactionSplit = {
-                ...createMockTransaction('Sub Payment', '50.00', ''),
+                ...billPayment('Sub Payment', '50.00', ''),
                 bill_id: null,
                 subscription_id: '1',
             };
@@ -699,7 +685,7 @@ describe('BillComparisonService', () => {
                 createMockBill('1', 'Starry', '50', 'monthly', 0, true),
             ]);
             mockTransactionService.getTransactionsForMonth.mockResolvedValue([
-                { ...createMockTransaction('Starry', '50.00', '1'), source_id: 'pool' },
+                { ...billPayment('Starry', '50.00', '1'), source_id: 'pool' },
             ]);
 
             const result = await billComparisonService.calculateBillComparison(10, 2024);

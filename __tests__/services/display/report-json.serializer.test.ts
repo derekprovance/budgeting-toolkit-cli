@@ -1,32 +1,17 @@
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { TEST_DATE, deposit, withdrawal } from '../../shared/test-data.js';
 import {
     toBillTotalsJson,
     toTransactionJson,
 } from '../../../src/services/display/report-json.serializer.js';
 import { BillComparisonDto } from '../../../src/types/dto/bill-comparison.dto.js';
 
-const tx = (overrides: Partial<TransactionSplit>): TransactionSplit =>
-    ({
-        transaction_journal_id: 'j0',
-        description: 'Transaction',
-        type: 'withdrawal',
-        amount: '0.00',
-        date: '2025-01-15T00:00:00+00:00',
-        source_id: 'cc',
-        destination_id: 'shop',
-        budget_id: null,
-        bill_id: null,
-        ...overrides,
-    }) as TransactionSplit;
-
 describe('toTransactionJson', () => {
     it('keeps the amount unsigned and maps ids to null when absent', () => {
         expect(
             toTransactionJson(
-                tx({
+                deposit('20.000000000000', {
+                    description: 'Transaction',
                     transaction_journal_id: undefined,
-                    type: 'deposit',
-                    amount: '20.000000000000',
                     source_id: null,
                     destination_id: null,
                     budget_id: undefined,
@@ -38,7 +23,7 @@ describe('toTransactionJson', () => {
             description: 'Transaction',
             type: 'deposit',
             amount: 20,
-            date: '2025-01-15T00:00:00+00:00',
+            date: TEST_DATE,
             sourceId: null,
             destinationId: null,
             budgetId: null,
@@ -47,7 +32,9 @@ describe('toTransactionJson', () => {
     });
 
     it('falls back to subscription_id for the bill link', () => {
-        expect(toTransactionJson(tx({ bill_id: null, subscription_id: 's9' })).billId).toBe('s9');
+        expect(
+            toTransactionJson(withdrawal(0, { bill_id: null, subscription_id: 's9' })).billId
+        ).toBe('s9');
     });
 });
 
