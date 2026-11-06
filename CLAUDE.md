@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**`CODE_QUALITY.md` is the standard every change is written and reviewed
+against** (naming, functions, DRY, error handling, tests, verification and the
+checkpoint review). Read it before writing code. This file records the facts it
+defers to.
+
 ## What This Tool Is For
 
 This tool measures **one isolated envelope: cost of living.** `Net Cash Flow` in
