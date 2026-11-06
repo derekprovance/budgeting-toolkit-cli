@@ -6,7 +6,7 @@ import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
 import { BudgetLimitDto } from '../../src/types/dto/budget-limit.dto.js';
 import { TransactionClassificationService } from '../../src/services/core/transaction-classification.service.js';
 import { CashFlowService } from '../../src/services/cash-flow.service.js';
-import { BudgetError } from '../../src/types/error/budget.error.js';
+import { MonthError } from '../../src/types/error/month.error.js';
 import { withdrawal } from '../shared/test-data.js';
 import { createMockAccountScopeService, createMockLogger } from '../setup/mock-services.js';
 
@@ -104,7 +104,7 @@ describe('BudgetAnalyticsService', () => {
         it('should throw error when budget report service fails', async () => {
             budgetReportService.getBudgetReport = jest.fn<GetReport>().mockResolvedValue({
                 ok: false,
-                error: { message: 'API error', userMessage: 'Failed' } as unknown as BudgetError,
+                error: { message: 'API error', userMessage: 'Failed' } as unknown as MonthError,
             });
 
             await expect(service.getBudgetReport(1, 2024, 0)).rejects.toThrow('API error');

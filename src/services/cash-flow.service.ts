@@ -9,16 +9,10 @@ import { AccountScopeService } from './core/account-scope.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 import { Result } from '../types/result.type.js';
-import {
-    TransactionAnalysisError,
-    TransactionAnalysisErrorFactory,
-    TransactionAnalysisErrorType,
-} from '../types/error/transaction-analysis.error.js';
+import { MonthError, monthFailure } from '../types/error/month.error.js';
 
 /** A month's transactions, each in the one bucket it is charged to */
 export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
-
-const OPERATION = 'getBuckets';
 
 /**
  * Sorts a month's transactions into buckets. Every figure `analyze` and
@@ -36,21 +30,18 @@ export class CashFlowService {
         private readonly logger: ILogger = defaultLogger
     ) {}
 
-    async getBuckets(
-        month: number,
-        year: number
-    ): Promise<Result<MonthBuckets, TransactionAnalysisError>> {
+    async getBuckets(month: number, year: number): Promise<Result<MonthBuckets, MonthError>> {
         let transactions: TransactionSplit[];
         try {
             transactions = await this.transactionService.getTransactionsForMonth(month, year);
         } catch (error) {
-            return this.fail(TransactionAnalysisErrorType.FETCH_FAILED, month, year, error);
+            return monthFailure('TRANSACTIONS_FETCH_FAILED', { month, year }, error);
         }
 
         try {
             return Result.ok(await this.sort(transactions));
         } catch (error) {
-            return this.fail(TransactionAnalysisErrorType.CALCULATION_FAILED, month, year, error);
+            return monthFailure('BUCKETS_FAILED', { month, year }, error);
         }
     }
 
@@ -71,27 +62,5 @@ export class CashFlowService {
         );
 
         return buckets;
-    }
-
-    private fail(
-        type: TransactionAnalysisErrorType,
-        month: number,
-        year: number,
-        error: unknown
-    ): Result<MonthBuckets, TransactionAnalysisError> {
-        const err = error instanceof Error ? error : new Error(String(error));
-        this.logger.error(
-            {
-                month,
-                year,
-                operation: OPERATION,
-                error: err.message,
-                errorType: err.constructor.name,
-            },
-            `${OPERATION} failed`
-        );
-        return Result.err(
-            TransactionAnalysisErrorFactory.create(type, month, year, OPERATION, err)
-        );
     }
 }

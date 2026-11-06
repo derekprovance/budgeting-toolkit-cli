@@ -7,7 +7,7 @@ import { TransactionCalculationUtils } from '../utils/transaction-calculation.ut
 import { BillService } from './core/bill.service.js';
 import { CashFlowService } from './cash-flow.service.js';
 import { Result } from '../types/result.type.js';
-import { BillError, BillErrorFactory, BillErrorType } from '../types/error/bill.error.js';
+import { MonthError, monthFailure } from '../types/error/month.error.js';
 
 export class BillComparisonService {
     constructor(
@@ -16,107 +16,89 @@ export class BillComparisonService {
     ) {}
 
     /**
-     * Calculates bill comparison for a given month and year.
-     * Returns Result type for explicit error handling.
+     * Expected versus paid for every bill this month (R-BILL-1).
      *
-     * @param month - Month to calculate (1-12)
-     * @param year - Year to calculate
-     * @returns Result containing bill comparison or error
+     * @returns The comparison, or the month's error when the bills or the
+     *   bill bucket could not be read
      */
     async calculateBillComparison(
         month: number,
         year: number
-    ): Promise<Result<BillComparisonDto, BillError>> {
-        const operation = 'calculateBillComparison';
-
+    ): Promise<Result<BillComparisonDto, MonthError>> {
         try {
-            // All bills with pay_dates populated for this month. Deactivated
-            // bills are kept: they predict nothing, but spending still linked
-            // to them has to be counted somewhere, and every other bucket
-            // rejects a bill-linked transaction.
-            const bills = await this.billService.getBillsForMonth(month, year);
+            return await this.compare(month, year);
+        } catch (error) {
+            return monthFailure('BILL_COMPARISON_FAILED', { month, year }, error);
+        }
+    }
 
-            // The bill bucket: bill-linked envelope withdrawals and their
-            // refunds (RULES.md, R-BILL-1). A bill paid from outside the
-            // envelope is not here: it shows as expected but not paid.
-            const buckets = await this.cashFlowService.getBuckets(month, year);
-            if (!buckets.ok) {
-                return Result.err(buckets.error);
-            }
-            const billTransactions = buckets.value.bill;
+    private async compare(
+        month: number,
+        year: number
+    ): Promise<Result<BillComparisonDto, MonthError>> {
+        // All bills with pay_dates populated for this month. Deactivated
+        // bills are kept: they predict nothing, but spending still linked
+        // to them has to be counted somewhere, and every other bucket
+        // rejects a bill-linked transaction.
+        const bills = await this.billService.getBillsForMonth(month, year);
 
-            // Bail out only when there is genuinely nothing to report. Returning
-            // early on `bills.length === 0` alone would skip the orphan path
-            // below, and bill-linked spending would then be charged nowhere at
-            // all — every other bucket rejects a bill-linked transaction.
-            if (bills.length === 0 && billTransactions.length === 0) {
-                logger.debug('No bills or bill-linked transactions found for year ' + year);
-                // Not an error - just return empty result
-                return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
-            }
+        // The bill bucket: bill-linked envelope withdrawals and their
+        // refunds (RULES.md, R-BILL-1). A bill paid from outside the
+        // envelope is not here: it shows as expected but not paid.
+        const buckets = await this.cashFlowService.getBuckets(month, year);
+        if (!buckets.ok) {
+            return Result.err(buckets.error);
+        }
+        const billTransactions = buckets.value.bill;
 
-            // Calculate bill details with predicted amounts based on pay_dates
-            const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
-                bills,
-                billTransactions,
+        // Bail out only when there is genuinely nothing to report. Returning
+        // early on `bills.length === 0` alone would skip the orphan path
+        // below, and bill-linked spending would then be charged nowhere at
+        // all — every other bucket rejects a bill-linked transaction.
+        if (bills.length === 0 && billTransactions.length === 0) {
+            logger.debug('No bills or bill-linked transactions found for year ' + year);
+            // Not an error - just return empty result
+            return Result.ok(BillComparisonDto.create(0, 0, [], 'USD', '$'));
+        }
+
+        // Calculate bill details with predicted amounts based on pay_dates
+        const { predictedTotal, actualTotal, billDetails } = this.calculateBillDetails(
+            bills,
+            billTransactions,
+            month,
+            year
+        );
+
+        // Get currency info from first bill or use default
+        const currencyCode =
+            bills[0]?.attributes.currency_code ??
+            bills[0]?.attributes.primary_currency_code ??
+            'USD';
+        const currencySymbol =
+            bills[0]?.attributes.currency_symbol ??
+            bills[0]?.attributes.primary_currency_symbol ??
+            '$';
+
+        const result = BillComparisonDto.create(
+            predictedTotal,
+            actualTotal,
+            billDetails,
+            currencyCode,
+            currencySymbol
+        );
+
+        logger.debug(
+            {
                 month,
-                year
-            );
-
-            // Get currency info from first bill or use default
-            const currencyCode =
-                bills[0]?.attributes.currency_code ??
-                bills[0]?.attributes.primary_currency_code ??
-                'USD';
-            const currencySymbol =
-                bills[0]?.attributes.currency_symbol ??
-                bills[0]?.attributes.primary_currency_symbol ??
-                '$';
-
-            const result = BillComparisonDto.create(
+                year,
+                billCount: bills.length,
                 predictedTotal,
                 actualTotal,
-                billDetails,
-                currencyCode,
-                currencySymbol
-            );
+            },
+            'Bill comparison calculated successfully'
+        );
 
-            logger.debug(
-                {
-                    month,
-                    year,
-                    billCount: bills.length,
-                    predictedTotal,
-                    actualTotal,
-                },
-                'Bill comparison calculated successfully'
-            );
-
-            return Result.ok(result);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-
-            logger.error(
-                {
-                    month,
-                    year,
-                    operation,
-                    error: err.message,
-                    errorType: err.constructor.name,
-                },
-                'Failed to calculate bill comparison'
-            );
-
-            return Result.err(
-                BillErrorFactory.create(
-                    BillErrorType.CALCULATION_FAILED,
-                    month,
-                    year,
-                    operation,
-                    err
-                )
-            );
-        }
+        return Result.ok(result);
     }
 
     /**
