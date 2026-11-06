@@ -10,6 +10,7 @@ import { ILogger } from '../types/interface/logger.interface.js';
 import { logger as defaultLogger } from '../logger.js';
 import { Result } from '../types/result.type.js';
 import { MonthError, monthFailure } from '../types/error/month.error.js';
+import { assertValidMonth } from '../utils/date.utils.js';
 
 /** A month's transactions, each in the one bucket it is charged to */
 export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
@@ -28,6 +29,12 @@ export class CashFlowService {
     ) {}
 
     async getBuckets(month: number, year: number): Promise<Result<MonthBuckets, MonthError>> {
+        try {
+            assertValidMonth(month, year);
+        } catch (error) {
+            return monthFailure('INVALID_MONTH', { month, year }, error);
+        }
+
         let transactions: TransactionSplit[];
         try {
             transactions = await this.transactionService.getTransactionsForMonth(month, year);

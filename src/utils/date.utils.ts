@@ -24,16 +24,21 @@ export function localDay(date: Date): Day {
  * @throws Error when `month` is not 1–12 or `year` is not a four-digit year
  */
 export function monthRange(month: number, year: number): { start: Day; end: Day } {
+    assertValidMonth(month, year);
+    return {
+        start: formatDay(year, month, 1),
+        end: formatDay(year, month, daysInMonth(year, month)),
+    };
+}
+
+/** @throws Error when `month` is not 1–12 or `year` is not a four-digit year */
+export function assertValidMonth(month: number, year: number): void {
     if (!Number.isInteger(month) || month < 1 || month > 12) {
         throw new Error('Month must be an integer between 1 and 12');
     }
     if (!Number.isInteger(year) || year < 1900 || year > 9999) {
         throw new Error('Year must be a valid 4-digit year');
     }
-    return {
-        start: formatDay(year, month, 1),
-        end: formatDay(year, month, daysInMonth(year, month)),
-    };
 }
 
 export function shiftMonth(

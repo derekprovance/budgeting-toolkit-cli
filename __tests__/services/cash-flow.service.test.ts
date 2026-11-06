@@ -90,6 +90,19 @@ describe('CashFlowService', () => {
         );
     });
 
+    it('should report an impossible month as invalid, not as a failed fetch', async () => {
+        const service = build([]);
+
+        const result = await service.getBuckets(13, 2024);
+
+        expect(!result.ok && result.error).toMatchObject({
+            kind: 'INVALID_MONTH',
+            message: 'Invalid month 13/2024: Month must be an integer between 1 and 12',
+            userMessage: '13/2024 is not a month that can be reported on.',
+        });
+        expect(service.getTransactionsForMonth).not.toHaveBeenCalled();
+    });
+
     it('should report a failure to resolve the account scope as an error', async () => {
         const accountScope = createMockAccountScopeService();
         accountScope.getScope.mockRejectedValue(new Error('No income account'));

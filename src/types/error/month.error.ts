@@ -4,6 +4,7 @@ import { toError } from '../../utils/error-detection.utils.js';
 
 /** What could not be produced for a month */
 export type MonthErrorKind =
+    | 'INVALID_MONTH'
     | 'TRANSACTIONS_FETCH_FAILED'
     | 'BUCKETS_FAILED'
     | 'BILL_COMPARISON_FAILED'
@@ -25,6 +26,10 @@ const MESSAGES: Record<
     MonthErrorKind,
     (period: string) => { failed?: string; userMessage: string }
 > = {
+    INVALID_MONTH: period => ({
+        failed: `Invalid month ${period}`,
+        userMessage: `${period} is not a month that can be reported on.`,
+    }),
     TRANSACTIONS_FETCH_FAILED: period => ({
         userMessage: `Unable to retrieve transactions for ${period}. Please check your connection and try again.`,
     }),
