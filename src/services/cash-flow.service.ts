@@ -5,12 +5,21 @@ import {
     BUCKETS,
     ITransactionClassificationService,
 } from './core/transaction-classification.service.interface.js';
-import { BaseTransactionAnalysisService } from './core/base-transaction-analysis.service.js';
 import { AccountScopeService } from './core/account-scope.service.js';
 import { ILogger } from '../types/interface/logger.interface.js';
+import { logger as defaultLogger } from '../logger.js';
+import { Result } from '../types/result.type.js';
+import { DateUtils } from '../utils/date.utils.js';
+import {
+    TransactionAnalysisError,
+    TransactionAnalysisErrorFactory,
+    TransactionAnalysisErrorType,
+} from '../types/error/transaction-analysis.error.js';
 
 /** A month's transactions, each in the one bucket it is charged to */
 export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
+
+const OPERATION = 'getBuckets';
 
 /**
  * Sorts a month's transactions into buckets. Every figure `analyze` and
@@ -20,21 +29,50 @@ export type MonthBuckets = Record<Bucket, TransactionSplit[]>;
  * Transactions no bucket claims — anything outside the envelope, and transfers
  * inside or into it — are dropped here and appear nowhere (RULES.md).
  */
-export class CashFlowService extends BaseTransactionAnalysisService<MonthBuckets> {
+export class CashFlowService {
     constructor(
-        transactionService: ITransactionService,
-        transactionClassificationService: ITransactionClassificationService,
+        private readonly transactionService: ITransactionService,
+        private readonly transactionClassificationService: ITransactionClassificationService,
         private readonly accountScope: AccountScopeService,
-        logger?: ILogger
-    ) {
-        super(transactionService, transactionClassificationService, logger);
+        private readonly logger: ILogger = defaultLogger
+    ) {}
+
+    async getBuckets(
+        month: number,
+        year: number
+    ): Promise<Result<MonthBuckets, TransactionAnalysisError>> {
+        const dateValidation = DateUtils.validateMonthYearResult(
+            month,
+            year,
+            OPERATION,
+            (m, y, op, err) =>
+                TransactionAnalysisErrorFactory.create(
+                    TransactionAnalysisErrorType.INVALID_DATE,
+                    m,
+                    y,
+                    op,
+                    err
+                )
+        );
+        if (!dateValidation.ok) {
+            return Result.err(dateValidation.error);
+        }
+
+        let transactions: TransactionSplit[];
+        try {
+            transactions = await this.transactionService.getTransactionsForMonth(month, year);
+        } catch (error) {
+            return this.fail(TransactionAnalysisErrorType.FETCH_FAILED, month, year, error);
+        }
+
+        try {
+            return Result.ok(await this.sort(transactions));
+        } catch (error) {
+            return this.fail(TransactionAnalysisErrorType.CALCULATION_FAILED, month, year, error);
+        }
     }
 
-    getBuckets(month: number, year: number) {
-        return this.executeAnalysis(month, year);
-    }
-
-    protected async analyzeTransactions(transactions: TransactionSplit[]): Promise<MonthBuckets> {
+    private async sort(transactions: TransactionSplit[]): Promise<MonthBuckets> {
         const scope = await this.accountScope.getScope();
         const buckets = Object.fromEntries(BUCKETS.map(b => [b, []])) as unknown as MonthBuckets;
 
@@ -53,7 +91,25 @@ export class CashFlowService extends BaseTransactionAnalysisService<MonthBuckets
         return buckets;
     }
 
-    protected getOperationName(): string {
-        return 'getBuckets';
+    private fail(
+        type: TransactionAnalysisErrorType,
+        month: number,
+        year: number,
+        error: unknown
+    ): Result<MonthBuckets, TransactionAnalysisError> {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.logger.error(
+            {
+                month,
+                year,
+                operation: OPERATION,
+                error: err.message,
+                errorType: err.constructor.name,
+            },
+            `${OPERATION} failed`
+        );
+        return Result.err(
+            TransactionAnalysisErrorFactory.create(type, month, year, OPERATION, err)
+        );
     }
 }

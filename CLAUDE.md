@@ -207,7 +207,7 @@ Services are organized by role and all wired in `ServiceFactory.createServices(a
 - **AI Services** (`src/services/ai/`): Claude integration with structured prompts and transaction mapping.
 - **Display Services** (`src/services/display/`): CLI output formatting for reports, analysis, and status messages, plus the `--json` serializers.
 
-**Pattern:** `CashFlowService` extends `BaseTransactionAnalysisService`, which provides a template method: validate date range → fetch transactions → call `analyzeTransactions()` → return a `Result`.
+**Pattern:** `CashFlowService.getBuckets` fetches the month's transactions, classifies each into its bucket and returns a `Result`; a failed fetch or classification is a `Result` error, never a throw.
 
 **Configuration:** All services receive configuration via constructor injection (never load themselves). Configuration comes from `ConfigManager` singleton, with priority: YAML > environment variables > defaults.
 
