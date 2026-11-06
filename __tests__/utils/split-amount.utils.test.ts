@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+    assertSplitAmounts,
     parseSplitAmount,
     remainderAmount,
     validateSplitAmount,
@@ -56,6 +57,24 @@ describe('parseSplitAmount', () => {
     it('should throw the validation message for an invalid amount', () => {
         expect(() => parseSplitAmount('150', 100, '€')).toThrow(
             'Amount must be less than the original amount (€100)'
+        );
+    });
+});
+
+describe('assertSplitAmounts', () => {
+    it('should accept parts that sum to the original', () => {
+        expect(() => assertSplitAmounts(100, ['60.00', '40.00'], '$')).not.toThrow();
+    });
+
+    it('should refuse parts that do not sum to the original to the cent', () => {
+        expect(() => assertSplitAmounts(100, ['60.00', '39.99'], '$')).toThrow(
+            'Split amounts sum to $99.99, not the original $100.00'
+        );
+    });
+
+    it('should refuse a part that validateSplitAmount refuses', () => {
+        expect(() => assertSplitAmounts(100, ['100.00', '0.00'], '$')).toThrow(
+            'Amount must be less than the original amount ($100)'
         );
     });
 });

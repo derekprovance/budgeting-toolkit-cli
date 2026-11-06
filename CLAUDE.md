@@ -208,7 +208,7 @@ The CLI uses a command pattern with four main commands defined in `src/cli.ts`. 
     - Use `--force` (`-f`) to re-run AI on transactions that already have both category and budget
     - Use `--dry-run` (`-n`) to preview changes without applying
 
-4. **split** `<transaction-id>` (alias: `sp`) - Interactively splits a transaction into two parts. Preserves metadata (category, budget, tags) on the first split; leaves the second split uncategorized for manual assignment in Firefly III. Validates split amounts within 0.01 floating-point tolerance.
+4. **split** `<transaction-id>` (alias: `sp`) - Interactively splits a transaction into two parts. Preserves metadata (category, budget, tags) on the first split; leaves the second split uncategorized for manual assignment in Firefly III. Validates that the split amounts sum to the original to the cent.
 
 ### Service Layer Architecture
 
@@ -252,9 +252,10 @@ The `TransactionSplitService` provides functionality for splitting transactions 
 
 **Validation:**
 
-- Split amounts must sum to original amount within 0.01 epsilon (floating-point tolerance)
+- Split amounts must sum to the original amount to the cent (compared after rounding to cents, so float noise cannot pass or fail a split)
 - Each split must be at least 0.01; amounts limited to 2 decimal places
 - Transaction must not already be split (single-split transactions only)
+- The transaction is re-fetched just before the update, and the split refused if it is no longer the same single split with the same amount: a PUT deletes every split it does not list (V22)
 
 ### AI Integration
 

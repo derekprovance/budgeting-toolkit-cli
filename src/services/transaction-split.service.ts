@@ -8,6 +8,7 @@ import { FireflyClientWithCerts } from '../api/firefly-client-with-certs.js';
 import { logger as defaultLogger } from '../logger.js';
 import { ILogger } from '../types/interface/logger.interface.js';
 import { errorMessage } from '../utils/error-detection.utils.js';
+import { assertSplitAmounts, currencySymbolOf } from '../utils/split-amount.utils.js';
 
 export interface SplitData {
     amount: string;
@@ -47,20 +48,25 @@ export class TransactionSplitService {
     }
 
     /**
+     * Re-fetches the transaction first: a PUT deletes every split it does not
+     * list (V22), so a change made in Firefly since `originalSplit` was fetched
+     * must stop the split rather than be overwritten.
      * @param originalSplit Its only split, from getSingleSplit
      * @param parts The first part keeps the original's category, budget and
-     *   tags; the second is left for manual assignment. Their amounts must sum
-     *   to the original's: the first is checked by validateSplitAmount
-     *   (split-amount.utils) and the second is its remainderAmount
+     *   tags; the second is left for manual assignment
      * @returns The updated transaction
-     * @throws when Firefly rejects the update
+     * @throws when the transaction is no longer that single split, when the
+     *   parts are not amounts a split can take or do not sum to the original
+     *   to the cent, and when Firefly rejects the update
      */
     async splitTransaction(
         transactionId: string,
         originalSplit: TransactionSplit,
         parts: SplitParts
     ): Promise<TransactionRead> {
-        const updatePayload = this.createSplitPayload(originalSplit, parts);
+        const currentSplit = await this.getUnchangedSplit(transactionId, originalSplit);
+        this.assertPartsFit(transactionId, currentSplit, parts);
+        const updatePayload = this.createSplitPayload(currentSplit, parts);
 
         this.logger.debug(
             {
@@ -82,6 +88,42 @@ export class TransactionSplitService {
         );
 
         return updated;
+    }
+
+    private async getUnchangedSplit(
+        transactionId: string,
+        originalSplit: TransactionSplit
+    ): Promise<TransactionSplit> {
+        const currentSplit = await this.getSingleSplit(transactionId);
+        const isUnchanged =
+            currentSplit.transaction_journal_id === originalSplit.transaction_journal_id &&
+            parseFloat(currentSplit.amount) === parseFloat(originalSplit.amount);
+        if (!isUnchanged) {
+            throw new Error(
+                `Transaction ${transactionId} changed in Firefly since it was fetched ` +
+                    `(journal ${originalSplit.transaction_journal_id}, amount ${originalSplit.amount} ` +
+                    `is now journal ${currentSplit.transaction_journal_id}, amount ${currentSplit.amount}); nothing was split`
+            );
+        }
+        return currentSplit;
+    }
+
+    private assertPartsFit(
+        transactionId: string,
+        originalSplit: TransactionSplit,
+        parts: SplitParts
+    ): void {
+        try {
+            assertSplitAmounts(
+                parseFloat(originalSplit.amount),
+                [parts[0].amount, parts[1].amount],
+                currencySymbolOf(originalSplit)
+            );
+        } catch (error) {
+            throw new Error(`Cannot split transaction ${transactionId}: ${errorMessage(error)}`, {
+                cause: error,
+            });
+        }
     }
 
     private async fetchTransaction(transactionId: string): Promise<TransactionRead> {

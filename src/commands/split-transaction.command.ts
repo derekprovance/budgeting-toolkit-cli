@@ -5,8 +5,11 @@ import { Command } from '../types/interface/command.interface.js';
 import { TransactionSplitService, SplitParts } from '../services/transaction-split.service.js';
 import { SplitTransactionDisplayService } from '../services/display/split-transaction-display.service.js';
 import { UserInputService } from '../services/user-input.service.js';
-import { parseSplitAmount, remainderAmount } from '../utils/split-amount.utils.js';
-import { DEFAULT_CURRENCY } from '../utils/currency.utils.js';
+import {
+    currencySymbolOf,
+    parseSplitAmount,
+    remainderAmount,
+} from '../utils/split-amount.utils.js';
 
 interface SplitTransactionParams {
     transactionId: string;
@@ -123,10 +126,6 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             this.displayService.formatSuccess(transactionId, updated.attributes.transactions.length)
         );
     }
-}
-
-function currencySymbolOf(split: TransactionSplit): string {
-    return split.currency_symbol || DEFAULT_CURRENCY.symbol;
 }
 
 /** Rethrows for the CLI to print once. */

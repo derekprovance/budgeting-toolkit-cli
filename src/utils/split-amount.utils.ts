@@ -1,4 +1,5 @@
-import { CurrencyUtils } from './currency.utils.js';
+import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { CurrencyUtils, DEFAULT_CURRENCY } from './currency.utils.js';
 
 const SPLIT_AMOUNT_FORMAT = /^\d+(\.\d{1,2})?$/;
 const MIN_SPLIT_AMOUNT = 0.01;
@@ -52,4 +53,27 @@ export function parseSplitAmount(
         throw new Error(validation);
     }
     return parseFloat(value.trim());
+}
+
+/**
+ * @throws when either part is not an amount validateSplitAmount accepts, or
+ *   the parts do not sum to the original to the cent
+ */
+export function assertSplitAmounts(
+    originalAmount: number,
+    partAmounts: readonly [string, string],
+    currencySymbol: string
+): void {
+    const total = partAmounts
+        .map(amount => parseSplitAmount(amount, originalAmount, currencySymbol))
+        .reduce((sum, amount) => sum + amount, 0);
+    if (CurrencyUtils.toCents(total) !== CurrencyUtils.toCents(originalAmount)) {
+        throw new Error(
+            `Split amounts sum to ${CurrencyUtils.formatWithSymbol(total, currencySymbol)}, not the original ${CurrencyUtils.formatWithSymbol(originalAmount, currencySymbol)}`
+        );
+    }
+}
+
+export function currencySymbolOf(split: TransactionSplit): string {
+    return split.currency_symbol || DEFAULT_CURRENCY.symbol;
 }
