@@ -26,7 +26,7 @@ export const CONTRACT_PAGE_LIMIT = 10;
  * is NO server-side cap — limit=1000 is served as per_page 1000. The fake
  * server must not cap either.
  */
-export const PAGINATION_BEHAVIOR = { defaultLimit: 50, serverCap: null } as const;
+export const PAGINATION_BEHAVIOR = { defaultLimit: 50 } as const;
 
 /** A limit larger than any plausible cap, to prove there is none */
 export const UNCAPPED_PROBE_LIMIT = 1000;
