@@ -16,7 +16,8 @@ import { AppConfig } from './config/config.types.js';
 import { CategorizeMode } from './types/enums.js';
 import { CommandConfigError, requireCommandConfig } from './utils/command-config-validator.js';
 import { logger } from './logger.js';
-import { errorMessage } from './utils/error-detection.utils.js';
+import { errorMessage, isCertificateError } from './utils/error-detection.utils.js';
+import { CategorizeDisplayService } from './services/display/categorize-display.service.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -119,14 +120,18 @@ const requireArg = (value: string, name: string, usage: string, example: string)
 };
 
 const handleError = (error: unknown, operation: string): never => {
+    printError(error, operation);
+    process.exit(1);
+};
+
+const printError = (error: unknown, operation: string): void => {
     if (error instanceof CommandConfigError) {
         printCommandConfigError(error);
-        process.exit(1);
+        return;
     }
     logger.error({ err: error }, `Error ${operation}:`);
     // The structured log is silent by default; the user still needs to see why it failed
     console.error(`Error ${operation}: ${errorMessage(error)}`);
-    process.exit(1);
 };
 
 const printCommandConfigError = ({ command, guidance, docsHint }: CommandConfigError): void => {
@@ -303,7 +308,11 @@ Examples:
                     dryRun: options.dryRun,
                 });
             } catch (error) {
-                handleError(error, 'categorizing transactions');
+                printError(error, 'categorizing transactions');
+                if (isCertificateError(error)) {
+                    console.error(new CategorizeDisplayService().formatCertificateHelp());
+                }
+                process.exit(1);
             }
         });
 

@@ -115,17 +115,5 @@ describe('CategorizeCommand', () => {
             expect(printedErrors()).not.toContain('invalid x-api-key');
             expect(printed()).not.toContain('invalid x-api-key');
         });
-
-        it('adds certificate guidance once for a TLS error', async () => {
-            const error = Object.assign(new Error('certificate has expired'), {
-                code: 'CERT_HAS_EXPIRED',
-            });
-            updateTransactionsByTag.mockRejectedValue(error);
-
-            await expect(command.execute(params)).rejects.toBe(error);
-            expect(stderr).toHaveBeenCalledTimes(1);
-            expect(printedErrors()).toContain('This looks like a TLS/certificate error');
-            expect(printedErrors()).not.toContain('certificate has expired');
-        });
     });
 });

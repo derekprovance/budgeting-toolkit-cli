@@ -24,11 +24,12 @@ jest.unstable_mockModule('../src/config/config-manager.js', () => ({
 }));
 
 const mockCreateServices = jest.fn<(client: unknown, config?: AppConfig) => object>(() => ({}));
+const mockCreateOrchestrator = jest.fn<() => Promise<object>>();
 
 jest.unstable_mockModule('../src/factories/service.factory.js', () => ({
     ServiceFactory: {
         createServices: mockCreateServices,
-        createAITransactionUpdateOrchestrator: jest.fn(),
+        createAITransactionUpdateOrchestrator: mockCreateOrchestrator,
     },
 }));
 
@@ -353,6 +354,31 @@ describe('CLI', () => {
                 ],
                 ['See CONFIG.md for detailed AI configuration.'],
             ]);
+        });
+
+        it('should print the categorize failure before the certificate advice', async () => {
+            testConfig.api.claude.apiKey = 'sk-test';
+            mockCreateOrchestrator.mockResolvedValueOnce({
+                updateTransactionsByTag: async () => {
+                    throw Object.assign(new Error('certificate has expired'), {
+                        code: 'CERT_HAS_EXPIRED',
+                    });
+                },
+            });
+            const cli = createCli();
+
+            try {
+                await expect(
+                    cli.parseAsync(argv('categorize', 'Import-2025-06-23'))
+                ).rejects.toThrow('process.exit called');
+            } finally {
+                testConfig.api.claude.apiKey = '';
+            }
+            const printed = consoleErrorSpy.mock.calls.map(call => String(call[0]));
+            expect(processExitSpy).toHaveBeenCalledWith(1);
+            expect(printed).toHaveLength(2);
+            expect(printed[0]).toBe('Error categorizing transactions: certificate has expired');
+            expect(printed[1]).toContain('This looks like a TLS/certificate error');
         });
 
         it('should still exit 1 when a json-mode command fails', async () => {
