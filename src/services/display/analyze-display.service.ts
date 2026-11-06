@@ -131,7 +131,6 @@ export class AnalyzeDisplayService {
         // and draws are internal transfers between accounts they already hold,
         // so there is nothing to net off and no breakdown to print.
         if (data.disposableIncomeTransactions.length > 0) {
-            const count = data.disposableIncomeTransactions.length;
             // Net of refunds and NOT floored at zero. formatWithSymbol takes an
             // absolute value, so the number alone renders a refund-heavy month
             // identically to a spending one — the caption below carries the
@@ -143,7 +142,7 @@ export class AnalyzeDisplayService {
             lines.push(
                 `  ${chalk.bold('Disposable Income'.padEnd(28))} ` +
                     `${CurrencyUtils.formatWithSymbol(data.disposableIncome, data.currencySymbol)}` +
-                    `${chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)}`
+                    transactionCount(data.disposableIncomeTransactions.length)
             );
             lines.push(
                 chalk.dim(
@@ -236,8 +235,7 @@ export class AnalyzeDisplayService {
         }
 
         const count = data.disposableIncomeTransactions.length;
-        const countText =
-            count > 0 ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`) : '';
+        const countText = count > 0 ? transactionCount(count) : '';
         const amount = CurrencyUtils.formatWithSymbol(Math.abs(balance), data.currencySymbol);
 
         if (balance > 0) {
@@ -324,20 +322,11 @@ export class AnalyzeDisplayService {
     /**
      * Formats an income item with amount and count
      */
-    private formatIncomeItem(
-        label: string,
-        amount: number,
-        symbol: string,
-        count?: number
-    ): string {
+    private formatIncomeItem(label: string, amount: number, symbol: string, count: number): string {
         const formattedAmount = CurrencyUtils.formatWithSymbol(amount, symbol);
-        const countText =
-            count !== undefined
-                ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
-                : '';
         const icon = DisplayFormatterUtils.getStatusIcon(amount, true);
 
-        return `  ${chalk.bold(label.padEnd(28))} ${chalk.green(formattedAmount)} ${icon}${countText}`;
+        return `  ${chalk.bold(label.padEnd(28))} ${chalk.green(formattedAmount)} ${icon}${transactionCount(count)}`;
     }
 
     /**
@@ -347,17 +336,13 @@ export class AnalyzeDisplayService {
         label: string,
         amount: number,
         symbol: string,
-        count?: number
+        count: number
     ): string {
         // formatNetImpact already carries the status icon; appending another
         // renders every expense line as "-$300.00 ⚠ ⚠"
         const formattedAmount = DisplayFormatterUtils.formatNetImpact(-amount, symbol, true);
-        const countText =
-            count !== undefined
-                ? chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`)
-                : '';
 
-        return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount}${countText}`;
+        return `  ${chalk.bold(label.padEnd(28))} ${formattedAmount}${transactionCount(count)}`;
     }
 
     /**
@@ -410,4 +395,9 @@ export class AnalyzeDisplayService {
 
         return `    ${bill.name.substring(0, 30).padEnd(30)} ${DisplayFormatterUtils.padVisible(freqBadge, 15)} Predicted: ${CurrencyUtils.formatWithSymbol(bill.predicted, symbol)} | Actual: ${CurrencyUtils.formatWithSymbol(bill.actual, symbol)} ${trailer}`;
     }
+}
+
+/** The dimmed " [N transactions]" suffix after a total */
+function transactionCount(count: number): string {
+    return chalk.dim(` [${count} transaction${count !== 1 ? 's' : ''}]`);
 }
