@@ -109,14 +109,31 @@ describe('ExcludedTransactionService', () => {
                 true
             );
         });
+    });
 
-        it('should not match when the RULE amount is unparseable', () => {
-            const badRule = new ExcludedTransactionService(
-                [{ description: 'Broken Rule', amount: 'not-an-amount' }],
-                mockLogger
+    describe('refusing a rule that would exclude unrelated transactions', () => {
+        it('[R-EXCL-1] should refuse an amount-only rule', () => {
+            const amountOnly = { amount: '10.00' } as unknown as ExcludedTransaction;
+
+            expect(() => new ExcludedTransactionService([amountOnly], mockLogger)).toThrow(
+                'Excluded transaction 0 has no description'
             );
+        });
 
-            expect(badRule.isExcludedTransaction('Broken Rule', '100.00')).toBe(false);
+        it('[R-EXCL-1] should refuse an empty description', () => {
+            expect(
+                () => new ExcludedTransactionService([{ description: '  ' }], mockLogger)
+            ).toThrow('Excluded transaction 0 has no description');
+        });
+
+        it('[R-EXCL-1] should refuse an unparseable rule amount', () => {
+            expect(
+                () =>
+                    new ExcludedTransactionService(
+                        [{ description: 'Broken Rule', amount: 'not-an-amount' }],
+                        mockLogger
+                    )
+            ).toThrow('Excluded transaction 0 has an invalid amount: not-an-amount');
         });
     });
 });

@@ -14,8 +14,8 @@ interface ExclusionRule {
 }
 
 /**
- * See `ExcludedTransaction` for how a rule matches. `ConfigValidator` rejects a
- * rule without a description or with an unparseable amount before it gets here.
+ * See `ExcludedTransaction` for how a rule matches. `ConfigValidator` reports a
+ * bad rule at startup; the constructor refuses one regardless.
  */
 export class ExcludedTransactionService implements IExcludedTransactionService {
     private readonly rules: readonly ExclusionRule[];
@@ -50,12 +50,21 @@ export class ExcludedTransactionService implements IExcludedTransactionService {
  * The configured amount is parsed the same way as the transaction's, so a
  * currency-formatted rule ("$1,200.00") cannot silently mean something other
  * than it reads.
+ * @throws when the rule has no description (it would drop every transaction of
+ *   that amount, or every one without a description) or an unparseable amount
  */
-function toRule({ description, amount }: ExcludedTransaction): ExclusionRule {
+function toRule({ description, amount }: ExcludedTransaction, index: number): ExclusionRule {
+    if (typeof description !== 'string' || !description.trim()) {
+        throw new Error(
+            `Excluded transaction ${index} has no description; a rule without one would exclude unrelated transactions`
+        );
+    }
+    const parsedAmount = amount ? TransactionCalculationUtils.parseAmount(amount) : undefined;
+    if (amount && parsedAmount === undefined) {
+        throw new Error(`Excluded transaction ${index} has an invalid amount: ${amount}`);
+    }
     return {
         description: StringUtils.normalizeForMatching(description),
-        amount: amount
-            ? Math.abs(TransactionCalculationUtils.parseAmount(amount) ?? NaN)
-            : undefined,
+        amount: parsedAmount === undefined ? undefined : Math.abs(parsedAmount),
     };
 }
