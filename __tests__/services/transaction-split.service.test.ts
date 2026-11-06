@@ -410,23 +410,6 @@ describe('TransactionSplitService', () => {
         });
 
         describe('description handling', () => {
-            it('should use original description when no custom text', async () => {
-                const mockTransaction = createMockTransaction();
-                mockClient.transactions.updateTransaction.mockResolvedValue({
-                    data: mockTransaction,
-                });
-
-                await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' }, // No description
-                    { amount: '40.00' }, // No description
-                ]);
-
-                const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
-                const payload = updateCall[1];
-                expect(sentSplits(payload)[0].description).toBe('Test Transaction');
-                expect(sentSplits(payload)[1].description).toBe('Test Transaction');
-            });
-
             it('should use custom description when provided', async () => {
                 const mockTransaction = createMockTransaction();
                 mockClient.transactions.updateTransaction.mockResolvedValue({
@@ -451,8 +434,8 @@ describe('TransactionSplitService', () => {
                 });
 
                 await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '40.00' },
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
                 ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
@@ -469,8 +452,8 @@ describe('TransactionSplitService', () => {
                 });
 
                 await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '40.00' },
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
                 ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
@@ -485,8 +468,8 @@ describe('TransactionSplitService', () => {
                 });
 
                 await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '40.00' },
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
                 ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
@@ -501,8 +484,8 @@ describe('TransactionSplitService', () => {
                 });
 
                 await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '40.00' },
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
                 ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
@@ -517,8 +500,8 @@ describe('TransactionSplitService', () => {
                 });
 
                 await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '40.00' },
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
                 ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];
@@ -533,8 +516,8 @@ describe('TransactionSplitService', () => {
                 });
 
                 await service.splitTransaction('123', onlySplit(mockTransaction), [
-                    { amount: '60.00' },
-                    { amount: '40.00' },
+                    { amount: '60.00', description: 'Part 1' },
+                    { amount: '40.00', description: 'Part 2' },
                 ]);
 
                 const updateCall = mockClient.transactions.updateTransaction.mock.calls[0];

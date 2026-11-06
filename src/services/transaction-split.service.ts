@@ -14,7 +14,7 @@ import { errorMessage } from '../utils/error-detection.utils.js';
  */
 export interface SplitData {
     amount: string;
-    description?: string;
+    description: string;
 }
 
 /** The two parts a transaction is split into: the first keeps the original journal */
@@ -138,7 +138,7 @@ export class TransactionSplitService {
         const firstSplitUpdate: TransactionSplitUpdate = {
             transaction_journal_id: originalSplit.transaction_journal_id,
             amount: firstData.amount,
-            description: firstData.description || originalSplit.description,
+            description: firstData.description,
             // Copy tags from original transaction
             ...(originalSplit.tags && { tags: originalSplit.tags }),
             // Preserve category from original
@@ -153,7 +153,7 @@ export class TransactionSplitService {
             type: originalSplit.type,
             date: originalSplit.date,
             amount: secondData.amount,
-            description: secondData.description || originalSplit.description,
+            description: secondData.description,
 
             // Copy account information from original
             source_id: originalSplit.source_id,

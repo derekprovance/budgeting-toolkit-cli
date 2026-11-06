@@ -97,9 +97,9 @@ export class SplitTransactionCommand implements Command<void, SplitTransactionPa
             this.displayService.formatSplitPreview(
                 originalSplit.description, // Parent transaction title
                 firstSplitData.amount,
-                firstSplitData.description || originalSplit.description,
+                firstSplitData.description,
                 secondSplitData.amount,
-                secondSplitData.description || originalSplit.description,
+                secondSplitData.description,
                 currencySymbol
             )
         );
