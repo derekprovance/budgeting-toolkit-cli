@@ -42,7 +42,7 @@ export class BudgetAnalyticsService {
             // Get current month budget data
             const currentResult = await this.budgetReportService.getBudgetReport(month, year);
             if (!currentResult.ok) {
-                throw new Error(currentResult.error.message);
+                throw new Error(currentResult.error.message, { cause: currentResult.error });
             }
             const currentBudgets = currentResult.value;
 
@@ -165,7 +165,7 @@ export class BudgetAnalyticsService {
     private async getBuckets(month: number, year: number): Promise<MonthBuckets> {
         const result = await this.cashFlowService.getBuckets(month, year);
         if (!result.ok) {
-            throw new Error(result.error.message);
+            throw new Error(result.error.message, { cause: result.error });
         }
         return result.value;
     }

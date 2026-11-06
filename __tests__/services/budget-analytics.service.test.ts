@@ -110,6 +110,17 @@ describe('BudgetAnalyticsService', () => {
             await expect(service.getBudgetReport(1, 2024, 0)).rejects.toThrow('API error');
         });
 
+        it('should keep the failed result as the cause when bucketing fails', async () => {
+            transactionService.getTransactionsForMonth = jest
+                .fn<GetTransactions>()
+                .mockRejectedValue(new Error('Firefly down'));
+
+            await expect(service.getTopExpenses(1, 2024)).rejects.toMatchObject({
+                message: expect.stringContaining('Firefly down'),
+                cause: expect.objectContaining({ month: 1, year: 2024 }),
+            });
+        });
+
         it('should calculate percentage used correctly', async () => {
             const budgetWithData: BudgetReportDto = {
                 ...mockBudget,

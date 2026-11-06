@@ -49,7 +49,7 @@ export class BudgetReportService implements IBudgetReportService {
                 this.cashFlowService.getBuckets(month, year),
             ]);
             if (!buckets.ok) {
-                throw buckets.error;
+                return Result.err(buckets.error);
             }
 
             // The budget bucket and allocations analyze totals, split by

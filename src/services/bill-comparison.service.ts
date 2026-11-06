@@ -52,7 +52,7 @@ export class BillComparisonService implements IBillComparisonService {
             // envelope is not here: it shows as expected but not paid.
             const buckets = await this.cashFlowService.getBuckets(month, year);
             if (!buckets.ok) {
-                throw buckets.error;
+                return Result.err(buckets.error);
             }
             const billTransactions = buckets.value.bill;
 

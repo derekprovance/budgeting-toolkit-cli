@@ -550,9 +550,7 @@ describe('BillComparisonService', () => {
             const result = await billComparisonService.calculateBillComparison(10, 2024);
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.message).toContain(
-                    'Bill comparison calculation failed for calculateBillComparison on month 10'
-                );
+                expect(result.error.message).toContain('Transaction Error');
             }
         });
     });

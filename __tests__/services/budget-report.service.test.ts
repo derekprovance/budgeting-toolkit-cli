@@ -108,7 +108,7 @@ describe('BudgetReportService', () => {
             2025
         );
 
-        expect(result.ok).toBe(false);
+        expect(!result.ok && result.error.message).toBe('fetch failed');
     });
 
     it('should validate month and year', async () => {
