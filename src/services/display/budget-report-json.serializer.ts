@@ -1,24 +1,10 @@
-import { BudgetReportDto } from '../../types/dto/budget-report.dto.js';
-import { BillComparisonDto } from '../../types/dto/bill-comparison.dto.js';
-import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
+import { BudgetReportResult } from '../../types/dto/budget-report-result.dto.js';
 import { BudgetReportJson } from '../../types/dto/report-json.types.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js';
 
 const { toCents } = CurrencyUtils;
-
-/**
- * The parts of BudgetReportCommand's report data that the JSON contract
- * carries. The command's full result is a structural superset.
- */
-export interface BudgetReportSerializerInput {
-    budgets: BudgetReportDto[];
-    billComparison: BillComparisonDto;
-    unbudgeted: CategorizedUnbudgetedDto[];
-    month: number;
-    year: number;
-}
 
 /**
  * Builds the `report --json` document from what BudgetReportCommand computed.
@@ -29,7 +15,9 @@ export interface BudgetReportSerializerInput {
  * the two outputs cannot disagree. Money is rounded to cents and percentages
  * to two decimals.
  */
-export function serializeBudgetReport(data: BudgetReportSerializerInput): BudgetReportJson {
+export function serializeBudgetReport(
+    data: Pick<BudgetReportResult, 'budgets' | 'billComparison' | 'unbudgeted' | 'month' | 'year'>
+): BudgetReportJson {
     const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
     const totalAllocated = data.budgets.reduce((sum, b) => sum + b.amount, 0);
     const totalPercentage = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;

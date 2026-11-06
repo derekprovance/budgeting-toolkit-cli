@@ -11,27 +11,8 @@ import { TransactionService } from '../services/core/transaction.service.js';
 import { EmojiUtils } from '../utils/emoji.utils.js';
 import { CategorizedUnbudgetedDto } from '../types/dto/categorized-unbudgeted.dto.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
-import { BudgetReportDto } from '../types/dto/budget-report.dto.js';
-import { TopExpenseDto } from '../types/dto/top-expense.dto.js';
-import { BillComparisonDto } from '../types/dto/bill-comparison.dto.js';
-import { BudgetInsight } from '../types/dto/budget-insight.dto.js';
+import { BudgetReportResult } from '../types/dto/budget-report-result.dto.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
-
-/**
- * Everything BudgetReportCommand computed for one month — what the text
- * report and the JSON document are both built from.
- */
-export interface BudgetReportResult {
-    budgets: BudgetReportDto[];
-    topExpenses: TopExpenseDto[];
-    billComparison: BillComparisonDto;
-    unbudgeted: CategorizedUnbudgetedDto[];
-    insights: BudgetInsight[];
-    month: number;
-    year: number;
-    isCurrentMonth: boolean;
-    daysInfo?: { daysLeft: number; dataThrough?: Date };
-}
 
 /**
  * Command for displaying budget report with insights and categorized sections

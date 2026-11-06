@@ -9,29 +9,11 @@ import {
     isBillUpcoming,
 } from '../../types/dto/bill-comparison.dto.js';
 import { CategorizedUnbudgetedDto } from '../../types/dto/categorized-unbudgeted.dto.js';
+import { BudgetReportResult } from '../../types/dto/budget-report-result.dto.js';
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
-
-/**
- * Interface for report data
- */
-interface ReportData {
-    budgets: BudgetReportDto[];
-    topExpenses: TopExpenseDto[];
-    billComparison: BillComparisonDto;
-    unbudgeted: CategorizedUnbudgetedDto[];
-    insights: BudgetInsight[];
-    month: number;
-    year: number;
-    isCurrentMonth: boolean;
-    daysInfo?: {
-        daysLeft: number;
-        /** Date of the most recent imported transaction, if known */
-        dataThrough?: Date;
-    };
-}
 
 /**
  * Service for formatting budget reports with insights and visual sections
@@ -55,7 +37,7 @@ export class BudgetDisplayService {
      * @param verbose Whether to show detailed information
      * @returns Formatted report string
      */
-    formatReport(data: ReportData, verbose = false): string {
+    formatReport(data: BudgetReportResult, verbose = false): string {
         const sections: string[] = [];
 
         // Header
@@ -115,7 +97,7 @@ export class BudgetDisplayService {
     /**
      * Formats the overview section with summary and status
      */
-    private formatOverviewSection(data: ReportData): string {
+    private formatOverviewSection(data: BudgetReportResult): string {
         const totalSpent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
         const totalBudget = data.budgets.reduce((sum, b) => sum + b.amount, 0);
         const percentageUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
