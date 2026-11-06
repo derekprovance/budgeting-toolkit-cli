@@ -4,18 +4,9 @@ import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { SplitParts } from '../transaction-split.service.js';
 
-/**
- * Service for formatting split transaction display output
- */
 export class SplitTransactionDisplayService {
     constructor(private readonly baseUrl: string) {}
 
-    /**
-     * Formats the original transaction details for display
-     * @param transaction The original transaction split data
-     * @param transactionId The ID of the transaction
-     * @returns Formatted string showing transaction details with link
-     */
     formatOriginalTransaction(transaction: TransactionSplit, transactionId: string): string {
         const lines = [
             chalk.bold('\nOriginal Transaction:'),
@@ -47,11 +38,7 @@ export class SplitTransactionDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the split preview showing parent transaction and both child splits before confirmation
-     * @param parentDescription The parent transaction title (group_title)
-     * @returns Formatted preview showing parent and both child splits
-     */
+    /** @param parentDescription the parent transaction's group_title */
     formatSplitPreview(
         parentDescription: string,
         [first, second]: SplitParts,
@@ -75,12 +62,6 @@ export class SplitTransactionDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats success message after split operation
-     * @param transactionId The ID of the split transaction
-     * @param splitCount Number of splits created
-     * @returns Formatted success message with link to view transaction
-     */
     formatSuccess(transactionId: string, splitCount: number): string {
         return [
             `Created ${splitCount} splits from original transaction.`,
@@ -88,11 +69,6 @@ export class SplitTransactionDisplayService {
         ].join('\n');
     }
 
-    /**
-     * Formats the header for split operation
-     * @param transactionId The ID of the transaction being split
-     * @returns Formatted header banner
-     */
     formatHeader(transactionId: string): string {
         return [
             chalk.bold('\n' + '='.repeat(60)),
@@ -103,21 +79,12 @@ export class SplitTransactionDisplayService {
         ].join('\n');
     }
 
-    /**
-     * Formats calculated remainder for display
-     * @param amount The remainder amount for the second split
-     * @param currencySymbol Currency symbol to display
-     * @returns Formatted remainder message
-     */
     formatRemainder(amount: number, currencySymbol: string): string {
         return chalk.dim(
             `Remainder for second split: ${CurrencyUtils.formatWithSymbol(amount, currencySymbol)}`
         );
     }
 
-    /**
-     * Returns the transaction link
-     */
     private getTransactionLink(transactionId: string): string {
         return DisplayFormatterUtils.transactionUrl(this.baseUrl, transactionId);
     }

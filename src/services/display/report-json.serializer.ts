@@ -5,11 +5,8 @@ import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { TransactionCalculationUtils } from '../../utils/transaction-calculation.utils.js';
 
 /**
- * Serializes one transaction split for the JSON contract.
- *
- * The amount stays unsigned, exactly as Firefly returns it; direction is
- * `type`. `billId` falls back to `subscription_id`, matching how
- * TransactionClassificationService.isBill recognises a bill link.
+ * The amount stays unsigned, as Firefly returns it; direction is `type`.
+ * `billId` falls back to `subscription_id`, as `isBill` does.
  */
 export function toTransactionJson(transaction: TransactionSplit): TransactionJson {
     return {

@@ -17,10 +17,6 @@ import { CurrencyUtils } from '../../utils/currency.utils.js';
 import { EmojiUtils } from '../../utils/emoji.utils.js';
 import { budgetTotals } from './budget-totals.js';
 
-/**
- * Service for formatting budget reports with insights and visual sections
- * Provides comprehensive display of budget data with emoji indicators and categorized sections
- */
 export class BudgetDisplayService {
     private static readonly PROGRESS_BAR_WIDTH = 20;
     private static readonly NAME_COLUMN_WIDTH = 25;
@@ -30,19 +26,11 @@ export class BudgetDisplayService {
 
     constructor(private readonly baseUrl: string = '') {}
 
-    /**
-     * Formats the complete budget report
-     * @param data Report data with all sections
-     * @param verbose Whether to show detailed information
-     * @returns Formatted report string
-     */
     formatReport(data: BudgetReportResult, verbose: boolean): string {
         const sections: string[] = [];
 
-        // Header
         sections.push(this.formatOverviewSection(data));
 
-        // Budget sections by status
         const overBudgets = data.budgets.filter(b => b.status === 'over');
         const onTrackBudgets = data.budgets.filter(b => b.status !== 'over');
 
@@ -66,36 +54,28 @@ export class BudgetDisplayService {
             );
         }
 
-        // Top expenses
         if (data.topExpenses.length > 0) {
             sections.push(this.formatTopExpensesSection(data.topExpenses));
         }
 
-        // Bills section
         sections.push(this.formatBillsSection(data.billComparison, verbose));
 
-        // Unbudgeted expenses — spending the cash-flow net charges to the
-        // unbudgeted bucket, the same definition the analyze command uses
+        // The same unbudgeted bucket the analyze net charges
         if (data.unbudgeted.length > 0) {
             sections.push(
                 this.formatUnbudgetedSection(data.unbudgeted, data.billComparison.currencySymbol)
             );
         }
 
-        // Insights
         if (data.insights.length > 0) {
             sections.push(this.formatInsightsSection(data.insights));
         }
 
-        // Footer
         sections.push(this.formatFooterTip());
 
         return sections.join('\n');
     }
 
-    /**
-     * Formats the overview section with summary and status
-     */
     private formatOverviewSection(data: BudgetReportResult): string {
         const {
             spent: totalSpent,
@@ -110,7 +90,6 @@ export class BudgetDisplayService {
 
         const lines: string[] = [header, ''];
 
-        // Total spent line
         const spentFormatted = CurrencyUtils.formatWithSymbol(
             totalSpent,
             data.billComparison.currencySymbol
@@ -121,7 +100,6 @@ export class BudgetDisplayService {
         );
         lines.push(`${chalk.bold('Total Spent:')}      ${spentFormatted} / ${budgetFormatted}`);
 
-        // Status line
         if (isOverBudget) {
             const overAmount = totalSpent - totalBudget;
             const overFormatted = CurrencyUtils.formatWithSymbol(
@@ -161,9 +139,6 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the attention needed section (over-budget items)
-     */
     private formatAttentionNeededSection(
         budgets: BudgetReportDto[],
         currencySymbol: string,
@@ -178,9 +153,6 @@ export class BudgetDisplayService {
         });
     }
 
-    /**
-     * Formats the on-track section (under-budget items)
-     */
     private formatOnTrackSection(
         budgets: BudgetReportDto[],
         currencySymbol: string,
@@ -198,10 +170,6 @@ export class BudgetDisplayService {
         });
     }
 
-    /**
-     * Shared method for formatting budget sections (Attention Needed and On Track)
-     * Reduces code duplication between the two methods
-     */
     private formatBudgetSectionWithConfig(
         budgets: BudgetReportDto[],
         currencySymbol: string,
@@ -218,10 +186,8 @@ export class BudgetDisplayService {
         lines.push(DisplayFormatterUtils.createSectionHeader(config.sectionTitle));
         lines.push('');
 
-        // Sort by percentage descending (worst first)
         const sorted = [...budgets].sort((a, b) => b.percentageUsed - a.percentageUsed);
 
-        // Display all budget lines
         sorted.forEach(budget => {
             const spentFormatted = CurrencyUtils.formatWithSymbol(budget.spent, currencySymbol);
             const budgetFormatted = CurrencyUtils.formatWithSymbol(budget.amount, currencySymbol);
@@ -255,9 +221,6 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the top expenses section
-     */
     private formatTopExpensesSection(expenses: TopExpenseDto[]): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('TOP EXPENSES'));
@@ -299,14 +262,10 @@ export class BudgetDisplayService {
         ]);
     }
 
-    /**
-     * Formats budget statistics for verbose output
-     */
     private formatBudgetStatistics(budget: BudgetReportDto, currencySymbol: string): string {
         const lines: string[] = [];
-        const indent = '  '; // 2 spaces for indentation
+        const indent = '  ';
 
-        // Top Merchant (if available)
         if (budget.transactionStats.topMerchant) {
             const { name, totalSpent, visitCount } = budget.transactionStats.topMerchant;
             const totalFormatted = CurrencyUtils.formatWithSymbol(totalSpent, currencySymbol);
@@ -316,7 +275,6 @@ export class BudgetDisplayService {
             );
         }
 
-        // Historical Comparison (always available)
         const averageSpentFormatted = CurrencyUtils.formatWithSymbol(
             budget.historicalComparison.averageSpent,
             currencySymbol
@@ -326,9 +284,6 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the bills and recurring section
-     */
     private formatBillsSection(billComparison: BillComparisonDto, verbose: boolean): string {
         const symbol = billComparison.currencySymbol;
         const billsToShow = verbose ? billComparison.bills : getTopBills(billComparison);
@@ -392,9 +347,8 @@ export class BudgetDisplayService {
         if (!isBillUpcoming(bill)) {
             return this.formatJudgedBillRow(bill, symbol);
         }
-        // A bill that has not come around yet is not "under budget": it is
-        // simply unpaid, and rendering it green beside genuinely cheap bills
-        // invites the reader to bank money they still owe
+        // A bill not yet due is unpaid, not under budget; green would invite
+        // the reader to bank money they still owe
         const upcoming = CurrencyUtils.formatWithSymbol(bill.upcomingAmount ?? 0, symbol);
         const predicted = CurrencyUtils.formatWithSymbol(bill.predicted, symbol);
         return this.billRow(
@@ -455,11 +409,7 @@ export class BudgetDisplayService {
         return `${row.emoji} ${name} ${actual}  ${row.trailer}`;
     }
 
-    /**
-     * Formats a description with truncation and optional hyperlink
-     * Truncates to DESCRIPTION_MAX_LENGTH without ellipsis
-     * Wraps with OSC 8 hyperlink if baseUrl and transactionId are available
-     */
+    /** An OSC 8 hyperlink when baseUrl and transactionId are both set */
     private formatDescription(description: string, transactionId: string | undefined): string {
         const truncated = DisplayFormatterUtils.fitWidth(
             description,
@@ -468,9 +418,6 @@ export class BudgetDisplayService {
         return DisplayFormatterUtils.linkedText(truncated, this.baseUrl, transactionId);
     }
 
-    /**
-     * Formats the unbudgeted expenses section
-     */
     private formatUnbudgetedSection(
         unbudgeted: TransactionSplit[],
         currencySymbol: string
@@ -515,9 +462,6 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the insights section
-     */
     private formatInsightsSection(insights: BudgetInsight[]): string {
         const lines: string[] = [];
         lines.push(DisplayFormatterUtils.createSectionHeader('INSIGHTS'));
@@ -533,9 +477,6 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the footer tip
-     */
     private formatFooterTip(): string {
         const lines: string[] = [];
         lines.push(
@@ -554,9 +495,6 @@ export class BudgetDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Creates a progress bar
-     */
     private createProgressBar(percentage: number): string {
         // Clamped both ways: refunds can push a budget below 0%
         const filled = Math.max(

@@ -7,15 +7,9 @@ import { BillDetailDto, isBillUpcoming } from '../../types/dto/bill-comparison.d
 import { DisplayFormatterUtils } from '../../utils/display-formatter.utils.js';
 import { DisposablePoolDirection, disposablePoolAction } from './disposable-pool-action.js';
 
-/**
- * Service for formatting and displaying comprehensive budget analysis information
- */
 export class AnalyzeDisplayService {
     constructor(private transactionClassificationService: ITransactionClassificationService) {}
 
-    /**
-     * Formats the complete analysis report with all sections
-     */
     formatAnalysisReport(data: AnalyzeReportDto, verbose: boolean = false): string {
         const sections = [
             DisplayFormatterUtils.createBoxHeader(
@@ -31,16 +25,10 @@ export class AnalyzeDisplayService {
         return sections.join('\n');
     }
 
-    /**
-     * Formats the month header
-     */
     private formatMonthHeader(month: number, year: number): string {
         return chalk.bold(DisplayFormatterUtils.formatMonthYear(month, year));
     }
 
-    /**
-     * Formats the income sources section
-     */
     private formatIncomeSection(data: AnalyzeReportDto, verbose: boolean): string {
         const lines = [
             '',
@@ -64,9 +52,6 @@ export class AnalyzeDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the expenses and spending section
-     */
     private formatExpensesSection(data: AnalyzeReportDto, verbose: boolean): string {
         return [
             '',
@@ -128,20 +113,16 @@ export class AnalyzeDisplayService {
     }
 
     /**
-     * Listed for visibility, but deliberately NOT styled as a deduction: these
-     * purchases are charged to the disposable pool, not to the envelope, so
-     * they never reach netImpact (R-DISP-1). The amount the owner still owes
-     * themselves is stated in the summary instead.
+     * Not styled as a deduction: these purchases are charged to the disposable
+     * pool, not the envelope, so they never reach netImpact (R-DISP-1).
      */
     private formatDisposableIncomeLines(data: AnalyzeReportDto, verbose: boolean): string[] {
         const transactions = data.disposableIncomeTransactions;
         if (transactions.length === 0) {
             return [];
         }
-        // Net of refunds and NOT floored at zero. formatWithSymbol takes an
-        // absolute value, so the number alone renders a refund-heavy month
-        // identically to a spending one — the caption below carries the
-        // direction instead.
+        // Not floored at zero, and formatWithSymbol drops the sign, so the
+        // caption below carries the direction
         const isReimbursement = disposablePoolAction(data.disposableIncome)?.direction !== 'toPool';
         const lines = [
             '',
@@ -164,13 +145,9 @@ export class AnalyzeDisplayService {
         return lines;
     }
 
-    /**
-     * Formats the paycheck analysis section
-     */
     private formatPaycheckSection(data: AnalyzeReportDto): string {
         const lines = ['', DisplayFormatterUtils.createSectionHeader('PAYCHECK ANALYSIS'), ''];
 
-        // Use actual values from DTO
         lines.push(
             `  Expected:     ${CurrencyUtils.formatWithSymbol(data.expectedMonthlyPaycheck, data.currencySymbol)}`
         );
@@ -184,9 +161,6 @@ export class AnalyzeDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats the financial summary section
-     */
     private formatSummarySection(data: AnalyzeReportDto): string {
         const lines = [
             '',
@@ -200,10 +174,8 @@ export class AnalyzeDisplayService {
             `    ${DisplayFormatterUtils.getStatusIcon(-data.unbudgetedExpenseTotal, true)} ${'Unbudgeted Expenses:'.padEnd(30)} ${DisplayFormatterUtils.formatSignedAmount(-data.unbudgetedExpenseTotal, data.currencySymbol, true)}`,
         ];
 
-        // Disposable spending is deliberately absent from this column. It is
-        // charged to the pool rather than the envelope, so netImpact does not
-        // subtract it — listing it here would stop the column summing to the
-        // total. It is stated below the net as an action instead.
+        // Disposable spending is absent: netImpact does not subtract it
+        // (R-DISP-1), so listing it would stop the column summing to the total
 
         lines.push(`    ${chalk.dim('────────────────────────────────────')}`);
 
@@ -219,14 +191,9 @@ export class AnalyzeDisplayService {
     }
 
     /**
-     * States what the owner still owes themselves out of the disposable pool.
-     *
-     * This is an action, not an adjustment: the amount is outside netImpact by
-     * design, so it is printed below the rule rather than in the column above.
-     *
-     * `disposableIncome` is a net figure that is NOT floored at zero — a month
-     * whose refunds exceed its tagged spending reports a negative balance — so
-     * all three signs are handled rather than assuming a positive amount.
+     * What the owner still owes themselves out of the disposable pool, printed
+     * below the net because it is outside netImpact. `disposableIncome` is not
+     * floored at zero, so it can be owed in either direction.
      */
     private formatDisposableAction(data: AnalyzeReportDto): string[] {
         const action = disposablePoolAction(data.disposableIncome);
@@ -246,13 +213,9 @@ export class AnalyzeDisplayService {
         ];
     }
 
-    /**
-     * Formats actionable recommendations based on the data
-     */
     private formatRecommendations(data: AnalyzeReportDto): string {
         const lines = ['', DisplayFormatterUtils.createSectionHeader('RECOMMENDATIONS'), ''];
 
-        // Main recommendation based on net impact
         if (data.netImpact > 500) {
             lines.push(
                 chalk.green('  ✓ Strong Position:') + chalk.white(' Maintain current approach'),
@@ -274,7 +237,6 @@ export class AnalyzeDisplayService {
             );
         }
 
-        // Bill analysis recommendations
         if (data.billComparison.variance > 100) {
             const overBudgetBills = data.billComparison.bills.filter(
                 b => b.actual > b.predicted
@@ -289,7 +251,6 @@ export class AnalyzeDisplayService {
             }
         }
 
-        // Budget surplus recommendations
         if (data.budgetSurplus < 0) {
             lines.push(
                 '',
@@ -303,9 +264,6 @@ export class AnalyzeDisplayService {
         return lines.join('\n');
     }
 
-    /**
-     * Formats an income item with amount and count
-     */
     private formatIncomeItem(label: string, amount: number, symbol: string, count: number): string {
         const formattedAmount = CurrencyUtils.formatWithSymbol(amount, symbol);
         const icon = DisplayFormatterUtils.getStatusIcon(amount, true);
@@ -313,9 +271,6 @@ export class AnalyzeDisplayService {
         return `  ${chalk.bold(label.padEnd(28))} ${chalk.green(formattedAmount)} ${icon}${transactionCount(count)}`;
     }
 
-    /**
-     * Formats an expense item with amount and count
-     */
     private formatExpenseItem(
         label: string,
         amount: number,
@@ -343,9 +298,6 @@ export class AnalyzeDisplayService {
         return `    ${typeLabel} ${DisplayFormatterUtils.fitWidth(description, 40)} ${amount} ${date}`;
     }
 
-    /**
-     * Gets transaction type label for display
-     */
     private getTransactionTypeLabel(transaction: TransactionSplit): string {
         if (this.transactionClassificationService.isBill(transaction)) {
             return chalk.dim('[BILL]');
@@ -359,9 +311,6 @@ export class AnalyzeDisplayService {
         return chalk.dim('[OTHER]');
     }
 
-    /**
-     * Formats a bill detail for verbose mode
-     */
     private formatBillDetail(bill: BillDetailDto, symbol: string): string {
         const isUpcoming = isBillUpcoming(bill);
         const variance = bill.actual - bill.predicted;
@@ -372,7 +321,6 @@ export class AnalyzeDisplayService {
             ? chalk.dim(`(due ${DisplayFormatterUtils.formatShortDate(bill.dueDate)})`)
             : `(${DisplayFormatterUtils.formatSignedAmount(variance, symbol, false)})`;
 
-        // Format frequency with capitalization
         const freq = bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1);
         const freqBadge = chalk.dim(`[${freq}]`);
 

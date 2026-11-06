@@ -8,12 +8,9 @@ import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js
 const { toCents } = CurrencyUtils;
 
 /**
- * Builds the `report --json` document from what BudgetReportCommand computed.
- *
- * Per-budget figures are read straight off the DTOs. The totals come from
- * `budgetTotals` and `calculateNetSpend`, as in BudgetDisplayService, so the
- * two outputs cannot disagree. Money is rounded to cents and percentages to
- * two decimals.
+ * Totals come from `budgetTotals` and `calculateNetSpend`, as in
+ * BudgetDisplayService, so the text and JSON reports cannot disagree. Money is
+ * rounded to cents and percentages to two decimals.
  */
 export function serializeBudgetReport(
     data: Pick<BudgetReportResult, 'budgets' | 'billComparison' | 'unbudgeted' | 'month' | 'year'>

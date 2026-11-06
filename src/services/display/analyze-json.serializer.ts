@@ -6,12 +6,7 @@ import { toBillTotalsJson, toTransactionJson } from './report-json.serializer.js
 
 const { toCents } = CurrencyUtils;
 
-/**
- * Builds the `analyze --json` document from the report DTO.
- *
- * Every number is read straight off the DTO and only rounded to cents here —
- * nothing is recomputed, so the JSON and the text report cannot disagree.
- */
+/** Numbers are only rounded to cents, never recomputed, so JSON and text cannot disagree */
 export function serializeAnalyzeReport(report: AnalyzeReportDto): AnalyzeReportJson {
     return {
         schemaVersion: 2,
