@@ -11,7 +11,6 @@ export enum CategorizeStatus {
     NO_TAG,
     EMPTY_TAG,
     HAS_RESULTS,
-    PROCESSING_FAILED,
 }
 
 /** What `categorize --mode` asks suggestions for; the values are the CLI's */

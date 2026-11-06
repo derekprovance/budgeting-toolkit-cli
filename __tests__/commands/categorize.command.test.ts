@@ -1,9 +1,11 @@
 import { CategorizeCommand } from '../../src/commands/categorize.command.js';
 import { AITransactionUpdateOrchestrator } from '../../src/services/ai-transaction-update-orchestrator.service.js';
-import { CategorizeDisplayService } from '../../src/services/display/categorize-display.service.js';
-import { jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { CategorizeMode, CategorizeStatus } from '../../src/types/enums.js';
 import { TransactionValidationError } from '../../src/types/result.type.js';
+import { CategorizeStatusDto } from '../../src/types/dto/categorize-status.dto.js';
+
+// chalk is not mocked: FORCE_COLOR=0 (__tests__/setup/env.ts) keeps output plain.
 
 const transactionError = (description: string): TransactionValidationError => ({
     field: 'category',
@@ -14,207 +16,113 @@ const transactionError = (description: string): TransactionValidationError => ({
 });
 
 describe('CategorizeCommand', () => {
+    let updateTransactionsByTag: jest.Mock<
+        AITransactionUpdateOrchestrator['updateTransactionsByTag']
+    >;
     let command: CategorizeCommand;
-    let mockAIOrchestrator: jest.Mocked<AITransactionUpdateOrchestrator>;
-    let mockDisplayService: jest.Mocked<CategorizeDisplayService>;
+    let stdout: jest.Spied<typeof console.log>;
+    let stderr: jest.Spied<typeof console.error>;
+
+    const params = { tag: 'test-tag', updateMode: CategorizeMode.Both };
+    const printed = () => stdout.mock.calls.map(call => String(call[0])).join('\n');
+    const printedErrors = () => stderr.mock.calls.map(call => String(call[0])).join('\n');
+    const given = (status: CategorizeStatusDto) =>
+        updateTransactionsByTag.mockResolvedValue(status);
 
     beforeEach(() => {
-        mockAIOrchestrator = {
-            updateTransactionsByTag: jest.fn(),
-        } as unknown as jest.Mocked<AITransactionUpdateOrchestrator>;
-
-        mockDisplayService = {
-            formatProcessingHeader: jest.fn().mockReturnValue('Processing header'),
-            formatTagNotFound: jest.fn().mockReturnValue('Tag not found'),
-            formatEmptyTag: jest.fn().mockReturnValue('Empty tag'),
-            formatError: jest.fn().mockReturnValue('Error'),
-        } as unknown as jest.Mocked<CategorizeDisplayService>;
-
-        jest.spyOn(CategorizeDisplayService.prototype, 'formatProcessingHeader').mockImplementation(
-            mockDisplayService.formatProcessingHeader
-        );
-        jest.spyOn(CategorizeDisplayService.prototype, 'formatTagNotFound').mockImplementation(
-            mockDisplayService.formatTagNotFound
-        );
-        jest.spyOn(CategorizeDisplayService.prototype, 'formatEmptyTag').mockImplementation(
-            mockDisplayService.formatEmptyTag
-        );
-        jest.spyOn(CategorizeDisplayService.prototype, 'formatError').mockImplementation(
-            mockDisplayService.formatError
-        );
-
-        command = new CategorizeCommand(mockAIOrchestrator);
+        updateTransactionsByTag =
+            jest.fn<AITransactionUpdateOrchestrator['updateTransactionsByTag']>();
+        command = new CategorizeCommand({
+            updateTransactionsByTag,
+        } as unknown as AITransactionUpdateOrchestrator);
+        stdout = jest.spyOn(console, 'log').mockImplementation(() => {});
+        stderr = jest.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     afterEach(() => {
-        jest.clearAllMocks();
+        jest.restoreAllMocks();
     });
 
-    describe('execute', () => {
-        it('should handle tag not found', async () => {
-            const params = {
-                tag: 'nonexistent-tag',
-                updateMode: CategorizeMode.Both,
-            };
+    it('prints the header for the mode and processes the tag', async () => {
+        given({ status: CategorizeStatus.HAS_RESULTS, transactionsUpdated: 0, errors: [] });
 
-            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
-                status: CategorizeStatus.NO_TAG,
-                transactionsUpdated: 0,
-                errors: [],
+        await command.execute(params);
+
+        expect(updateTransactionsByTag).toHaveBeenCalledWith('test-tag', CategorizeMode.Both);
+        expect(printed()).toContain(
+            'Processing transactions with tag "test-tag" for categories and budgets'
+        );
+    });
+
+    it('reports a tag that does not exist', async () => {
+        given({ status: CategorizeStatus.NO_TAG, transactionsUpdated: 0, errors: [] });
+
+        await command.execute(params);
+
+        expect(printed()).toContain('Tag "test-tag" not found');
+    });
+
+    it('reports a tag with nothing to process', async () => {
+        given({ status: CategorizeStatus.EMPTY_TAG, transactionsUpdated: 0, errors: [] });
+
+        await command.execute(params);
+
+        expect(printed()).toContain('No processable transactions found with tag "test-tag"');
+    });
+
+    it('reports how many transactions were updated', async () => {
+        given({ status: CategorizeStatus.HAS_RESULTS, transactionsUpdated: 5, errors: [] });
+
+        await command.execute(params);
+
+        expect(stdout).toHaveBeenCalledWith('\nUpdated 5 Transaction(s)!');
+        expect(stderr).not.toHaveBeenCalled();
+    });
+
+    it('marks a dry run', async () => {
+        given({ status: CategorizeStatus.HAS_RESULTS, transactionsUpdated: 3, errors: [] });
+
+        await command.execute({ ...params, dryRun: true });
+
+        expect(printed()).toContain('(Dry Run)');
+        expect(stdout).toHaveBeenCalledWith('\n[DRYRUN] Updated 3 Transaction(s)!');
+    });
+
+    it('lists the transactions that failed, once, on stderr', async () => {
+        given({
+            status: CategorizeStatus.HAS_RESULTS,
+            transactionsUpdated: 8,
+            errors: [transactionError('Coffee Bar'), transactionError('Gym')],
+        });
+
+        await command.execute(params);
+
+        expect(stdout).toHaveBeenCalledWith('\nUpdated 8 Transaction(s)!');
+        expect(stderr).toHaveBeenCalledTimes(1);
+        expect(printedErrors()).toContain('2 transaction(s) failed validation');
+        expect(printedErrors()).toContain('Coffee Bar');
+    });
+
+    describe('when the run fails', () => {
+        it('propagates the error without printing it, so the CLI reports it once', async () => {
+            const error = new Error('invalid x-api-key');
+            updateTransactionsByTag.mockRejectedValue(error);
+
+            await expect(command.execute(params)).rejects.toBe(error);
+            expect(printedErrors()).not.toContain('invalid x-api-key');
+            expect(printed()).not.toContain('invalid x-api-key');
+        });
+
+        it('adds certificate guidance once for a TLS error', async () => {
+            const error = Object.assign(new Error('certificate has expired'), {
+                code: 'CERT_HAS_EXPIRED',
             });
+            updateTransactionsByTag.mockRejectedValue(error);
 
-            await command.execute(params);
-
-            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode
-            );
-            expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode,
-                false
-            );
-            expect(mockDisplayService.formatTagNotFound).toHaveBeenCalledWith(params.tag);
-        });
-
-        it('should handle empty tag', async () => {
-            const params = {
-                tag: 'empty-tag',
-                updateMode: CategorizeMode.Both,
-            };
-
-            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue({
-                status: CategorizeStatus.EMPTY_TAG,
-                transactionsUpdated: 0,
-                errors: [],
-            });
-
-            await command.execute(params);
-
-            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode
-            );
-            expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode,
-                false
-            );
-            expect(mockDisplayService.formatEmptyTag).toHaveBeenCalledWith(params.tag);
-        });
-
-        it('should handle successful updates', async () => {
-            const params = {
-                tag: 'test-tag',
-                updateMode: CategorizeMode.Both,
-            };
-
-            const results = {
-                status: CategorizeStatus.HAS_RESULTS,
-                transactionsUpdated: 5,
-                errors: [],
-            };
-
-            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
-
-            // Mock console.log to verify output
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
-            await command.execute(params);
-
-            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode
-            );
-            expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode,
-                false
-            );
-            expect(consoleSpy).toHaveBeenCalledWith('\nUpdated 5 Transaction(s)!');
-
-            consoleSpy.mockRestore();
-        });
-
-        it('should handle dry run mode', async () => {
-            const params = {
-                tag: 'test-tag',
-                updateMode: CategorizeMode.Both,
-                dryRun: true,
-            };
-
-            const results = {
-                status: CategorizeStatus.HAS_RESULTS,
-                transactionsUpdated: 3,
-                errors: [],
-            };
-
-            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
-
-            // Mock console.log to verify output
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
-            await command.execute(params);
-
-            expect(mockAIOrchestrator.updateTransactionsByTag).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode
-            );
-            expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode,
-                true
-            );
-            expect(consoleSpy).toHaveBeenCalledWith('\n[DRYRUN] Updated 3 Transaction(s)!');
-
-            consoleSpy.mockRestore();
-        });
-
-        it('should handle errors', async () => {
-            const params = {
-                tag: 'test-tag',
-                updateMode: CategorizeMode.Both,
-            };
-
-            const error = new Error('Test error');
-            mockAIOrchestrator.updateTransactionsByTag.mockRejectedValue(error);
-
-            await expect(command.execute(params)).rejects.toThrow(error);
-            expect(mockDisplayService.formatProcessingHeader).toHaveBeenCalledWith(
-                params.tag,
-                params.updateMode,
-                false
-            );
-            expect(mockDisplayService.formatError).toHaveBeenCalledWith(error);
-        });
-
-        it('should display warning when some transactions fail to update', async () => {
-            const params = {
-                tag: 'test-tag',
-                updateMode: CategorizeMode.Both,
-            };
-
-            const results = {
-                status: CategorizeStatus.HAS_RESULTS,
-                transactionsUpdated: 8,
-                errors: [transactionError('a'), transactionError('b')],
-            };
-
-            mockAIOrchestrator.updateTransactionsByTag.mockResolvedValue(results);
-
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-            await command.execute(params);
-
-            expect(consoleSpy).toHaveBeenCalledWith('\nUpdated 8 Transaction(s)!');
-            expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-            expect(consoleErrorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('2 transaction(s) failed validation')
-            );
-
-            consoleSpy.mockRestore();
-            consoleErrorSpy.mockRestore();
+            await expect(command.execute(params)).rejects.toBe(error);
+            expect(stderr).toHaveBeenCalledTimes(1);
+            expect(printedErrors()).toContain('This looks like a TLS/certificate error');
+            expect(printedErrors()).not.toContain('certificate has expired');
         });
     });
 });

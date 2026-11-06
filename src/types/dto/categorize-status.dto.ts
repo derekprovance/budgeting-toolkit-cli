@@ -6,5 +6,4 @@ export interface CategorizeStatusDto {
     transactionsUpdated: number;
     /** One per transaction that failed validation or could not be updated */
     errors: TransactionValidationError[];
-    error?: string;
 }

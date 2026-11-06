@@ -15,7 +15,6 @@ import {
     PreparedUpdate,
 } from './interactive-transaction-updater.service.js';
 import { TransactionValidationError } from '../types/result.type.js';
-import { isCertificateError } from '../utils/error-detection.utils.js';
 import { TransactionHistoryService } from './transaction-history.service.js';
 import {
     CategorizeOptions,
@@ -48,105 +47,78 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         tag: string,
         updateMode: CategorizeMode
     ): Promise<CategorizeStatusDto> {
+        if (!(await this.transactionService.tagExists(tag))) {
+            logger.debug(
+                {
+                    tag,
+                    updateMode,
+                },
+                'Tag does not exist'
+            );
+            return { status: CategorizeStatus.NO_TAG, transactionsUpdated: 0, errors: [] };
+        }
+
+        const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
+
+        const transactions = unfilteredTransactions
+            .filter(t => this.validator.shouldProcessTransaction(t, this.options.force))
+            .filter(t => this.isUpdatable(t));
+
+        if (!transactions.length) {
+            logger.debug(
+                {
+                    tag,
+                    updateMode,
+                    totalTransactions: unfilteredTransactions.length,
+                    filteredTransactions: transactions.length,
+                },
+                'No valid transactions found for tag'
+            );
+            return { status: CategorizeStatus.EMPTY_TAG, transactionsUpdated: 0, errors: [] };
+        }
+
+        logger.debug(
+            {
+                tag,
+                updateMode,
+                totalTransactions: transactions.length,
+            },
+            'Processing transactions'
+        );
+
+        // Show spinner while history and the AI produce suggestions
+        const spinner = ora(
+            `Finding suggestions for ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}...`
+        ).start();
+
         try {
-            if (!(await this.transactionService.tagExists(tag))) {
-                logger.debug(
-                    {
-                        tag,
-                        updateMode,
-                    },
-                    'Tag does not exist'
-                );
-                return { status: CategorizeStatus.NO_TAG, transactionsUpdated: 0, errors: [] };
-            }
+            const suggestions = await this.suggest(transactions, updateMode);
 
-            const unfilteredTransactions = await this.transactionService.getTransactionsByTag(tag);
+            // Cleared without a summary: the prompts follow straight away
+            spinner.stop();
 
-            const transactions = unfilteredTransactions
-                .filter(t => this.validator.shouldProcessTransaction(t, this.options.force))
-                .filter(t => this.isUpdatable(t));
-
-            if (!transactions.length) {
-                logger.debug(
-                    {
-                        tag,
-                        updateMode,
-                        totalTransactions: unfilteredTransactions.length,
-                        filteredTransactions: transactions.length,
-                    },
-                    'No valid transactions found for tag'
-                );
-                return { status: CategorizeStatus.EMPTY_TAG, transactionsUpdated: 0, errors: [] };
-            }
+            const { updatedTransactions, errors } =
+                await this.updateTransactionsWithAIResults(suggestions);
 
             logger.debug(
                 {
                     tag,
                     updateMode,
                     totalTransactions: transactions.length,
+                    updatedTransactions: updatedTransactions.length,
+                    validationErrors: errors.length,
                 },
-                'Processing transactions'
-            );
-
-            // Show spinner while history and the AI produce suggestions
-            const spinner = ora(
-                `Finding suggestions for ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}...`
-            ).start();
-
-            try {
-                const suggestions = await this.suggest(transactions, updateMode);
-
-                // Cleared without a summary: the prompts follow straight away
-                spinner.stop();
-
-                const { updatedTransactions, errors } =
-                    await this.updateTransactionsWithAIResults(suggestions);
-
-                logger.debug(
-                    {
-                        tag,
-                        updateMode,
-                        totalTransactions: transactions.length,
-                        updatedTransactions: updatedTransactions.length,
-                        validationErrors: errors.length,
-                    },
-                    'Transaction update complete'
-                );
-
-                return {
-                    status: CategorizeStatus.HAS_RESULTS,
-                    transactionsUpdated: updatedTransactions.length,
-                    errors,
-                };
-            } catch (aiError) {
-                spinner.fail('AI processing failed');
-                throw aiError;
-            }
-        } catch (ex) {
-            // Re-throw certificate/network errors so the command layer can display
-            // actionable remediation guidance with the full error context
-            if (isCertificateError(ex)) {
-                throw ex;
-            }
-
-            logger.error(
-                {
-                    tag,
-                    updateMode,
-                    error: ex instanceof Error ? ex.message : 'Unknown error',
-                },
-                'Failed to update transactions'
+                'Transaction update complete'
             );
 
             return {
-                status: CategorizeStatus.PROCESSING_FAILED,
-                transactionsUpdated: 0,
-                errors: [],
-                error:
-                    ex instanceof Error
-                        ? ex.message
-                        : 'Unknown error occurred while processing transactions',
+                status: CategorizeStatus.HAS_RESULTS,
+                transactionsUpdated: updatedTransactions.length,
+                errors,
             };
+        } catch (aiError) {
+            spinner.fail('AI processing failed');
+            throw aiError;
         }
     }
 

@@ -285,13 +285,18 @@ describe('AITransactionUpdateOrchestrator', () => {
 
         it('fails the run when the AI layer hits a critical error', async () => {
             tagged = [incoming('1')];
-            assign.mockRejectedValue(new Error('invalid x-api-key'));
+            const error = new Error('invalid x-api-key');
+            assign.mockRejectedValue(error);
 
-            const result = await run();
-
-            expect(result.status).toBe(CategorizeStatus.PROCESSING_FAILED);
-            expect(result.error).toBe('invalid x-api-key');
+            await expect(run()).rejects.toBe(error);
             expect(mockUpdater.applyUpdate).not.toHaveBeenCalled();
+        });
+
+        it('fails the run when the transactions cannot be fetched', async () => {
+            const error = new Error('Firefly is down');
+            mockTransactionService.getTransactionsByTag.mockRejectedValue(error);
+
+            await expect(run()).rejects.toBe(error);
         });
     });
 
