@@ -78,8 +78,8 @@ export class TransactionClassificationService implements ITransactionClassificat
         return transaction.type === 'withdrawal';
     }
 
-    hasACategory(transaction: TransactionSplit): boolean {
-        return !(transaction.category_id === undefined || transaction.category_id === null);
+    hasCategory(transaction: TransactionSplit): boolean {
+        return transaction.category_id != null;
     }
 
     hasBudget(transaction: TransactionSplit): boolean {

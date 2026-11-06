@@ -92,20 +92,20 @@ describe('TransactionClassificationService', () => {
         });
     });
 
-    describe('hasACategory', () => {
+    describe('hasCategory', () => {
         it('should return true when transaction has category_id', () => {
             const transaction = { category_id: '123' } as TransactionSplit;
-            expect(service.hasACategory(transaction)).toBe(true);
+            expect(service.hasCategory(transaction)).toBe(true);
         });
 
         it('should return false when category_id is undefined', () => {
             const transaction = { category_id: undefined } as TransactionSplit;
-            expect(service.hasACategory(transaction)).toBe(false);
+            expect(service.hasCategory(transaction)).toBe(false);
         });
 
         it('should return false when category_id is null', () => {
             const transaction = { category_id: null } as TransactionSplit;
-            expect(service.hasACategory(transaction)).toBe(false);
+            expect(service.hasCategory(transaction)).toBe(false);
         });
     });
 
