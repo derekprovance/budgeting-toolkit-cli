@@ -9,9 +9,9 @@ import { TransactionService } from '../services/core/transaction.service.js';
 import { CashFlowService } from '../services/cash-flow.service.js';
 import { BillComparisonDto } from '../types/dto/bill-comparison.dto.js';
 import { BudgetReportResult } from '../types/dto/budget-report-result.dto.js';
-import { daysLeftInMonth } from '../utils/days-left.utils.js';
 import { serializeBudgetReport } from '../services/display/budget-report-json.serializer.js';
 import { ReportProgress } from './report-progress.js';
+import { daysLeftInMonth } from '../utils/date.utils.js';
 
 export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDateParams> {
     constructor(

@@ -1,4 +1,10 @@
-import { localDay, monthRange, shiftMonth, toDay } from '../../src/utils/date.utils.js';
+import {
+    daysLeftInMonth,
+    localDay,
+    monthRange,
+    shiftMonth,
+    toDay,
+} from '../../src/utils/date.utils.js';
 
 describe('monthRange', () => {
     it('[R-TIME-1] should bound a month by its first and last day', () => {
@@ -48,5 +54,25 @@ describe('shiftMonth', () => {
         expect(shiftMonth(1, 2024, -1)).toEqual({ month: 12, year: 2023 });
         expect(shiftMonth(11, 2024, 3)).toEqual({ month: 2, year: 2025 });
         expect(shiftMonth(3, 2024, -14)).toEqual({ month: 1, year: 2023 });
+    });
+});
+
+describe('daysLeftInMonth', () => {
+    it('should count today as a day still remaining', () => {
+        // 31 January, a 31-day month: today is still spendable
+        expect(daysLeftInMonth(1, 2024, new Date(2024, 0, 31))).toBe(1);
+    });
+
+    it('should count the whole month on the first', () => {
+        expect(daysLeftInMonth(1, 2024, new Date(2024, 0, 1))).toBe(31);
+    });
+
+    it('should include today mid-month', () => {
+        // 24th of a 31-day month leaves the 24th through the 31st
+        expect(daysLeftInMonth(1, 2024, new Date(2024, 0, 24))).toBe(8);
+    });
+
+    it('should handle a short month', () => {
+        expect(daysLeftInMonth(2, 2024, new Date(2024, 1, 29))).toBe(1);
     });
 });
