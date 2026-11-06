@@ -19,8 +19,8 @@ export type SuggestionSource = 'history' | 'ai';
 
 /** Names suggested for one transaction, and where each came from */
 export interface Suggestion {
-    transaction: JournaledTransaction;
-    category?: string;
-    budget?: string;
-    source: { category?: SuggestionSource; budget?: SuggestionSource };
+    readonly transaction: JournaledTransaction;
+    readonly category?: string;
+    readonly budget?: string;
+    readonly source: { readonly category?: SuggestionSource; readonly budget?: SuggestionSource };
 }

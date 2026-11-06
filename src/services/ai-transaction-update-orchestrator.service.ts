@@ -21,12 +21,16 @@ import {
     CategorizeOptions,
     JournaledTransaction,
     Suggestion,
+    SuggestionSource,
     hasJournalId,
 } from '../types/categorize.types.js';
 
-interface SuggestionCounts {
-    category: { history: number; ai: number };
-    budget: { history: number; ai: number };
+/** What one transaction needs once history has answered what it can */
+interface SuggestionPlan {
+    readonly transaction: JournaledTransaction;
+    /** History values that still name an existing category or budget */
+    readonly remembered: { readonly category?: string; readonly budget?: string };
+    readonly askAI: { readonly category: boolean; readonly budget: boolean };
 }
 
 interface TransactionError {
@@ -101,15 +105,13 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             ).start();
 
             try {
-                const aiResults = await this.getAIResultsForTransactions(transactions, updateMode);
+                const suggestions = await this.suggest(transactions, updateMode);
 
                 // Cleared without a summary: the prompts follow straight away
                 spinner.stop();
 
-                const { updatedTransactions, errors } = await this.updateTransactionsWithAIResults(
-                    transactions,
-                    aiResults
-                );
+                const { updatedTransactions, errors } =
+                    await this.updateTransactionsWithAIResults(suggestions);
 
                 // Display validation errors to user
                 if (errors.length > 0) {
@@ -192,117 +194,77 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
         }
     }
 
-    private async getAIResultsForTransactions(
+    /** Suggestions for `transactions`: from history where it can, else from the AI */
+    private async suggest(
         transactions: JournaledTransaction[],
         updateMode: CategorizeMode
-    ): Promise<Record<string, Suggestion>> {
-        const categoryNames =
-            updateMode !== CategorizeMode.Budget ? this.catalog.categoryNames() : undefined;
-        const budgetNames =
-            updateMode !== CategorizeMode.Category ? this.catalog.budgetNames() : undefined;
-
-        logger.debug(
-            {
-                updateMode,
-                transactionCount: transactions.length,
-                categoryCount: categoryNames?.length,
-                budgetCount: budgetNames?.length,
-            },
-            'Getting AI results for transactions'
-        );
-
-        // Group B: has category, no budget — budget assignment only
-        const budgetOnlySet = new Set(
-            this.options.force
-                ? []
-                : transactions.filter(t => this.validator.isBudgetOnlyCandidate(t))
-        );
-
+    ): Promise<Suggestion[]> {
         await this.loadHistory(transactions);
+        const plans = transactions.flatMap(t => this.plan(t, updateMode) ?? []);
+        const aiCategories = await this.askAI(
+            'category',
+            plans.filter(p => p.askAI.category).map(p => p.transaction)
+        );
+        const aiBudgets = await this.askAI(
+            'budget',
+            plans.filter(p => p.askAI.budget).map(p => p.transaction)
+        );
+        return plans.flatMap(
+            p =>
+                mergeSuggestion(p, aiCategories.get(p.transaction), aiBudgets.get(p.transaction)) ??
+                []
+        );
+    }
 
-        const results: Record<string, Suggestion> = {};
-        const counts: SuggestionCounts = {
-            category: { history: 0, ai: 0 },
-            budget: { history: 0, ai: 0 },
+    /** Which fields `transaction` needs, what history says, and what is left for the AI */
+    private plan(
+        transaction: JournaledTransaction,
+        updateMode: CategorizeMode
+    ): SuggestionPlan | undefined {
+        // A transaction that has a category but no budget keeps its category
+        // unless --force; category mode leaves it alone entirely
+        const wantsCategory =
+            updateMode !== CategorizeMode.Budget &&
+            (this.options.force || !this.validator.isBudgetOnlyCandidate(transaction));
+        // The validator's rule: never a deposit (Firefly drops the budget,
+        // VERIFICATION.md V8), a bill-linked or a disposable-income one
+        const wantsBudget =
+            updateMode !== CategorizeMode.Category && this.validator.shouldSetBudget(transaction);
+        if (!wantsCategory && !wantsBudget) {
+            return undefined;
+        }
+
+        // A history value is only used while it still names an existing
+        // category or budget; otherwise the field falls through to the AI
+        const remembered = this.history.suggest(transaction);
+        const category = wantsCategory
+            ? this.catalog.findCategory(remembered?.category)?.name
+            : undefined;
+        const budget = wantsBudget
+            ? this.catalog.findBudget(remembered?.budget)?.attributes.name
+            : undefined;
+        // A match that was deliberately left unbudgeted last time is the
+        // answer: keep it unbudgeted rather than asking the AI for one
+        const keptUnbudgeted = remembered?.budget === null;
+
+        return {
+            transaction,
+            remembered: { category, budget },
+            askAI: {
+                category: wantsCategory && !category,
+                budget: wantsBudget && !budget && !keptUnbudgeted,
+            },
         };
-        const needsCategory: JournaledTransaction[] = [];
-        const needsBudget: JournaledTransaction[] = [];
-
-        for (const t of transactions) {
-            // Group A gets every field the mode asks for. Group B keeps its
-            // category, and category mode leaves it alone entirely
-            const isBudgetOnly = budgetOnlySet.has(t);
-            const wantsCategory = !!categoryNames && !isBudgetOnly;
-            // The validator's rule: never a deposit (Firefly drops the budget,
-            // VERIFICATION.md V8), a bill-linked or a disposable-income one
-            const wantsBudget = !!budgetNames && this.validator.shouldSetBudget(t);
-            if (!wantsCategory && !wantsBudget) {
-                continue;
-            }
-
-            // A history value is only used while it still names an existing
-            // category or budget; otherwise the field falls through to the AI
-            const suggestion = this.history.suggest(t);
-            const category = wantsCategory
-                ? this.catalog.findCategory(suggestion?.category)?.name
-                : undefined;
-            const budget = wantsBudget
-                ? this.catalog.findBudget(suggestion?.budget)?.attributes.name
-                : undefined;
-            // A match that was deliberately left unbudgeted last time is the
-            // answer: keep it unbudgeted rather than asking the AI for one
-            const keptUnbudgeted = wantsBudget && suggestion?.budget === null;
-
-            const missingCategory = wantsCategory && !category;
-            const missingBudget = wantsBudget && !budget && !keptUnbudgeted;
-
-            if (wantsCategory) counts.category[missingCategory ? 'ai' : 'history']++;
-            if (wantsBudget) counts.budget[missingBudget ? 'ai' : 'history']++;
-
-            if (!category && !budget && !missingCategory && !missingBudget) {
-                // Nothing to suggest and nothing left to ask
-                continue;
-            }
-
-            results[t.transaction_journal_id] = {
-                transaction: t,
-                ...(category && { category }),
-                ...(budget && { budget }),
-                source: {
-                    ...(category && { category: 'history' as const }),
-                    ...(budget && { budget: 'history' as const }),
-                },
-            };
-
-            if (missingCategory) needsCategory.push(t);
-            if (missingBudget) needsBudget.push(t);
-        }
-
-        const aiCategories = await this.askAI('category', needsCategory, categoryNames);
-        for (const [t, category] of aiCategories) {
-            const entry = results[t.transaction_journal_id];
-            entry.category = category;
-            entry.source = { ...entry.source, category: 'ai' };
-        }
-        const aiBudgets = await this.askAI('budget', needsBudget, budgetNames);
-        for (const [t, budget] of aiBudgets) {
-            const entry = results[t.transaction_journal_id];
-            entry.budget = budget;
-            entry.source = { ...entry.source, budget: 'ai' };
-        }
-
-        logger.debug(counts, 'Suggestions resolved');
-
-        return results;
     }
 
     /** The AI's answer for each of `transactions` it found a match for */
     private async askAI(
         type: AssignmentType,
-        transactions: JournaledTransaction[],
-        options: string[] | undefined
+        transactions: JournaledTransaction[]
     ): Promise<Map<JournaledTransaction, string>> {
-        if (!transactions.length || !options?.length) {
+        const options =
+            type === 'category' ? this.catalog.categoryNames() : this.catalog.budgetNames();
+        if (!transactions.length || !options.length) {
             return new Map();
         }
         const answers = await this.llm.assign(type, transactions, options);
@@ -315,10 +277,8 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
     }
 
     private async updateTransactionsWithAIResults(
-        transactions: JournaledTransaction[],
-        aiResults: Record<string, Suggestion>
+        suggestions: Suggestion[]
     ): Promise<{ updatedTransactions: TransactionRead[]; errors: TransactionError[] }> {
-        logger.debug({ count: transactions.length }, 'START updateTransactionsWithAIResults');
         const results: TransactionRead[] = [];
         const errors: TransactionError[] = [];
 
@@ -328,15 +288,13 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
             // a suggestion that fails validation or changes nothing never
             // reaches the user and must not take a number
             const prepared: PreparedUpdate[] = [];
-            for (const transaction of transactions) {
-                const suggestion = aiResults[transaction.transaction_journal_id];
-                if (!suggestion) {
-                    continue;
-                }
-
+            for (const suggestion of suggestions) {
                 const prepareResult = this.interactiveTransactionUpdater.prepareUpdate(suggestion);
                 if (!prepareResult.ok) {
-                    errors.push({ transaction, error: prepareResult.error });
+                    errors.push({
+                        transaction: suggestion.transaction,
+                        error: prepareResult.error,
+                    });
                 } else if (prepareResult.value) {
                     prepared.push(prepareResult.value);
                 }
@@ -368,7 +326,7 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
                 }
             }
 
-            const totalTransactions = transactions.length;
+            const totalTransactions = suggestions.length;
             const updatedCount = results.length;
             const errorCount = errors.length;
             const skippedCount = totalTransactions - updatedCount - errorCount;
@@ -427,4 +385,38 @@ export class AITransactionUpdateOrchestrator implements IAITransactionUpdateOrch
 
         console.error('Please check your categories and budgets in Firefly III.');
     }
+}
+
+/**
+ * One transaction's suggestion: each field from history when it has a value,
+ * else from the AI. Undefined when neither suggests anything.
+ */
+function mergeSuggestion(
+    plan: SuggestionPlan,
+    aiCategory: string | undefined,
+    aiBudget: string | undefined
+): Suggestion | undefined {
+    const category = pickSource(plan.remembered.category, aiCategory);
+    const budget = pickSource(plan.remembered.budget, aiBudget);
+    if (!category && !budget) {
+        return undefined;
+    }
+    return {
+        transaction: plan.transaction,
+        ...(category && { category: category.name }),
+        ...(budget && { budget: budget.name }),
+        source: {
+            ...(category && { category: category.source }),
+            ...(budget && { budget: budget.source }),
+        },
+    };
+}
+
+function pickSource(
+    remembered: string | undefined,
+    ai: string | undefined
+): { name: string; source: SuggestionSource } | undefined {
+    if (remembered) return { name: remembered, source: 'history' };
+    if (ai) return { name: ai, source: 'ai' };
+    return undefined;
 }
