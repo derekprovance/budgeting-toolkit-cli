@@ -9,7 +9,7 @@ import { buckets, createMockCashFlowService, partialMock } from '../shared/mocks
 import { BudgetReportDto } from '../../src/types/dto/budget-report.dto.js';
 import { BillComparisonDto } from '../../src/types/dto/bill-comparison.dto.js';
 import { jest } from '@jest/globals';
-import { TransactionSplit } from '@derekprovance/firefly-iii-sdk';
+import { withdrawal } from '../shared/test-data.js';
 
 describe('BudgetReportCommand', () => {
     let command: BudgetReportCommand;
@@ -209,17 +209,13 @@ describe('BudgetReportCommand', () => {
         let consoleErrorSpy: jest.Spied<typeof console.error>;
         let stderrSpy: jest.Spied<typeof process.stderr.write>;
 
-        const unbudgetedTx = {
+        const unbudgetedTx = withdrawal(4.5, {
             transaction_journal_id: 'j1',
             description: 'Coffee',
-            type: 'withdrawal',
-            amount: '4.50',
             date: '2024-05-03T00:00:00+00:00',
             source_id: 'cc',
             destination_id: 'shop',
-            budget_id: null,
-            bill_id: null,
-        } as TransactionSplit;
+        });
         beforeEach(() => {
             consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
             stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
