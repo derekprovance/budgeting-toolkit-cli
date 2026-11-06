@@ -120,9 +120,7 @@ export class BudgetReportCommand implements Command<BudgetReportResult, BudgetDa
             if (spinner.isSpinning) {
                 spinner.fail(this.BUDGET_GEN_FAIL);
             }
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.error({ error: err.message }, 'Failed to generate budget report');
-            throw err;
+            throw error;
         }
     }
 
